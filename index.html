@@ -462,14 +462,28 @@
             return typeof key === 'string' && key.startsWith('escalator');
         }
 
+        function resolveRoadBaseKey(key) {
+            let currentKey = key;
+            const visited = new Set();
+
+            while (currentKey && ROAD_LIB[currentKey] && ROAD_LIB[currentKey].baseKey && !visited.has(currentKey)) {
+                visited.add(currentKey);
+                currentKey = ROAD_LIB[currentKey].baseKey;
+            }
+
+            return currentKey || key;
+        }
+
         function mergeCustomRoad(docId, data) {
-            if (!data || !data.baseKey || !ROAD_LIB[data.baseKey]) return;
-            const base = ROAD_LIB[data.baseKey];
+            if (!data || !data.baseKey) return;
+            const resolvedBaseKey = resolveRoadBaseKey(data.baseKey);
+            if (!ROAD_LIB[resolvedBaseKey]) return;
+            const base = ROAD_LIB[resolvedBaseKey];
             ROAD_LIB[docId] = {
                 ...base,
                 ...data,
                 id: docId,
-                baseKey: data.baseKey,
+                baseKey: resolvedBaseKey,
                 w: Number(data.w) || base.w,
                 h: Number(data.h) || base.h,
                 pw: Number(data.pw) || Math.min(30, Math.round((Number(data.w) || base.w) / 5)),
@@ -1578,7 +1592,7 @@
                     newBody = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else {
                     // 일반 블록
-                    const behaviorKey = conf.baseKey || conf.id;
+                    const behaviorKey = resolveRoadBaseKey(conf.baseKey || conf.id);
                     const isShockAbsorber = behaviorKey === 'shock_absorber';
                     const bodyLabel = (behaviorKey === 'slime' || isEscalatorKey(behaviorKey) || isShockAbsorber) ? behaviorKey : conf.id;
                     const basePlugin = { w: conf.w, h: conf.h, baseKey: behaviorKey };
@@ -1638,7 +1652,7 @@
                 const box = document.getElementById('custom-draw-box');
                 const baseConf = ROAD_LIB[customBaseKey];
                 const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
-                const isEscalatorBase = isEscalatorKey(customBaseKey);
+                const isEscalatorBase = isEscalatorKey(resolveRoadBaseKey(baseConf?.baseKey || customBaseKey));
                 
                 if (isCircleBase) {
                     // 원형: 드래그 거리를 지름으로 사용
@@ -1688,7 +1702,7 @@
                 
                 const baseConf = ROAD_LIB[customBaseKey];
                 const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
-                const isEscalatorBase = isEscalatorKey(customBaseKey);
+                const isEscalatorBase = isEscalatorKey(resolveRoadBaseKey(baseConf?.baseKey || customBaseKey));
                 
                 if (isCircleBase) {
                     // 원형: 드래그 거리 = 지름
@@ -1880,10 +1894,11 @@
             pendingGoalCount = Math.max(1, Math.min(50, parseInt(document.getElementById('goal-count-input').value, 10) || 1));
             document.getElementById('goal-setup-modal').style.display = 'none';
             const base = ROAD_LIB[customBaseKey];
+            const resolvedBaseKey = resolveRoadBaseKey(base?.baseKey || customBaseKey);
             const id = 'custom_' + Date.now();
             const roadData = {
                 ...base,
-                baseKey: customBaseKey,
+                baseKey: resolvedBaseKey,
                 name: `${base.name}(${pendingGoalCount}개)`,
                 targetCount: pendingGoalCount
             };
@@ -1905,11 +1920,12 @@
             
             // 크기 그리기 건너뛰고 기본 크기로 즉시 저장
             const base = ROAD_LIB[customBaseKey];
+            const resolvedBaseKey = resolveRoadBaseKey(base?.baseKey || customBaseKey);
             const name = pendingHitCount > 1 ? `${base.name}(${pendingHitCount}타)` : base.name;
             const id = 'custom_' + Date.now();
             const roadData = {
                 ...base,
-                baseKey: customBaseKey,
+                baseKey: resolvedBaseKey,
                 name: name,
                 hitThreshold: pendingHitCount
             };
@@ -1929,7 +1945,8 @@
         function saveCustomRoad() {
             const base = ROAD_LIB[customBaseKey];
             if (!base) { cancelCustomSave(); return; }
-            const isEscalatorBase = isEscalatorKey(customBaseKey);
+            const resolvedBaseKey = resolveRoadBaseKey(base.baseKey || customBaseKey);
+            const isEscalatorBase = isEscalatorKey(resolvedBaseKey);
             const customW = pendingCustomW;
             const customH = isEscalatorBase ? base.h : pendingCustomH;
             const defaultName = pendingHitCount > 1 
@@ -1940,7 +1957,7 @@
             const id = 'custom_' + Date.now();
             const roadData = {
                 ...base,
-                baseKey: customBaseKey,
+                baseKey: resolvedBaseKey,
                 name: name,
                 w: customW,
                 h: customH,
