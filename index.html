@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Marble Builder Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #3b82f6;
+            --accent-light: rgba(59,130,246,0.1);
+            --bg: #f0f2f5;
+            --surface: rgba(255,255,255,0.85);
+            --border: rgba(0,0,0,0.08);
+            --text: #1a1a2e;
+            --text-dim: #6b7280;
+            --danger: #ef4444;
+        }
+        body {
+            margin: 0; padding: 0; overflow: hidden;
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: var(--bg); user-select: none; color: var(--text);
+        }
+        #canvas-container {
+            width: 100vw; height: 100vh; cursor: crosshair;
+            background-color: #e8ecf1;
+            background-image:
+                linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px);
+            background-size: 100px 100px;
+            background-position: 0 0;
+        }
+        #ui-top { position: absolute; top: 16px; left: 16px; z-index: 100; pointer-events: none; }
+        .info-panel {
+            background: var(--surface); backdrop-filter: blur(16px);
+            padding: 14px 18px; border-radius: 14px; border: 1px solid var(--border);
+            pointer-events: auto; box-shadow: 0 4px 20px rgba(0,0,0,0.06); max-width: 310px;
+        }
+        .info-panel h1 { margin: 0 0 8px; font-size: 14px; font-weight: 700; color: var(--text); }
+        .info-panel p { margin: 3px 0; font-size: 11px; line-height: 1.5; color: var(--text-dim); }
+        .info-panel b { color: var(--text); font-weight: 600; }
+
+        #ui-bottom {
+            position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 100; display: flex; gap: 7px;
+            background: var(--surface); backdrop-filter: blur(20px);
+            padding: 10px 14px; border-radius: 16px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.08), 0 0 0 1px var(--border);
+            pointer-events: auto; align-items: center;
+        }
+
+        .road-slot {
+            width: 46px; height: 46px; background: #f7f8fa;
+            border: 2px solid var(--border); border-radius: 10px; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: all 0.2s ease; position: relative;
+        }
+        .road-slot:hover { background: #eef0f4; }
+        .road-slot.active {
+            border-color: var(--accent); background: var(--accent-light);
+            transform: translateY(-3px); box-shadow: 0 4px 12px rgba(59,130,246,0.15);
+        }
+        .road-slot span {
+            font-size: 8px; color: var(--text-dim); margin-top: 3px;
+            pointer-events: none; text-align: center; line-height: 1; font-weight: 500;
+        }
+        .road-preview-box { border-radius: 2px; pointer-events: none; }
+
+        .btn-library {
+            width: 46px; height: 46px; border-radius: 10px;
+            background: var(--accent); color: white; font-size: 20px; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-library:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(59,130,246,0.25); }
+
+        .btn-action {
+            padding: 8px 13px; border-radius: 8px; border: 1px solid var(--border);
+            background: #fff; color: var(--text);
+            font-weight: 600; font-size: 11px; cursor: pointer;
+            transition: all 0.15s; white-space: nowrap;
+        }
+        .btn-action:hover { background: #f0f2f5; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+        #error-msg {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            color: var(--danger); font-size: 15px; font-weight: 600;
+            background: rgba(255,255,255,0.95); backdrop-filter: blur(12px);
+            padding: 12px 24px; border-radius: 12px;
+            border: 1px solid rgba(239,68,68,0.2);
+            pointer-events: none; display: none; z-index: 200;
+            box-shadow: 0 4px 20px rgba(239,68,68,0.08);
+        }
+
+        /* -- Modals -- */
+        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+            background: rgba(255,255,255,0.97); backdrop-filter: blur(24px);
+            padding: 22px; border-radius: 16px; border: 1px solid var(--border);
+            box-shadow: 0 12px 48px rgba(0,0,0,0.1);
+            display: none;
+        }
+        #library-modal { z-index: 300; width: 400px; }
+        #marble-modal { z-index: 300; width: 340px; }
+        #custom-save-modal { z-index: 400; width: 280px; text-align: center; }
+        #pushable-setup-modal { z-index: 400; width: 280px; text-align: center; }
+
+        #library-modal h2, #marble-modal h2 {
+            margin: 0 0 14px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text);
+        }
+        #custom-save-modal h3 { margin: 0 0 12px; color: var(--accent); font-size: 13px; font-weight: 700; }
+        #pushable-setup-modal h3 { margin: 0 0 12px; color: #7c3aed; font-size: 13px; font-weight: 700; }
+        #pushable-setup-modal p { color: var(--text-dim); font-size: 12px; }
+
+        .library-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
+        .lib-item {
+            background: #f7f8fa; border: 1px solid var(--border);
+            border-radius: 10px; height: 64px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .lib-item:hover { border-color: var(--accent); background: var(--accent-light); transform: translateY(-2px); }
+        .lib-item span { font-size: 9px; margin-top: 4px; text-align: center; font-weight: 600; color: var(--text-dim); }
+        .close-btn {
+            position: absolute; top: 10px; right: 14px; font-size: 16px;
+            cursor: pointer; color: #aaa; transition: color 0.2s;
+        }
+        .close-btn:hover { color: var(--text); }
+
+        .marble-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .marble-row label { flex: 1; font-weight: 500; font-size: 12px; color: var(--text-dim); }
+        .marble-row input[type=number], #pushable-setup-modal input[type=number] {
+            width: 52px; padding: 8px; border: 1px solid #dde1e6;
+            border-radius: 8px; font-size: 14px; text-align: center;
+            background: #f7f8fa; color: var(--text);
+            font-family: 'Inter', sans-serif; font-weight: 600;
+        }
+        .marble-row input:focus, #pushable-setup-modal input:focus,
+        #custom-save-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+
+        .marble-dot {
+            width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center;
+            font-size: 10px; color: white; font-weight: 700;
+            border: 2px solid rgba(0,0,0,0.1); transition: transform 0.15s;
+        }
+        .marble-dot:hover { transform: scale(1.15); }
+        #seq-display {
+            display: flex; flex-wrap: wrap; gap: 5px; min-height: 38px; padding: 10px;
+            background: #f7f8fa; border-radius: 10px;
+            border: 1px solid #eee; margin-bottom: 12px;
+        }
+        .marble-seq-info { font-size: 10px; color: var(--text-dim); text-align: center; margin-bottom: 8px; }
+        .btn-marble-modal {
+            width: 100%; padding: 10px; border: none; border-radius: 10px;
+            background: var(--accent); color: white;
+            font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.15s;
+            font-family: 'Inter', sans-serif;
+        }
+        .btn-marble-modal:hover { opacity: 0.92; transform: translateY(-1px); }
+
+        #custom-save-modal input[type=text] {
+            width: 80%; padding: 9px; border: 1px solid #dde1e6;
+            border-radius: 8px; font-size: 13px; margin-bottom: 12px;
+            background: #f7f8fa; color: var(--text); font-family: 'Inter', sans-serif;
+        }
+        #custom-save-modal .preview-info { font-size: 11px; color: var(--text-dim); margin-bottom: 10px; }
+
+        #ghost-element {
+            position: absolute; opacity: 0.35; pointer-events: none;
+            display: none; transform-origin: center; z-index: 30;
+        }
+        .world-node { position: absolute; pointer-events: none; z-index: 40; display: none; }
+        #spawner-indicator {
+            width: 36px; height: 36px; border: 2px solid var(--accent); border-radius: 50%;
+            background: var(--accent-light); color: var(--accent); font-weight: 700;
+            display: flex; align-items: center; justify-content: center; font-size: 13px;
+        }
+        #selection-indicator { display: none !important; }
+        #custom-draw-box {
+            position: absolute; border: 2px dashed var(--accent);
+            background: rgba(59,130,246,0.08); pointer-events: none;
+            z-index: 50; display: none; border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="error-msg">❌ 길이 겹쳐서 놓을 수 없습니다!</div>
+    
+    <div id="ui-top">
+        <div class="info-panel">
+            <h1>Marble Builder Pro</h1>
+            <p>• <b>[+]</b> 블록 종류 변경 · <b>우클릭</b> 카메라 이동</p>
+            <p>• <b>휠</b> 회전(배치 전) · <b>방향키</b> 회전(배치 후)</p>
+            <p>• <b>Space</b> 투하 · <b>R</b> 리셋 · <b>Del</b> 삭제 · <b>F</b> 팔로우</p>
+        </div>
+    </div>
+
+    <!-- Library Modal -->
+    <div id="library-modal">
+        <span class="close-btn" onclick="closeLibrary()">✕</span>
+        <h2>블록 라이브러리</h2>
+        <div class="library-grid" id="lib-grid"></div>
+    </div>
+
+    <div id="ui-bottom">
+        <!-- 5 Main Slots -->
+        <div class="road-slot active" data-index="0" onclick="selectSlot(0)"></div>
+        <div class="road-slot" data-index="1" onclick="selectSlot(1)"></div>
+        <div class="road-slot" data-index="2" onclick="selectSlot(2)"></div>
+        <div class="road-slot" data-index="3" onclick="selectSlot(3)"></div>
+        <div class="road-slot" data-index="4" onclick="selectSlot(4)"></div>
+        
+        <div style="width: 1px; height: 28px; background: rgba(0,0,0,0.08); margin: 0 4px;"></div>
+        
+        <button class="btn-library" onclick="openLibrary()" title="블록 라이브러리">+</button>
+        
+        <div style="width: 1px; height: 28px; background: rgba(0,0,0,0.08); margin: 0 4px;"></div>
+        
+        <button id="btn-follow" class="btn-action">팔로우 OFF</button>
+        <button id="btn-marble-setup" class="btn-action">구슬 설정</button>
+        <button id="btn-drop" class="btn-action" style="background:var(--accent);color:#fff;border:none">투하</button>
+        <button id="btn-rewind" class="btn-action">되돌리기</button>
+        <button id="btn-clear" class="btn-action" style="color:var(--danger)">리셋</button>
+    </div>
+
+    <!-- Custom Draw Box -->
+    <div id="custom-draw-box"></div>
+
+    <!-- Custom Save Modal -->
+    <div id="custom-save-modal">
+        <h3>커스텀 길 저장</h3>
+        <div class="preview-info" id="custom-size-info"></div>
+        <input type="text" id="custom-name-input" placeholder="이름 입력 (예: 내 길)" maxlength="10">
+        <br>
+        <button class="btn-marble-modal" onclick="saveCustomRoad()" style="background:#e65100; margin-bottom:8px;">저장</button>
+        <button class="btn-marble-modal" onclick="cancelCustomSave()" style="background:#999;">취소</button>
+    </div>
+
+
+
+    <!-- Pushable Setup Modal -->
+    <div id="pushable-setup-modal">
+        <h3>🧱 밀리는 길 설정</h3>
+        <p style="font-size: 14px; color: #555; margin-bottom: 5px;">몇 번 부딪혀야 밀리게 할까요?</p>
+        <input type="number" id="pushable-hit-input" min="1" max="100" value="1">
+        <br>
+        <button class="btn-marble-modal" onclick="startPushableCustomSize()" style="background:#e65100; margin-bottom:8px;">다음 (두께/길이 그리기)</button>
+        <button class="btn-marble-modal" onclick="skipPushableCustomSize()" style="background:#ab47bc; margin-bottom:8px;">건너뛰기 (기본 크기 저장)</button>
+        <button class="btn-marble-modal" onclick="document.getElementById('pushable-setup-modal').style.display='none'" style="background:#999;">취소</button>
+    </div>
+
+    <!-- Marble Setup Modal -->
+    <div id="marble-modal">
+        <span class="close-btn" onclick="closeMarbleModal()">✕</span>
+        <h2>구슬 설정</h2>
+        <div class="marble-row">
+            <label>🔴 일반 구슬</label>
+            <input type="number" id="input-normal" min="0" max="20" value="3" onchange="rebuildSequence()">
+        </div>
+        <div class="marble-row">
+            <label>⚫ 쇠구슬</label>
+            <input type="number" id="input-steel" min="0" max="20" value="0" onchange="rebuildSequence()">
+        </div>
+        <div class="marble-row">
+            <label>⏱️ 발사 간격 (초)</label>
+            <input type="number" id="input-interval" min="0.5" max="10" step="0.5" value="2">
+        </div>
+        <p class="marble-seq-info">클릭하면 종류 변경 | 드래그로 순서 변경</p>
+        <div id="seq-display"></div>
+        <button class="btn-marble-modal" onclick="closeMarbleModal()">완료</button>
+    </div>
+
+    <div id="spawner-indicator" class="world-node">↓</div>
+    <div id="selection-indicator" class="world-node"></div>
+    <div id="ghost-element"></div>
+    <div id="canvas-container"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script>
+        const { Engine, Render, Runner, World, Bodies, Composite, Body, Query, Events, Sleeping } = Matter;
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCTKcgo-O2RjisW6fH-Dw0PudNtrAWu2VI",
+            authDomain: "minsung-46560.firebaseapp.com",
+            projectId: "minsung-46560",
+            storageBucket: "minsung-46560.firebasestorage.app",
+            messagingSenderId: "346973319437",
+            appId: "1:346973319437:web:ec28294a997f1a27c98044",
+            measurementId: "G-YD6KQ0TXET"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const customRoadsCollection = db.collection('customRoads');
+
+        const engine = Engine.create({ enableSleeping: true });
+        engine.gravity.y = 1.5; // 중력 강화
+        
+        const world = engine.world;
+        const container = document.getElementById('canvas-container');
+
+        const render = Render.create({
+            element: container,
+            engine: engine,
+            options: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                wireframes: false,
+                background: 'transparent',
+                hasBounds: true,
+                showSleeping: false
+            }
+        });
+
+        Render.run(render);
+        const runner = Runner.create();
+        Runner.run(runner, engine);
+
+        // 아주 넓은 바닥
+        const ground = Bodies.rectangle(window.innerWidth/2, window.innerHeight + 1500, 20000, 100, { 
+            isStatic: true, 
+            friction: 0.001,
+            render: { fillStyle: '#bcc3ce' } 
+        });
+        World.add(world, ground);
+
+        // -- Road Configuration Library --
+        const ROAD_LIB = {
+            'long':   { id: 'long', name: '긴 길',   w: 200, h: 15, color: '#7a6652', restitution: 0.0, pw: 30, ph: 5 },
+            'medium': { id: 'medium', name: '보통 길', w: 100, h: 15, color: '#7a6652', restitution: 0.0, pw: 20, ph: 5 },
+            'short':  { id: 'short', name: '짧은 길', w: 50,  h: 15, color: '#7a6652', restitution: 0.0, pw: 10, ph: 5 },
+            'thick':  { id: 'thick', name: '벽돌',    w: 60,  h: 40, color: '#8b7355', restitution: 0.0, pw: 15, ph: 15 },
+            'thin':   { id: 'thin', name: '얇은 길', w: 150, h: 5,  color: '#6d5c4a', restitution: 0.0, pw: 25, ph: 2 },
+            'giant':  { id: 'giant', name: '거대 벽', w: 100, h: 200,color: '#8a8a8a', restitution: 0.0, pw: 10, ph: 25 },
+            'slime':  { id: 'slime', name: '슬라임', w: 120, h: 30, color: '#66bb6a', restitution: 1.2, pw: 20, ph: 10 }, 
+            'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
+            'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
+            'escalator_l_l': { id: 'escalator_l_l', name: '에스컬[←긺]', w: 200, h: 20, color: '#e0a030', restitution: 0.0, pw: 30, ph: 5 },
+            'escalator_r_s': { id: 'escalator_r_s', name: '에스컬[→짧]', w: 100, h: 20, color: '#d4940a', restitution: 0.0, pw: 20, ph: 5 },
+            'escalator_r_l': { id: 'escalator_r_l', name: '에스컬[→긺]', w: 200, h: 20, color: '#d4940a', restitution: 0.0, pw: 30, ph: 5 },
+            'pushable':  { id: 'pushable', name: '밀리는 길', w: 120, h: 20, color: '#9575cd', restitution: 0.0, pw: 20, ph: 5, type: 'pushable' },
+            'place_marble': { id: 'place_marble', name: '배치 구슬', w: 30, h: 30, color: '#42a5f5', restitution: 0.5, pw: 15, ph: 15, type: 'place_marble' },
+            'magnet':    { id: 'magnet', name: '자석', w: 16, h: 16, color: '#e53935', restitution: 0.0, pw: 10, ph: 10, type: 'magnet' }
+        };
+
+        function mergeCustomRoad(docId, data) {
+            if (!data || !data.baseKey || !ROAD_LIB[data.baseKey]) return;
+            const base = ROAD_LIB[data.baseKey];
+            ROAD_LIB[docId] = {
+                ...base,
+                ...data,
+                id: docId,
+                baseKey: data.baseKey,
+                w: Number(data.w) || base.w,
+                h: Number(data.h) || base.h,
+                pw: Number(data.pw) || Math.min(30, Math.round((Number(data.w) || base.w) / 5)),
+                ph: Number(data.ph) || Math.min(25, Math.round((Number(data.h) || base.h) / 3))
+            };
+        }
+
+        async function loadCustomRoads() {
+            try {
+                const snapshot = await customRoadsCollection.orderBy('createdAt', 'asc').get();
+                snapshot.forEach(doc => mergeCustomRoad(doc.id, doc.data()));
+                renderSlots();
+                renderLibrary();
+                updateGhostStyle();
+            } catch (error) {
+                console.error('Failed to load custom roads from Firestore:', error);
+            }
+        }
+
+        async function saveCustomRoadToFirestore(id, roadData) {
+            await customRoadsCollection.doc(id).set({
+                ...roadData,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        // 초기 슬롯 세팅 (5개)
+        let slots = ['long', 'medium', 'short', 'thick', 'slime'];
+        let currentSlotIndex = 0;
+
+        function renderSlots() {
+            const slotEls = document.querySelectorAll('.road-slot');
+            slots.forEach((roadId, i) => {
+                const conf = ROAD_LIB[roadId];
+                const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
+                const borderR = isCircle ? 'border-radius:50%;' : '';
+                slotEls[i].innerHTML = `
+                    <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
+                    <span>${conf.name}</span>
+                `;
+            });
+        }
+        
+        function selectSlot(index) {
+            document.querySelectorAll('.road-slot').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.road-slot')[index].classList.add('active');
+            currentSlotIndex = index;
+            ghostAngle = 0;
+            updateGhostStyle();
+        }
+
+        // Library UI
+        function openLibrary() { document.getElementById('library-modal').style.display = 'block'; }
+        function closeLibrary() { document.getElementById('library-modal').style.display = 'none'; }
+
+        function renderLibrary() {
+            const grid = document.getElementById('lib-grid');
+            grid.innerHTML = '';
+            for(const key in ROAD_LIB) {
+                const conf = ROAD_LIB[key];
+                const el = document.createElement('div');
+                el.className = 'lib-item';
+                const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
+                const borderR = isCircle ? 'border-radius:50%;' : '';
+                el.innerHTML = `
+                    <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
+                    <span>${conf.name}</span>
+                `;
+                // 왼쪽 클릭: 슬롯에 장착
+                el.onclick = () => {
+                    slots[currentSlotIndex] = key;
+                    renderSlots();
+                    updateGhostStyle();
+                    closeLibrary();
+                };
+                // 오른쪽 클릭: 커스텀 크기 맞추기 모드 또는 밀리는 길 설정 모달
+                el.oncontextmenu = (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    customBaseKey = key;
+
+                    if (conf.type === 'pushable') {
+                        document.getElementById('pushable-setup-modal').style.display = 'block';
+                        document.getElementById('pushable-hit-input').value = 1;
+                    } else {
+                        isCustomMode = true;
+                        ghost.style.display = 'none';
+                        closeLibrary();
+                        container.style.cursor = 'crosshair';
+                        // 안내 메시지
+                        errorMsg.innerText = `📏 [${conf.name}] 크기 맞추기: 맵에서 드래그하세요`;
+                        errorMsg.style.color = '#e65100';
+                        errorMsg.style.borderColor = '#e65100';
+                        errorMsg.style.display = 'block';
+                        if(errorTimeout) clearTimeout(errorTimeout);
+                        errorTimeout = setTimeout(() => {
+                            errorMsg.style.display = 'none';
+                            errorMsg.innerText = '❌ 길이 겹쳐서 놓을 수 없습니다!';
+                            errorMsg.style.color = '#d32f2f';
+                            errorMsg.style.borderColor = '#d32f2f';
+                        }, 2500);
+                    }
+                };
+                grid.appendChild(el);
+            }
+        }
+
+        // State Vars
+        let selectedBody = null;
+        let isDraggingBody = false;
+        let isPanning = false;
+        let cameraPos = { x: 0, y: 0 };
+        let lastMousePos = { x: 0, y: 0 };
+        let ghostAngle = 0; 
+        let errorTimeout = null;
+        let lastKeyTime = {};
+        const DOUBLE_CLICK_DELAY = 250;
+        let marble = null;
+        let placedMarbles = [];  // 배치된 구슬들
+        let magnets = [];        // 자석들
+        let pushables = [];      // 밀리는 길들
+        // 커스텀 길 그리기 모드
+        let isCustomMode = false;
+        let isCustomDrawing = false;
+        let customStartWorld = null;
+        let customStartScreen = null;
+        let pendingCustomW = 0;
+        let pendingCustomH = 0;
+        let customCounter = 0;
+        let customBaseKey = null;  // 커스텀 베이스 블록 키
+        const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
+
+        const ghost = document.getElementById('ghost-element');
+        const indicator = document.getElementById('selection-indicator');
+        const spawnerNode = document.getElementById('spawner-indicator');
+        const errorMsg = document.getElementById('error-msg');
+
+        function updateGhostStyle() {
+            const conf = ROAD_LIB[slots[currentSlotIndex]];
+            const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
+            ghost.style.width = conf.w + 'px';
+            ghost.style.height = conf.h + 'px';
+            ghost.style.background = conf.color;
+            ghost.style.borderRadius = isCircle ? '50%' : '0';
+            ghost.style.display = 'block';
+            ghost.style.transform = `rotate(${ghostAngle}rad)`;
+        }
+
+        // Initialize UI
+        renderSlots();
+        renderLibrary();
+        updateGhostStyle();
+        loadCustomRoads();
+
+        // Mouse Wheel (Rotation)
+        window.addEventListener('wheel', (e) => {
+            if (isPanning || isDraggingBody) return;
+            const angleDelta = Math.PI / 180 * 5; 
+            ghostAngle += (e.deltaY < 0 ? -angleDelta : angleDelta);
+            ghost.style.transform = `rotate(${ghostAngle}rad)`;
+        });
+
+        function showError() {
+            errorMsg.style.display = 'block';
+            if(errorTimeout) clearTimeout(errorTimeout);
+            errorTimeout = setTimeout(() => errorMsg.style.display = 'none', 1500);
+        }
+
+        window.addEventListener('contextmenu', e => {
+            // 라이브러리 안에서는 우클릭 메뉴 허용
+            if(!e.target.closest('#library-modal')) e.preventDefault();
+        });
+
+        window.addEventListener('mousedown', (e) => {
+            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal')) return;
+
+            if (e.button === 2) { 
+                isPanning = true;
+                lastMousePos = { x: e.clientX, y: e.clientY };
+                container.style.cursor = 'grabbing';
+                return;
+            }
+
+            const worldPos = { x: e.clientX + cameraPos.x, y: e.clientY + cameraPos.y };
+
+            // 커스텀 그리기 모드
+            if (isCustomMode) {
+                customStartWorld = { ...worldPos };
+                customStartScreen = { x: e.clientX, y: e.clientY };
+                isCustomDrawing = true;
+                const box = document.getElementById('custom-draw-box');
+                // 원형 타입인지 확인
+                const baseConf = ROAD_LIB[customBaseKey];
+                const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
+                box.style.borderRadius = isCircleBase ? '50%' : '0';
+                box.style.left = e.clientX + 'px';
+                box.style.top = e.clientY + 'px';
+                box.style.width = '0px';
+                box.style.height = '0px';
+                box.style.display = 'block';
+                return;
+            }
+
+            const bodies = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+            const clicked = Query.point(bodies, worldPos);
+
+            if (clicked.length > 0) {
+                selectedBody = clicked[0];
+                isDraggingBody = true;
+                container.style.cursor = 'move';
+            } else {
+                const conf = ROAD_LIB[slots[currentSlotIndex]];
+                const isCircleType = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
+                
+                // 자석: 다른 자석과는 겹칠 수 없지만 일반 길 위에는 겹쳐 놓을 수 있음
+                if (conf.type === 'magnet') {
+                    const mockMag = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2);
+                    const existingMagnets = magnets.filter(m => Composite.allBodies(world).includes(m));
+                    if (existingMagnets.length > 0 && Query.collides(mockMag, existingMagnets).length > 0) {
+                        showError();
+                        return;
+                    }
+                } else {
+                    const mockRoad = isCircleType 
+                        ? Bodies.circle(worldPos.x, worldPos.y, conf.w / 2)
+                        : Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, { angle: ghostAngle });
+                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    
+                    if (Query.collides(mockRoad, existingRoads).length > 0) {
+                        showError(); 
+                        return; 
+                    }
+                }
+
+                let newBody;
+
+                if (conf.type === 'place_marble') {
+                    // 배치 구슬: 처음엔 sleeping 상태 (반투명), 충돌로 깨어남
+                    newBody = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2, {
+                        isStatic: false,
+                        isSleeping: true,
+                        label: 'place_marble',
+                        restitution: conf.restitution,
+                        friction: 0.01,
+                        frictionAir: 0,
+                        bullet: true,
+                        density: 1.5,
+                        render: { fillStyle: conf.color, opacity: 0.5 },
+                        plugin: { originX: worldPos.x, originY: worldPos.y }
+                    });
+                    placedMarbles.push(newBody);
+
+                } else if (conf.type === 'magnet') {
+                    // 자석: 작은 원형, isStatic으로 고정, 물리 충돌 있음
+                    newBody = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2, {
+                        isStatic: true,
+                        label: 'magnet',
+                        restitution: 0,
+                        render: { fillStyle: conf.color }
+                    });
+                    magnets.push(newBody);
+                } else if (conf.type === 'pushable') {
+                    // 밀리는 길: 횟수 설정에 따라 초기 상태 변경
+                    const threshold = conf.hitThreshold || 1;
+                    const isInitiallyStatic = (threshold > 1);
+                    newBody = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, {
+                        isStatic: isInitiallyStatic,
+                        isSleeping: !isInitiallyStatic,
+                        label: conf.id,
+                        angle: ghostAngle,
+                        friction: 0.05,
+                        frictionStatic: 0.1,
+                        restitution: conf.restitution || 0.4,
+                        density: 0.8,
+                        render: { fillStyle: conf.color, opacity: isInitiallyStatic ? 0.8 : 1.0 },
+                        plugin: { 
+                            type: 'pushable',
+                            w: conf.w, h: conf.h, originX: worldPos.x, originY: worldPos.y, originAngle: ghostAngle,
+                            hitThreshold: threshold, currentHits: 0
+                        }
+                    });
+                    pushables.push(newBody);
+                } else {
+                    // 일반 블록
+                    newBody = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, {
+                        isStatic: true,
+                        label: conf.id,
+                        angle: ghostAngle,
+                        friction: 0,
+                        frictionStatic: 0,
+                        restitution: conf.restitution,
+                        render: { fillStyle: conf.color },
+                        plugin: { w: conf.w, h: conf.h }
+                    });
+                }
+                World.add(world, newBody);
+                selectedBody = newBody;
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isPanning) {
+                // 우클릭(e.buttons === 2) 상태가 아니면 즉시 패닝 모드 해제
+                if (e.buttons !== 2) {
+                    isPanning = false;
+                    container.style.cursor = 'crosshair';
+                } else {
+                    const panSensitivity = 0.5;
+                    const dx = (e.clientX - lastMousePos.x) * panSensitivity;
+                    const dy = (e.clientY - lastMousePos.y) * panSensitivity;
+                    cameraPos.x -= dx;
+                    cameraPos.y -= dy;
+                    lastMousePos = { x: e.clientX, y: e.clientY };
+                    
+                    render.bounds.min.x = cameraPos.x;
+                    render.bounds.max.x = cameraPos.x + window.innerWidth;
+                    render.bounds.min.y = cameraPos.y;
+                    render.bounds.max.y = cameraPos.y + window.innerHeight;
+                    container.style.backgroundPosition = `${-cameraPos.x}px ${-cameraPos.y}px`;
+                    return;
+                }
+            }
+
+            if (isDraggingBody && selectedBody) {
+                const worldPos = { x: e.clientX + cameraPos.x, y: e.clientY + cameraPos.y };
+                Body.setPosition(selectedBody, worldPos);
+            } else if (isCustomDrawing && customStartScreen) {
+                // 커스텀 드래그 박스 업데이트
+                const box = document.getElementById('custom-draw-box');
+                const baseConf = ROAD_LIB[customBaseKey];
+                const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
+                
+                if (isCircleBase) {
+                    // 원형: 드래그 거리를 지름으로 사용
+                    const dx = e.clientX - customStartScreen.x;
+                    const dy = e.clientY - customStartScreen.y;
+                    const diameter = Math.round(Math.sqrt(dx*dx + dy*dy)) * 2;
+                    box.style.left = (customStartScreen.x - diameter/2) + 'px';
+                    box.style.top = (customStartScreen.y - diameter/2) + 'px';
+                    box.style.width = diameter + 'px';
+                    box.style.height = diameter + 'px';
+                } else {
+                    // 사각형
+                    const x = Math.min(e.clientX, customStartScreen.x);
+                    const y = Math.min(e.clientY, customStartScreen.y);
+                    const w = Math.abs(e.clientX - customStartScreen.x);
+                    const h = Math.abs(e.clientY - customStartScreen.y);
+                    box.style.left = x + 'px';
+                    box.style.top = y + 'px';
+                    box.style.width = w + 'px';
+                    box.style.height = h + 'px';
+                }
+            } else {
+                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal')) {
+                    ghost.style.display = 'none';
+                } else if (!isCustomMode) {
+                    ghost.style.display = 'block';
+                    ghost.style.left = (e.clientX - ghost.offsetWidth / 2) + 'px';
+                    ghost.style.top = (e.clientY - ghost.offsetHeight / 2) + 'px';
+                }
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (isCustomDrawing) {
+                isCustomDrawing = false;
+                const box = document.getElementById('custom-draw-box');
+                box.style.display = 'none';
+                box.style.borderRadius = '0';
+                
+                const baseConf = ROAD_LIB[customBaseKey];
+                const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
+                
+                if (isCircleBase) {
+                    // 원형: 드래그 거리 = 지름
+                    const dx = e.clientX - customStartScreen.x;
+                    const dy = e.clientY - customStartScreen.y;
+                    const diameter = Math.round(Math.sqrt(dx*dx + dy*dy)) * 2;
+                    if (diameter >= 10) {
+                        pendingCustomW = diameter;
+                        pendingCustomH = diameter;
+                        document.getElementById('custom-size-info').innerText = `크기: ⌀ ${diameter} px (원형)`;
+                        document.getElementById('custom-name-input').value = '';
+                        document.getElementById('custom-save-modal').style.display = 'block';
+                    }
+                } else {
+                    // 사각형
+                    const w = Math.abs(e.clientX - customStartScreen.x);
+                    const h = Math.abs(e.clientY - customStartScreen.y);
+                    if (w >= 10 && h >= 5) {
+                        pendingCustomW = Math.round(w);
+                        pendingCustomH = Math.round(h);
+                        document.getElementById('custom-size-info').innerText = `크기: ${pendingCustomW} × ${pendingCustomH} px`;
+                        document.getElementById('custom-name-input').value = '';
+                        document.getElementById('custom-save-modal').style.display = 'block';
+                    }
+                }
+                return;
+            }
+
+            if (isDraggingBody && selectedBody) {
+                // 드래그가 끝났을 때 현재 위치를 새로운 '되돌리기 기준점'으로 저장
+                if (selectedBody.plugin) {
+                    selectedBody.plugin.originX = selectedBody.position.x;
+                    selectedBody.plugin.originY = selectedBody.position.y;
+                    if (selectedBody.plugin.originAngle === undefined) {
+                        selectedBody.plugin.originAngle = selectedBody.angle;
+                    }
+                }
+            }
+            isPanning = false;
+            isDraggingBody = false;
+            container.style.cursor = isCustomMode ? 'crosshair' : 'crosshair';
+        });
+
+        (function updateUI() {
+            spawnerNode.style.display = 'flex';
+            spawnerNode.style.left = (SPAWN_POINT.x - cameraPos.x - 20) + 'px';
+            spawnerNode.style.top = (SPAWN_POINT.y - cameraPos.y - 20) + 'px';
+
+            if (selectedBody) {
+                const { min, max } = selectedBody.bounds;
+                indicator.style.display = 'block';
+                indicator.style.left = (min.x - cameraPos.x - 5) + 'px';
+                indicator.style.top = (min.y - cameraPos.y - 5) + 'px';
+                indicator.style.width = (max.x - min.x + 10) + 'px';
+                indicator.style.height = (max.y - min.y + 10) + 'px';
+            } else {
+                indicator.style.display = 'none';
+            }
+
+            requestAnimationFrame(updateUI);
+        })();
+
+        function handleRotation(dir) {
+            if (!selectedBody) return;
+            const now = Date.now();
+            const lastTime = lastKeyTime[dir] || 0;
+            let amount = Math.PI / 180;
+            if (now - lastTime < DOUBLE_CLICK_DELAY) amount = Math.PI / 2;
+            lastKeyTime[dir] = now;
+            const factor = (dir === 'Left' || dir === 'Up') ? -1 : 1;
+            const newAngle = selectedBody.angle + (amount * factor);
+            Body.setAngle(selectedBody, newAngle);
+            
+            // 회전시켰을 때 현재 각도를 새로운 '되돌리기 기준점'으로 저장
+            if (selectedBody.plugin) {
+                selectedBody.plugin.originAngle = newAngle;
+            }
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.key.startsWith('Arrow')) {
+                handleRotation(e.key.replace('Arrow', ''));
+                e.preventDefault();
+            } else if (e.code === 'Space') {
+                startMarbleSequence();
+            } else if (e.key.toLowerCase() === 'r') {
+                const bodies = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                World.remove(world, bodies);
+                selectedBody = null;
+                placedMarbles = [];
+                magnets = [];
+                pushables = [];
+                cameraPos = { x: 0, y: 0 };
+                render.bounds.min.x = 0;
+                render.bounds.max.x = window.innerWidth;
+                render.bounds.min.y = 0;
+                render.bounds.max.y = window.innerHeight;
+                container.style.backgroundPosition = `0px 0px`;
+            } else if (e.key.toLowerCase() === 'f') {
+                toggleFollowMode();
+            } else if (e.key === 'Delete' || e.key === 'Backspace') {
+                if (selectedBody) {
+                    placedMarbles = placedMarbles.filter(b => b !== selectedBody);
+                    magnets = magnets.filter(b => b !== selectedBody);
+                    pushables = pushables.filter(b => b !== selectedBody);
+                    World.remove(world, selectedBody);
+                    selectedBody = null;
+                }
+            }
+        });
+
+        document.getElementById('btn-drop').onclick = () => startMarbleSequence();
+        document.getElementById('btn-clear').onclick = () => window.dispatchEvent(new KeyboardEvent('keydown', {key: 'r'}));
+        document.getElementById('btn-rewind').onclick = () => rewindMarbles();
+
+        let pendingHitCount = 1;
+
+        function startPushableCustomSize() {
+            pendingHitCount = parseInt(document.getElementById('pushable-hit-input').value) || 1;
+            document.getElementById('pushable-setup-modal').style.display = 'none';
+            // 즉시 커스텀 그리기 모드 진입
+            const conf = ROAD_LIB[customBaseKey];
+            isCustomMode = true;
+            ghost.style.display = 'none';
+            closeLibrary();
+            container.style.cursor = 'crosshair';
+            errorMsg.innerText = `📏 [${conf.name}] 크기 맞추기: 맵에서 드래그하세요`;
+            errorMsg.style.color = '#e65100';
+            errorMsg.style.borderColor = '#e65100';
+            errorMsg.style.display = 'block';
+            if(errorTimeout) clearTimeout(errorTimeout);
+            errorTimeout = setTimeout(() => {
+                errorMsg.style.display = 'none';
+                errorMsg.innerText = '❌ 길이 겹쳐서 놓을 수 없습니다!';
+                errorMsg.style.color = '#d32f2f';
+                errorMsg.style.borderColor = '#d32f2f';
+            }, 2500);
+        }
+
+        function skipPushableCustomSize() {
+            pendingHitCount = parseInt(document.getElementById('pushable-hit-input').value) || 1;
+            document.getElementById('pushable-setup-modal').style.display = 'none';
+            
+            // 크기 그리기 건너뛰고 기본 크기로 즉시 저장
+            const base = ROAD_LIB[customBaseKey];
+            const name = pendingHitCount > 1 ? `${base.name}(${pendingHitCount}타)` : base.name;
+            const id = 'custom_' + Date.now();
+            const roadData = {
+                ...base,
+                baseKey: customBaseKey,
+                name: name,
+                hitThreshold: pendingHitCount
+            };
+            ROAD_LIB[id] = { ...roadData, id: id };
+            slots[currentSlotIndex] = id;
+            renderSlots();
+            renderLibrary();
+            updateGhostStyle();
+            closeLibrary();
+            pendingHitCount = 1; // 리셋
+            saveCustomRoadToFirestore(id, roadData).catch(error => {
+                console.error('Failed to save pushable road to Firestore:', error);
+            });
+        }
+
+        // 커스텀 길 저장 (원본 블록 속성 복사 + 커스텀 크기)
+        function saveCustomRoad() {
+            const base = ROAD_LIB[customBaseKey];
+            if (!base) { cancelCustomSave(); return; }
+            const defaultName = pendingHitCount > 1 
+                ? `${base.name}(${pendingCustomW}×${pendingCustomH}, ${pendingHitCount}타)` 
+                : `${base.name}(${pendingCustomW}×${pendingCustomH})`;
+            const name = document.getElementById('custom-name-input').value.trim() || defaultName;
+            const id = 'custom_' + Date.now();
+            const roadData = {
+                ...base,
+                baseKey: customBaseKey,
+                name: name,
+                w: pendingCustomW,
+                h: pendingCustomH,
+                pw: Math.min(30, Math.round(pendingCustomW / 5)),
+                ph: Math.min(25, Math.round(pendingCustomH / 3))
+            };
+            if (pendingHitCount > 1) {
+                roadData.hitThreshold = pendingHitCount;
+            }
+            ROAD_LIB[id] = { ...roadData, id: id };
+            // 현재 슬롯에 자동 장착
+            slots[currentSlotIndex] = id;
+            renderSlots();
+            renderLibrary();
+            updateGhostStyle();
+            document.getElementById('custom-save-modal').style.display = 'none';
+            isCustomMode = false;
+            pendingHitCount = 1; // 리셋
+            saveCustomRoadToFirestore(id, roadData).catch(error => {
+                console.error('Failed to save custom road to Firestore:', error);
+            });
+        }
+
+        function cancelCustomSave() {
+            document.getElementById('custom-save-modal').style.display = 'none';
+            pendingCustomW = 0;
+            pendingCustomH = 0;
+            isCustomMode = false;
+            pendingHitCount = 1; // 리셋
+            updateGhostStyle();
+        }
+
+        // 구슬 되돌리기: 발사된 구슬 제거 + 배치 구슬 원래 자리로
+        function rewindMarbles() {
+            // 발사 중이면 중단
+            if (seqTimer) { clearInterval(seqTimer); seqTimer = null; }
+            isLaunching = false;
+            document.getElementById('btn-drop').innerText = '구슬 투하';
+            document.getElementById('btn-drop').style.background = '';
+
+            // 발사된 구슬들 (맵에 떨어진 marble/steel_marble) 제거
+            const launchedBalls = Composite.allBodies(world).filter(b => 
+                b !== ground && !placedMarbles.includes(b) && !magnets.includes(b) &&
+                (b.label === 'marble' || b.label === 'steel_marble')
+            );
+            launchedBalls.forEach(b => World.remove(world, b));
+            marble = null;
+
+            // 배치 구슬들 원래 위치로 복원 + sleeping
+            placedMarbles.forEach(pm => {
+                if (pm.plugin && pm.plugin.originX !== undefined) {
+                    Body.setPosition(pm, { x: pm.plugin.originX, y: pm.plugin.originY });
+                    Body.setVelocity(pm, { x: 0, y: 0 });
+                    Body.setAngularVelocity(pm, 0);
+                    Body.setAngle(pm, 0);
+                    Sleeping.set(pm, true);
+                    pm.render.opacity = 0.5;
+                }
+            });
+
+            // 밀리는 길들 원래 위치/각도로 복원 + 상태 리셋
+            pushables.forEach(p => {
+                if (p.plugin && p.plugin.originX !== undefined) {
+                    Body.setPosition(p, { x: p.plugin.originX, y: p.plugin.originY });
+                    Body.setVelocity(p, { x: 0, y: 0 });
+                    Body.setAngularVelocity(p, 0);
+                    Body.setAngle(p, p.plugin.originAngle || 0);
+                    
+                    if (p.plugin.hitThreshold > 1) {
+                        Body.setStatic(p, true);
+                        p.plugin.currentHits = 0;
+                        p.render.opacity = 0.8;
+                    } else {
+                        Sleeping.set(p, true);
+                        p.render.opacity = 1.0;
+                    }
+                }
+            });
+        }
+
+        let isFollowMode = false;
+        const btnFollow = document.getElementById('btn-follow');
+        function toggleFollowMode() {
+            isFollowMode = !isFollowMode;
+            btnFollow.innerText = isFollowMode ? "팔로우 ON" : "팔로우 OFF";
+            btnFollow.style.background = isFollowMode ? "var(--accent)" : "#fff";
+            btnFollow.style.color = isFollowMode ? "#fff" : "var(--text)";
+            btnFollow.style.borderColor = isFollowMode ? "var(--accent)" : "var(--border)";
+            btnFollow.blur();
+        }
+        btnFollow.onclick = toggleFollowMode;
+
+        // ======= 구슬 시퀀스 설정 시스템 =======
+        let marbleSequence = ['normal', 'normal', 'normal'];
+        let seqIndex = 0;
+        let seqTimer = null;
+        let isLaunching = false;
+        let dragSrcIdx = null;
+
+        // 모달 열기/닫기
+        document.getElementById('btn-marble-setup').onclick = () => {
+            document.getElementById('marble-modal').style.display = 'block';
+            renderSequenceDisplay();
+        };
+        function closeMarbleModal() {
+            document.getElementById('marble-modal').style.display = 'none';
+        }
+
+        // 시퀀스 재생성 (개수 입력이 변경되었을 때)
+        function rebuildSequence() {
+            const normalCount = parseInt(document.getElementById('input-normal').value) || 0;
+            const steelCount = parseInt(document.getElementById('input-steel').value) || 0;
+            marbleSequence = [];
+            for (let i = 0; i < normalCount; i++) marbleSequence.push('normal');
+            for (let i = 0; i < steelCount; i++) marbleSequence.push('steel');
+            renderSequenceDisplay();
+        }
+
+        // 시퀀스 시각화
+        function renderSequenceDisplay() {
+            const container = document.getElementById('seq-display');
+            container.innerHTML = '';
+            if (marbleSequence.length === 0) {
+                container.innerHTML = '<span style="color:#aaa; font-size:13px;">구슬이 없습니다</span>';
+                return;
+            }
+            marbleSequence.forEach((type, i) => {
+                const dot = document.createElement('div');
+                dot.className = 'marble-dot';
+                dot.style.background = type === 'steel' ? '#78909c' : '#f44336';
+                dot.innerText = (i + 1);
+                dot.title = type === 'steel' ? '쇠구슬 (클릭: 변경)' : '일반 구슬 (클릭: 변경)';
+                dot.draggable = true;
+                // 클릭으로 종류 토글
+                dot.onclick = () => {
+                    marbleSequence[i] = marbleSequence[i] === 'normal' ? 'steel' : 'normal';
+                    renderSequenceDisplay();
+                };
+                // 드래그로 순서 변경
+                dot.ondragstart = (e) => { dragSrcIdx = i; e.dataTransfer.effectAllowed = 'move'; };
+                dot.ondragover = (e) => { e.preventDefault(); dot.style.transform = 'scale(1.3)'; };
+                dot.ondragleave = () => { dot.style.transform = ''; };
+                dot.ondrop = (e) => {
+                    e.preventDefault();
+                    dot.style.transform = '';
+                    if (dragSrcIdx !== null && dragSrcIdx !== i) {
+                        const item = marbleSequence.splice(dragSrcIdx, 1)[0];
+                        marbleSequence.splice(i, 0, item);
+                        renderSequenceDisplay();
+                    }
+                    dragSrcIdx = null;
+                };
+                container.appendChild(dot);
+            });
+        }
+
+        // 구슬 하나 생성
+        function spawnMarble(type) {
+            const m = type === 'steel'
+                ? Bodies.circle(SPAWN_POINT.x, SPAWN_POINT.y, 15, {
+                    label: 'steel_marble', restitution: 0.3,
+                    friction: 0.01, frictionStatic: 0, frictionAir: 0,
+                    density: 6.0, render: { fillStyle: '#8d99ae' },
+                    bullet: true
+                })
+                : Bodies.circle(SPAWN_POINT.x, SPAWN_POINT.y, 15, {
+                    label: 'marble', restitution: 0.5,
+                    friction: 0, frictionStatic: 0, frictionAir: 0,
+                    density: 1.5, render: { fillStyle: '#e74c3c' },
+                    bullet: true
+                });
+            World.add(world, m);
+            marble = m; // 팔로우 카메라용
+            return m;
+        }
+
+        // 시퀀스 자동 발사 시작
+        function startMarbleSequence() {
+            if (isLaunching) return; // 이미 발사 중이면 무시
+            if (marbleSequence.length === 0) return;
+            const interval = (parseFloat(document.getElementById('input-interval').value) || 2) * 1000;
+            seqIndex = 0;
+            isLaunching = true;
+            document.getElementById('btn-drop').innerText = '발사 중'; // 텍스트 간결하게 변경
+            document.getElementById('btn-drop').style.background = '#e53935';
+
+            // 첫 번째 즉시 발사
+            spawnMarble(marbleSequence[seqIndex]);
+            seqIndex++;
+
+            if (seqIndex < marbleSequence.length) {
+                seqTimer = setInterval(() => {
+                    if (seqIndex < marbleSequence.length) {
+                        spawnMarble(marbleSequence[seqIndex]);
+                        seqIndex++;
+                    }
+                    if (seqIndex >= marbleSequence.length) {
+                        clearInterval(seqTimer);
+                        seqTimer = null;
+                        isLaunching = false;
+                        document.getElementById('btn-drop').innerText = '투하';
+                        document.getElementById('btn-drop').style.background = '';
+                    }
+                }, interval);
+            } else {
+                isLaunching = false;
+                document.getElementById('btn-drop').innerText = '투하';
+                document.getElementById('btn-drop').style.background = '';
+            }
+        }
+
+        // 초기 시퀀스 디스플레이 렌더링
+        renderSequenceDisplay();
+
+        // 무조건 엄청 튕기는 슬라임 로직 + 배치 구슬 깨우기
+        Events.on(engine, 'collisionStart', (event) => {
+            event.pairs.forEach(pair => {
+                const { bodyA, bodyB } = pair;
+                const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
+                const theMarble = isMarbleLabel(bodyA.label) ? bodyA : (isMarbleLabel(bodyB.label) ? bodyB : null);
+                const theSlime = bodyA.label === 'slime' ? bodyA : (bodyB.label === 'slime' ? bodyB : null);
+
+                if (theMarble && theSlime) {
+                    const incomingSpeed = Math.sqrt(theMarble.velocity.x ** 2 + theMarble.velocity.y ** 2);
+                    const bounceSpeed = Math.max(12, incomingSpeed * 1.8);
+                    const angle = theSlime.angle;
+                    // 슬라임 표면 법선 방향으로 튕김
+                    const nx = Math.sin(angle);
+                    const ny = -Math.cos(angle);
+                    // 기존 수평 속도 일부 보존 → 부드러운 포물선
+                    const keepX = theMarble.velocity.x * 0.3;
+                    Body.setVelocity(theMarble, {
+                        x: keepX + nx * bounceSpeed,
+                        y: ny * bounceSpeed
+                    });
+                }
+
+                // 배치 구슬 및 밀리는 길 횟수 로직
+                [bodyA, bodyB].forEach(b => {
+                    const otherBody = (b === bodyA) ? bodyB : bodyA;
+                    const isHittingValidTarget = isMarbleLabel(otherBody.label) || (otherBody.plugin && otherBody.plugin.type === 'pushable');
+
+                    // 밀리는 길 횟수 충돌 로직
+                    if (b.plugin && b.plugin.type === 'pushable' && isHittingValidTarget) {
+                        if (b.plugin.hitThreshold > 1 && b.isStatic) {
+                            b.plugin.currentHits = (b.plugin.currentHits || 0) + 1;
+                            
+                            // 통과 횟수 도달하면 밀리게 만듦
+                            if (b.plugin.currentHits >= b.plugin.hitThreshold) {
+                                Body.setStatic(b, false);
+                                Sleeping.set(b, false);
+                                b.render.opacity = 1.0;
+                            } else {
+                                // 약간 시각적 피드백
+                                b.render.opacity = 0.5;
+                                setTimeout(() => { if (b.isStatic) b.render.opacity = 0.8; }, 100);
+                            }
+                        } else if (b.isSleeping) {
+                            Sleeping.set(b, false);
+                            b.render.opacity = 1.0;
+                        }
+                    } 
+                    // 배치 구슬 깨우기
+                    else if (b.isSleeping && b.label === 'place_marble') {
+                        Sleeping.set(b, false);
+                        // 깨어나면 불투명도 원래대로 복원
+                        b.render.opacity = 1.0;
+                    }
+                });
+            });
+        });
+
+        // 에스컬레이터 물리 로직
+        Events.on(engine, 'collisionActive', (event) => {
+            event.pairs.forEach(pair => {
+                const { bodyA, bodyB } = pair;
+                const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
+                const theMarble = isMarbleLabel(bodyA.label) ? bodyA : (isMarbleLabel(bodyB.label) ? bodyB : null);
+                const theEscalator = (bodyA.label && bodyA.label.startsWith('escalator')) ? bodyA : ((bodyB.label && bodyB.label.startsWith('escalator')) ? bodyB : null);
+
+                if (theMarble && theEscalator) {
+                    const angle = theEscalator.angle;
+                    // _l_ 은 왼쪽(-x 방향)으로, _r_ 은 오른쪽(+x 방향)으로 이동
+                    let dir = theEscalator.label.includes('_l_') ? -1 : 1;
+
+                    const speed = 4; // 구슬이 확실히 부드럽게 이동할 수 있도록 안정적인 속도 설정
+                    
+                    // 컨베이어(표면) 이동 방향 벡터
+                    const moveX = Math.cos(angle) * dir * speed;
+                    const moveY = Math.sin(angle) * dir * speed;
+
+                    // 강제적인 표면 밀착(pull) 로직을 제거하고 속도 보간(Lerp)을 사용하여
+                    // 여러 블록 사이를 지날 때 끊기거나 튀는 현상 방지
+                    const currentVel = theMarble.velocity;
+                    Body.setVelocity(theMarble, { 
+                        x: currentVel.x + (moveX - currentVel.x) * 0.4, 
+                        y: currentVel.y + (moveY - currentVel.y) * 0.4
+                    });
+                }
+            });
+        });
+
+        // 카메라 팔로우 로직
+        Events.on(engine, 'afterUpdate', () => {
+            if (isFollowMode && marble && !isPanning) {
+                const targetX = marble.position.x - window.innerWidth / 2;
+                const targetY = marble.position.y - window.innerHeight / 2;
+                
+                // 부드러운 카메라 이동 (lerp)
+                cameraPos.x += (targetX - cameraPos.x) * 0.1;
+                cameraPos.y += (targetY - cameraPos.y) * 0.1;
+
+                render.bounds.min.x = cameraPos.x;
+                render.bounds.max.x = cameraPos.x + window.innerWidth;
+                render.bounds.min.y = cameraPos.y;
+                render.bounds.max.y = cameraPos.y + window.innerHeight;
+                container.style.backgroundPosition = `${-cameraPos.x}px ${-cameraPos.y}px`;
+            }
+        });
+
+        // 자석이 쇠구슬을 끌어당기는 로직 (속도 직접 조절 방식)
+        const MAGNET_RANGE = 60;  // 자석 유효 범위
+        const MAGNET_PULL = 1.2;   // 자석 힘 줄임
+        Events.on(engine, 'beforeUpdate', () => {
+            const steelBodies = Composite.allBodies(world).filter(b => b.label === 'steel_marble');
+            magnets.forEach(mag => {
+                steelBodies.forEach(steel => {
+                    const dx = mag.position.x - steel.position.x;
+                    const dy = mag.position.y - steel.position.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < MAGNET_RANGE && dist > 5) {
+                        // 자석 범위에 들어오면 잠든 구슬 깨우기 (배치용 쇠구슬 대응)
+                        if (steel.isSleeping) {
+                            Sleeping.set(steel, false);
+                            steel.render.opacity = 1.0;
+                        }
+                        // 가까울수록 강하게 끌림 (제곱 비례)
+                        const ratio = Math.pow(1 - dist / MAGNET_RANGE, 2);
+                        const pullX = (dx / dist) * MAGNET_PULL * ratio;
+                        const pullY = (dy / dist) * MAGNET_PULL * ratio;
+                        
+                        // 현재 속도에 자석 방향 속도를 더해줌
+                        const vel = steel.velocity;
+                        Body.setVelocity(steel, {
+                            x: vel.x + pullX,
+                            y: vel.y + pullY
+                        });
+                    }
+                });
+            });
+
+            // 잠자는 배치 구슬이 공중에 떠 있으면 깨우기 (밀리는 벽은 제외)
+            // → 아래에 지지체가 없으면 sleeping 해제
+            const allBodies = Composite.allBodies(world);
+            allBodies.forEach(b => {
+                if (!b.isSleeping) return;
+                if (b === ground) return;
+                // 밀리는 벽(pushable)은 이 체크에서 제외 (충돌로만 깨어남)
+                if (b.plugin && b.plugin.type === 'pushable') return;
+                
+                // 이 바디 아래쪽으로 짧은 거리에 다른 바디가 있는지 확인
+                const checkY = b.position.y + ((b.circleRadius || 15) + 3);
+                const pointBodies = Query.point(allBodies, { x: b.position.x, y: checkY });
+                // 자기 자신 제외, 실제 지지체가 있는지 확인
+                const supporters = pointBodies.filter(s => s !== b);
+                
+                if (supporters.length === 0) {
+                    // 지지체가 없으면 깨우기 (공중에 떠있는 상태)
+                    Sleeping.set(b, false);
+                    if (b.render) b.render.opacity = 1.0;
+                }
+            });
+        });
+
+        // 에스컬레이터 탱크 바퀴(무한궤도) 애니메이션 렌더링
+        Events.on(render, 'afterRender', () => {
+            const ctx = render.context;
+            const bodies = Composite.allBodies(world);
+            const time = engine.timing.timestamp;
+            
+            bodies.forEach(b => {
+                if (b.label && b.label.startsWith('escalator')) {
+                    const w = b.plugin?.w;
+                    const h = b.plugin?.h;
+                    if (!w || !h) return; // 설정된 크기가 없으면 패스
+                    
+                    const dir = b.label.includes('_l_') ? -1 : 1;
+                    const speed = 0.05; // 궤도 이동 속도
+                    const phase = (time * speed * dir) % 20; 
+                    
+                    ctx.save();
+                    // 카메라 이동(render.bounds.min)에 따른 위치 보정
+                    ctx.translate(b.position.x - render.bounds.min.x, b.position.y - render.bounds.min.y);
+                    ctx.rotate(b.angle);
+                    
+                    // 블록 밖으로 그리지 않게 클리핑
+                    ctx.beginPath();
+                    ctx.rect(-w/2, -h/2, w, h);
+                    ctx.clip();
+                    
+                    // 궤도 무늬 (선)
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'; // 반투명 검은색 무늬
+                    
+                    for (let x = -w/2 - 20; x <= w/2 + 20; x += 20) {
+                        const drawX = x + phase;
+                        ctx.beginPath();
+                        ctx.moveTo(drawX, -h/2);
+                        ctx.lineTo(drawX, h/2);
+                        ctx.stroke();
+                    }
+                    
+                    // 시각적 퀄리티를 위해 테두리를 진하게 그리기
+                    ctx.lineWidth = 4;
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.strokeRect(-w/2, -h/2, w, h);
+                    
+                    ctx.restore();
+                }
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            render.canvas.width = window.innerWidth;
+            render.canvas.height = window.innerHeight;
+            render.bounds.max.x = render.bounds.min.x + window.innerWidth;
+            render.bounds.max.y = render.bounds.min.y + window.innerHeight;
+            SPAWN_POINT.x = window.innerWidth / 2;
+        });
+    </script>
+</body>
+</html>
