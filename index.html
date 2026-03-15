@@ -424,25 +424,8 @@
         });
 
         Render.run(render);
-        const FIXED_STEP_MS = 1000 / 240;
-        const MAX_FRAME_MS = 1000 / 20;
-        let lastPhysicsTime = performance.now();
-        let physicsAccumulator = 0;
-
-        function runPhysicsFrame(now) {
-            const frameTime = Math.min(MAX_FRAME_MS, now - lastPhysicsTime);
-            lastPhysicsTime = now;
-            physicsAccumulator += frameTime;
-
-            while (physicsAccumulator >= FIXED_STEP_MS) {
-                Engine.update(engine, FIXED_STEP_MS);
-                physicsAccumulator -= FIXED_STEP_MS;
-            }
-
-            requestAnimationFrame(runPhysicsFrame);
-        }
-
-        requestAnimationFrame(runPhysicsFrame);
+        const runner = Runner.create();
+        Runner.run(runner, engine);
 
         // 아주 넓은 바닥
         const ground = Bodies.rectangle(window.innerWidth/2, window.innerHeight + 1500, 20000, 100, { 
