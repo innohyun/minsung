@@ -1028,6 +1028,77 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
+        function worldToBodyLocal(body, point) {
+            const dx = point.x - body.position.x;
+            const dy = point.y - body.position.y;
+            const cos = Math.cos(body.angle);
+            const sin = Math.sin(body.angle);
+            return {
+                x: dx * cos + dy * sin,
+                y: -dx * sin + dy * cos
+            };
+        }
+
+        function getCarryableMarbles() {
+            return Composite.allBodies(world).filter(body =>
+                body.circleRadius &&
+                !body.isStatic &&
+                !body.isSensor &&
+                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble')
+            );
+        }
+
+        function isMarbleInsidePushableBasket(basket, marble) {
+            const wall = basket.plugin?.wall || 10;
+            const halfW = (basket.plugin?.w || 0) / 2;
+            const halfH = (basket.plugin?.h || 0) / 2;
+            const radius = marble.circleRadius || 15;
+            const local = worldToBodyLocal(basket, marble.position);
+            const innerHalfW = halfW - wall - radius * 0.45;
+            const innerTop = -halfH + radius * 0.65;
+            const innerBottom = halfH - wall - radius * 0.2;
+
+            return (
+                local.x >= -innerHalfW &&
+                local.x <= innerHalfW &&
+                local.y >= innerTop &&
+                local.y <= innerBottom
+            );
+        }
+
+        function carryMarblesInPushableBasket(basket) {
+            if (!basket.plugin?.escalatorContact || basket.plugin.shape !== 'basket') return;
+
+            const prevCarrierPosition = basket.plugin.prevCarrierPosition;
+            basket.plugin.prevCarrierPosition = {
+                x: basket.position.x,
+                y: basket.position.y
+            };
+            if (!prevCarrierPosition) return;
+
+            const deltaX = basket.position.x - prevCarrierPosition.x;
+            const deltaY = basket.position.y - prevCarrierPosition.y;
+            if (Math.abs(deltaX) < 0.001 && Math.abs(deltaY) < 0.001) return;
+
+            getCarryableMarbles().forEach(marble => {
+                if (marble === basket || marble.plugin?.attachedMagnetId) return;
+                if (!isMarbleInsidePushableBasket(basket, marble)) return;
+                if (marble.isSleeping) {
+                    Sleeping.set(marble, false);
+                }
+
+                Body.setPosition(marble, {
+                    x: marble.position.x + deltaX,
+                    y: marble.position.y + deltaY
+                });
+
+                Body.setVelocity(marble, {
+                    x: basket.velocity.x,
+                    y: basket.velocity.y
+                });
+            });
+        }
+
         function updateGhostStyle() {
             const conf = ROAD_LIB[slots[currentSlotIndex]];
             const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
@@ -1654,6 +1725,7 @@
                     Body.setAngularVelocity(p, 0);
                     Body.setAngle(p, p.plugin.originAngle || 0);
                     p.plugin.escalatorContact = null;
+                    p.plugin.prevCarrierPosition = null;
                     
                     if (p.plugin.hitThreshold > 1) {
                         Body.setStatic(p, true);
@@ -1971,6 +2043,19 @@
         });
 
         // 카메라 팔로우 로직
+        Events.on(engine, 'afterUpdate', () => {
+            pushables.forEach(body => {
+                if (!body.plugin || body.plugin.shape !== 'basket') return;
+                carryMarblesInPushableBasket(body);
+                if (!body.plugin.escalatorContact) {
+                    body.plugin.prevCarrierPosition = {
+                        x: body.position.x,
+                        y: body.position.y
+                    };
+                }
+            });
+        });
+
         Events.on(engine, 'afterUpdate', () => {
             if (isFollowMode && marble && !isPanning) {
                 const targetX = marble.position.x - window.innerWidth / 2;
