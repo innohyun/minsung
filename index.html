@@ -1859,7 +1859,8 @@
                     // _l_ 은 왼쪽(-x 방향)으로, _r_ 은 오른쪽(+x 방향)으로 이동
                     let dir = theEscalator.label.includes('_l_') ? -1 : 1;
 
-                    const speed = theEscalatorTarget.plugin?.type === 'pushable' ? 2.6 : 4; // 무거운 밀리는 벽은 조금 더 천천히 이동
+                    const isPushableTarget = theEscalatorTarget.plugin?.type === 'pushable';
+                    const speed = isPushableTarget ? 3.8 : 4;
                     
                     // 컨베이어(표면) 이동 방향 벡터
                     const moveX = Math.cos(angle) * dir * speed;
@@ -1868,7 +1869,10 @@
                     // 강제적인 표면 밀착(pull) 로직을 제거하고 속도 보간(Lerp)을 사용하여
                     // 여러 블록 사이를 지날 때 끊기거나 튀는 현상 방지
                     const currentVel = theEscalatorTarget.velocity;
-                    const lerp = theEscalatorTarget.plugin?.type === 'pushable' ? 0.24 : 0.4;
+                    const lerp = isPushableTarget ? 0.42 : 0.4;
+                    if (isPushableTarget && theEscalatorTarget.isSleeping) {
+                        Sleeping.set(theEscalatorTarget, false);
+                    }
                     Body.setVelocity(theEscalatorTarget, { 
                         x: currentVel.x + (moveX - currentVel.x) * lerp, 
                         y: currentVel.y + (moveY - currentVel.y) * lerp
