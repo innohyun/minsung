@@ -462,8 +462,8 @@
             return typeof key === 'string' && key.startsWith('escalator');
         }
 
-        function getShockAbsorberRadius(width, height) {
-            return Math.max(10, Math.round(Math.min(width, height) / 2));
+        function getShockAbsorberBorderRadius() {
+            return '9999px';
         }
 
         function resolveRoadBaseKey(key) {
@@ -525,7 +525,7 @@
                 const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
                 const borderR = isCircle
                     ? 'border-radius:50%;'
-                    : (conf.type === 'shock_absorber' ? `border-radius:${getShockAbsorberRadius(conf.pw, conf.ph)}px;` : '');
+                    : (conf.type === 'shock_absorber' ? `border-radius:${getShockAbsorberBorderRadius()};` : '');
                 slotEls[i].innerHTML = `
                     <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
                     <span>${conf.name}</span>
@@ -598,7 +598,7 @@
                 const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
                 const borderR = isCircle
                     ? 'border-radius:50%;'
-                    : (conf.type === 'shock_absorber' ? `border-radius:${getShockAbsorberRadius(conf.pw, conf.ph)}px;` : '');
+                    : (conf.type === 'shock_absorber' ? `border-radius:${getShockAbsorberBorderRadius()};` : '');
                 el.innerHTML = `
                     <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
                     <span>${conf.name}</span>
@@ -961,6 +961,62 @@
             return goalBody;
         }
 
+        function createShockAbsorberBody(x, y, conf, angle) {
+            const w = conf.w;
+            const h = conf.h;
+            const common = {
+                isStatic: true,
+                friction: 0,
+                frictionStatic: 0,
+                restitution: 0,
+                render: { visible: false }
+            };
+            const parts = [];
+
+            if (w > h + 0.5) {
+                const radius = h / 2;
+                const centerWidth = Math.max(1, w - h);
+                parts.push(Bodies.rectangle(x, y, centerWidth, h, common));
+                parts.push(Bodies.circle(x - centerWidth / 2, y, radius, common));
+                parts.push(Bodies.circle(x + centerWidth / 2, y, radius, common));
+            } else if (h > w + 0.5) {
+                const radius = w / 2;
+                const centerHeight = Math.max(1, h - w);
+                parts.push(Bodies.rectangle(x, y, w, centerHeight, common));
+                parts.push(Bodies.circle(x, y - centerHeight / 2, radius, common));
+                parts.push(Bodies.circle(x, y + centerHeight / 2, radius, common));
+            } else {
+                parts.push(Bodies.circle(x, y, Math.min(w, h) / 2, common));
+            }
+
+            return Body.create({
+                isStatic: true,
+                label: 'shock_absorber',
+                angle,
+                parts,
+                render: { visible: false },
+                plugin: {
+                    type: 'shock_absorber',
+                    baseKey: 'shock_absorber',
+                    color: conf.color,
+                    w,
+                    h,
+                    originX: x,
+                    originY: y,
+                    originAngle: angle,
+                    shockState: {
+                        target: 0,
+                        display: 0,
+                        velocity: 0,
+                        axis: 'y',
+                        side: -1,
+                        highlight: 0
+                    }
+                },
+                slop: 0
+            });
+        }
+
         function createPushableBasketBody(x, y, conf, angle) {
             const w = conf.w;
             const h = conf.h;
@@ -1148,18 +1204,34 @@
             return `rgb(${Math.round(base.r + (t.r - base.r) * blend)}, ${Math.round(base.g + (t.g - base.g) * blend)}, ${Math.round(base.b + (t.b - base.b) * blend)})`;
         }
 
-        function addRoundedRectPath(ctx, x, y, w, h, radius) {
-            const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+        function addShockAbsorberPath(ctx, width, height) {
+            const halfW = width / 2;
+            const halfH = height / 2;
+
+            if (Math.abs(width - height) < 0.001) {
+                ctx.beginPath();
+                ctx.arc(0, 0, Math.min(halfW, halfH), 0, Math.PI * 2);
+                ctx.closePath();
+                return;
+            }
+
             ctx.beginPath();
-            ctx.moveTo(x + r, y);
-            ctx.lineTo(x + w - r, y);
-            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-            ctx.lineTo(x + w, y + h - r);
-            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-            ctx.lineTo(x + r, y + h);
-            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-            ctx.lineTo(x, y + r);
-            ctx.quadraticCurveTo(x, y, x + r, y);
+
+            if (width >= height) {
+                const radius = halfH;
+                ctx.moveTo(-halfW + radius, -halfH);
+                ctx.lineTo(halfW - radius, -halfH);
+                ctx.arc(halfW - radius, 0, radius, -Math.PI / 2, Math.PI / 2);
+                ctx.lineTo(-halfW + radius, halfH);
+                ctx.arc(-halfW + radius, 0, radius, Math.PI / 2, -Math.PI / 2);
+            } else {
+                const radius = halfW;
+                ctx.moveTo(-halfW, -halfH + radius);
+                ctx.lineTo(-halfW, halfH - radius);
+                ctx.arc(0, halfH - radius, radius, Math.PI, 0);
+                ctx.lineTo(halfW, -halfH + radius);
+                ctx.arc(0, -halfH + radius, radius, 0, Math.PI);
+            }
             ctx.closePath();
         }
 
@@ -1172,7 +1244,6 @@
             const color = body.plugin?.color || body.render?.fillStyle || '#e66a4f';
             const compression = Math.max(0, Math.min(0.34, state.display || 0));
             const stretch = compression * 0.24;
-            const radius = getShockAbsorberRadius(width, height);
 
             ctx.save();
             ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
@@ -1199,17 +1270,17 @@
             ctx.shadowBlur = 18;
             ctx.shadowOffsetY = 6;
             ctx.fillStyle = fill;
-            addRoundedRectPath(ctx, -width / 2, -height / 2, width, height, radius);
+            addShockAbsorberPath(ctx, width, height);
             ctx.fill();
 
             ctx.shadowColor = 'transparent';
             ctx.lineWidth = Math.max(2, Math.min(4, Math.min(width, height) * 0.12));
             ctx.strokeStyle = mixColor(color, '#2c0d08', 0.35);
-            addRoundedRectPath(ctx, -width / 2, -height / 2, width, height, radius);
+            addShockAbsorberPath(ctx, width, height);
             ctx.stroke();
 
             ctx.save();
-            addRoundedRectPath(ctx, -width / 2, -height / 2, width, height, radius);
+            addShockAbsorberPath(ctx, width, height);
             ctx.clip();
 
             const bandCount = Math.max(2, Math.min(5, Math.round(width / 42)));
@@ -1422,7 +1493,7 @@
             ghost.style.background = conf.color;
             ghost.style.borderRadius = isCircle
                 ? '50%'
-                : (conf.type === 'shock_absorber' ? `${getShockAbsorberRadius(conf.w, conf.h)}px` : '0');
+                : (conf.type === 'shock_absorber' ? getShockAbsorberBorderRadius() : '0');
             ghost.style.display = 'block';
             ghost.style.transform = `rotate(${ghostAngle}rad)`;
         }
@@ -1474,7 +1545,9 @@
                 // 원형 타입인지 확인
                 const baseConf = ROAD_LIB[customBaseKey];
                 const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
-                box.style.borderRadius = isCircleBase ? '50%' : '0';
+                box.style.borderRadius = isCircleBase
+                    ? '50%'
+                    : (baseConf?.type === 'shock_absorber' ? getShockAbsorberBorderRadius() : '0');
                 box.style.left = e.clientX + 'px';
                 box.style.top = e.clientY + 'px';
                 box.style.width = '0px';
@@ -1506,6 +1579,13 @@
                     const mockGoal = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
                     const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
                     if (Query.collides(mockGoal, existingRoads).length > 0) {
+                        showError();
+                        return;
+                    }
+                } else if (conf.type === 'shock_absorber') {
+                    const mockShockAbsorber = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    if (Query.collides(mockShockAbsorber, existingRoads).length > 0) {
                         showError();
                         return;
                     }
@@ -1600,6 +1680,8 @@
                     pushables.push(newBody);
                 } else if (conf.type === 'goal_box') {
                     newBody = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                } else if (conf.type === 'shock_absorber') {
+                    newBody = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else {
                     // 일반 블록
                     const behaviorKey = resolveRoadBaseKey(conf.baseKey || conf.id);
@@ -1693,7 +1775,7 @@
                     box.style.top = y + 'px';
                     box.style.width = w + 'px';
                     box.style.height = h + 'px';
-                    box.style.borderRadius = `${getShockAbsorberRadius(w, h)}px`;
+                    box.style.borderRadius = getShockAbsorberBorderRadius();
                 } else {
                     // 사각형
                     const x = Math.min(e.clientX, customStartScreen.x);
