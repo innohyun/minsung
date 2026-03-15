@@ -1024,6 +1024,10 @@
             };
         }
 
+        function getCollisionRoot(body) {
+            return body && body.parent && body.parent !== body ? body.parent : body;
+        }
+
         function updateGhostStyle() {
             const conf = ROAD_LIB[slots[currentSlotIndex]];
             const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
@@ -1807,6 +1811,8 @@
         Events.on(engine, 'collisionStart', (event) => {
             event.pairs.forEach(pair => {
                 const { bodyA, bodyB } = pair;
+                const rootA = getCollisionRoot(bodyA);
+                const rootB = getCollisionRoot(bodyB);
                 const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
                 const theMarble = isMarbleLabel(bodyA.label) ? bodyA : (isMarbleLabel(bodyB.label) ? bodyB : null);
                 const theSlime = bodyA.label === 'slime' ? bodyA : (bodyB.label === 'slime' ? bodyB : null);
@@ -1843,8 +1849,8 @@
                     }
                 }
 
-                [bodyA, bodyB].forEach(b => {
-                    const otherBody = (b === bodyA) ? bodyB : bodyA;
+                [rootA, rootB].forEach(b => {
+                    const otherBody = (b === rootA) ? rootB : rootA;
                     if (b.label && b.label.startsWith('escalator') && otherBody && otherBody !== ground && !otherBody.isSensor) {
                         b.plugin = b.plugin || {};
                         b.plugin.isActivated = true;
@@ -1852,8 +1858,8 @@
                 });
 
                 // 배치 구슬 및 밀리는 길 횟수 로직
-                [bodyA, bodyB].forEach(b => {
-                    const otherBody = (b === bodyA) ? bodyB : bodyA;
+                [rootA, rootB].forEach(b => {
+                    const otherBody = (b === rootA) ? rootB : rootA;
                     const isHittingValidTarget = isMarbleLabel(otherBody.label) || (otherBody.plugin && otherBody.plugin.type === 'pushable');
 
                     // 밀리는 길 횟수 충돌 로직
@@ -1894,13 +1900,15 @@
         Events.on(engine, 'collisionActive', (event) => {
             event.pairs.forEach(pair => {
                 const { bodyA, bodyB } = pair;
+                const rootA = getCollisionRoot(bodyA);
+                const rootB = getCollisionRoot(bodyB);
                 const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
                 const theEscalatorTarget = (
-                    isMarbleLabel(bodyA.label) || bodyA.plugin?.type === 'pushable'
-                ) ? bodyA : (
-                    (isMarbleLabel(bodyB.label) || bodyB.plugin?.type === 'pushable') ? bodyB : null
+                    isMarbleLabel(rootA.label) || rootA.plugin?.type === 'pushable'
+                ) ? rootA : (
+                    (isMarbleLabel(rootB.label) || rootB.plugin?.type === 'pushable') ? rootB : null
                 );
-                const theEscalator = (bodyA.label && bodyA.label.startsWith('escalator')) ? bodyA : ((bodyB.label && bodyB.label.startsWith('escalator')) ? bodyB : null);
+                const theEscalator = (rootA.label && rootA.label.startsWith('escalator')) ? rootA : ((rootB.label && rootB.label.startsWith('escalator')) ? rootB : null);
 
                 if (theEscalatorTarget && theEscalator && theEscalator.plugin?.isActivated) {
                     const angle = theEscalator.angle;
