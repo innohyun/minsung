@@ -82,7 +82,7 @@
         }
         .btn-action:hover { background: #f0f2f5; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 
-        #error-msg {
+        #error-msg, #end-msg {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
             color: var(--danger); font-size: 15px; font-weight: 600;
             background: rgba(255,255,255,0.95); backdrop-filter: blur(12px);
@@ -91,9 +91,18 @@
             pointer-events: none; display: none; z-index: 200;
             box-shadow: 0 4px 20px rgba(239,68,68,0.08);
         }
+        #end-msg {
+            color: #111827;
+            font-size: 40px;
+            font-weight: 800;
+            border-color: rgba(17,24,39,0.1);
+            padding: 18px 34px;
+            z-index: 500;
+            letter-spacing: 0.04em;
+        }
 
         /* -- Modals -- */
-        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal {
+        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
             background: rgba(255,255,255,0.97); backdrop-filter: blur(24px);
             padding: 22px; border-radius: 16px; border: 1px solid var(--border);
@@ -105,6 +114,7 @@
         #custom-save-modal { z-index: 400; width: 280px; text-align: center; }
         #pushable-setup-modal { z-index: 400; width: 280px; text-align: center; }
         #magnet-setup-modal { z-index: 400; width: 300px; text-align: center; }
+        #goal-setup-modal { z-index: 400; width: 300px; text-align: center; }
 
         #library-modal h2, #marble-modal h2 {
             margin: 0 0 14px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text);
@@ -114,6 +124,8 @@
         #pushable-setup-modal p { color: var(--text-dim); font-size: 12px; }
         #magnet-setup-modal h3 { margin: 0 0 12px; color: #d32f2f; font-size: 13px; font-weight: 700; }
         #magnet-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
+        #goal-setup-modal h3 { margin: 0 0 12px; color: #0f766e; font-size: 13px; font-weight: 700; }
+        #goal-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
 
         .library-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
         .lib-item {
@@ -145,9 +157,15 @@
             background: #f7f8fa; color: var(--text);
             font-family: 'Inter', sans-serif; font-weight: 600;
         }
+        #goal-setup-modal input[type=number] {
+            width: 72px; padding: 8px; border: 1px solid #dde1e6;
+            border-radius: 8px; font-size: 13px; text-align: center;
+            background: #f7f8fa; color: var(--text);
+            font-family: 'Inter', sans-serif; font-weight: 600;
+        }
         .marble-row input:focus, #pushable-setup-modal input:focus,
         #custom-save-modal input:focus, #magnet-setup-modal input:focus,
-        #magnet-setup-modal select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        #magnet-setup-modal select:focus, #goal-setup-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 
         .marble-dot {
             width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
@@ -238,6 +256,7 @@
 </head>
 <body>
     <div id="error-msg">❌ 길이 겹쳐서 놓을 수 없습니다!</div>
+    <div id="end-msg">The end</div>
     
     <div id="ui-top">
         <div class="info-panel">
@@ -318,6 +337,18 @@
         </div>
         <button class="btn-marble-modal" onclick="saveMagnetConfig()" style="background:#d32f2f; margin-bottom:8px;">적용</button>
         <button class="btn-marble-modal" onclick="closeMagnetSetup()" style="background:#999;">취소</button>
+    </div>
+
+    <div id="goal-setup-modal">
+        <h3>🏁 엔드 박스 설정</h3>
+        <p>안에 들어오면 끝나는 구슬 개수를 정하고, 이어서 드래그로 크기를 맞춥니다.</p>
+        <div class="magnet-row">
+            <label for="goal-count-input">목표 구슬 수</label>
+            <input type="number" id="goal-count-input" min="1" max="50" value="1">
+        </div>
+        <button class="btn-marble-modal" onclick="startGoalCustomSize()" style="background:#0f766e; margin-bottom:8px;">다음 (크기 그리기)</button>
+        <button class="btn-marble-modal" onclick="skipGoalCustomSize()" style="background:#14b8a6; margin-bottom:8px;">건너뛰기 (기본 크기 저장)</button>
+        <button class="btn-marble-modal" onclick="closeGoalSetup()" style="background:#999;">취소</button>
     </div>
 
     <!-- Marble Setup Modal -->
@@ -421,6 +452,7 @@
             'pushable':  { id: 'pushable', name: '밀리는 길', w: 120, h: 20, color: '#9575cd', restitution: 0.0, pw: 20, ph: 5, type: 'pushable' },
             'place_marble': { id: 'place_marble', name: '배치 구슬', w: 30, h: 30, color: '#42a5f5', restitution: 0.5, pw: 15, ph: 15, type: 'place_marble', marbleType: 'normal' },
             'place_steel_marble': { id: 'place_steel_marble', name: '배치 쇠구슬', w: 30, h: 30, color: '#8d99ae', restitution: 0.3, pw: 15, ph: 15, type: 'place_marble', marbleType: 'steel' },
+            'goal_box': { id: 'goal_box', name: '엔드 박스', w: 140, h: 90, color: '#0f766e', restitution: 0.0, pw: 20, ph: 12, type: 'goal_box', targetCount: 1 },
             'magnet':    { id: 'magnet', name: '붙어있는 자석', w: 16, h: 16, color: '#e53935', restitution: 0.0, pw: 10, ph: 10, type: 'magnet', isAttached: true, magnetStrength: 3 }
         };
 
@@ -494,6 +526,13 @@
         function closeMagnetSetup() {
             document.getElementById('magnet-setup-modal').style.display = 'none';
         }
+        function openGoalSetup() {
+            document.getElementById('goal-count-input').value = pendingGoalCount;
+            document.getElementById('goal-setup-modal').style.display = 'block';
+        }
+        function closeGoalSetup() {
+            document.getElementById('goal-setup-modal').style.display = 'none';
+        }
         function saveMagnetConfig() {
             const base = ROAD_LIB.magnet;
             const mode = document.getElementById('magnet-mode-input').value === 'free' ? 'free' : 'attached';
@@ -552,6 +591,9 @@
                     if (conf.type === 'pushable') {
                         document.getElementById('pushable-setup-modal').style.display = 'block';
                         document.getElementById('pushable-hit-input').value = 1;
+                    } else if (conf.type === 'goal_box') {
+                        pendingGoalCount = conf.targetCount || 1;
+                        openGoalSetup();
                     } else if (conf.type === 'magnet') {
                         pendingMagnetMode = conf.isAttached === false ? 'free' : 'attached';
                         pendingMagnetStrength = conf.magnetStrength || 3;
@@ -604,12 +646,14 @@
         let customBaseKey = null;  // 커스텀 베이스 블록 키
         let pendingMagnetMode = 'attached';
         let pendingMagnetStrength = 3;
+        let pendingGoalCount = 1;
         const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
 
         const ghost = document.getElementById('ghost-element');
         const indicator = document.getElementById('selection-indicator');
         const spawnerNode = document.getElementById('spawner-indicator');
         const errorMsg = document.getElementById('error-msg');
+        const endMsg = document.getElementById('end-msg');
         const minimapPanel = document.getElementById('minimap-panel');
         const minimapCanvas = document.getElementById('minimap-canvas');
         const minimapCtx = minimapCanvas.getContext('2d');
@@ -745,6 +789,56 @@
             minimapCtx.fillRect(viewportTopLeft.x, viewportTopLeft.y, viewportWidth, viewportHeight);
         }
 
+        function hideEndMessage() {
+            endMsg.style.display = 'none';
+        }
+
+        function showEndMessage() {
+            endMsg.style.display = 'block';
+        }
+
+        function createGoalBoxBody(x, y, conf, angle) {
+            const w = conf.w;
+            const h = conf.h;
+            const wall = Math.max(10, Math.round(Math.min(w, h) * 0.12));
+            const leftWall = Bodies.rectangle(x - (w / 2) + (wall / 2), y, wall, h, {
+                isStatic: true,
+                render: { fillStyle: conf.color }
+            });
+            const rightWall = Bodies.rectangle(x + (w / 2) - (wall / 2), y, wall, h, {
+                isStatic: true,
+                render: { fillStyle: conf.color }
+            });
+            const bottomWall = Bodies.rectangle(x, y + (h / 2) - (wall / 2), w, wall, {
+                isStatic: true,
+                render: { fillStyle: conf.color }
+            });
+            const sensor = Bodies.rectangle(x, y + wall * 0.1, w - wall * 2, h - wall * 1.4, {
+                isStatic: true,
+                isSensor: true,
+                render: { visible: false }
+            });
+            const goalBody = Body.create({
+                isStatic: true,
+                angle: angle,
+                parts: [leftWall, rightWall, bottomWall, sensor],
+                render: { fillStyle: conf.color },
+                plugin: {
+                    type: 'goal_box',
+                    w: w,
+                    h: h,
+                    wall: wall,
+                    targetCount: conf.targetCount || 1,
+                    enteredMarbleIds: [],
+                    originX: x,
+                    originY: y,
+                    originAngle: angle
+                }
+            });
+            sensor.plugin = { type: 'goal_sensor' };
+            return goalBody;
+        }
+
         function updateGhostStyle() {
             const conf = ROAD_LIB[slots[currentSlotIndex]];
             const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
@@ -783,7 +877,7 @@
         });
 
         window.addEventListener('mousedown', (e) => {
-            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal')) return;
+            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal')) return;
 
             if (e.button === 2) { 
                 isPanning = true;
@@ -816,7 +910,7 @@
             const clicked = Query.point(bodies, worldPos);
 
             if (clicked.length > 0) {
-                selectedBody = clicked[0];
+                selectedBody = clicked[0].parent && clicked[0].parent !== clicked[0] ? clicked[0].parent : clicked[0];
                 isDraggingBody = true;
                 container.style.cursor = 'move';
             } else {
@@ -828,6 +922,13 @@
                     const mockMag = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2);
                     const existingMagnets = magnets.filter(m => Composite.allBodies(world).includes(m));
                     if (existingMagnets.length > 0 && Query.collides(mockMag, existingMagnets).length > 0) {
+                        showError();
+                        return;
+                    }
+                } else if (conf.type === 'goal_box') {
+                    const mockGoal = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    if (Query.collides(mockGoal, existingRoads).length > 0) {
                         showError();
                         return;
                     }
@@ -910,6 +1011,8 @@
                         slop: 0
                     });
                     pushables.push(newBody);
+                } else if (conf.type === 'goal_box') {
+                    newBody = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else {
                     // 일반 블록
                     newBody = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, {
@@ -975,7 +1078,7 @@
                     box.style.height = h + 'px';
                 }
             } else {
-                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal')) {
+                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal')) {
                     ghost.style.display = 'none';
                 } else if (!isCustomMode) {
                     ghost.style.display = 'block';
@@ -1096,6 +1199,7 @@
                 placedMarbles = [];
                 magnets = [];
                 pushables = [];
+                hideEndMessage();
                 setCameraPosition(0, 0);
             } else if (e.key.toLowerCase() === 'f') {
                 toggleFollowMode();
@@ -1138,6 +1242,50 @@
             }, 2500);
         }
 
+        function startGoalCustomSize() {
+            pendingGoalCount = Math.max(1, Math.min(50, parseInt(document.getElementById('goal-count-input').value, 10) || 1));
+            document.getElementById('goal-setup-modal').style.display = 'none';
+            const conf = ROAD_LIB[customBaseKey];
+            isCustomMode = true;
+            ghost.style.display = 'none';
+            closeLibrary();
+            container.style.cursor = 'crosshair';
+            errorMsg.innerText = `🏁 [${conf.name}] 크기 맞추기: 맵에서 드래그하세요`;
+            errorMsg.style.color = '#0f766e';
+            errorMsg.style.borderColor = '#0f766e';
+            errorMsg.style.display = 'block';
+            if(errorTimeout) clearTimeout(errorTimeout);
+            errorTimeout = setTimeout(() => {
+                errorMsg.style.display = 'none';
+                errorMsg.innerText = '❌ 길이 겹쳐서 놓을 수 없습니다!';
+                errorMsg.style.color = '#d32f2f';
+                errorMsg.style.borderColor = '#d32f2f';
+            }, 2500);
+        }
+
+        function skipGoalCustomSize() {
+            pendingGoalCount = Math.max(1, Math.min(50, parseInt(document.getElementById('goal-count-input').value, 10) || 1));
+            document.getElementById('goal-setup-modal').style.display = 'none';
+            const base = ROAD_LIB[customBaseKey];
+            const id = 'custom_' + Date.now();
+            const roadData = {
+                ...base,
+                baseKey: customBaseKey,
+                name: `${base.name}(${pendingGoalCount}개)`,
+                targetCount: pendingGoalCount
+            };
+            ROAD_LIB[id] = { ...roadData, id: id };
+            slots[currentSlotIndex] = id;
+            renderSlots();
+            renderLibrary();
+            updateGhostStyle();
+            closeLibrary();
+            hideEndMessage();
+            saveCustomRoadToFirestore(id, roadData).catch(error => {
+                console.error('Failed to save goal box to Firestore:', error);
+            });
+        }
+
         function skipPushableCustomSize() {
             pendingHitCount = parseInt(document.getElementById('pushable-hit-input').value) || 1;
             document.getElementById('pushable-setup-modal').style.display = 'none';
@@ -1171,7 +1319,8 @@
             const defaultName = pendingHitCount > 1 
                 ? `${base.name}(${pendingCustomW}×${pendingCustomH}, ${pendingHitCount}타)` 
                 : `${base.name}(${pendingCustomW}×${pendingCustomH})`;
-            const name = document.getElementById('custom-name-input').value.trim() || defaultName;
+            const goalDefaultName = `${base.name}(${pendingCustomW}×${pendingCustomH}, ${pendingGoalCount}개)`;
+            const name = document.getElementById('custom-name-input').value.trim() || (base.type === 'goal_box' ? goalDefaultName : defaultName);
             const id = 'custom_' + Date.now();
             const roadData = {
                 ...base,
@@ -1184,6 +1333,9 @@
             };
             if (pendingHitCount > 1) {
                 roadData.hitThreshold = pendingHitCount;
+            }
+            if (base.type === 'goal_box') {
+                roadData.targetCount = pendingGoalCount;
             }
             ROAD_LIB[id] = { ...roadData, id: id };
             // 현재 슬롯에 자동 장착
@@ -1223,6 +1375,13 @@
             );
             launchedBalls.forEach(b => World.remove(world, b));
             marble = null;
+            hideEndMessage();
+
+            Composite.allBodies(world).forEach(body => {
+                if (body.plugin && body.plugin.type === 'goal_box') {
+                    body.plugin.enteredMarbleIds = [];
+                }
+            });
 
             // 배치 구슬들 원래 위치로 복원 + sleeping
             placedMarbles.forEach(pm => {
@@ -1409,6 +1568,12 @@
                 const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
                 const theMarble = isMarbleLabel(bodyA.label) ? bodyA : (isMarbleLabel(bodyB.label) ? bodyB : null);
                 const theSlime = bodyA.label === 'slime' ? bodyA : (bodyB.label === 'slime' ? bodyB : null);
+                const goalSensor = bodyA.plugin?.type === 'goal_sensor' ? bodyA : (bodyB.plugin?.type === 'goal_sensor' ? bodyB : null);
+                const countedMarble = (
+                    bodyA.label === 'marble' || bodyA.label === 'steel_marble' || bodyA.label === 'place_marble'
+                ) ? bodyA : (
+                    (bodyB.label === 'marble' || bodyB.label === 'steel_marble' || bodyB.label === 'place_marble') ? bodyB : null
+                );
 
                 if (theMarble && theSlime) {
                     const incomingSpeed = Math.sqrt(theMarble.velocity.x ** 2 + theMarble.velocity.y ** 2);
@@ -1423,6 +1588,17 @@
                         x: keepX + nx * bounceSpeed,
                         y: ny * bounceSpeed
                     });
+                }
+
+                if (goalSensor && countedMarble) {
+                    const goalBody = goalSensor.parent;
+                    goalBody.plugin.enteredMarbleIds = goalBody.plugin.enteredMarbleIds || [];
+                    if (!goalBody.plugin.enteredMarbleIds.includes(countedMarble.id)) {
+                        goalBody.plugin.enteredMarbleIds.push(countedMarble.id);
+                        if (goalBody.plugin.enteredMarbleIds.length >= (goalBody.plugin.targetCount || 1)) {
+                            showEndMessage();
+                        }
+                    }
                 }
 
                 // 배치 구슬 및 밀리는 길 횟수 로직
