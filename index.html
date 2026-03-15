@@ -456,6 +456,10 @@
             'magnet':    { id: 'magnet', name: '붙어있는 자석', w: 16, h: 16, color: '#e53935', restitution: 0.0, pw: 10, ph: 10, type: 'magnet', isAttached: true, magnetStrength: 3 }
         };
 
+        function isEscalatorKey(key) {
+            return typeof key === 'string' && key.startsWith('escalator');
+        }
+
         function mergeCustomRoad(docId, data) {
             if (!data || !data.baseKey || !ROAD_LIB[data.baseKey]) return;
             const base = ROAD_LIB[data.baseKey];
@@ -1109,15 +1113,17 @@
                     newBody = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else {
                     // 일반 블록
+                    const behaviorKey = conf.baseKey || conf.id;
+                    const bodyLabel = (behaviorKey === 'slime' || isEscalatorKey(behaviorKey)) ? behaviorKey : conf.id;
                     newBody = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, {
                         isStatic: true,
-                        label: conf.id,
+                        label: bodyLabel,
                         angle: ghostAngle,
                         friction: 0,
                         frictionStatic: 0,
                         restitution: conf.restitution,
                         render: { fillStyle: conf.color },
-                        plugin: { w: conf.w, h: conf.h },
+                        plugin: { w: conf.w, h: conf.h, baseKey: behaviorKey },
                         slop: 0
                     });
                 }
@@ -1150,6 +1156,7 @@
                 const box = document.getElementById('custom-draw-box');
                 const baseConf = ROAD_LIB[customBaseKey];
                 const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
+                const isEscalatorBase = isEscalatorKey(customBaseKey);
                 
                 if (isCircleBase) {
                     // 원형: 드래그 거리를 지름으로 사용
@@ -1160,6 +1167,14 @@
                     box.style.top = (customStartScreen.y - diameter/2) + 'px';
                     box.style.width = diameter + 'px';
                     box.style.height = diameter + 'px';
+                } else if (isEscalatorBase && baseConf) {
+                    const dx = e.clientX - customStartScreen.x;
+                    const dy = e.clientY - customStartScreen.y;
+                    const length = Math.max(10, Math.round(Math.sqrt(dx * dx + dy * dy)));
+                    box.style.left = (customStartScreen.x - length / 2) + 'px';
+                    box.style.top = (customStartScreen.y - baseConf.h / 2) + 'px';
+                    box.style.width = length + 'px';
+                    box.style.height = baseConf.h + 'px';
                 } else {
                     // 사각형
                     const x = Math.min(e.clientX, customStartScreen.x);
@@ -1191,6 +1206,7 @@
                 
                 const baseConf = ROAD_LIB[customBaseKey];
                 const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
+                const isEscalatorBase = isEscalatorKey(customBaseKey);
                 
                 if (isCircleBase) {
                     // 원형: 드래그 거리 = 지름
@@ -1201,6 +1217,17 @@
                         pendingCustomW = diameter;
                         pendingCustomH = diameter;
                         document.getElementById('custom-size-info').innerText = `크기: ⌀ ${diameter} px (원형)`;
+                        document.getElementById('custom-name-input').value = '';
+                        document.getElementById('custom-save-modal').style.display = 'block';
+                    }
+                } else if (isEscalatorBase && baseConf) {
+                    const dx = e.clientX - customStartScreen.x;
+                    const dy = e.clientY - customStartScreen.y;
+                    const length = Math.round(Math.sqrt(dx * dx + dy * dy));
+                    if (length >= 10) {
+                        pendingCustomW = length;
+                        pendingCustomH = baseConf.h;
+                        document.getElementById('custom-size-info').innerText = `크기: ${pendingCustomW} × ${pendingCustomH} px (두께 고정)`;
                         document.getElementById('custom-name-input').value = '';
                         document.getElementById('custom-save-modal').style.display = 'block';
                     }
@@ -1420,20 +1447,23 @@
         function saveCustomRoad() {
             const base = ROAD_LIB[customBaseKey];
             if (!base) { cancelCustomSave(); return; }
+            const isEscalatorBase = isEscalatorKey(customBaseKey);
+            const customW = pendingCustomW;
+            const customH = isEscalatorBase ? base.h : pendingCustomH;
             const defaultName = pendingHitCount > 1 
-                ? `${base.name}(${pendingCustomW}×${pendingCustomH}, ${pendingHitCount}타)` 
-                : `${base.name}(${pendingCustomW}×${pendingCustomH})`;
-            const goalDefaultName = `${base.name}(${pendingCustomW}×${pendingCustomH}, ${pendingGoalCount}개)`;
+                ? `${base.name}(${customW}×${customH}, ${pendingHitCount}타)` 
+                : `${base.name}(${customW}×${customH})`;
+            const goalDefaultName = `${base.name}(${customW}×${customH}, ${pendingGoalCount}개)`;
             const name = document.getElementById('custom-name-input').value.trim() || (base.type === 'goal_box' ? goalDefaultName : defaultName);
             const id = 'custom_' + Date.now();
             const roadData = {
                 ...base,
                 baseKey: customBaseKey,
                 name: name,
-                w: pendingCustomW,
-                h: pendingCustomH,
-                pw: Math.min(30, Math.round(pendingCustomW / 5)),
-                ph: Math.min(25, Math.round(pendingCustomH / 3))
+                w: customW,
+                h: customH,
+                pw: Math.min(30, Math.round(customW / 5)),
+                ph: Math.min(25, Math.round(customH / 3))
             };
             if (pendingHitCount > 1) {
                 roadData.hitThreshold = pendingHitCount;
