@@ -977,6 +977,53 @@
             });
         }
 
+        function getSupportCenter(supports, fallback) {
+            if (!supports || supports.length === 0) {
+                return { x: fallback.x, y: fallback.y };
+            }
+            const total = supports.reduce((acc, support) => {
+                acc.x += support.x;
+                acc.y += support.y;
+                return acc;
+            }, { x: 0, y: 0 });
+            return {
+                x: total.x / supports.length,
+                y: total.y / supports.length
+            };
+        }
+
+        function getBodyNormalExtent(body, normal) {
+            return body.vertices.reduce((maxExtent, vertex) => {
+                const projection = (vertex.x - body.position.x) * normal.x + (vertex.y - body.position.y) * normal.y;
+                return Math.max(maxExtent, projection);
+            }, 0);
+        }
+
+        function getEscalatorContactData(pair, targetBody, escalatorBody) {
+            const support = getSupportCenter(pair.collision?.supports, escalatorBody.position);
+            let nx = targetBody.position.x - support.x;
+            let ny = targetBody.position.y - support.y;
+            let length = Math.hypot(nx, ny);
+
+            if (length < 0.001) {
+                nx = pair.collision?.normal?.x || 0;
+                ny = pair.collision?.normal?.y || -1;
+                const toTargetX = targetBody.position.x - escalatorBody.position.x;
+                const toTargetY = targetBody.position.y - escalatorBody.position.y;
+                if ((nx * toTargetX) + (ny * toTargetY) < 0) {
+                    nx *= -1;
+                    ny *= -1;
+                }
+                length = Math.hypot(nx, ny) || 1;
+            }
+
+            return {
+                support,
+                normalX: nx / length,
+                normalY: ny / length
+            };
+        }
+
         function updateGhostStyle() {
             const conf = ROAD_LIB[slots[currentSlotIndex]];
             const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
@@ -1602,6 +1649,7 @@
                     Body.setVelocity(p, { x: 0, y: 0 });
                     Body.setAngularVelocity(p, 0);
                     Body.setAngle(p, p.plugin.originAngle || 0);
+                    p.plugin.escalatorContact = null;
                     
                     if (p.plugin.hitThreshold > 1) {
                         Body.setStatic(p, true);
@@ -1863,26 +1911,57 @@
                     const speed = 4;
                     const tangentX = Math.cos(angle);
                     const tangentY = Math.sin(angle);
-                    const relX = theEscalatorTarget.position.x - theEscalator.position.x;
-                    const relY = theEscalatorTarget.position.y - theEscalator.position.y;
-                    const normalSign = (relX * -tangentY + relY * tangentX) >= 0 ? 1 : -1;
-                    const normalX = -tangentY * normalSign;
-                    const normalY = tangentX * normalSign;
                     
                     // 컨베이어(표면) 이동 방향 벡터
                     const moveX = tangentX * dir * speed;
                     const moveY = tangentY * dir * speed;
 
-                    // 밀리는 벽은 표면 쪽으로 당겨서 공처럼 에스컬레이터에 달라붙게 만든다.
                     const currentVel = theEscalatorTarget.velocity;
-                    const lerp = isPushableTarget ? 0.7 : 0.4;
-                    const stickStrength = isPushableTarget ? 1.8 : 0;
-                    if (isPushableTarget && theEscalatorTarget.isSleeping) {
-                        Sleeping.set(theEscalatorTarget, false);
+                    if (isPushableTarget) {
+                        if (theEscalatorTarget.isSleeping) {
+                            Sleeping.set(theEscalatorTarget, false);
+                        }
+
+                        const contact = getEscalatorContactData(pair, theEscalatorTarget, theEscalator);
+                        theEscalatorTarget.plugin.escalatorContact = {
+                            escalatorId: theEscalator.id,
+                            normalX: contact.normalX,
+                            normalY: contact.normalY
+                        };
+
+                        const extent = getBodyNormalExtent(theEscalatorTarget, {
+                            x: contact.normalX,
+                            y: contact.normalY
+                        });
+                        const currentDistance =
+                            ((theEscalatorTarget.position.x - contact.support.x) * contact.normalX) +
+                            ((theEscalatorTarget.position.y - contact.support.y) * contact.normalY);
+                        const desiredDistance = extent + 0.75;
+                        const correction = Math.max(-2.5, Math.min(2.5, desiredDistance - currentDistance));
+
+                        if (Math.abs(correction) > 0.001) {
+                            Body.setPosition(theEscalatorTarget, {
+                                x: theEscalatorTarget.position.x + contact.normalX * correction,
+                                y: theEscalatorTarget.position.y + contact.normalY * correction
+                            });
+                        }
+
+                        const tangentSpeed = (currentVel.x * tangentX) + (currentVel.y * tangentY);
+                        const normalSpeed = (currentVel.x * contact.normalX) + (currentVel.y * contact.normalY);
+                        const nextTangentSpeed = tangentSpeed + ((dir * speed) - tangentSpeed) * 0.72;
+                        const nextNormalSpeed = Math.min(normalSpeed, 0) * 0.15 - 0.1;
+
+                        Body.setVelocity(theEscalatorTarget, {
+                            x: tangentX * nextTangentSpeed + contact.normalX * nextNormalSpeed,
+                            y: tangentY * nextTangentSpeed + contact.normalY * nextNormalSpeed
+                        });
+                        Body.setAngularVelocity(theEscalatorTarget, theEscalatorTarget.angularVelocity * 0.15);
+                        return;
                     }
-                    Body.setVelocity(theEscalatorTarget, { 
-                        x: currentVel.x + (moveX - currentVel.x) * lerp + (isPushableTarget ? moveX * 0.08 : 0) - normalX * stickStrength, 
-                        y: currentVel.y + (moveY - currentVel.y) * lerp + (isPushableTarget ? moveY * 0.08 : 0) - normalY * stickStrength
+
+                    Body.setVelocity(theEscalatorTarget, {
+                        x: currentVel.x + (moveX - currentVel.x) * 0.4,
+                        y: currentVel.y + (moveY - currentVel.y) * 0.4
                     });
                 }
             });
@@ -1933,6 +2012,14 @@
             getTunnelSensitiveBodies().forEach(body => {
                 body.plugin = body.plugin || {};
                 body.plugin.prevPosition = { x: body.position.x, y: body.position.y };
+            });
+        });
+
+        Events.on(engine, 'beforeUpdate', () => {
+            pushables.forEach(body => {
+                if (body.plugin) {
+                    body.plugin.escalatorContact = null;
+                }
             });
         });
 
