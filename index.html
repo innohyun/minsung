@@ -1860,7 +1860,7 @@
                     let dir = theEscalator.label.includes('_l_') ? -1 : 1;
 
                     const isPushableTarget = theEscalatorTarget.plugin?.type === 'pushable';
-                    const speed = isPushableTarget ? 3.8 : 4;
+                    const speed = 4;
                     
                     // 컨베이어(표면) 이동 방향 벡터
                     const moveX = Math.cos(angle) * dir * speed;
@@ -1869,13 +1869,13 @@
                     // 강제적인 표면 밀착(pull) 로직을 제거하고 속도 보간(Lerp)을 사용하여
                     // 여러 블록 사이를 지날 때 끊기거나 튀는 현상 방지
                     const currentVel = theEscalatorTarget.velocity;
-                    const lerp = isPushableTarget ? 0.42 : 0.4;
+                    const lerp = isPushableTarget ? 0.7 : 0.4;
                     if (isPushableTarget && theEscalatorTarget.isSleeping) {
                         Sleeping.set(theEscalatorTarget, false);
                     }
                     Body.setVelocity(theEscalatorTarget, { 
-                        x: currentVel.x + (moveX - currentVel.x) * lerp, 
-                        y: currentVel.y + (moveY - currentVel.y) * lerp
+                        x: currentVel.x + (moveX - currentVel.x) * lerp + (isPushableTarget ? moveX * 0.08 : 0), 
+                        y: currentVel.y + (moveY - currentVel.y) * lerp + (isPushableTarget ? moveY * 0.08 : 0)
                     });
                 }
             });
