@@ -1807,6 +1807,21 @@
             return activeMagnets.find(mag => mag.id === magnetId) || null;
         }
 
+        function getTunnelSensitiveBodies() {
+            return Composite.allBodies(world).filter(body =>
+                !body.isStatic &&
+                body.circleRadius &&
+                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble')
+            );
+        }
+
+        Events.on(engine, 'beforeUpdate', () => {
+            getTunnelSensitiveBodies().forEach(body => {
+                body.plugin = body.plugin || {};
+                body.plugin.prevPosition = { x: body.position.x, y: body.position.y };
+            });
+        });
+
         Events.on(engine, 'beforeUpdate', () => {
             const steelBodies = Composite.allBodies(world).filter(b => b.label === 'steel_marble');
             const activeMagnets = magnets.filter(m => Composite.allBodies(world).includes(m));
@@ -1951,6 +1966,41 @@
                     Sleeping.set(b, false);
                     if (b.render) b.render.opacity = 1.0;
                 }
+            });
+        });
+
+        Events.on(engine, 'afterUpdate', () => {
+            const staticSolids = Composite.allBodies(world).filter(body =>
+                body.isStatic &&
+                !body.isSensor &&
+                body.label !== 'slime'
+            );
+
+            getTunnelSensitiveBodies().forEach(body => {
+                const prev = body.plugin?.prevPosition;
+                if (!prev) return;
+
+                const dx = body.position.x - prev.x;
+                const dy = body.position.y - prev.y;
+                const travel = Math.sqrt(dx * dx + dy * dy);
+                if (travel < Math.max(8, body.circleRadius * 0.75)) return;
+
+                const collisions = Query.ray(staticSolids, prev, body.position, body.circleRadius * 1.2);
+                if (collisions.length === 0) return;
+
+                const collision = collisions[0];
+                const support = collision.supports && collision.supports[0] ? collision.supports[0] : body.position;
+                const nx = dx / travel;
+                const ny = dy / travel;
+
+                Body.setPosition(body, {
+                    x: support.x - nx * (body.circleRadius + 1),
+                    y: support.y - ny * (body.circleRadius + 1)
+                });
+                Body.setVelocity(body, {
+                    x: body.velocity.x * 0.15,
+                    y: body.velocity.y * 0.15
+                });
             });
         });
 
