@@ -182,6 +182,47 @@
             background: rgba(59,130,246,0.08); pointer-events: none;
             z-index: 50; display: none; border-radius: 4px;
         }
+        #minimap-panel {
+            position: absolute;
+            right: 18px;
+            bottom: 96px;
+            z-index: 120;
+            width: min(240px, 34vw);
+            height: 160px;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(18px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            overflow: hidden;
+            pointer-events: auto;
+        }
+        #minimap-label {
+            position: absolute;
+            top: 10px;
+            left: 12px;
+            z-index: 2;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-dim);
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            pointer-events: none;
+        }
+        #minimap-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: pointer;
+        }
+        @media (max-width: 768px) {
+            #minimap-panel {
+                right: 12px;
+                bottom: 92px;
+                width: min(180px, 42vw);
+                height: 120px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -274,6 +315,10 @@
     <div id="spawner-indicator" class="world-node">↓</div>
     <div id="selection-indicator" class="world-node"></div>
     <div id="ghost-element"></div>
+    <div id="minimap-panel">
+        <div id="minimap-label">Mini Map</div>
+        <canvas id="minimap-canvas" width="240" height="160"></canvas>
+    </div>
     <div id="canvas-container"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
@@ -490,6 +535,140 @@
         const indicator = document.getElementById('selection-indicator');
         const spawnerNode = document.getElementById('spawner-indicator');
         const errorMsg = document.getElementById('error-msg');
+        const minimapPanel = document.getElementById('minimap-panel');
+        const minimapCanvas = document.getElementById('minimap-canvas');
+        const minimapCtx = minimapCanvas.getContext('2d');
+        const MINIMAP_PADDING = 80;
+        const DEFAULT_MINIMAP_EXTENT = {
+            minX: -600,
+            maxX: 600,
+            minY: -200,
+            maxY: 1000
+        };
+
+        function syncCameraBounds() {
+            render.bounds.min.x = cameraPos.x;
+            render.bounds.max.x = cameraPos.x + window.innerWidth;
+            render.bounds.min.y = cameraPos.y;
+            render.bounds.max.y = cameraPos.y + window.innerHeight;
+            container.style.backgroundPosition = `${-cameraPos.x}px ${-cameraPos.y}px`;
+        }
+
+        function setCameraPosition(x, y) {
+            cameraPos.x = x;
+            cameraPos.y = y;
+            syncCameraBounds();
+        }
+
+        function centerCameraOn(x, y) {
+            setCameraPosition(x - window.innerWidth / 2, y - window.innerHeight / 2);
+        }
+
+        function resizeMinimapCanvas() {
+            const rect = minimapPanel.getBoundingClientRect();
+            minimapCanvas.width = Math.max(120, Math.round(rect.width));
+            minimapCanvas.height = Math.max(90, Math.round(rect.height));
+        }
+
+        function getMinimapBodies() {
+            return Composite.allBodies(world).filter(body =>
+                body !== ground &&
+                body.label !== 'marble' &&
+                body.label !== 'steel_marble' &&
+                body.label !== 'place_marble'
+            );
+        }
+
+        function getMinimapExtent() {
+            const bodies = getMinimapBodies();
+            if (bodies.length === 0) {
+                return { ...DEFAULT_MINIMAP_EXTENT };
+            }
+
+            let minX = Infinity;
+            let maxX = -Infinity;
+            let minY = Infinity;
+            let maxY = -Infinity;
+
+            bodies.forEach(body => {
+                minX = Math.min(minX, body.bounds.min.x);
+                maxX = Math.max(maxX, body.bounds.max.x);
+                minY = Math.min(minY, body.bounds.min.y);
+                maxY = Math.max(maxY, body.bounds.max.y);
+            });
+
+            return {
+                minX: minX - MINIMAP_PADDING,
+                maxX: maxX + MINIMAP_PADDING,
+                minY: minY - MINIMAP_PADDING,
+                maxY: maxY + MINIMAP_PADDING
+            };
+        }
+
+        function worldToMinimapPoint(x, y, extent) {
+            const width = Math.max(1, extent.maxX - extent.minX);
+            const height = Math.max(1, extent.maxY - extent.minY);
+            return {
+                x: ((x - extent.minX) / width) * minimapCanvas.width,
+                y: ((y - extent.minY) / height) * minimapCanvas.height
+            };
+        }
+
+        function drawMinimap() {
+            const extent = getMinimapExtent();
+            const width = minimapCanvas.width;
+            const height = minimapCanvas.height;
+            const worldWidth = Math.max(1, extent.maxX - extent.minX);
+            const worldHeight = Math.max(1, extent.maxY - extent.minY);
+
+            minimapCtx.clearRect(0, 0, width, height);
+            minimapCtx.fillStyle = '#eef2f6';
+            minimapCtx.fillRect(0, 0, width, height);
+
+            minimapCtx.strokeStyle = 'rgba(0,0,0,0.05)';
+            minimapCtx.lineWidth = 1;
+            for (let x = 0; x <= width; x += 24) {
+                minimapCtx.beginPath();
+                minimapCtx.moveTo(x, 0);
+                minimapCtx.lineTo(x, height);
+                minimapCtx.stroke();
+            }
+            for (let y = 0; y <= height; y += 24) {
+                minimapCtx.beginPath();
+                minimapCtx.moveTo(0, y);
+                minimapCtx.lineTo(width, y);
+                minimapCtx.stroke();
+            }
+
+            getMinimapBodies().forEach(body => {
+                minimapCtx.save();
+                const center = worldToMinimapPoint(body.position.x, body.position.y, extent);
+                minimapCtx.translate(center.x, center.y);
+                minimapCtx.rotate(body.angle);
+                minimapCtx.fillStyle = body.render?.fillStyle || '#7a6652';
+
+                if (body.circleRadius) {
+                    const radius = Math.max(2, (body.circleRadius / worldWidth) * width);
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(0, 0, radius, 0, Math.PI * 2);
+                    minimapCtx.fill();
+                } else {
+                    const bodyWidth = Math.max(3, ((body.bounds.max.x - body.bounds.min.x) / worldWidth) * width);
+                    const bodyHeight = Math.max(3, ((body.bounds.max.y - body.bounds.min.y) / worldHeight) * height);
+                    minimapCtx.fillRect(-bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight);
+                }
+                minimapCtx.restore();
+            });
+
+            const viewportTopLeft = worldToMinimapPoint(cameraPos.x, cameraPos.y, extent);
+            const viewportWidth = Math.max(8, (window.innerWidth / worldWidth) * width);
+            const viewportHeight = Math.max(8, (window.innerHeight / worldHeight) * height);
+            minimapCtx.strokeStyle = 'rgba(59,130,246,0.95)';
+            minimapCtx.lineWidth = 2;
+            minimapCtx.strokeRect(viewportTopLeft.x, viewportTopLeft.y, viewportWidth, viewportHeight);
+            minimapCtx.fillStyle = 'rgba(59,130,246,0.12)';
+            minimapCtx.fillRect(viewportTopLeft.x, viewportTopLeft.y, viewportWidth, viewportHeight);
+        }
 
         function updateGhostStyle() {
             const conf = ROAD_LIB[slots[currentSlotIndex]];
@@ -503,6 +682,7 @@
         }
 
         // Initialize UI
+        resizeMinimapCanvas();
         renderSlots();
         renderLibrary();
         updateGhostStyle();
@@ -528,7 +708,7 @@
         });
 
         window.addEventListener('mousedown', (e) => {
-            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal')) return;
+            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel')) return;
 
             if (e.button === 2) { 
                 isPanning = true;
@@ -664,15 +844,8 @@
                     const panSensitivity = 0.5;
                     const dx = (e.clientX - lastMousePos.x) * panSensitivity;
                     const dy = (e.clientY - lastMousePos.y) * panSensitivity;
-                    cameraPos.x -= dx;
-                    cameraPos.y -= dy;
+                    setCameraPosition(cameraPos.x - dx, cameraPos.y - dy);
                     lastMousePos = { x: e.clientX, y: e.clientY };
-                    
-                    render.bounds.min.x = cameraPos.x;
-                    render.bounds.max.x = cameraPos.x + window.innerWidth;
-                    render.bounds.min.y = cameraPos.y;
-                    render.bounds.max.y = cameraPos.y + window.innerHeight;
-                    container.style.backgroundPosition = `${-cameraPos.x}px ${-cameraPos.y}px`;
                     return;
                 }
             }
@@ -707,7 +880,7 @@
                     box.style.height = h + 'px';
                 }
             } else {
-                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal')) {
+                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel')) {
                     ghost.style.display = 'none';
                 } else if (!isCustomMode) {
                     ghost.style.display = 'block';
@@ -788,6 +961,16 @@
             requestAnimationFrame(updateUI);
         })();
 
+        minimapCanvas.addEventListener('click', (e) => {
+            const rect = minimapCanvas.getBoundingClientRect();
+            const extent = getMinimapExtent();
+            const clickX = (e.clientX - rect.left) / rect.width;
+            const clickY = (e.clientY - rect.top) / rect.height;
+            const worldX = extent.minX + clickX * (extent.maxX - extent.minX);
+            const worldY = extent.minY + clickY * (extent.maxY - extent.minY);
+            centerCameraOn(worldX, worldY);
+        });
+
         function handleRotation(dir) {
             if (!selectedBody) return;
             const now = Date.now();
@@ -818,12 +1001,7 @@
                 placedMarbles = [];
                 magnets = [];
                 pushables = [];
-                cameraPos = { x: 0, y: 0 };
-                render.bounds.min.x = 0;
-                render.bounds.max.x = window.innerWidth;
-                render.bounds.min.y = 0;
-                render.bounds.max.y = window.innerHeight;
-                container.style.backgroundPosition = `0px 0px`;
+                setCameraPosition(0, 0);
             } else if (e.key.toLowerCase() === 'f') {
                 toggleFollowMode();
             } else if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -1212,14 +1390,10 @@
                 const targetY = marble.position.y - window.innerHeight / 2;
                 
                 // 부드러운 카메라 이동 (lerp)
-                cameraPos.x += (targetX - cameraPos.x) * 0.1;
-                cameraPos.y += (targetY - cameraPos.y) * 0.1;
-
-                render.bounds.min.x = cameraPos.x;
-                render.bounds.max.x = cameraPos.x + window.innerWidth;
-                render.bounds.min.y = cameraPos.y;
-                render.bounds.max.y = cameraPos.y + window.innerHeight;
-                container.style.backgroundPosition = `${-cameraPos.x}px ${-cameraPos.y}px`;
+                setCameraPosition(
+                    cameraPos.x + (targetX - cameraPos.x) * 0.1,
+                    cameraPos.y + (targetY - cameraPos.y) * 0.1
+                );
             }
         });
 
@@ -1323,6 +1497,8 @@
                     ctx.restore();
                 }
             });
+
+            drawMinimap();
         });
 
         window.addEventListener('resize', () => {
@@ -1331,6 +1507,8 @@
             render.bounds.max.x = render.bounds.min.x + window.innerWidth;
             render.bounds.max.y = render.bounds.min.y + window.innerHeight;
             SPAWN_POINT.x = window.innerWidth / 2;
+            resizeMinimapCanvas();
+            syncCameraBounds();
         });
     </script>
 </body>
