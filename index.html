@@ -863,9 +863,9 @@
                         isStatic: isAttached,
                         label: 'magnet',
                         restitution: 0,
-                        friction: 0.02,
-                        frictionAir: isAttached ? 0.02 : 0.08,
-                        density: isAttached ? 0.8 : 0.18,
+                        friction: 0.08,
+                        frictionAir: isAttached ? 0.04 : 0.14,
+                        density: isAttached ? 0.7 : 0.08,
                         render: { fillStyle: conf.color, opacity: isAttached ? 1.0 : 0.95 },
                         plugin: {
                             type: 'magnet',
@@ -1481,12 +1481,12 @@
         // 자석이 쇠구슬과 이동형 자석을 끌어당기는 로직
         function getMagnetRange(magnetBody) {
             const strength = magnetBody.plugin?.magnetStrength || 3;
-            return 40 + strength * 16;
+            return 18 + strength * 7;
         }
 
         function getMagnetPull(magnetBody) {
             const strength = magnetBody.plugin?.magnetStrength || 3;
-            return 0.45 + strength * 0.3;
+            return 0.03 + strength * 0.018;
         }
 
         Events.on(engine, 'beforeUpdate', () => {
@@ -1506,22 +1506,24 @@
                             Sleeping.set(steel, false);
                             steel.render.opacity = 1.0;
                         }
-                        // 가까울수록 강하게 끌림 (제곱 비례)
+                        // 짧은 거리에서만 부드럽게 작동하도록 감쇠를 강하게 둔다.
                         const ratio = Math.pow(1 - dist / magnetRange, 2);
                         const pullX = (dx / dist) * magnetPull * ratio;
                         const pullY = (dy / dist) * magnetPull * ratio;
-                        
-                        // 현재 속도에 자석 방향 속도를 더해줌
-                        const vel = steel.velocity;
-                        Body.setVelocity(steel, {
-                            x: vel.x + pullX,
-                            y: vel.y + pullY
-                        });
 
                         if (mag.plugin?.isAttached === false) {
                             Body.setVelocity(mag, {
-                                x: mag.velocity.x - pullX * 0.55,
-                                y: mag.velocity.y - pullY * 0.55
+                                x: mag.velocity.x - pullX * 1.45,
+                                y: mag.velocity.y - pullY * 1.45
+                            });
+                            Body.setVelocity(steel, {
+                                x: steel.velocity.x + pullX * 0.12,
+                                y: steel.velocity.y + pullY * 0.12
+                            });
+                        } else {
+                            Body.setVelocity(steel, {
+                                x: steel.velocity.x + pullX * 0.22,
+                                y: steel.velocity.y + pullY * 0.22
                             });
                         }
                     }
@@ -1542,7 +1544,7 @@
                     const ratio = Math.pow(1 - dist / range, 2);
 
                     if (magA.plugin?.isAttached === false) {
-                        const pullA = getMagnetPull(magB) * ratio;
+                        const pullA = getMagnetPull(magB) * ratio * 0.55;
                         Body.setVelocity(magA, {
                             x: magA.velocity.x - (dx / dist) * pullA,
                             y: magA.velocity.y - (dy / dist) * pullA
@@ -1550,7 +1552,7 @@
                     }
 
                     if (magB.plugin?.isAttached === false) {
-                        const pullB = getMagnetPull(magA) * ratio;
+                        const pullB = getMagnetPull(magA) * ratio * 0.55;
                         Body.setVelocity(magB, {
                             x: magB.velocity.x + (dx / dist) * pullB,
                             y: magB.velocity.y + (dy / dist) * pullB
