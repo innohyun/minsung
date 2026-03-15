@@ -450,6 +450,7 @@
             'escalator_r_s': { id: 'escalator_r_s', name: '에스컬[→짧]', w: 100, h: 20, color: '#d4940a', restitution: 0.0, pw: 20, ph: 5 },
             'escalator_r_l': { id: 'escalator_r_l', name: '에스컬[→긺]', w: 200, h: 20, color: '#d4940a', restitution: 0.0, pw: 30, ph: 5 },
             'pushable':  { id: 'pushable', name: '밀리는 길', w: 120, h: 20, color: '#9575cd', restitution: 0.0, pw: 20, ph: 5, type: 'pushable' },
+            'pushable_basket': { id: 'pushable_basket', name: '밀리는 바구니', w: 140, h: 90, color: '#7e57c2', restitution: 0.0, pw: 20, ph: 12, type: 'pushable_basket' },
             'place_marble': { id: 'place_marble', name: '배치 구슬', w: 30, h: 30, color: '#42a5f5', restitution: 0.5, pw: 15, ph: 15, type: 'place_marble', marbleType: 'normal' },
             'place_steel_marble': { id: 'place_steel_marble', name: '배치 쇠구슬', w: 30, h: 30, color: '#8d99ae', restitution: 0.3, pw: 15, ph: 15, type: 'place_marble', marbleType: 'steel' },
             'goal_box': { id: 'goal_box', name: '엔드 박스', w: 140, h: 90, color: '#0f766e', restitution: 0.0, pw: 20, ph: 12, type: 'goal_box', targetCount: 1 },
@@ -592,7 +593,7 @@
                     ev.stopPropagation();
                     customBaseKey = key;
 
-                    if (conf.type === 'pushable') {
+                    if (conf.type === 'pushable' || conf.type === 'pushable_basket') {
                         document.getElementById('pushable-setup-modal').style.display = 'block';
                         document.getElementById('pushable-hit-input').value = 1;
                     } else if (conf.type === 'goal_box') {
@@ -937,6 +938,45 @@
             return goalBody;
         }
 
+        function createPushableBasketBody(x, y, conf, angle) {
+            const w = conf.w;
+            const h = conf.h;
+            const wall = Math.max(10, Math.round(Math.min(w, h) * 0.12));
+            const threshold = conf.hitThreshold || 1;
+            const isInitiallyStatic = threshold > 1;
+            const common = {
+                friction: 0.05,
+                frictionStatic: 0.1,
+                restitution: conf.restitution || 0.0,
+                density: 0.8,
+                render: { fillStyle: conf.color, opacity: isInitiallyStatic ? 0.8 : 1.0 }
+            };
+            const leftWall = Bodies.rectangle(x - (w / 2) + (wall / 2), y, wall, h, common);
+            const rightWall = Bodies.rectangle(x + (w / 2) - (wall / 2), y, wall, h, common);
+            const bottomWall = Bodies.rectangle(x, y + (h / 2) - (wall / 2), w, wall, common);
+            return Body.create({
+                isStatic: isInitiallyStatic,
+                isSleeping: !isInitiallyStatic,
+                label: conf.id,
+                angle,
+                parts: [leftWall, rightWall, bottomWall],
+                render: { fillStyle: conf.color, opacity: isInitiallyStatic ? 0.8 : 1.0 },
+                plugin: {
+                    type: 'pushable',
+                    shape: 'basket',
+                    w,
+                    h,
+                    wall,
+                    originX: x,
+                    originY: y,
+                    originAngle: angle,
+                    hitThreshold: threshold,
+                    currentHits: 0
+                },
+                slop: 0
+            });
+        }
+
         function updateGhostStyle() {
             const conf = ROAD_LIB[slots[currentSlotIndex]];
             const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
@@ -1030,6 +1070,13 @@
                         showError();
                         return;
                     }
+                } else if (conf.type === 'pushable_basket') {
+                    const mockBasket = createPushableBasketBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    if (Query.collides(mockBasket, existingRoads).length > 0) {
+                        showError();
+                        return;
+                    }
                 } else {
                     const mockRoad = isCircleType 
                         ? Bodies.circle(worldPos.x, worldPos.y, conf.w / 2)
@@ -1108,6 +1155,9 @@
                         },
                         slop: 0
                     });
+                    pushables.push(newBody);
+                } else if (conf.type === 'pushable_basket') {
+                    newBody = createPushableBasketBody(worldPos.x, worldPos.y, conf, ghostAngle);
                     pushables.push(newBody);
                 } else if (conf.type === 'goal_box') {
                     newBody = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
@@ -1779,15 +1829,19 @@
             event.pairs.forEach(pair => {
                 const { bodyA, bodyB } = pair;
                 const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
-                const theMarble = isMarbleLabel(bodyA.label) ? bodyA : (isMarbleLabel(bodyB.label) ? bodyB : null);
+                const theEscalatorTarget = (
+                    isMarbleLabel(bodyA.label) || bodyA.plugin?.type === 'pushable'
+                ) ? bodyA : (
+                    (isMarbleLabel(bodyB.label) || bodyB.plugin?.type === 'pushable') ? bodyB : null
+                );
                 const theEscalator = (bodyA.label && bodyA.label.startsWith('escalator')) ? bodyA : ((bodyB.label && bodyB.label.startsWith('escalator')) ? bodyB : null);
 
-                if (theMarble && theEscalator) {
+                if (theEscalatorTarget && theEscalator) {
                     const angle = theEscalator.angle;
                     // _l_ 은 왼쪽(-x 방향)으로, _r_ 은 오른쪽(+x 방향)으로 이동
                     let dir = theEscalator.label.includes('_l_') ? -1 : 1;
 
-                    const speed = 4; // 구슬이 확실히 부드럽게 이동할 수 있도록 안정적인 속도 설정
+                    const speed = theEscalatorTarget.plugin?.type === 'pushable' ? 2.6 : 4; // 무거운 밀리는 벽은 조금 더 천천히 이동
                     
                     // 컨베이어(표면) 이동 방향 벡터
                     const moveX = Math.cos(angle) * dir * speed;
@@ -1795,10 +1849,11 @@
 
                     // 강제적인 표면 밀착(pull) 로직을 제거하고 속도 보간(Lerp)을 사용하여
                     // 여러 블록 사이를 지날 때 끊기거나 튀는 현상 방지
-                    const currentVel = theMarble.velocity;
-                    Body.setVelocity(theMarble, { 
-                        x: currentVel.x + (moveX - currentVel.x) * 0.4, 
-                        y: currentVel.y + (moveY - currentVel.y) * 0.4
+                    const currentVel = theEscalatorTarget.velocity;
+                    const lerp = theEscalatorTarget.plugin?.type === 'pushable' ? 0.24 : 0.4;
+                    Body.setVelocity(theEscalatorTarget, { 
+                        x: currentVel.x + (moveX - currentVel.x) * lerp, 
+                        y: currentVel.y + (moveY - currentVel.y) * lerp
                     });
                 }
             });
