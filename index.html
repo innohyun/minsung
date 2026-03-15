@@ -2091,6 +2091,7 @@
                     const speed = 4;
                     const tangentX = Math.cos(angle);
                     const tangentY = Math.sin(angle);
+                    const escalatorSurfaceOffset = ((theEscalator.plugin?.h || 20) / 2);
                     
                     // 컨베이어(표면) 이동 방향 벡터
                     const moveX = tangentX * dir * speed;
@@ -2124,7 +2125,7 @@
                             tangentOffset,
                             normalX,
                             normalY,
-                            normalOffset: extent + 0.2,
+                            normalOffset: escalatorSurfaceOffset + extent + 0.1,
                             escalatorHalfLength: (theEscalator.plugin?.w || 0) / 2
                         };
                         return;
@@ -2147,8 +2148,8 @@
                             x: normalX,
                             y: normalY
                         });
-                        const targetX = theEscalator.position.x + tangentX * tangentOffset + normalX * (extent + 0.2);
-                        const targetY = theEscalator.position.y + tangentY * tangentOffset + normalY * (extent + 0.2);
+                        const targetX = theEscalator.position.x + tangentX * tangentOffset + normalX * (escalatorSurfaceOffset + extent + 0.1);
+                        const targetY = theEscalator.position.y + tangentY * tangentOffset + normalY * (escalatorSurfaceOffset + extent + 0.1);
                         theEscalatorTarget.plugin.escalatorContact = {
                             escalatorId: theEscalator.id,
                             normalX,
