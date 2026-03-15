@@ -371,6 +371,9 @@
         const customRoadsCollection = db.collection('customRoads');
 
         const engine = Engine.create({ enableSleeping: true });
+        engine.positionIterations = 10;
+        engine.velocityIterations = 8;
+        engine.constraintIterations = 4;
         engine.gravity.y = 1.5; // 중력 강화
         
         const world = engine.world;
@@ -416,7 +419,8 @@
             'escalator_r_s': { id: 'escalator_r_s', name: '에스컬[→짧]', w: 100, h: 20, color: '#d4940a', restitution: 0.0, pw: 20, ph: 5 },
             'escalator_r_l': { id: 'escalator_r_l', name: '에스컬[→긺]', w: 200, h: 20, color: '#d4940a', restitution: 0.0, pw: 30, ph: 5 },
             'pushable':  { id: 'pushable', name: '밀리는 길', w: 120, h: 20, color: '#9575cd', restitution: 0.0, pw: 20, ph: 5, type: 'pushable' },
-            'place_marble': { id: 'place_marble', name: '배치 구슬', w: 30, h: 30, color: '#42a5f5', restitution: 0.5, pw: 15, ph: 15, type: 'place_marble' },
+            'place_marble': { id: 'place_marble', name: '배치 구슬', w: 30, h: 30, color: '#42a5f5', restitution: 0.5, pw: 15, ph: 15, type: 'place_marble', marbleType: 'normal' },
+            'place_steel_marble': { id: 'place_steel_marble', name: '배치 쇠구슬', w: 30, h: 30, color: '#8d99ae', restitution: 0.3, pw: 15, ph: 15, type: 'place_marble', marbleType: 'steel' },
             'magnet':    { id: 'magnet', name: '붙어있는 자석', w: 16, h: 16, color: '#e53935', restitution: 0.0, pw: 10, ph: 10, type: 'magnet', isAttached: true, magnetStrength: 3 }
         };
 
@@ -846,14 +850,20 @@
                     newBody = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2, {
                         isStatic: false,
                         isSleeping: true,
-                        label: 'place_marble',
+                        label: conf.marbleType === 'steel' ? 'steel_marble' : 'place_marble',
                         restitution: conf.restitution,
                         friction: 0.01,
                         frictionAir: 0,
                         bullet: true,
-                        density: 1.5,
+                        density: conf.marbleType === 'steel' ? 6.0 : 1.5,
                         render: { fillStyle: conf.color, opacity: 0.5 },
-                        plugin: { originX: worldPos.x, originY: worldPos.y }
+                        slop: 0,
+                        plugin: {
+                            type: 'place_marble',
+                            marbleType: conf.marbleType || 'normal',
+                            originX: worldPos.x,
+                            originY: worldPos.y
+                        }
                     });
                     placedMarbles.push(newBody);
 
@@ -873,7 +883,8 @@
                             magnetStrength: conf.magnetStrength || 3,
                             originX: worldPos.x,
                             originY: worldPos.y
-                        }
+                        },
+                        slop: 0
                     });
                     magnets.push(newBody);
                 } else if (conf.type === 'pushable') {
@@ -894,7 +905,8 @@
                             type: 'pushable',
                             w: conf.w, h: conf.h, originX: worldPos.x, originY: worldPos.y, originAngle: ghostAngle,
                             hitThreshold: threshold, currentHits: 0
-                        }
+                        },
+                        slop: 0
                     });
                     pushables.push(newBody);
                 } else {
@@ -907,7 +919,8 @@
                         frictionStatic: 0,
                         restitution: conf.restitution,
                         render: { fillStyle: conf.color },
-                        plugin: { w: conf.w, h: conf.h }
+                        plugin: { w: conf.w, h: conf.h },
+                        slop: 0
                     });
                 }
                 World.add(world, newBody);
@@ -1213,12 +1226,24 @@
             // 배치 구슬들 원래 위치로 복원 + sleeping
             placedMarbles.forEach(pm => {
                 if (pm.plugin && pm.plugin.originX !== undefined) {
+                    pm.plugin.attachedMagnetId = null;
+                    pm.plugin.attachedOffset = null;
                     Body.setPosition(pm, { x: pm.plugin.originX, y: pm.plugin.originY });
                     Body.setVelocity(pm, { x: 0, y: 0 });
                     Body.setAngularVelocity(pm, 0);
                     Body.setAngle(pm, 0);
                     Sleeping.set(pm, true);
                     pm.render.opacity = 0.5;
+                }
+            });
+
+            // 붙어있지 않은 자석은 원래 위치로 복원
+            magnets.forEach(mag => {
+                if (mag.plugin && mag.plugin.originX !== undefined && mag.plugin.isAttached === false) {
+                    Body.setPosition(mag, { x: mag.plugin.originX, y: mag.plugin.originY });
+                    Body.setVelocity(mag, { x: 0, y: 0 });
+                    Body.setAngularVelocity(mag, 0);
+                    Body.setAngle(mag, 0);
                 }
             });
 
@@ -1325,13 +1350,13 @@
                     label: 'steel_marble', restitution: 0.3,
                     friction: 0.01, frictionStatic: 0, frictionAir: 0,
                     density: 6.0, render: { fillStyle: '#8d99ae' },
-                    bullet: true
+                    bullet: true, slop: 0
                 })
                 : Bodies.circle(SPAWN_POINT.x, SPAWN_POINT.y, 15, {
                     label: 'marble', restitution: 0.5,
                     friction: 0, frictionStatic: 0, frictionAir: 0,
                     density: 1.5, render: { fillStyle: '#e74c3c' },
-                    bullet: true
+                    bullet: true, slop: 0
                 });
             World.add(world, m);
             marble = m; // 팔로우 카메라용
@@ -1425,7 +1450,7 @@
                         }
                     } 
                     // 배치 구슬 깨우기
-                    else if (b.isSleeping && b.label === 'place_marble') {
+                    else if (b.isSleeping && (b.label === 'place_marble' || (b.plugin && b.plugin.type === 'place_marble'))) {
                         Sleeping.set(b, false);
                         // 깨어나면 불투명도 원래대로 복원
                         b.render.opacity = 1.0;
