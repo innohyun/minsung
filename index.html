@@ -1028,6 +1028,10 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
+        function isEscalatorCarrierPushable(body) {
+            return body?.plugin?.type === 'pushable';
+        }
+
         function isPushableBasket(body) {
             return body?.plugin?.type === 'pushable' && body.plugin?.shape === 'basket';
         }
@@ -1036,50 +1040,50 @@
             return Composite.allBodies(world).find(body => body.id === bodyId) || null;
         }
 
-        function clearPushableBasketCarrierState(basket) {
-            if (!basket?.plugin) return;
-            const state = basket.plugin.carrierState;
-            basket.plugin.carrierState = null;
-            basket.plugin.escalatorContact = null;
-            basket.plugin.prevCarrierPosition = {
-                x: basket.position.x,
-                y: basket.position.y
+        function clearPushableBasketCarrierState(pushable) {
+            if (!pushable?.plugin) return;
+            const state = pushable.plugin.carrierState;
+            pushable.plugin.carrierState = null;
+            pushable.plugin.escalatorContact = null;
+            pushable.plugin.prevCarrierPosition = {
+                x: pushable.position.x,
+                y: pushable.position.y
             };
 
             if (!state) return;
 
-            Body.setAngularVelocity(basket, 0);
+            Body.setAngularVelocity(pushable, 0);
             if (state.wasStatic) {
-                Body.setStatic(basket, true);
-                Body.setVelocity(basket, { x: 0, y: 0 });
+                Body.setStatic(pushable, true);
+                Body.setVelocity(pushable, { x: 0, y: 0 });
                 return;
             }
 
-            Body.setStatic(basket, false);
-            Body.setVelocity(basket, {
+            Body.setStatic(pushable, false);
+            Body.setVelocity(pushable, {
                 x: state.tangentX * state.speed,
                 y: state.tangentY * state.speed
             });
-            Sleeping.set(basket, false);
+            Sleeping.set(pushable, false);
         }
 
-        function updatePushableBasketCarrier(basket) {
-            if (!isPushableBasket(basket)) return;
-            basket.plugin = basket.plugin || {};
+        function updatePushableBasketCarrier(pushable) {
+            if (!isEscalatorCarrierPushable(pushable)) return;
+            pushable.plugin = pushable.plugin || {};
 
-            const contact = basket.plugin.escalatorContact;
-            let state = basket.plugin.carrierState;
+            const contact = pushable.plugin.escalatorContact;
+            let state = pushable.plugin.carrierState;
 
             if (contact && (!state || state.escalatorId !== contact.escalatorId)) {
                 state = {
                     ...contact,
-                    wasStatic: basket.isStatic
+                    wasStatic: pushable.isStatic
                 };
-                basket.plugin.carrierState = state;
-                if (!basket.isStatic) {
-                    Body.setStatic(basket, true);
+                pushable.plugin.carrierState = state;
+                if (!pushable.isStatic) {
+                    Body.setStatic(pushable, true);
                 }
-                Sleeping.set(basket, false);
+                Sleeping.set(pushable, false);
             } else if (contact && state) {
                 state.angle = contact.angle;
                 state.dir = contact.dir;
@@ -1096,14 +1100,14 @@
 
             const escalator = findBodyById(state.escalatorId);
             if (!escalator) {
-                clearPushableBasketCarrierState(basket);
+                clearPushableBasketCarrierState(pushable);
                 return;
             }
 
-            const basketHalfLength = (basket.plugin?.w || 0) / 2;
+            const pushableHalfLength = (pushable.plugin?.w || 0) / 2;
             const nextTangentOffset = state.tangentOffset + state.dir * state.speed;
-            if (Math.abs(nextTangentOffset) > state.escalatorHalfLength + basketHalfLength) {
-                clearPushableBasketCarrierState(basket);
+            if (Math.abs(nextTangentOffset) > state.escalatorHalfLength + pushableHalfLength) {
+                clearPushableBasketCarrierState(pushable);
                 return;
             }
 
@@ -1117,13 +1121,13 @@
                 state.tangentY * state.tangentOffset +
                 state.normalY * state.normalOffset;
 
-            Body.setAngle(basket, state.angle);
-            Body.setPosition(basket, { x: targetX, y: targetY });
-            Body.setVelocity(basket, {
+            Body.setAngle(pushable, state.angle);
+            Body.setPosition(pushable, { x: targetX, y: targetY });
+            Body.setVelocity(pushable, {
                 x: state.tangentX * state.speed,
                 y: state.tangentY * state.speed
             });
-            Body.setAngularVelocity(basket, 0);
+            Body.setAngularVelocity(pushable, 0);
         }
 
         function worldToBodyLocal(body, point) {
@@ -1365,7 +1369,7 @@
                         angle: ghostAngle,
                         friction: 0.05,
                         frictionStatic: 0.1,
-                        restitution: conf.restitution || 0.4,
+                        restitution: conf.restitution,
                         density: 0.8,
                         render: { fillStyle: conf.color, opacity: isInitiallyStatic ? 0.8 : 1.0 },
                         plugin: { 
@@ -2087,7 +2091,6 @@
                     let dir = theEscalator.label.includes('_l_') ? -1 : 1;
 
                     const isPushableTarget = theEscalatorTarget.plugin?.type === 'pushable';
-                    const isBasketTarget = isPushableBasket(theEscalatorTarget);
                     const speed = 4;
                     const tangentX = Math.cos(angle);
                     const tangentY = Math.sin(angle);
@@ -2098,7 +2101,7 @@
                     const moveY = tangentY * dir * speed;
 
                     const currentVel = theEscalatorTarget.velocity;
-                    if (isBasketTarget) {
+                    if (isPushableTarget) {
                         if (theEscalatorTarget.isSleeping) {
                             Sleeping.set(theEscalatorTarget, false);
                         }
@@ -2131,43 +2134,6 @@
                         return;
                     }
 
-                    if (isPushableTarget) {
-                        if (theEscalatorTarget.isSleeping) {
-                            Sleeping.set(theEscalatorTarget, false);
-                        }
-
-                        const relX = theEscalatorTarget.position.x - theEscalator.position.x;
-                        const relY = theEscalatorTarget.position.y - theEscalator.position.y;
-                        const baseNormalX = Math.sin(angle);
-                        const baseNormalY = -Math.cos(angle);
-                        const normalSign = (relX * baseNormalX + relY * baseNormalY) >= 0 ? 1 : -1;
-                        const normalX = baseNormalX * normalSign;
-                        const normalY = baseNormalY * normalSign;
-                        const tangentOffset = relX * tangentX + relY * tangentY;
-                        const extent = getBodyNormalExtent(theEscalatorTarget, {
-                            x: normalX,
-                            y: normalY
-                        });
-                        const targetX = theEscalator.position.x + tangentX * tangentOffset + normalX * (escalatorSurfaceOffset + extent + 0.1);
-                        const targetY = theEscalator.position.y + tangentY * tangentOffset + normalY * (escalatorSurfaceOffset + extent + 0.1);
-                        theEscalatorTarget.plugin.escalatorContact = {
-                            escalatorId: theEscalator.id,
-                            normalX,
-                            normalY
-                        };
-                        Body.setAngle(theEscalatorTarget, angle);
-                        Body.setPosition(theEscalatorTarget, {
-                            x: targetX,
-                            y: targetY
-                        });
-                        Body.setVelocity(theEscalatorTarget, {
-                            x: moveX,
-                            y: moveY
-                        });
-                        Body.setAngularVelocity(theEscalatorTarget, 0);
-                        return;
-                    }
-
                     Body.setVelocity(theEscalatorTarget, {
                         x: currentVel.x + (moveX - currentVel.x) * 0.4,
                         y: currentVel.y + (moveY - currentVel.y) * 0.4
@@ -2179,10 +2145,8 @@
         // 카메라 팔로우 로직
         Events.on(engine, 'afterUpdate', () => {
             pushables.forEach(body => {
-                if (!body.plugin) return;
-                if (body.plugin.shape === 'basket') {
-                    updatePushableBasketCarrier(body);
-                }
+                if (!isEscalatorCarrierPushable(body)) return;
+                updatePushableBasketCarrier(body);
                 if (body.plugin.shape === 'basket' && !body.plugin.carrierState) {
                     body.plugin.prevCarrierPosition = {
                         x: body.position.x,
