@@ -725,64 +725,115 @@
             };
         }
 
-        function worldToMinimapPoint(x, y, extent) {
-            const width = Math.max(1, extent.maxX - extent.minX);
-            const height = Math.max(1, extent.maxY - extent.minY);
+        function getMinimapTransform(extent) {
+            const width = minimapCanvas.width;
+            const height = minimapCanvas.height;
+            const worldWidth = Math.max(1, extent.maxX - extent.minX);
+            const worldHeight = Math.max(1, extent.maxY - extent.minY);
+            const scale = Math.min(width / worldWidth, height / worldHeight);
+            const drawWidth = worldWidth * scale;
+            const drawHeight = worldHeight * scale;
+
             return {
-                x: ((x - extent.minX) / width) * minimapCanvas.width,
-                y: ((y - extent.minY) / height) * minimapCanvas.height
+                width,
+                height,
+                worldWidth,
+                worldHeight,
+                scale,
+                offsetX: (width - drawWidth) / 2,
+                offsetY: (height - drawHeight) / 2
+            };
+        }
+
+        function worldToMinimapPoint(x, y, extent, transform) {
+            return {
+                x: transform.offsetX + (x - extent.minX) * transform.scale,
+                y: transform.offsetY + (y - extent.minY) * transform.scale
+            };
+        }
+
+        function minimapToWorldPoint(x, y, extent, transform) {
+            return {
+                x: extent.minX + (x - transform.offsetX) / transform.scale,
+                y: extent.minY + (y - transform.offsetY) / transform.scale
             };
         }
 
         function drawMinimap() {
             const extent = getMinimapExtent();
-            const width = minimapCanvas.width;
-            const height = minimapCanvas.height;
-            const worldWidth = Math.max(1, extent.maxX - extent.minX);
-            const worldHeight = Math.max(1, extent.maxY - extent.minY);
+            const transform = getMinimapTransform(extent);
+            const { width, height, worldWidth, worldHeight, scale, offsetX, offsetY } = transform;
 
             minimapCtx.clearRect(0, 0, width, height);
-            minimapCtx.fillStyle = '#eef2f6';
+            minimapCtx.fillStyle = '#edf2f7';
             minimapCtx.fillRect(0, 0, width, height);
+            minimapCtx.fillStyle = 'rgba(255,255,255,0.72)';
+            minimapCtx.fillRect(offsetX, offsetY, worldWidth * scale, worldHeight * scale);
 
-            minimapCtx.strokeStyle = 'rgba(0,0,0,0.05)';
+            const minorGrid = 100;
+            const majorGrid = 500;
+            const startMinorX = Math.floor(extent.minX / minorGrid) * minorGrid;
+            const startMinorY = Math.floor(extent.minY / minorGrid) * minorGrid;
+
+            minimapCtx.strokeStyle = 'rgba(15,23,42,0.06)';
             minimapCtx.lineWidth = 1;
-            for (let x = 0; x <= width; x += 24) {
+            for (let x = startMinorX; x <= extent.maxX; x += minorGrid) {
+                const drawX = offsetX + (x - extent.minX) * scale;
                 minimapCtx.beginPath();
-                minimapCtx.moveTo(x, 0);
-                minimapCtx.lineTo(x, height);
+                minimapCtx.moveTo(drawX, offsetY);
+                minimapCtx.lineTo(drawX, offsetY + worldHeight * scale);
                 minimapCtx.stroke();
             }
-            for (let y = 0; y <= height; y += 24) {
+            for (let y = startMinorY; y <= extent.maxY; y += minorGrid) {
+                const drawY = offsetY + (y - extent.minY) * scale;
                 minimapCtx.beginPath();
-                minimapCtx.moveTo(0, y);
-                minimapCtx.lineTo(width, y);
+                minimapCtx.moveTo(offsetX, drawY);
+                minimapCtx.lineTo(offsetX + worldWidth * scale, drawY);
+                minimapCtx.stroke();
+            }
+
+            minimapCtx.strokeStyle = 'rgba(15,23,42,0.13)';
+            for (let x = Math.floor(extent.minX / majorGrid) * majorGrid; x <= extent.maxX; x += majorGrid) {
+                const drawX = offsetX + (x - extent.minX) * scale;
+                minimapCtx.beginPath();
+                minimapCtx.moveTo(drawX, offsetY);
+                minimapCtx.lineTo(drawX, offsetY + worldHeight * scale);
+                minimapCtx.stroke();
+            }
+            for (let y = Math.floor(extent.minY / majorGrid) * majorGrid; y <= extent.maxY; y += majorGrid) {
+                const drawY = offsetY + (y - extent.minY) * scale;
+                minimapCtx.beginPath();
+                minimapCtx.moveTo(offsetX, drawY);
+                minimapCtx.lineTo(offsetX + worldWidth * scale, drawY);
                 minimapCtx.stroke();
             }
 
             getMinimapBodies().forEach(body => {
                 minimapCtx.save();
-                const center = worldToMinimapPoint(body.position.x, body.position.y, extent);
+                const center = worldToMinimapPoint(body.position.x, body.position.y, extent, transform);
                 minimapCtx.translate(center.x, center.y);
                 minimapCtx.rotate(body.angle);
                 minimapCtx.fillStyle = body.render?.fillStyle || '#7a6652';
 
                 if (body.circleRadius) {
-                    const radius = Math.max(2, (body.circleRadius / worldWidth) * width);
+                    const radius = Math.max(2, body.circleRadius * scale);
                     minimapCtx.beginPath();
                     minimapCtx.arc(0, 0, radius, 0, Math.PI * 2);
                     minimapCtx.fill();
                 } else {
-                    const bodyWidth = Math.max(3, ((body.bounds.max.x - body.bounds.min.x) / worldWidth) * width);
-                    const bodyHeight = Math.max(3, ((body.bounds.max.y - body.bounds.min.y) / worldHeight) * height);
+                    const bodyWidth = Math.max(3, (body.bounds.max.x - body.bounds.min.x) * scale);
+                    const bodyHeight = Math.max(3, (body.bounds.max.y - body.bounds.min.y) * scale);
                     minimapCtx.fillRect(-bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight);
                 }
                 minimapCtx.restore();
             });
 
-            const viewportTopLeft = worldToMinimapPoint(cameraPos.x, cameraPos.y, extent);
-            const viewportWidth = Math.max(8, (window.innerWidth / worldWidth) * width);
-            const viewportHeight = Math.max(8, (window.innerHeight / worldHeight) * height);
+            minimapCtx.strokeStyle = 'rgba(15,23,42,0.12)';
+            minimapCtx.strokeRect(offsetX, offsetY, worldWidth * scale, worldHeight * scale);
+
+            const viewportTopLeft = worldToMinimapPoint(cameraPos.x, cameraPos.y, extent, transform);
+            const viewportWidth = Math.max(8, window.innerWidth * scale);
+            const viewportHeight = Math.max(8, window.innerHeight * scale);
             minimapCtx.strokeStyle = 'rgba(59,130,246,0.95)';
             minimapCtx.lineWidth = 2;
             minimapCtx.strokeRect(viewportTopLeft.x, viewportTopLeft.y, viewportWidth, viewportHeight);
@@ -1172,11 +1223,21 @@
         minimapCanvas.addEventListener('click', (e) => {
             const rect = minimapCanvas.getBoundingClientRect();
             const extent = getMinimapExtent();
-            const clickX = (e.clientX - rect.left) / rect.width;
-            const clickY = (e.clientY - rect.top) / rect.height;
-            const worldX = extent.minX + clickX * (extent.maxX - extent.minX);
-            const worldY = extent.minY + clickY * (extent.maxY - extent.minY);
-            centerCameraOn(worldX, worldY);
+            const transform = getMinimapTransform(extent);
+            const localX = ((e.clientX - rect.left) / rect.width) * minimapCanvas.width;
+            const localY = ((e.clientY - rect.top) / rect.height) * minimapCanvas.height;
+
+            if (
+                localX < transform.offsetX ||
+                localX > transform.offsetX + transform.worldWidth * transform.scale ||
+                localY < transform.offsetY ||
+                localY > transform.offsetY + transform.worldHeight * transform.scale
+            ) {
+                return;
+            }
+
+            const point = minimapToWorldPoint(localX, localY, extent, transform);
+            centerCameraOn(point.x, point.y);
         });
 
         function handleRotation(dir) {
