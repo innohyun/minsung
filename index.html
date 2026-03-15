@@ -462,6 +462,10 @@
             return typeof key === 'string' && key.startsWith('escalator');
         }
 
+        function getShockAbsorberRadius(width, height) {
+            return Math.max(10, Math.round(Math.min(width, height) / 2));
+        }
+
         function resolveRoadBaseKey(key) {
             let currentKey = key;
             const visited = new Set();
@@ -519,7 +523,9 @@
             slots.forEach((roadId, i) => {
                 const conf = ROAD_LIB[roadId];
                 const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
-                const borderR = isCircle ? 'border-radius:50%;' : '';
+                const borderR = isCircle
+                    ? 'border-radius:50%;'
+                    : (conf.type === 'shock_absorber' ? `border-radius:${getShockAbsorberRadius(conf.pw, conf.ph)}px;` : '');
                 slotEls[i].innerHTML = `
                     <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
                     <span>${conf.name}</span>
@@ -590,7 +596,9 @@
                 const el = document.createElement('div');
                 el.className = 'lib-item';
                 const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
-                const borderR = isCircle ? 'border-radius:50%;' : '';
+                const borderR = isCircle
+                    ? 'border-radius:50%;'
+                    : (conf.type === 'shock_absorber' ? `border-radius:${getShockAbsorberRadius(conf.pw, conf.ph)}px;` : '');
                 el.innerHTML = `
                     <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
                     <span>${conf.name}</span>
@@ -1164,7 +1172,7 @@
             const color = body.plugin?.color || body.render?.fillStyle || '#e66a4f';
             const compression = Math.max(0, Math.min(0.34, state.display || 0));
             const stretch = compression * 0.24;
-            const radius = Math.max(8, Math.min(width, height) * 0.28);
+            const radius = getShockAbsorberRadius(width, height);
 
             ctx.save();
             ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
@@ -1412,7 +1420,9 @@
             ghost.style.width = conf.w + 'px';
             ghost.style.height = conf.h + 'px';
             ghost.style.background = conf.color;
-            ghost.style.borderRadius = isCircle ? '50%' : '0';
+            ghost.style.borderRadius = isCircle
+                ? '50%'
+                : (conf.type === 'shock_absorber' ? `${getShockAbsorberRadius(conf.w, conf.h)}px` : '0');
             ghost.style.display = 'block';
             ghost.style.transform = `rotate(${ghostAngle}rad)`;
         }
@@ -1653,6 +1663,7 @@
                 const baseConf = ROAD_LIB[customBaseKey];
                 const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
                 const isEscalatorBase = isEscalatorKey(resolveRoadBaseKey(baseConf?.baseKey || customBaseKey));
+                const isShockAbsorberBase = baseConf?.type === 'shock_absorber';
                 
                 if (isCircleBase) {
                     // 원형: 드래그 거리를 지름으로 사용
@@ -1663,6 +1674,7 @@
                     box.style.top = (customStartScreen.y - diameter/2) + 'px';
                     box.style.width = diameter + 'px';
                     box.style.height = diameter + 'px';
+                    box.style.borderRadius = '50%';
                 } else if (isEscalatorBase && baseConf) {
                     const dx = e.clientX - customStartScreen.x;
                     const dy = e.clientY - customStartScreen.y;
@@ -1671,6 +1683,17 @@
                     box.style.top = (customStartScreen.y - baseConf.h / 2) + 'px';
                     box.style.width = length + 'px';
                     box.style.height = baseConf.h + 'px';
+                    box.style.borderRadius = '0';
+                } else if (isShockAbsorberBase) {
+                    const x = Math.min(e.clientX, customStartScreen.x);
+                    const y = Math.min(e.clientY, customStartScreen.y);
+                    const w = Math.abs(e.clientX - customStartScreen.x);
+                    const h = Math.abs(e.clientY - customStartScreen.y);
+                    box.style.left = x + 'px';
+                    box.style.top = y + 'px';
+                    box.style.width = w + 'px';
+                    box.style.height = h + 'px';
+                    box.style.borderRadius = `${getShockAbsorberRadius(w, h)}px`;
                 } else {
                     // 사각형
                     const x = Math.min(e.clientX, customStartScreen.x);
@@ -1681,6 +1704,7 @@
                     box.style.top = y + 'px';
                     box.style.width = w + 'px';
                     box.style.height = h + 'px';
+                    box.style.borderRadius = '0';
                 }
             } else {
                 if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal')) {
