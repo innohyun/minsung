@@ -1028,6 +1028,104 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
+        function isPushableBasket(body) {
+            return body?.plugin?.type === 'pushable' && body.plugin?.shape === 'basket';
+        }
+
+        function findBodyById(bodyId) {
+            return Composite.allBodies(world).find(body => body.id === bodyId) || null;
+        }
+
+        function clearPushableBasketCarrierState(basket) {
+            if (!basket?.plugin) return;
+            const state = basket.plugin.carrierState;
+            basket.plugin.carrierState = null;
+            basket.plugin.escalatorContact = null;
+            basket.plugin.prevCarrierPosition = {
+                x: basket.position.x,
+                y: basket.position.y
+            };
+
+            if (!state) return;
+
+            Body.setAngularVelocity(basket, 0);
+            if (state.wasStatic) {
+                Body.setStatic(basket, true);
+                Body.setVelocity(basket, { x: 0, y: 0 });
+                return;
+            }
+
+            Body.setStatic(basket, false);
+            Body.setVelocity(basket, {
+                x: state.tangentX * state.speed,
+                y: state.tangentY * state.speed
+            });
+            Sleeping.set(basket, false);
+        }
+
+        function updatePushableBasketCarrier(basket) {
+            if (!isPushableBasket(basket)) return;
+            basket.plugin = basket.plugin || {};
+
+            const contact = basket.plugin.escalatorContact;
+            let state = basket.plugin.carrierState;
+
+            if (contact && (!state || state.escalatorId !== contact.escalatorId)) {
+                state = {
+                    ...contact,
+                    wasStatic: basket.isStatic
+                };
+                basket.plugin.carrierState = state;
+                if (!basket.isStatic) {
+                    Body.setStatic(basket, true);
+                }
+                Sleeping.set(basket, false);
+            } else if (contact && state) {
+                state.angle = contact.angle;
+                state.dir = contact.dir;
+                state.speed = contact.speed;
+                state.normalX = contact.normalX;
+                state.normalY = contact.normalY;
+                state.normalOffset = contact.normalOffset;
+                state.escalatorHalfLength = contact.escalatorHalfLength;
+                state.tangentX = contact.tangentX;
+                state.tangentY = contact.tangentY;
+            }
+
+            if (!state) return;
+
+            const escalator = findBodyById(state.escalatorId);
+            if (!escalator) {
+                clearPushableBasketCarrierState(basket);
+                return;
+            }
+
+            const basketHalfLength = (basket.plugin?.w || 0) / 2;
+            const nextTangentOffset = state.tangentOffset + state.dir * state.speed;
+            if (Math.abs(nextTangentOffset) > state.escalatorHalfLength + basketHalfLength) {
+                clearPushableBasketCarrierState(basket);
+                return;
+            }
+
+            state.tangentOffset = nextTangentOffset;
+            const targetX =
+                escalator.position.x +
+                state.tangentX * state.tangentOffset +
+                state.normalX * state.normalOffset;
+            const targetY =
+                escalator.position.y +
+                state.tangentY * state.tangentOffset +
+                state.normalY * state.normalOffset;
+
+            Body.setAngle(basket, state.angle);
+            Body.setPosition(basket, { x: targetX, y: targetY });
+            Body.setVelocity(basket, {
+                x: state.tangentX * state.speed,
+                y: state.tangentY * state.speed
+            });
+            Body.setAngularVelocity(basket, 0);
+        }
+
         function worldToBodyLocal(body, point) {
             const dx = point.x - body.position.x;
             const dy = point.y - body.position.y;
@@ -1067,7 +1165,7 @@
         }
 
         function carryMarblesInPushableBasket(basket) {
-            if (!basket.plugin?.escalatorContact || basket.plugin.shape !== 'basket') return;
+            if (!basket.plugin?.carrierState || basket.plugin.shape !== 'basket') return;
 
             const prevCarrierPosition = basket.plugin.prevCarrierPosition;
             basket.plugin.prevCarrierPosition = {
@@ -1725,6 +1823,7 @@
                     Body.setAngularVelocity(p, 0);
                     Body.setAngle(p, p.plugin.originAngle || 0);
                     p.plugin.escalatorContact = null;
+                    p.plugin.carrierState = null;
                     p.plugin.prevCarrierPosition = null;
                     
                     if (p.plugin.hitThreshold > 1) {
@@ -1988,6 +2087,7 @@
                     let dir = theEscalator.label.includes('_l_') ? -1 : 1;
 
                     const isPushableTarget = theEscalatorTarget.plugin?.type === 'pushable';
+                    const isBasketTarget = isPushableBasket(theEscalatorTarget);
                     const speed = 4;
                     const tangentX = Math.cos(angle);
                     const tangentY = Math.sin(angle);
@@ -1997,6 +2097,39 @@
                     const moveY = tangentY * dir * speed;
 
                     const currentVel = theEscalatorTarget.velocity;
+                    if (isBasketTarget) {
+                        if (theEscalatorTarget.isSleeping) {
+                            Sleeping.set(theEscalatorTarget, false);
+                        }
+
+                        const relX = theEscalatorTarget.position.x - theEscalator.position.x;
+                        const relY = theEscalatorTarget.position.y - theEscalator.position.y;
+                        const baseNormalX = Math.sin(angle);
+                        const baseNormalY = -Math.cos(angle);
+                        const normalSign = (relX * baseNormalX + relY * baseNormalY) >= 0 ? 1 : -1;
+                        const normalX = baseNormalX * normalSign;
+                        const normalY = baseNormalY * normalSign;
+                        const tangentOffset = relX * tangentX + relY * tangentY;
+                        const extent = getBodyNormalExtent(theEscalatorTarget, {
+                            x: normalX,
+                            y: normalY
+                        });
+                        theEscalatorTarget.plugin.escalatorContact = {
+                            escalatorId: theEscalator.id,
+                            angle,
+                            dir,
+                            speed,
+                            tangentX,
+                            tangentY,
+                            tangentOffset,
+                            normalX,
+                            normalY,
+                            normalOffset: extent + 0.2,
+                            escalatorHalfLength: (theEscalator.plugin?.w || 0) / 2
+                        };
+                        return;
+                    }
+
                     if (isPushableTarget) {
                         if (theEscalatorTarget.isSleeping) {
                             Sleeping.set(theEscalatorTarget, false);
@@ -2046,8 +2179,9 @@
         Events.on(engine, 'afterUpdate', () => {
             pushables.forEach(body => {
                 if (!body.plugin || body.plugin.shape !== 'basket') return;
+                updatePushableBasketCarrier(body);
                 carryMarblesInPushableBasket(body);
-                if (!body.plugin.escalatorContact) {
+                if (!body.plugin.carrierState) {
                     body.plugin.prevCarrierPosition = {
                         x: body.position.x,
                         y: body.position.y
