@@ -1930,7 +1930,23 @@
                             Sleeping.set(theEscalatorTarget, false);
                         }
 
+                        const prevContact = theEscalatorTarget.plugin.escalatorContact;
                         const contact = getEscalatorContactData(pair, theEscalatorTarget, theEscalator);
+                        if (prevContact && prevContact.escalatorId === theEscalator.id) {
+                            let rawNormalX = contact.normalX;
+                            let rawNormalY = contact.normalY;
+                            const dot = rawNormalX * prevContact.normalX + rawNormalY * prevContact.normalY;
+                            if (dot < 0) {
+                                rawNormalX *= -1;
+                                rawNormalY *= -1;
+                            }
+                            const blendedNormalX = prevContact.normalX * 0.82 + rawNormalX * 0.18;
+                            const blendedNormalY = prevContact.normalY * 0.82 + rawNormalY * 0.18;
+                            const blendedLength = Math.hypot(blendedNormalX, blendedNormalY) || 1;
+                            contact.normalX = blendedNormalX / blendedLength;
+                            contact.normalY = blendedNormalY / blendedLength;
+                        }
+
                         theEscalatorTarget.plugin.escalatorContact = {
                             escalatorId: theEscalator.id,
                             normalX: contact.normalX,
@@ -1944,8 +1960,8 @@
                         const currentDistance =
                             ((theEscalatorTarget.position.x - contact.support.x) * contact.normalX) +
                             ((theEscalatorTarget.position.y - contact.support.y) * contact.normalY);
-                        const desiredDistance = extent + 0.75;
-                        const correction = Math.max(-2.5, Math.min(2.5, desiredDistance - currentDistance));
+                        const desiredDistance = extent + 0.35;
+                        const correction = Math.max(-0.75, Math.min(0.75, desiredDistance - currentDistance));
 
                         if (Math.abs(correction) > 0.001) {
                             Body.setPosition(theEscalatorTarget, {
@@ -1956,14 +1972,14 @@
 
                         const tangentSpeed = (currentVel.x * tangentX) + (currentVel.y * tangentY);
                         const normalSpeed = (currentVel.x * contact.normalX) + (currentVel.y * contact.normalY);
-                        const nextTangentSpeed = tangentSpeed + ((dir * speed) - tangentSpeed) * 0.72;
-                        const nextNormalSpeed = Math.min(normalSpeed, 0) * 0.15 - 0.1;
+                        const nextTangentSpeed = tangentSpeed + ((dir * speed) - tangentSpeed) * 0.82;
+                        const nextNormalSpeed = Math.min(normalSpeed, 0) * 0.02 - 0.02;
 
                         Body.setVelocity(theEscalatorTarget, {
                             x: tangentX * nextTangentSpeed + contact.normalX * nextNormalSpeed,
                             y: tangentY * nextTangentSpeed + contact.normalY * nextNormalSpeed
                         });
-                        Body.setAngularVelocity(theEscalatorTarget, theEscalatorTarget.angularVelocity * 0.15);
+                        Body.setAngularVelocity(theEscalatorTarget, 0);
                         return;
                     }
 
