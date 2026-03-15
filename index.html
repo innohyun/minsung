@@ -1493,71 +1493,83 @@
             const steelBodies = Composite.allBodies(world).filter(b => b.label === 'steel_marble');
             const activeMagnets = magnets.filter(m => Composite.allBodies(world).includes(m));
 
-            activeMagnets.forEach(mag => {
-                const magnetRange = getMagnetRange(mag);
-                const magnetPull = getMagnetPull(mag);
-                steelBodies.forEach(steel => {
+            steelBodies.forEach(steel => {
+                let nearestMagnet = null;
+                let nearestDist = Infinity;
+
+                activeMagnets.forEach(mag => {
                     const dx = mag.position.x - steel.position.x;
                     const dy = mag.position.y - steel.position.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < magnetRange && dist > 5) {
-                        // 자석 범위에 들어오면 잠든 구슬 깨우기 (배치용 쇠구슬 대응)
-                        if (steel.isSleeping) {
-                            Sleeping.set(steel, false);
-                            steel.render.opacity = 1.0;
-                        }
-                        // 짧은 거리에서만 부드럽게 작동하도록 감쇠를 강하게 둔다.
-                        const ratio = Math.pow(1 - dist / magnetRange, 2);
-                        const pullX = (dx / dist) * magnetPull * ratio;
-                        const pullY = (dy / dist) * magnetPull * ratio;
-
-                        if (mag.plugin?.isAttached === false) {
-                            Body.setVelocity(mag, {
-                                x: mag.velocity.x - pullX * 1.35,
-                                y: mag.velocity.y - pullY * 1.35
-                            });
-                            Body.setVelocity(steel, {
-                                x: steel.velocity.x + pullX * 0.2,
-                                y: steel.velocity.y + pullY * 0.2
-                            });
-                        } else {
-                            Body.setVelocity(steel, {
-                                x: steel.velocity.x + pullX * 0.5,
-                                y: steel.velocity.y + pullY * 0.5
-                            });
-                        }
-
-                        const contactDistance = (mag.circleRadius || 8) + (steel.circleRadius || 15) + 2;
-                        if (dist < contactDistance) {
-                            const nx = dx / dist;
-                            const ny = dy / dist;
-                            const relativeVelocity = {
-                                x: steel.velocity.x - mag.velocity.x,
-                                y: steel.velocity.y - mag.velocity.y
-                            };
-                            const approachSpeed = relativeVelocity.x * nx + relativeVelocity.y * ny;
-
-                            if (approachSpeed > 0) {
-                                const stickDistance = (mag.circleRadius || 8) + (steel.circleRadius || 15) - 0.5;
-                                Body.setPosition(steel, {
-                                    x: mag.position.x - nx * stickDistance,
-                                    y: mag.position.y - ny * stickDistance
-                                });
-                                Body.setVelocity(steel, {
-                                    x: steel.velocity.x * 0.55,
-                                    y: steel.velocity.y * 0.55
-                                });
-
-                                if (mag.plugin?.isAttached === false) {
-                                    Body.setVelocity(mag, {
-                                        x: mag.velocity.x * 0.82,
-                                        y: mag.velocity.y * 0.82
-                                    });
-                                }
-                            }
-                        }
+                    if (dist < getMagnetRange(mag) && dist < nearestDist) {
+                        nearestMagnet = mag;
+                        nearestDist = dist;
                     }
                 });
+
+                if (!nearestMagnet || nearestDist <= 5) return;
+
+                if (steel.isSleeping) {
+                    Sleeping.set(steel, false);
+                    steel.render.opacity = 1.0;
+                }
+
+                const dx = nearestMagnet.position.x - steel.position.x;
+                const dy = nearestMagnet.position.y - steel.position.y;
+                const nx = dx / nearestDist;
+                const ny = dy / nearestDist;
+                const magnetRange = getMagnetRange(nearestMagnet);
+                const magnetPull = getMagnetPull(nearestMagnet);
+                const ratio = Math.pow(1 - nearestDist / magnetRange, 2);
+                const pullX = nx * magnetPull * ratio;
+                const pullY = ny * magnetPull * ratio;
+
+                if (nearestMagnet.plugin?.isAttached === false) {
+                    Body.setVelocity(nearestMagnet, {
+                        x: nearestMagnet.velocity.x - pullX * 1.35,
+                        y: nearestMagnet.velocity.y - pullY * 1.35
+                    });
+                    Body.setVelocity(steel, {
+                        x: steel.velocity.x + pullX * 0.2,
+                        y: steel.velocity.y + pullY * 0.2
+                    });
+                } else {
+                    Body.setVelocity(steel, {
+                        x: steel.velocity.x + pullX * 0.5,
+                        y: steel.velocity.y + pullY * 0.5
+                    });
+                }
+
+                const contactDistance = (nearestMagnet.circleRadius || 8) + (steel.circleRadius || 15) + 2;
+                if (nearestDist < contactDistance) {
+                    const stickDistance = (nearestMagnet.circleRadius || 8) + (steel.circleRadius || 15) - 0.5;
+                    Body.setPosition(steel, {
+                        x: nearestMagnet.position.x - nx * stickDistance,
+                        y: nearestMagnet.position.y - ny * stickDistance
+                    });
+
+                    const relativeVelocity = {
+                        x: steel.velocity.x - nearestMagnet.velocity.x,
+                        y: steel.velocity.y - nearestMagnet.velocity.y
+                    };
+                    const normalSpeed = relativeVelocity.x * nx + relativeVelocity.y * ny;
+                    const tangentVelocity = {
+                        x: relativeVelocity.x - nx * normalSpeed,
+                        y: relativeVelocity.y - ny * normalSpeed
+                    };
+
+                    Body.setVelocity(steel, {
+                        x: nearestMagnet.velocity.x + tangentVelocity.x * 0.08,
+                        y: nearestMagnet.velocity.y + tangentVelocity.y * 0.08
+                    });
+
+                    if (nearestMagnet.plugin?.isAttached === false) {
+                        Body.setVelocity(nearestMagnet, {
+                            x: nearestMagnet.velocity.x * 0.88,
+                            y: nearestMagnet.velocity.y * 0.88
+                        });
+                    }
+                }
             });
 
             for (let i = 0; i < activeMagnets.length; i++) {
