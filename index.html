@@ -93,7 +93,7 @@
         }
 
         /* -- Modals -- */
-        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal {
+        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
             background: rgba(255,255,255,0.97); backdrop-filter: blur(24px);
             padding: 22px; border-radius: 16px; border: 1px solid var(--border);
@@ -104,6 +104,7 @@
         #marble-modal { z-index: 300; width: 340px; }
         #custom-save-modal { z-index: 400; width: 280px; text-align: center; }
         #pushable-setup-modal { z-index: 400; width: 280px; text-align: center; }
+        #magnet-setup-modal { z-index: 400; width: 300px; text-align: center; }
 
         #library-modal h2, #marble-modal h2 {
             margin: 0 0 14px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text);
@@ -111,6 +112,8 @@
         #custom-save-modal h3 { margin: 0 0 12px; color: var(--accent); font-size: 13px; font-weight: 700; }
         #pushable-setup-modal h3 { margin: 0 0 12px; color: #7c3aed; font-size: 13px; font-weight: 700; }
         #pushable-setup-modal p { color: var(--text-dim); font-size: 12px; }
+        #magnet-setup-modal h3 { margin: 0 0 12px; color: #d32f2f; font-size: 13px; font-weight: 700; }
+        #magnet-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
 
         .library-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
         .lib-item {
@@ -127,16 +130,24 @@
         }
         .close-btn:hover { color: var(--text); }
 
-        .marble-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .marble-row, .magnet-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
         .marble-row label { flex: 1; font-weight: 500; font-size: 12px; color: var(--text-dim); }
+        .magnet-row label { flex: 1; font-weight: 600; font-size: 12px; color: var(--text-dim); text-align: left; }
         .marble-row input[type=number], #pushable-setup-modal input[type=number] {
             width: 52px; padding: 8px; border: 1px solid #dde1e6;
             border-radius: 8px; font-size: 14px; text-align: center;
             background: #f7f8fa; color: var(--text);
             font-family: 'Inter', sans-serif; font-weight: 600;
         }
+        #magnet-setup-modal input[type=number], #magnet-setup-modal select {
+            width: 118px; padding: 8px; border: 1px solid #dde1e6;
+            border-radius: 8px; font-size: 13px; text-align: center;
+            background: #f7f8fa; color: var(--text);
+            font-family: 'Inter', sans-serif; font-weight: 600;
+        }
         .marble-row input:focus, #pushable-setup-modal input:focus,
-        #custom-save-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        #custom-save-modal input:focus, #magnet-setup-modal input:focus,
+        #magnet-setup-modal select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 
         .marble-dot {
             width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
@@ -291,6 +302,24 @@
         <button class="btn-marble-modal" onclick="document.getElementById('pushable-setup-modal').style.display='none'" style="background:#999;">취소</button>
     </div>
 
+    <div id="magnet-setup-modal">
+        <h3>🧲 자석 설정</h3>
+        <p>고정 자석과 이동 가능한 자석 중 하나를 고르고, 자석의 세기도 함께 정합니다.</p>
+        <div class="magnet-row">
+            <label for="magnet-mode-input">자석 종류</label>
+            <select id="magnet-mode-input">
+                <option value="attached">붙어있는 자석</option>
+                <option value="free">붙어있지 않는 자석</option>
+            </select>
+        </div>
+        <div class="magnet-row">
+            <label for="magnet-strength-input">자석 세기</label>
+            <input type="number" id="magnet-strength-input" min="1" max="10" value="3">
+        </div>
+        <button class="btn-marble-modal" onclick="saveMagnetConfig()" style="background:#d32f2f; margin-bottom:8px;">적용</button>
+        <button class="btn-marble-modal" onclick="closeMagnetSetup()" style="background:#999;">취소</button>
+    </div>
+
     <!-- Marble Setup Modal -->
     <div id="marble-modal">
         <span class="close-btn" onclick="closeMarbleModal()">✕</span>
@@ -388,7 +417,7 @@
             'escalator_r_l': { id: 'escalator_r_l', name: '에스컬[→긺]', w: 200, h: 20, color: '#d4940a', restitution: 0.0, pw: 30, ph: 5 },
             'pushable':  { id: 'pushable', name: '밀리는 길', w: 120, h: 20, color: '#9575cd', restitution: 0.0, pw: 20, ph: 5, type: 'pushable' },
             'place_marble': { id: 'place_marble', name: '배치 구슬', w: 30, h: 30, color: '#42a5f5', restitution: 0.5, pw: 15, ph: 15, type: 'place_marble' },
-            'magnet':    { id: 'magnet', name: '자석', w: 16, h: 16, color: '#e53935', restitution: 0.0, pw: 10, ph: 10, type: 'magnet' }
+            'magnet':    { id: 'magnet', name: '붙어있는 자석', w: 16, h: 16, color: '#e53935', restitution: 0.0, pw: 10, ph: 10, type: 'magnet', isAttached: true, magnetStrength: 3 }
         };
 
         function mergeCustomRoad(docId, data) {
@@ -453,6 +482,42 @@
         // Library UI
         function openLibrary() { document.getElementById('library-modal').style.display = 'block'; }
         function closeLibrary() { document.getElementById('library-modal').style.display = 'none'; }
+        function openMagnetSetup() {
+            document.getElementById('magnet-mode-input').value = pendingMagnetMode;
+            document.getElementById('magnet-strength-input').value = pendingMagnetStrength;
+            document.getElementById('magnet-setup-modal').style.display = 'block';
+        }
+        function closeMagnetSetup() {
+            document.getElementById('magnet-setup-modal').style.display = 'none';
+        }
+        function saveMagnetConfig() {
+            const base = ROAD_LIB.magnet;
+            const mode = document.getElementById('magnet-mode-input').value === 'free' ? 'free' : 'attached';
+            const strength = Math.max(1, Math.min(10, parseInt(document.getElementById('magnet-strength-input').value, 10) || 3));
+            const isAttached = mode === 'attached';
+            const id = `custom_magnet_${Date.now()}`;
+            const roadData = {
+                ...base,
+                baseKey: 'magnet',
+                name: `${isAttached ? '붙어있는 자석' : '붙어있지 않는 자석'}(${strength})`,
+                color: isAttached ? '#e53935' : '#ff6b6b',
+                isAttached: isAttached,
+                magnetStrength: strength
+            };
+
+            pendingMagnetMode = mode;
+            pendingMagnetStrength = strength;
+            ROAD_LIB[id] = { ...roadData, id: id };
+            slots[currentSlotIndex] = id;
+            renderSlots();
+            renderLibrary();
+            updateGhostStyle();
+            closeMagnetSetup();
+            closeLibrary();
+            saveCustomRoadToFirestore(id, roadData).catch(error => {
+                console.error('Failed to save magnet config to Firestore:', error);
+            });
+        }
 
         function renderLibrary() {
             const grid = document.getElementById('lib-grid');
@@ -483,6 +548,10 @@
                     if (conf.type === 'pushable') {
                         document.getElementById('pushable-setup-modal').style.display = 'block';
                         document.getElementById('pushable-hit-input').value = 1;
+                    } else if (conf.type === 'magnet') {
+                        pendingMagnetMode = conf.isAttached === false ? 'free' : 'attached';
+                        pendingMagnetStrength = conf.magnetStrength || 3;
+                        openMagnetSetup();
                     } else {
                         isCustomMode = true;
                         ghost.style.display = 'none';
@@ -529,6 +598,8 @@
         let pendingCustomH = 0;
         let customCounter = 0;
         let customBaseKey = null;  // 커스텀 베이스 블록 키
+        let pendingMagnetMode = 'attached';
+        let pendingMagnetStrength = 3;
         const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
 
         const ghost = document.getElementById('ghost-element');
@@ -708,7 +779,7 @@
         });
 
         window.addEventListener('mousedown', (e) => {
-            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel')) return;
+            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal')) return;
 
             if (e.button === 2) { 
                 isPanning = true;
@@ -787,12 +858,22 @@
                     placedMarbles.push(newBody);
 
                 } else if (conf.type === 'magnet') {
-                    // 자석: 작은 원형, isStatic으로 고정, 물리 충돌 있음
+                    const isAttached = conf.isAttached !== false;
                     newBody = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2, {
-                        isStatic: true,
+                        isStatic: isAttached,
                         label: 'magnet',
                         restitution: 0,
-                        render: { fillStyle: conf.color }
+                        friction: 0.02,
+                        frictionAir: isAttached ? 0.02 : 0.08,
+                        density: isAttached ? 0.8 : 0.18,
+                        render: { fillStyle: conf.color, opacity: isAttached ? 1.0 : 0.95 },
+                        plugin: {
+                            type: 'magnet',
+                            isAttached: isAttached,
+                            magnetStrength: conf.magnetStrength || 3,
+                            originX: worldPos.x,
+                            originY: worldPos.y
+                        }
                     });
                     magnets.push(newBody);
                 } else if (conf.type === 'pushable') {
@@ -880,7 +961,7 @@
                     box.style.height = h + 'px';
                 }
             } else {
-                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel')) {
+                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal')) {
                     ghost.style.display = 'none';
                 } else if (!isCustomMode) {
                     ghost.style.display = 'block';
@@ -1397,26 +1478,38 @@
             }
         });
 
-        // 자석이 쇠구슬을 끌어당기는 로직 (속도 직접 조절 방식)
-        const MAGNET_RANGE = 60;  // 자석 유효 범위
-        const MAGNET_PULL = 1.2;   // 자석 힘 줄임
+        // 자석이 쇠구슬과 이동형 자석을 끌어당기는 로직
+        function getMagnetRange(magnetBody) {
+            const strength = magnetBody.plugin?.magnetStrength || 3;
+            return 40 + strength * 16;
+        }
+
+        function getMagnetPull(magnetBody) {
+            const strength = magnetBody.plugin?.magnetStrength || 3;
+            return 0.45 + strength * 0.3;
+        }
+
         Events.on(engine, 'beforeUpdate', () => {
             const steelBodies = Composite.allBodies(world).filter(b => b.label === 'steel_marble');
-            magnets.forEach(mag => {
+            const activeMagnets = magnets.filter(m => Composite.allBodies(world).includes(m));
+
+            activeMagnets.forEach(mag => {
+                const magnetRange = getMagnetRange(mag);
+                const magnetPull = getMagnetPull(mag);
                 steelBodies.forEach(steel => {
                     const dx = mag.position.x - steel.position.x;
                     const dy = mag.position.y - steel.position.y;
                     const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < MAGNET_RANGE && dist > 5) {
+                    if (dist < magnetRange && dist > 5) {
                         // 자석 범위에 들어오면 잠든 구슬 깨우기 (배치용 쇠구슬 대응)
                         if (steel.isSleeping) {
                             Sleeping.set(steel, false);
                             steel.render.opacity = 1.0;
                         }
                         // 가까울수록 강하게 끌림 (제곱 비례)
-                        const ratio = Math.pow(1 - dist / MAGNET_RANGE, 2);
-                        const pullX = (dx / dist) * MAGNET_PULL * ratio;
-                        const pullY = (dy / dist) * MAGNET_PULL * ratio;
+                        const ratio = Math.pow(1 - dist / magnetRange, 2);
+                        const pullX = (dx / dist) * magnetPull * ratio;
+                        const pullY = (dy / dist) * magnetPull * ratio;
                         
                         // 현재 속도에 자석 방향 속도를 더해줌
                         const vel = steel.velocity;
@@ -1424,9 +1517,47 @@
                             x: vel.x + pullX,
                             y: vel.y + pullY
                         });
+
+                        if (mag.plugin?.isAttached === false) {
+                            Body.setVelocity(mag, {
+                                x: mag.velocity.x - pullX * 0.55,
+                                y: mag.velocity.y - pullY * 0.55
+                            });
+                        }
                     }
                 });
             });
+
+            for (let i = 0; i < activeMagnets.length; i++) {
+                for (let j = i + 1; j < activeMagnets.length; j++) {
+                    const magA = activeMagnets[i];
+                    const magB = activeMagnets[j];
+                    const dx = magA.position.x - magB.position.x;
+                    const dy = magA.position.y - magB.position.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    const range = Math.max(getMagnetRange(magA), getMagnetRange(magB));
+
+                    if (dist >= range || dist <= 5) continue;
+
+                    const ratio = Math.pow(1 - dist / range, 2);
+
+                    if (magA.plugin?.isAttached === false) {
+                        const pullA = getMagnetPull(magB) * ratio;
+                        Body.setVelocity(magA, {
+                            x: magA.velocity.x - (dx / dist) * pullA,
+                            y: magA.velocity.y - (dy / dist) * pullA
+                        });
+                    }
+
+                    if (magB.plugin?.isAttached === false) {
+                        const pullB = getMagnetPull(magA) * ratio;
+                        Body.setVelocity(magB, {
+                            x: magB.velocity.x + (dx / dist) * pullB,
+                            y: magB.velocity.y + (dy / dist) * pullB
+                        });
+                    }
+                }
+            }
 
             // 잠자는 배치 구슬이 공중에 떠 있으면 깨우기 (밀리는 벽은 제외)
             // → 아래에 지지체가 없으면 sleeping 해제
