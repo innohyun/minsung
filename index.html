@@ -1489,11 +1489,41 @@
             return 0.16 + strength * 0.065;
         }
 
+        function getMagnetContactDistance(magnetBody, steelBody) {
+            return (magnetBody.circleRadius || 8) + (steelBody.circleRadius || 15) + 2;
+        }
+
+        function findMagnetById(magnetId, activeMagnets) {
+            return activeMagnets.find(mag => mag.id === magnetId) || null;
+        }
+
         Events.on(engine, 'beforeUpdate', () => {
             const steelBodies = Composite.allBodies(world).filter(b => b.label === 'steel_marble');
             const activeMagnets = magnets.filter(m => Composite.allBodies(world).includes(m));
 
             steelBodies.forEach(steel => {
+                steel.plugin = steel.plugin || {};
+
+                if (steel.plugin.attachedMagnetId) {
+                    const attachedMagnet = findMagnetById(steel.plugin.attachedMagnetId, activeMagnets);
+                    if (attachedMagnet) {
+                        const offset = steel.plugin.attachedOffset || { x: 0, y: -(attachedMagnet.circleRadius || 8) - (steel.circleRadius || 15) + 0.5 };
+                        Body.setPosition(steel, {
+                            x: attachedMagnet.position.x + offset.x,
+                            y: attachedMagnet.position.y + offset.y
+                        });
+                        Body.setVelocity(steel, {
+                            x: attachedMagnet.velocity.x,
+                            y: attachedMagnet.velocity.y
+                        });
+                        Body.setAngularVelocity(steel, 0);
+                        return;
+                    }
+
+                    steel.plugin.attachedMagnetId = null;
+                    steel.plugin.attachedOffset = null;
+                }
+
                 let nearestMagnet = null;
                 let nearestDist = Infinity;
 
@@ -1540,35 +1570,23 @@
                     });
                 }
 
-                const contactDistance = (nearestMagnet.circleRadius || 8) + (steel.circleRadius || 15) + 2;
+                const contactDistance = getMagnetContactDistance(nearestMagnet, steel);
                 if (nearestDist < contactDistance) {
                     const stickDistance = (nearestMagnet.circleRadius || 8) + (steel.circleRadius || 15) - 0.5;
+                    steel.plugin.attachedMagnetId = nearestMagnet.id;
+                    steel.plugin.attachedOffset = {
+                        x: -nx * stickDistance,
+                        y: -ny * stickDistance
+                    };
                     Body.setPosition(steel, {
-                        x: nearestMagnet.position.x - nx * stickDistance,
-                        y: nearestMagnet.position.y - ny * stickDistance
+                        x: nearestMagnet.position.x + steel.plugin.attachedOffset.x,
+                        y: nearestMagnet.position.y + steel.plugin.attachedOffset.y
                     });
-
-                    const relativeVelocity = {
-                        x: steel.velocity.x - nearestMagnet.velocity.x,
-                        y: steel.velocity.y - nearestMagnet.velocity.y
-                    };
-                    const normalSpeed = relativeVelocity.x * nx + relativeVelocity.y * ny;
-                    const tangentVelocity = {
-                        x: relativeVelocity.x - nx * normalSpeed,
-                        y: relativeVelocity.y - ny * normalSpeed
-                    };
-
                     Body.setVelocity(steel, {
-                        x: nearestMagnet.velocity.x + tangentVelocity.x * 0.08,
-                        y: nearestMagnet.velocity.y + tangentVelocity.y * 0.08
+                        x: nearestMagnet.velocity.x,
+                        y: nearestMagnet.velocity.y
                     });
-
-                    if (nearestMagnet.plugin?.isAttached === false) {
-                        Body.setVelocity(nearestMagnet, {
-                            x: nearestMagnet.velocity.x * 0.88,
-                            y: nearestMagnet.velocity.y * 0.88
-                        });
-                    }
+                    Body.setAngularVelocity(steel, 0);
                 }
             });
 
