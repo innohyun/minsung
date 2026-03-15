@@ -1107,6 +1107,51 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
+        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice']);
+
+        function isTunnelGuardSurface(body) {
+            const root = getCollisionRoot(body);
+            if (!root || root.isSensor || !root.isStatic) return false;
+            if (root === ground) return true;
+            if (root.label === 'slime') return false;
+            if (root.plugin?.type === 'shock_absorber' || root.plugin?.type === 'goal_box' || root.plugin?.type === 'pushable') return false;
+            if (root.label && isEscalatorKey(root.label)) return false;
+            const surfaceKey = root.plugin?.baseKey || root.label;
+            return TUNNEL_GUARD_SURFACE_KEYS.has(surfaceKey);
+        }
+
+        function getTunnelCollisionBody(hit, staticSolids) {
+            if (!hit) return null;
+            if (staticSolids.includes(hit.bodyA)) return hit.bodyA;
+            if (staticSolids.includes(hit.bodyB)) return hit.bodyB;
+            return null;
+        }
+
+        function getTunnelSurfaceNormal(body, worldPoint) {
+            if (!body) return { x: 0, y: -1 };
+
+            const width = body.plugin?.w || (body.bounds.max.x - body.bounds.min.x);
+            const height = body.plugin?.h || (body.bounds.max.y - body.bounds.min.y);
+            const localPoint = worldToBodyLocal(body, worldPoint);
+            const halfW = Math.max(0.5, width / 2);
+            const halfH = Math.max(0.5, height / 2);
+            const candidates = [
+                { distance: Math.abs(localPoint.x + halfW), x: -1, y: 0 },
+                { distance: Math.abs(halfW - localPoint.x), x: 1, y: 0 },
+                { distance: Math.abs(localPoint.y + halfH), x: 0, y: -1 },
+                { distance: Math.abs(halfH - localPoint.y), x: 0, y: 1 }
+            ];
+            const best = candidates.reduce((closest, current) =>
+                current.distance < closest.distance ? current : closest
+            );
+            const cos = Math.cos(body.angle);
+            const sin = Math.sin(body.angle);
+            return {
+                x: best.x * cos - best.y * sin,
+                y: best.x * sin + best.y * cos
+            };
+        }
+
         function rotateWorldVectorToBody(body, vector) {
             const cos = Math.cos(body.angle);
             const sin = Math.sin(body.angle);
@@ -2714,9 +2759,7 @@
 
         Events.on(engine, 'afterUpdate', () => {
             const staticSolids = Composite.allBodies(world).filter(body =>
-                body.isStatic &&
-                !body.isSensor &&
-                body.label !== 'slime'
+                isTunnelGuardSurface(body)
             );
 
             getTunnelSensitiveBodies().forEach(body => {
@@ -2761,23 +2804,39 @@
 
                 if (!collision) return;
 
-                const support = collision.supports && collision.supports[0] ? collision.supports[0] : body.position;
-                const normalX = body.position.x - support.x;
-                const normalY = body.position.y - support.y;
-                const normalLength = Math.sqrt(normalX * normalX + normalY * normalY);
-                if (normalLength > 0.001) {
-                    const approach = Math.abs((nx * normalX + ny * normalY) / normalLength);
-                    // 경사면을 따라 미끄러지는 접촉은 관통 보정에서 제외
-                    if (approach < 0.45) return;
+                const surfaceBody = getTunnelCollisionBody(collision, staticSolids);
+                const support = getSupportCenter(collision.supports, surfaceBody?.position || body.position);
+                let surfaceNormal = getTunnelSurfaceNormal(surfaceBody, support);
+                const toBodyX = body.position.x - support.x;
+                const toBodyY = body.position.y - support.y;
+
+                if ((surfaceNormal.x * toBodyX) + (surfaceNormal.y * toBodyY) < 0) {
+                    surfaceNormal.x *= -1;
+                    surfaceNormal.y *= -1;
                 }
 
+                const approach = Math.max(0, -((nx * surfaceNormal.x) + (ny * surfaceNormal.y)));
+                const tangentMotion = Math.abs((nx * -surfaceNormal.y) + (ny * surfaceNormal.x));
+                // 경사면을 따라 미끄러지는 이동은 관통 보정에서 제외
+                if (approach < 0.35 || tangentMotion > approach * 1.8) return;
+
+                const separation = (toBodyX * surfaceNormal.x) + (toBodyY * surfaceNormal.y);
+                const targetSeparation = radius + 1.5;
+                const correction = Math.min(radius + 4, Math.max(0, targetSeparation - separation));
+                if (correction < 0.25) return;
+
                 Body.setPosition(body, {
-                    x: support.x - nx * (radius + 2),
-                    y: support.y - ny * (radius + 2)
+                    x: body.position.x + surfaceNormal.x * correction,
+                    y: body.position.y + surfaceNormal.y * correction
                 });
+
+                const tangentX = -surfaceNormal.y;
+                const tangentY = surfaceNormal.x;
+                const tangentSpeed = (body.velocity.x * tangentX) + (body.velocity.y * tangentY);
+                const normalSpeed = (body.velocity.x * surfaceNormal.x) + (body.velocity.y * surfaceNormal.y);
                 Body.setVelocity(body, {
-                    x: body.velocity.x * 0.08,
-                    y: body.velocity.y * 0.08
+                    x: tangentX * tangentSpeed + surfaceNormal.x * Math.max(0, normalSpeed) * 0.12,
+                    y: tangentY * tangentSpeed + surfaceNormal.y * Math.max(0, normalSpeed) * 0.12
                 });
             });
         });
