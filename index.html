@@ -2178,10 +2178,11 @@
         // 카메라 팔로우 로직
         Events.on(engine, 'afterUpdate', () => {
             pushables.forEach(body => {
-                if (!body.plugin || body.plugin.shape !== 'basket') return;
-                updatePushableBasketCarrier(body);
-                carryMarblesInPushableBasket(body);
-                if (!body.plugin.carrierState) {
+                if (!body.plugin) return;
+                if (body.plugin.shape === 'basket') {
+                    updatePushableBasketCarrier(body);
+                }
+                if (body.plugin.shape === 'basket' && !body.plugin.carrierState) {
                     body.plugin.prevCarrierPosition = {
                         x: body.position.x,
                         y: body.position.y
