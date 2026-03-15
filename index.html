@@ -828,6 +828,29 @@
                 minimapCtx.restore();
             });
 
+            const spawnPoint = worldToMinimapPoint(SPAWN_POINT.x, SPAWN_POINT.y, extent, transform);
+            minimapCtx.save();
+            minimapCtx.translate(spawnPoint.x, spawnPoint.y);
+            minimapCtx.fillStyle = 'rgba(59,130,246,0.16)';
+            minimapCtx.strokeStyle = 'rgba(59,130,246,0.95)';
+            minimapCtx.lineWidth = 2;
+            minimapCtx.beginPath();
+            minimapCtx.arc(0, 0, 7, 0, Math.PI * 2);
+            minimapCtx.fill();
+            minimapCtx.stroke();
+            minimapCtx.beginPath();
+            minimapCtx.moveTo(0, -3);
+            minimapCtx.lineTo(0, 4);
+            minimapCtx.stroke();
+            minimapCtx.beginPath();
+            minimapCtx.moveTo(-3, 1);
+            minimapCtx.lineTo(0, 5);
+            minimapCtx.lineTo(3, 1);
+            minimapCtx.closePath();
+            minimapCtx.fillStyle = 'rgba(59,130,246,0.95)';
+            minimapCtx.fill();
+            minimapCtx.restore();
+
             minimapCtx.strokeStyle = 'rgba(15,23,42,0.12)';
             minimapCtx.strokeRect(offsetX, offsetY, worldWidth * scale, worldHeight * scale);
 
