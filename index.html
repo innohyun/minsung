@@ -1165,6 +1165,10 @@
                     // 일반 블록
                     const behaviorKey = conf.baseKey || conf.id;
                     const bodyLabel = (behaviorKey === 'slime' || isEscalatorKey(behaviorKey)) ? behaviorKey : conf.id;
+                    const basePlugin = { w: conf.w, h: conf.h, baseKey: behaviorKey };
+                    if (isEscalatorKey(behaviorKey)) {
+                        basePlugin.isActivated = false;
+                    }
                     newBody = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, {
                         isStatic: true,
                         label: bodyLabel,
@@ -1173,7 +1177,7 @@
                         frictionStatic: 0,
                         restitution: conf.restitution,
                         render: { fillStyle: conf.color },
-                        plugin: { w: conf.w, h: conf.h, baseKey: behaviorKey },
+                        plugin: basePlugin,
                         slop: 0
                     });
                 }
@@ -1609,6 +1613,12 @@
                     }
                 }
             });
+
+            Composite.allBodies(world).forEach(body => {
+                if (body.label && body.label.startsWith('escalator') && body.plugin) {
+                    body.plugin.isActivated = false;
+                }
+            });
         }
 
         let isFollowMode = false;
@@ -1785,6 +1795,14 @@
                     }
                 }
 
+                [bodyA, bodyB].forEach(b => {
+                    const otherBody = (b === bodyA) ? bodyB : bodyA;
+                    if (b.label && b.label.startsWith('escalator') && otherBody && otherBody !== ground && !otherBody.isSensor) {
+                        b.plugin = b.plugin || {};
+                        b.plugin.isActivated = true;
+                    }
+                });
+
                 // 배치 구슬 및 밀리는 길 횟수 로직
                 [bodyA, bodyB].forEach(b => {
                     const otherBody = (b === bodyA) ? bodyB : bodyA;
@@ -1836,7 +1854,7 @@
                 );
                 const theEscalator = (bodyA.label && bodyA.label.startsWith('escalator')) ? bodyA : ((bodyB.label && bodyB.label.startsWith('escalator')) ? bodyB : null);
 
-                if (theEscalatorTarget && theEscalator) {
+                if (theEscalatorTarget && theEscalator && theEscalator.plugin?.isActivated) {
                     const angle = theEscalator.angle;
                     // _l_ 은 왼쪽(-x 방향)으로, _r_ 은 오른쪽(+x 방향)으로 이동
                     let dir = theEscalator.label.includes('_l_') ? -1 : 1;
@@ -2130,7 +2148,7 @@
                     
                     const dir = b.label.includes('_l_') ? -1 : 1;
                     const speed = 0.05; // 궤도 이동 속도
-                    const phase = (time * speed * dir) % 20; 
+                    const phase = b.plugin?.isActivated ? (time * speed * dir) % 20 : 0; 
                     
                     ctx.save();
                     // 카메라 이동(render.bounds.min)에 따른 위치 보정
@@ -2144,7 +2162,7 @@
                     
                     // 궤도 무늬 (선)
                     ctx.lineWidth = 4;
-                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'; // 반투명 검은색 무늬
+                    ctx.strokeStyle = b.plugin?.isActivated ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.18)';
                     
                     for (let x = -w/2 - 20; x <= w/2 + 20; x += 20) {
                         const drawX = x + phase;
