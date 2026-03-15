@@ -647,6 +647,7 @@
         let pendingMagnetMode = 'attached';
         let pendingMagnetStrength = 3;
         let pendingGoalCount = 1;
+        let endMessageTimer = null;
         const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
 
         const ghost = document.getElementById('ghost-element');
@@ -790,11 +791,20 @@
         }
 
         function hideEndMessage() {
+            if (endMessageTimer) {
+                clearTimeout(endMessageTimer);
+                endMessageTimer = null;
+            }
             endMsg.style.display = 'none';
         }
 
         function showEndMessage() {
             endMsg.style.display = 'block';
+            if (endMessageTimer) clearTimeout(endMessageTimer);
+            endMessageTimer = setTimeout(() => {
+                endMsg.style.display = 'none';
+                endMessageTimer = null;
+            }, 5000);
         }
 
         function createGoalBoxBody(x, y, conf, angle) {
