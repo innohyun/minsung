@@ -2762,6 +2762,14 @@
                 if (!collision) return;
 
                 const support = collision.supports && collision.supports[0] ? collision.supports[0] : body.position;
+                const normalX = body.position.x - support.x;
+                const normalY = body.position.y - support.y;
+                const normalLength = Math.sqrt(normalX * normalX + normalY * normalY);
+                if (normalLength > 0.001) {
+                    const approach = Math.abs((nx * normalX + ny * normalY) / normalLength);
+                    // 경사면을 따라 미끄러지는 접촉은 관통 보정에서 제외
+                    if (approach < 0.45) return;
+                }
 
                 Body.setPosition(body, {
                     x: support.x - nx * (radius + 2),
