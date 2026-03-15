@@ -846,10 +846,10 @@
                 let newBody;
 
                 if (conf.type === 'place_marble') {
-                    // 배치 구슬: 처음엔 sleeping 상태 (반투명), 충돌로 깨어남
+                    // 배치 구슬: 처음엔 고정 대기 상태, 충돌하면 움직이기 시작
                     newBody = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2, {
-                        isStatic: false,
-                        isSleeping: true,
+                        isStatic: true,
+                        isSleeping: false,
                         label: conf.marbleType === 'steel' ? 'steel_marble' : 'place_marble',
                         restitution: conf.restitution,
                         friction: 0.01,
@@ -861,6 +861,7 @@
                         plugin: {
                             type: 'place_marble',
                             marbleType: conf.marbleType || 'normal',
+                            isPlacedMarble: true,
                             originX: worldPos.x,
                             originY: worldPos.y
                         }
@@ -1228,11 +1229,11 @@
                 if (pm.plugin && pm.plugin.originX !== undefined) {
                     pm.plugin.attachedMagnetId = null;
                     pm.plugin.attachedOffset = null;
+                    Body.setStatic(pm, true);
                     Body.setPosition(pm, { x: pm.plugin.originX, y: pm.plugin.originY });
                     Body.setVelocity(pm, { x: 0, y: 0 });
                     Body.setAngularVelocity(pm, 0);
                     Body.setAngle(pm, 0);
-                    Sleeping.set(pm, true);
                     pm.render.opacity = 0.5;
                 }
             });
@@ -1450,9 +1451,13 @@
                         }
                     } 
                     // 배치 구슬 깨우기
-                    else if (b.isSleeping && (b.label === 'place_marble' || (b.plugin && b.plugin.type === 'place_marble'))) {
-                        Sleeping.set(b, false);
-                        // 깨어나면 불투명도 원래대로 복원
+                    else if (b.plugin && b.plugin.type === 'place_marble') {
+                        if (b.isStatic) {
+                            Body.setStatic(b, false);
+                        }
+                        if (b.isSleeping) {
+                            Sleeping.set(b, false);
+                        }
                         b.render.opacity = 1.0;
                     }
                 });
