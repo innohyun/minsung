@@ -444,6 +444,7 @@
             'thin':   { id: 'thin', name: '얇은 길', w: 150, h: 5,  color: '#6d5c4a', restitution: 0.0, pw: 25, ph: 2 },
             'giant':  { id: 'giant', name: '거대 벽', w: 100, h: 200,color: '#8a8a8a', restitution: 0.0, pw: 10, ph: 25 },
             'slime':  { id: 'slime', name: '슬라임', w: 120, h: 30, color: '#66bb6a', restitution: 1.2, pw: 20, ph: 10 }, 
+            'shock_absorber': { id: 'shock_absorber', name: '충격 흡수', w: 130, h: 26, color: '#e66a4f', restitution: 0.0, pw: 22, ph: 8, type: 'shock_absorber' },
             'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
             'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
             'escalator_l_l': { id: 'escalator_l_l', name: '에스컬[←긺]', w: 200, h: 20, color: '#e0a030', restitution: 0.0, pw: 30, ph: 5 },
@@ -1028,6 +1029,196 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
+        function rotateWorldVectorToBody(body, vector) {
+            const cos = Math.cos(body.angle);
+            const sin = Math.sin(body.angle);
+            return {
+                x: vector.x * cos + vector.y * sin,
+                y: -vector.x * sin + vector.y * cos
+            };
+        }
+
+        function isShockAbsorberBody(body) {
+            const root = getCollisionRoot(body);
+            return root?.label === 'shock_absorber' || root?.plugin?.baseKey === 'shock_absorber' || root?.plugin?.type === 'shock_absorber';
+        }
+
+        function ensureShockAbsorberState(body) {
+            body.plugin = body.plugin || {};
+            body.plugin.shockState = body.plugin.shockState || {
+                target: 0,
+                display: 0,
+                velocity: 0,
+                axis: 'y',
+                side: -1,
+                highlight: 0
+            };
+            return body.plugin.shockState;
+        }
+
+        function resetShockAbsorberState(body) {
+            if (!body?.plugin?.shockState) return;
+            body.plugin.shockState.target = 0;
+            body.plugin.shockState.display = 0;
+            body.plugin.shockState.velocity = 0;
+            body.plugin.shockState.highlight = 0;
+            body.plugin.shockState.axis = 'y';
+            body.plugin.shockState.side = -1;
+        }
+
+        function applyShockAbsorberImpact(block, targetBody, pair) {
+            if (!block || !targetBody || targetBody.isStatic || targetBody.isSensor) return;
+
+            const { normalX, normalY } = getEscalatorContactData(pair, targetBody, block);
+            const tangentX = -normalY;
+            const tangentY = normalX;
+            const normalSpeed = targetBody.velocity.x * normalX + targetBody.velocity.y * normalY;
+            const impactSpeed = Math.max(0, -normalSpeed);
+
+            if (impactSpeed > 0.15) {
+                const tangentSpeed = targetBody.velocity.x * tangentX + targetBody.velocity.y * tangentY;
+                const dampedTangent = tangentSpeed * 0.82;
+                const rebound = Math.min(0.7, impactSpeed * 0.06);
+                Body.setVelocity(targetBody, {
+                    x: tangentX * dampedTangent + normalX * rebound,
+                    y: tangentY * dampedTangent + normalY * rebound
+                });
+                Body.setAngularVelocity(targetBody, targetBody.angularVelocity * 0.55);
+            }
+
+            const state = ensureShockAbsorberState(block);
+            const localNormal = rotateWorldVectorToBody(block, { x: normalX, y: normalY });
+            const axis = Math.abs(localNormal.x) > Math.abs(localNormal.y) ? 'x' : 'y';
+            const side = axis === 'x'
+                ? (localNormal.x >= 0 ? 1 : -1)
+                : (localNormal.y >= 0 ? 1 : -1);
+            const compression = Math.min(0.32, 0.05 + impactSpeed * 0.018);
+
+            state.axis = axis;
+            state.side = side;
+            state.target = Math.max(state.target, compression);
+            state.highlight = Math.min(1, Math.max(state.highlight, impactSpeed / 16));
+        }
+
+        function hexToRgb(hex) {
+            if (!hex || typeof hex !== 'string') {
+                return { r: 122, g: 102, b: 82 };
+            }
+            const value = hex.replace('#', '');
+            const normalized = value.length === 3
+                ? value.split('').map(ch => ch + ch).join('')
+                : value;
+            const parsed = parseInt(normalized, 16);
+            if (Number.isNaN(parsed)) {
+                return { r: 122, g: 102, b: 82 };
+            }
+            return {
+                r: (parsed >> 16) & 255,
+                g: (parsed >> 8) & 255,
+                b: parsed & 255
+            };
+        }
+
+        function mixColor(hex, target, amount) {
+            const base = hexToRgb(hex);
+            const t = hexToRgb(target);
+            const blend = Math.max(0, Math.min(1, amount));
+            return `rgb(${Math.round(base.r + (t.r - base.r) * blend)}, ${Math.round(base.g + (t.g - base.g) * blend)}, ${Math.round(base.b + (t.b - base.b) * blend)})`;
+        }
+
+        function addRoundedRectPath(ctx, x, y, w, h, radius) {
+            const r = Math.max(0, Math.min(radius, w / 2, h / 2));
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
+        function drawShockAbsorberBody(ctx, body) {
+            if (!isShockAbsorberBody(body)) return;
+
+            const state = ensureShockAbsorberState(body);
+            const width = body.plugin?.w || (body.bounds.max.x - body.bounds.min.x);
+            const height = body.plugin?.h || (body.bounds.max.y - body.bounds.min.y);
+            const color = body.plugin?.color || body.render?.fillStyle || '#e66a4f';
+            const compression = Math.max(0, Math.min(0.34, state.display || 0));
+            const stretch = compression * 0.24;
+            const radius = Math.max(8, Math.min(width, height) * 0.28);
+
+            ctx.save();
+            ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
+            ctx.rotate(body.angle);
+
+            if (state.axis === 'x') {
+                const anchorX = state.side > 0 ? width / 2 : -width / 2;
+                ctx.translate(anchorX, 0);
+                ctx.scale(1 - compression, 1 + stretch);
+                ctx.translate(-anchorX, 0);
+            } else {
+                const anchorY = state.side > 0 ? height / 2 : -height / 2;
+                ctx.translate(0, anchorY);
+                ctx.scale(1 + stretch, 1 - compression);
+                ctx.translate(0, -anchorY);
+            }
+
+            const fill = ctx.createLinearGradient(-width / 2, -height / 2, width / 2, height / 2);
+            fill.addColorStop(0, mixColor(color, '#ffffff', 0.22));
+            fill.addColorStop(0.5, color);
+            fill.addColorStop(1, mixColor(color, '#32110d', 0.28));
+
+            ctx.shadowColor = 'rgba(15,23,42,0.16)';
+            ctx.shadowBlur = 18;
+            ctx.shadowOffsetY = 6;
+            ctx.fillStyle = fill;
+            addRoundedRectPath(ctx, -width / 2, -height / 2, width, height, radius);
+            ctx.fill();
+
+            ctx.shadowColor = 'transparent';
+            ctx.lineWidth = Math.max(2, Math.min(4, Math.min(width, height) * 0.12));
+            ctx.strokeStyle = mixColor(color, '#2c0d08', 0.35);
+            addRoundedRectPath(ctx, -width / 2, -height / 2, width, height, radius);
+            ctx.stroke();
+
+            ctx.save();
+            addRoundedRectPath(ctx, -width / 2, -height / 2, width, height, radius);
+            ctx.clip();
+
+            const bandCount = Math.max(2, Math.min(5, Math.round(width / 42)));
+            const bandInset = Math.max(6, height * 0.18);
+            const bandSpacing = width / (bandCount + 1);
+            ctx.strokeStyle = 'rgba(255,255,255,0.26)';
+            ctx.lineCap = 'round';
+            ctx.lineWidth = Math.max(2, Math.min(5, height * 0.16));
+            for (let i = 1; i <= bandCount; i++) {
+                const bandX = -width / 2 + bandSpacing * i;
+                ctx.beginPath();
+                ctx.moveTo(bandX, -height / 2 + bandInset);
+                ctx.lineTo(bandX, height / 2 - bandInset);
+                ctx.stroke();
+            }
+
+            if (state.highlight > 0.01) {
+                const glowAlpha = Math.min(0.3, state.highlight * 0.24);
+                const glowX = state.axis === 'x' ? state.side * width * 0.26 : 0;
+                const glowY = state.axis === 'y' ? state.side * height * 0.22 : 0;
+                const glow = ctx.createRadialGradient(glowX, glowY, 0, glowX, glowY, Math.max(width, height) * 0.75);
+                glow.addColorStop(0, `rgba(255,255,255,${glowAlpha})`);
+                glow.addColorStop(1, 'rgba(255,255,255,0)');
+                ctx.fillStyle = glow;
+                ctx.fillRect(-width / 2, -height / 2, width, height);
+            }
+
+            ctx.restore();
+            ctx.restore();
+        }
+
         function isEscalatorCarrierPushable(body) {
             return body?.plugin?.type === 'pushable';
         }
@@ -1388,10 +1579,23 @@
                 } else {
                     // 일반 블록
                     const behaviorKey = conf.baseKey || conf.id;
-                    const bodyLabel = (behaviorKey === 'slime' || isEscalatorKey(behaviorKey)) ? behaviorKey : conf.id;
+                    const isShockAbsorber = behaviorKey === 'shock_absorber';
+                    const bodyLabel = (behaviorKey === 'slime' || isEscalatorKey(behaviorKey) || isShockAbsorber) ? behaviorKey : conf.id;
                     const basePlugin = { w: conf.w, h: conf.h, baseKey: behaviorKey };
                     if (isEscalatorKey(behaviorKey)) {
                         basePlugin.isActivated = false;
+                    }
+                    if (isShockAbsorber) {
+                        basePlugin.type = 'shock_absorber';
+                        basePlugin.color = conf.color;
+                        basePlugin.shockState = {
+                            target: 0,
+                            display: 0,
+                            velocity: 0,
+                            axis: 'y',
+                            side: -1,
+                            highlight: 0
+                        };
                     }
                     newBody = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, {
                         isStatic: true,
@@ -1400,7 +1604,7 @@
                         friction: 0,
                         frictionStatic: 0,
                         restitution: conf.restitution,
-                        render: { fillStyle: conf.color },
+                        render: { fillStyle: conf.color, opacity: isShockAbsorber ? 0 : 1 },
                         plugin: basePlugin,
                         slop: 0
                     });
@@ -1793,6 +1997,9 @@
                 if (body.plugin && body.plugin.type === 'goal_box') {
                     body.plugin.enteredMarbleIds = [];
                 }
+                if (isShockAbsorberBody(body)) {
+                    resetShockAbsorberState(body);
+                }
             });
 
             // 배치 구슬들 원래 위치로 복원 + sleeping
@@ -2024,6 +2231,12 @@
                     }
                 }
 
+                const shockBlock = isShockAbsorberBody(rootA) ? rootA : (isShockAbsorberBody(rootB) ? rootB : null);
+                const shockTarget = shockBlock ? (shockBlock === rootA ? rootB : rootA) : null;
+                if (shockBlock && shockTarget && shockTarget !== ground && !shockTarget.isSensor && !shockTarget.isStatic) {
+                    applyShockAbsorberImpact(shockBlock, shockTarget, pair);
+                }
+
                 [rootA, rootB].forEach(b => {
                     const otherBody = (b === rootA) ? rootB : rootA;
                     if (b.label && b.label.startsWith('escalator') && otherBody && otherBody !== ground && !otherBody.isSensor) {
@@ -2152,6 +2365,24 @@
                         x: body.position.x,
                         y: body.position.y
                     };
+                }
+            });
+        });
+
+        Events.on(engine, 'afterUpdate', () => {
+            Composite.allBodies(world).forEach(body => {
+                if (!isShockAbsorberBody(body)) return;
+                const state = ensureShockAbsorberState(body);
+                state.velocity += (state.target - state.display) * 0.22;
+                state.velocity *= 0.72;
+                state.display += state.velocity;
+                state.target *= 0.78;
+                state.highlight *= 0.84;
+
+                if (Math.abs(state.target) < 0.0005) state.target = 0;
+                if (Math.abs(state.display) < 0.0005 && Math.abs(state.velocity) < 0.0005) {
+                    state.display = 0;
+                    state.velocity = 0;
                 }
             });
         });
@@ -2466,6 +2697,8 @@
                     ctx.restore();
                 }
             });
+
+            bodies.forEach(body => drawShockAbsorberBody(ctx, body));
 
             drawMinimap();
         });
