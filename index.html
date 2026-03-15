@@ -1985,21 +1985,48 @@
                 const travel = Math.sqrt(dx * dx + dy * dy);
                 if (travel < Math.max(8, body.circleRadius * 0.75)) return;
 
-                const collisions = Query.ray(staticSolids, prev, body.position, body.circleRadius * 1.2);
-                if (collisions.length === 0) return;
-
-                const collision = collisions[0];
-                const support = collision.supports && collision.supports[0] ? collision.supports[0] : body.position;
+                const radius = body.circleRadius || 0;
                 const nx = dx / travel;
                 const ny = dy / travel;
+                const px = -ny;
+                const py = nx;
+                const sweepOffsets = [0, radius * 0.45, -radius * 0.45, radius * 0.9, -radius * 0.9];
+                let collision = null;
+                let collisionDistance = Infinity;
+
+                sweepOffsets.forEach(offset => {
+                    const start = {
+                        x: prev.x + px * offset,
+                        y: prev.y + py * offset
+                    };
+                    const end = {
+                        x: body.position.x + px * offset,
+                        y: body.position.y + py * offset
+                    };
+                    const hits = Query.ray(staticSolids, start, end, radius + 2);
+                    hits.forEach(hit => {
+                        const support = hit.supports && hit.supports[0] ? hit.supports[0] : end;
+                        const hitDx = support.x - start.x;
+                        const hitDy = support.y - start.y;
+                        const hitDistance = Math.sqrt(hitDx * hitDx + hitDy * hitDy);
+                        if (hitDistance < collisionDistance) {
+                            collisionDistance = hitDistance;
+                            collision = hit;
+                        }
+                    });
+                });
+
+                if (!collision) return;
+
+                const support = collision.supports && collision.supports[0] ? collision.supports[0] : body.position;
 
                 Body.setPosition(body, {
-                    x: support.x - nx * (body.circleRadius + 1),
-                    y: support.y - ny * (body.circleRadius + 1)
+                    x: support.x - nx * (radius + 2),
+                    y: support.y - ny * (radius + 2)
                 });
                 Body.setVelocity(body, {
-                    x: body.velocity.x * 0.15,
-                    y: body.velocity.y * 0.15
+                    x: body.velocity.x * 0.08,
+                    y: body.velocity.y * 0.08
                 });
             });
         });
