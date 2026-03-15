@@ -821,9 +821,19 @@
                     minimapCtx.arc(0, 0, radius, 0, Math.PI * 2);
                     minimapCtx.fill();
                 } else {
-                    const bodyWidth = Math.max(3, (body.bounds.max.x - body.bounds.min.x) * scale);
-                    const bodyHeight = Math.max(3, (body.bounds.max.y - body.bounds.min.y) * scale);
-                    minimapCtx.fillRect(-bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight);
+                    const sourceWidth = body.plugin?.w || (body.bounds.max.x - body.bounds.min.x);
+                    const sourceHeight = body.plugin?.h || (body.bounds.max.y - body.bounds.min.y);
+                    const bodyWidth = Math.max(3, sourceWidth * scale);
+                    const bodyHeight = Math.max(3, sourceHeight * scale);
+
+                    if (body.plugin?.type === 'goal_box') {
+                        const wall = Math.max(2, (body.plugin.wall || 10) * scale);
+                        minimapCtx.fillRect(-bodyWidth / 2, -bodyHeight / 2, wall, bodyHeight);
+                        minimapCtx.fillRect(bodyWidth / 2 - wall, -bodyHeight / 2, wall, bodyHeight);
+                        minimapCtx.fillRect(-bodyWidth / 2, bodyHeight / 2 - wall, bodyWidth, wall);
+                    } else {
+                        minimapCtx.fillRect(-bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight);
+                    }
                 }
                 minimapCtx.restore();
             });
