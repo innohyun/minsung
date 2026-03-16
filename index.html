@@ -1297,62 +1297,6 @@
             return root?.label === 'sound_block' || root?.plugin?.baseKey === 'sound_block' || root?.plugin?.type === 'sound_block';
         }
 
-        function getBounceContactData(pair, targetBody, surfaceBody) {
-            const support = getSupportCenter(pair.collision?.supports, surfaceBody.position);
-            const pairNormal = pair.collision?.normal || { x: 0, y: -1 };
-            const rootA = getCollisionRoot(pair.bodyA);
-            const rootB = getCollisionRoot(pair.bodyB);
-            const targetRoot = getCollisionRoot(targetBody);
-            const surfaceRoot = getCollisionRoot(surfaceBody);
-            let nx = pairNormal.x;
-            let ny = pairNormal.y;
-
-            if (rootA === targetRoot && rootB === surfaceRoot) {
-                nx *= -1;
-                ny *= -1;
-            } else if (rootA !== surfaceRoot || rootB !== targetRoot) {
-                nx = targetBody.position.x - support.x;
-                ny = targetBody.position.y - support.y;
-            }
-
-            let length = Math.hypot(nx, ny);
-            if (length < 0.001) {
-                nx = targetBody.position.x - support.x;
-                ny = targetBody.position.y - support.y;
-                length = Math.hypot(nx, ny) || 1;
-            }
-
-            return {
-                support,
-                normalX: nx / length,
-                normalY: ny / length
-            };
-        }
-
-        function getReflectedDirection(body, normalX, normalY) {
-            const vx = body.velocity.x;
-            const vy = body.velocity.y;
-            const incomingSpeed = Math.hypot(vx, vy);
-            const dot = (vx * normalX) + (vy * normalY);
-            let rx;
-            let ry;
-
-            if (incomingSpeed < 0.001 || dot >= -0.001) {
-                rx = normalX;
-                ry = normalY;
-            } else {
-                rx = vx - (2 * dot * normalX);
-                ry = vy - (2 * dot * normalY);
-            }
-
-            const reflectedLength = Math.hypot(rx, ry) || 1;
-            return {
-                dirX: rx / reflectedLength,
-                dirY: ry / reflectedLength,
-                speed: incomingSpeed
-            };
-        }
-
         function playSoundBlockNote(block) {
             const ctx = ensureAudioContext();
             if (!ctx || !audioMasterGain) return;
@@ -1385,29 +1329,27 @@
         function applySoundBlockImpact(block, targetBody, pair) {
             if (!block || !targetBody || targetBody.isStatic || targetBody.isSensor) return;
 
-            const { support, normalX, normalY } = getBounceContactData(pair, targetBody, block);
-            const { dirX, dirY } = getReflectedDirection(targetBody, normalX, normalY);
+            const { normalX, normalY } = getEscalatorContactData(pair, targetBody, block);
+            const tangentX = -normalY;
+            const tangentY = normalX;
+            const tangentSpeed = targetBody.velocity.x * tangentX + targetBody.velocity.y * tangentY;
             const bounceSpeed = 6.4;
-            const radius = targetBody.circleRadius || 15;
-
-            Body.setPosition(targetBody, {
-                x: support.x + normalX * (radius + 1.5),
-                y: support.y + normalY * (radius + 1.5)
-            });
 
             Body.setVelocity(targetBody, {
-                x: dirX * bounceSpeed,
-                y: dirY * bounceSpeed
+                x: tangentX * tangentSpeed * 0.72 + normalX * bounceSpeed,
+                y: tangentY * tangentSpeed * 0.72 + normalY * bounceSpeed
             });
-            Body.setAngularVelocity(targetBody, targetBody.angularVelocity * 0.35);
+            Body.setAngularVelocity(targetBody, targetBody.angularVelocity * 0.45);
         }
 
         function applySlimeBounce(marbleBody, slimeBody, pair) {
             if (!marbleBody || !slimeBody || marbleBody.isSensor) return;
 
-            const { support, normalX, normalY } = getBounceContactData(pair, marbleBody, slimeBody);
-            const { dirX, dirY, speed } = getReflectedDirection(marbleBody, normalX, normalY);
-            const launchSpeed = Math.max(20, speed * 1.04);
+            const { support, normalX, normalY } = getEscalatorContactData(pair, marbleBody, slimeBody);
+            const tangentX = -normalY;
+            const tangentY = normalX;
+            const tangentSpeed = (marbleBody.velocity.x * tangentX) + (marbleBody.velocity.y * tangentY);
+            const launchSpeed = 20;
             const radius = marbleBody.circleRadius || 15;
 
             if (marbleBody.isSleeping) {
@@ -1420,8 +1362,8 @@
                 y: support.y + normalY * (radius + 2)
             });
             Body.setVelocity(marbleBody, {
-                x: dirX * launchSpeed,
-                y: dirY * launchSpeed
+                x: tangentX * tangentSpeed * 0.22 + normalX * launchSpeed,
+                y: tangentY * tangentSpeed * 0.22 + normalY * launchSpeed
             });
             Body.setAngularVelocity(marbleBody, marbleBody.angularVelocity * 0.18);
         }
