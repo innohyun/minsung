@@ -358,12 +358,13 @@
 
     <div id="sound-block-setup-modal">
         <h3>🎵 소리 블록 설정</h3>
-        <p>부딪히면 재생할 음을 고릅니다. 샵과 플랫은 같은 음으로 묶여 있습니다.</p>
+        <p>부딪히면 재생할 음을 고릅니다. 샵과 플랫은 같은 음으로 묶여 있고, 원하면 크기도 바로 키울 수 있습니다.</p>
         <div class="magnet-row">
             <label for="sound-block-note-input">음계</label>
             <select id="sound-block-note-input"></select>
         </div>
-        <button class="btn-marble-modal" onclick="saveSoundBlockConfig()" style="background:#0b5ed7; margin-bottom:8px;">적용</button>
+        <button class="btn-marble-modal" onclick="startSoundBlockCustomSize()" style="background:#0b5ed7; margin-bottom:8px;">다음 (크기 그리기)</button>
+        <button class="btn-marble-modal" onclick="saveSoundBlockConfig()" style="background:#4f46e5; margin-bottom:8px;">건너뛰기 (기본 크기 저장)</button>
         <button class="btn-marble-modal" onclick="closeSoundBlockSetup()" style="background:#999;">취소</button>
     </div>
 
@@ -609,7 +610,8 @@
         }
         function openSoundBlockSetup(conf) {
             populateSoundBlockNoteOptions();
-            document.getElementById('sound-block-note-input').value = conf?.noteKey || 'c4';
+            pendingSoundBlockNoteKey = conf?.noteKey || 'c4';
+            document.getElementById('sound-block-note-input').value = pendingSoundBlockNoteKey;
             document.getElementById('sound-block-setup-modal').style.display = 'block';
         }
         function closeSoundBlockSetup() {
@@ -628,16 +630,18 @@
             return base?.type === 'pushable_basket' ? `${count}개` : `${count}타`;
         }
         function saveSoundBlockConfig() {
-            const base = ROAD_LIB.sound_block;
             const note = getSoundBlockNote(document.getElementById('sound-block-note-input').value);
+            const base = ROAD_LIB[customBaseKey] || ROAD_LIB.sound_block;
+            const resolvedBaseKey = resolveRoadBaseKey(base?.baseKey || customBaseKey || 'sound_block');
             const id = `custom_sound_${Date.now()}`;
             const roadData = {
                 ...base,
-                baseKey: 'sound_block',
+                baseKey: resolvedBaseKey,
                 name: `소리 블록(${note.label})`,
                 noteKey: note.key
             };
 
+            pendingSoundBlockNoteKey = note.key;
             ROAD_LIB[id] = { ...roadData, id };
             slots[currentSlotIndex] = id;
             renderSlots();
@@ -648,6 +652,26 @@
             saveCustomRoadToFirestore(id, roadData).catch(error => {
                 console.error('Failed to save sound block config to Firestore:', error);
             });
+        }
+        function startSoundBlockCustomSize() {
+            pendingSoundBlockNoteKey = document.getElementById('sound-block-note-input').value || 'c4';
+            document.getElementById('sound-block-setup-modal').style.display = 'none';
+            const conf = ROAD_LIB[customBaseKey];
+            isCustomMode = true;
+            ghost.style.display = 'none';
+            closeLibrary();
+            container.style.cursor = 'crosshair';
+            errorMsg.innerText = `🎵 [${conf.name}] 크기 맞추기: 맵에서 드래그하세요`;
+            errorMsg.style.color = '#0b5ed7';
+            errorMsg.style.borderColor = '#0b5ed7';
+            errorMsg.style.display = 'block';
+            if(errorTimeout) clearTimeout(errorTimeout);
+            errorTimeout = setTimeout(() => {
+                errorMsg.style.display = 'none';
+                errorMsg.innerText = '❌ 길이 겹쳐서 놓을 수 없습니다!';
+                errorMsg.style.color = '#d32f2f';
+                errorMsg.style.borderColor = '#d32f2f';
+            }, 2500);
         }
         function saveMagnetConfig() {
             const base = ROAD_LIB.magnet;
@@ -766,6 +790,7 @@
         let pendingMagnetMode = 'attached';
         let pendingMagnetStrength = 3;
         let pendingGoalCount = 1;
+        let pendingSoundBlockNoteKey = 'c4';
         let endMessageTimer = null;
         const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
 
@@ -1146,20 +1171,39 @@
 
         function getEscalatorContactData(pair, targetBody, escalatorBody) {
             const support = getSupportCenter(pair.collision?.supports, escalatorBody.position);
-            let nx = targetBody.position.x - support.x;
-            let ny = targetBody.position.y - support.y;
-            let length = Math.hypot(nx, ny);
+            const pairNormal = pair.collision?.normal || { x: 0, y: -1 };
+            const rootA = getCollisionRoot(pair.bodyA);
+            const rootB = getCollisionRoot(pair.bodyB);
+            const targetRoot = getCollisionRoot(targetBody);
+            const surfaceRoot = getCollisionRoot(escalatorBody);
+            let nx = pairNormal.x;
+            let ny = pairNormal.y;
 
+            if (rootA === targetRoot && rootB === surfaceRoot) {
+                nx *= -1;
+                ny *= -1;
+            } else if (rootA !== surfaceRoot || rootB !== targetRoot) {
+                nx = targetBody.position.x - support.x;
+                ny = targetBody.position.y - support.y;
+            }
+
+            let length = Math.hypot(nx, ny);
             if (length < 0.001) {
-                nx = pair.collision?.normal?.x || 0;
-                ny = pair.collision?.normal?.y || -1;
-                const toTargetX = targetBody.position.x - escalatorBody.position.x;
-                const toTargetY = targetBody.position.y - escalatorBody.position.y;
-                if ((nx * toTargetX) + (ny * toTargetY) < 0) {
-                    nx *= -1;
-                    ny *= -1;
-                }
-                length = Math.hypot(nx, ny) || 1;
+                nx = targetBody.position.x - support.x;
+                ny = targetBody.position.y - support.y;
+                length = Math.hypot(nx, ny);
+            }
+            if (length < 0.001) {
+                nx = 0;
+                ny = -1;
+                length = 1;
+            }
+
+            const toTargetX = targetBody.position.x - support.x;
+            const toTargetY = targetBody.position.y - support.y;
+            if ((nx * toTargetX) + (ny * toTargetY) < 0) {
+                nx *= -1;
+                ny *= -1;
             }
 
             return {
@@ -1322,6 +1366,25 @@
                 y: tangentY * tangentSpeed * 0.22 + normalY * launchSpeed
             });
             Body.setAngularVelocity(marbleBody, marbleBody.angularVelocity * 0.18);
+        }
+
+        function updateBodyOrigin(body) {
+            if (!body?.plugin) return;
+            body.plugin.originX = body.position.x;
+            body.plugin.originY = body.position.y;
+            if (body.plugin.originAngle !== undefined || !body.circleRadius) {
+                body.plugin.originAngle = body.angle;
+            }
+        }
+
+        function snapshotRewindOrigins() {
+            placedMarbles.forEach(updateBodyOrigin);
+            pushables.forEach(updateBodyOrigin);
+            magnets.forEach(magnet => {
+                if (magnet.plugin?.isAttached === false) {
+                    updateBodyOrigin(magnet);
+                }
+            });
         }
 
         function isShockAbsorberBody(body) {
@@ -2079,13 +2142,9 @@
 
             if (isDraggingBody && selectedBody) {
                 // 드래그가 끝났을 때 현재 위치를 새로운 '되돌리기 기준점'으로 저장
-                if (selectedBody.plugin) {
-                    selectedBody.plugin.originX = selectedBody.position.x;
-                    selectedBody.plugin.originY = selectedBody.position.y;
-                    if (selectedBody.plugin.originAngle === undefined) {
-                        selectedBody.plugin.originAngle = selectedBody.angle;
-                    }
-                }
+                Body.setVelocity(selectedBody, { x: 0, y: 0 });
+                Body.setAngularVelocity(selectedBody, 0);
+                updateBodyOrigin(selectedBody);
             }
             isPanning = false;
             isDraggingBody = false;
@@ -2287,11 +2346,13 @@
             const customW = pendingCustomW;
             const customH = isEscalatorBase ? base.h : pendingCustomH;
             const thresholdSuffix = getPushableThresholdSuffix(base, pendingHitCount);
+            const soundNote = getSoundBlockNote(pendingSoundBlockNoteKey || base.noteKey || 'c4');
             const defaultName = pendingHitCount > 1 
                 ? `${base.name}(${customW}×${customH}, ${thresholdSuffix})` 
                 : `${base.name}(${customW}×${customH})`;
             const goalDefaultName = `${base.name}(${customW}×${customH}, ${pendingGoalCount}개)`;
-            const name = document.getElementById('custom-name-input').value.trim() || (base.type === 'goal_box' ? goalDefaultName : defaultName);
+            const soundDefaultName = `소리 블록(${soundNote.label}, ${customW}×${customH})`;
+            const name = document.getElementById('custom-name-input').value.trim() || (base.type === 'goal_box' ? goalDefaultName : (resolvedBaseKey === 'sound_block' ? soundDefaultName : defaultName));
             const id = 'custom_' + Date.now();
             const roadData = {
                 ...base,
@@ -2308,6 +2369,9 @@
             if (base.type === 'goal_box') {
                 roadData.targetCount = pendingGoalCount;
             }
+            if (resolvedBaseKey === 'sound_block') {
+                roadData.noteKey = soundNote.key;
+            }
             ROAD_LIB[id] = { ...roadData, id: id };
             // 현재 슬롯에 자동 장착
             slots[currentSlotIndex] = id;
@@ -2317,6 +2381,7 @@
             document.getElementById('custom-save-modal').style.display = 'none';
             isCustomMode = false;
             pendingHitCount = 1; // 리셋
+            pendingSoundBlockNoteKey = 'c4';
             saveCustomRoadToFirestore(id, roadData).catch(error => {
                 console.error('Failed to save custom road to Firestore:', error);
             });
@@ -2328,6 +2393,7 @@
             pendingCustomH = 0;
             isCustomMode = false;
             pendingHitCount = 1; // 리셋
+            pendingSoundBlockNoteKey = 'c4';
             updateGhostStyle();
         }
 
@@ -2511,6 +2577,7 @@
             if (isLaunching) return; // 이미 발사 중이면 무시
             if (marbleSequence.length === 0) return;
             const interval = (parseFloat(document.getElementById('input-interval').value) || 2) * 1000;
+            snapshotRewindOrigins();
             seqIndex = 0;
             isLaunching = true;
             document.getElementById('btn-drop').innerText = '발사 중'; // 텍스트 간결하게 변경
@@ -2982,7 +3049,11 @@
                 const ny = dy / travel;
                 const px = -ny;
                 const py = nx;
-                const sweepOffsets = [0, radius * 0.45, -radius * 0.45, radius * 0.9, -radius * 0.9];
+                const sweepOffsets = [0];
+                const offsetStep = Math.max(3, radius * 0.25);
+                for (let offset = offsetStep; offset <= radius + 0.001; offset += offsetStep) {
+                    sweepOffsets.push(offset, -offset);
+                }
                 let collision = null;
                 let collisionDistance = Infinity;
 
@@ -2995,7 +3066,7 @@
                         x: body.position.x + px * offset,
                         y: body.position.y + py * offset
                     };
-                    const hits = Query.ray(staticSolids, start, end, radius + 2);
+                    const hits = Query.ray(staticSolids, start, end, radius + 4);
                     hits.forEach(hit => {
                         const support = hit.supports && hit.supports[0] ? hit.supports[0] : end;
                         const hitDx = support.x - start.x;
