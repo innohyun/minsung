@@ -1027,7 +1027,6 @@
             const goalBody = Body.create({
                 isStatic: true,
                 label: conf.id,
-                angle: angle,
                 parts: [leftWall, rightWall, bottomWall, sensor],
                 render: { fillStyle: conf.color },
                 plugin: {
@@ -1042,6 +1041,9 @@
                     originAngle: angle
                 }
             });
+            if (angle) {
+                Body.setAngle(goalBody, angle);
+            }
             sensor.plugin = { type: 'goal_sensor' };
             return goalBody;
         }
