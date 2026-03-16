@@ -1296,6 +1296,32 @@
             Body.setAngularVelocity(targetBody, targetBody.angularVelocity * 0.45);
         }
 
+        function applySlimeBounce(marbleBody, slimeBody, pair) {
+            if (!marbleBody || !slimeBody || marbleBody.isSensor) return;
+
+            const { support, normalX, normalY } = getEscalatorContactData(pair, marbleBody, slimeBody);
+            const tangentX = -normalY;
+            const tangentY = normalX;
+            const tangentSpeed = (marbleBody.velocity.x * tangentX) + (marbleBody.velocity.y * tangentY);
+            const launchSpeed = 20;
+            const radius = marbleBody.circleRadius || 15;
+
+            if (marbleBody.isSleeping) {
+                Sleeping.set(marbleBody, false);
+            }
+
+            // 새로 설치한 슬라임에 겹쳐 들어간 경우, 먼저 표면 바깥으로 꺼내서 반발이 죽지 않게 한다.
+            Body.setPosition(marbleBody, {
+                x: support.x + normalX * (radius + 2),
+                y: support.y + normalY * (radius + 2)
+            });
+            Body.setVelocity(marbleBody, {
+                x: tangentX * tangentSpeed * 0.22 + normalX * launchSpeed,
+                y: tangentY * tangentSpeed * 0.22 + normalY * launchSpeed
+            });
+            Body.setAngularVelocity(marbleBody, marbleBody.angularVelocity * 0.18);
+        }
+
         function isShockAbsorberBody(body) {
             const root = getCollisionRoot(body);
             return root?.label === 'shock_absorber' || root?.plugin?.baseKey === 'shock_absorber' || root?.plugin?.type === 'shock_absorber';
@@ -2523,9 +2549,10 @@
                 const rootA = getCollisionRoot(bodyA);
                 const rootB = getCollisionRoot(bodyB);
                 const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
+                const isSlimeBounceLabel = l => l === 'marble' || l === 'steel_marble' || l === 'place_marble';
                 const isBallLabel = l => l === 'marble' || l === 'steel_marble' || l === 'place_marble';
-                const theMarble = isMarbleLabel(bodyA.label) ? bodyA : (isMarbleLabel(bodyB.label) ? bodyB : null);
-                const theSlime = bodyA.label === 'slime' ? bodyA : (bodyB.label === 'slime' ? bodyB : null);
+                const theSlimeTarget = isSlimeBounceLabel(rootA.label) ? rootA : (isSlimeBounceLabel(rootB.label) ? rootB : null);
+                const theSlime = rootA.label === 'slime' ? rootA : (rootB.label === 'slime' ? rootB : null);
                 const goalSensor = bodyA.plugin?.type === 'goal_sensor' ? bodyA : (bodyB.plugin?.type === 'goal_sensor' ? bodyB : null);
                 const countedMarble = (
                     bodyA.label === 'marble' || bodyA.label === 'steel_marble' || bodyA.label === 'place_marble'
@@ -2533,19 +2560,8 @@
                     (bodyB.label === 'marble' || bodyB.label === 'steel_marble' || bodyB.label === 'place_marble') ? bodyB : null
                 );
 
-                if (theMarble && theSlime) {
-                    const incomingSpeed = Math.sqrt(theMarble.velocity.x ** 2 + theMarble.velocity.y ** 2);
-                    const bounceSpeed = Math.max(12, incomingSpeed * 1.8);
-                    const angle = theSlime.angle;
-                    // 슬라임 표면 법선 방향으로 튕김
-                    const nx = Math.sin(angle);
-                    const ny = -Math.cos(angle);
-                    // 기존 수평 속도 일부 보존 → 부드러운 포물선
-                    const keepX = theMarble.velocity.x * 0.3;
-                    Body.setVelocity(theMarble, {
-                        x: keepX + nx * bounceSpeed,
-                        y: ny * bounceSpeed
-                    });
+                if (theSlimeTarget && theSlime) {
+                    applySlimeBounce(theSlimeTarget, theSlime, pair);
                 }
 
                 if (goalSensor && countedMarble) {
