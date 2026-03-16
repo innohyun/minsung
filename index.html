@@ -312,8 +312,8 @@
 
     <!-- Pushable Setup Modal -->
     <div id="pushable-setup-modal">
-        <h3>🧱 밀리는 길 설정</h3>
-        <p style="font-size: 14px; color: #555; margin-bottom: 5px;">몇 번 부딪혀야 밀리게 할까요?</p>
+        <h3 id="pushable-setup-title">🧱 밀리는 길 설정</h3>
+        <p id="pushable-setup-text" style="font-size: 14px; color: #555; margin-bottom: 5px;">몇 번 부딪혀야 밀리게 할까요?</p>
         <input type="number" id="pushable-hit-input" min="1" max="100" value="1">
         <br>
         <button class="btn-marble-modal" onclick="startPushableCustomSize()" style="background:#e65100; margin-bottom:8px;">다음 (두께/길이 그리기)</button>
@@ -559,6 +559,18 @@
         function closeGoalSetup() {
             document.getElementById('goal-setup-modal').style.display = 'none';
         }
+        function openPushableSetup(conf) {
+            const titleEl = document.getElementById('pushable-setup-title');
+            const textEl = document.getElementById('pushable-setup-text');
+            const isBasket = conf?.type === 'pushable_basket';
+            titleEl.textContent = isBasket ? '🧺 밀리는 바구니 설정' : '🧱 밀리는 길 설정';
+            textEl.textContent = isBasket ? '공이 몇 개 들어가야 밀리게 할까요?' : '몇 번 부딪혀야 밀리게 할까요?';
+            document.getElementById('pushable-hit-input').value = conf?.hitThreshold || 1;
+            document.getElementById('pushable-setup-modal').style.display = 'block';
+        }
+        function getPushableThresholdSuffix(base, count) {
+            return base?.type === 'pushable_basket' ? `${count}개` : `${count}타`;
+        }
         function saveMagnetConfig() {
             const base = ROAD_LIB.magnet;
             const mode = document.getElementById('magnet-mode-input').value === 'free' ? 'free' : 'attached';
@@ -617,8 +629,7 @@
                     customBaseKey = key;
 
                     if (conf.type === 'pushable' || conf.type === 'pushable_basket') {
-                        document.getElementById('pushable-setup-modal').style.display = 'block';
-                        document.getElementById('pushable-hit-input').value = 1;
+                        openPushableSetup(conf);
                     } else if (conf.type === 'goal_box') {
                         pendingGoalCount = conf.targetCount || 1;
                         openGoalSetup();
@@ -1479,6 +1490,14 @@
             );
         }
 
+        function getBasketCountableMarbles() {
+            return Composite.allBodies(world).filter(body =>
+                body.circleRadius &&
+                !body.isSensor &&
+                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble')
+            );
+        }
+
         function isMarbleInsidePushableBasket(basket, marble) {
             const wall = basket.plugin?.wall || 10;
             const halfW = (basket.plugin?.w || 0) / 2;
@@ -1495,6 +1514,11 @@
                 local.y >= innerTop &&
                 local.y <= innerBottom
             );
+        }
+
+        function getPushableBasketMarbleCount(basket) {
+            if (!basket?.plugin || basket.plugin.shape !== 'basket') return 0;
+            return getBasketCountableMarbles().filter(marble => isMarbleInsidePushableBasket(basket, marble)).length;
         }
 
         function carryMarblesInPushableBasket(basket) {
@@ -2072,7 +2096,8 @@
             // 크기 그리기 건너뛰고 기본 크기로 즉시 저장
             const base = ROAD_LIB[customBaseKey];
             const resolvedBaseKey = resolveRoadBaseKey(base?.baseKey || customBaseKey);
-            const name = pendingHitCount > 1 ? `${base.name}(${pendingHitCount}타)` : base.name;
+            const suffix = getPushableThresholdSuffix(base, pendingHitCount);
+            const name = pendingHitCount > 1 ? `${base.name}(${suffix})` : base.name;
             const id = 'custom_' + Date.now();
             const roadData = {
                 ...base,
@@ -2100,8 +2125,9 @@
             const isEscalatorBase = isEscalatorKey(resolvedBaseKey);
             const customW = pendingCustomW;
             const customH = isEscalatorBase ? base.h : pendingCustomH;
+            const thresholdSuffix = getPushableThresholdSuffix(base, pendingHitCount);
             const defaultName = pendingHitCount > 1 
-                ? `${base.name}(${customW}×${customH}, ${pendingHitCount}타)` 
+                ? `${base.name}(${customW}×${customH}, ${thresholdSuffix})` 
                 : `${base.name}(${customW}×${customH})`;
             const goalDefaultName = `${base.name}(${customW}×${customH}, ${pendingGoalCount}개)`;
             const name = document.getElementById('custom-name-input').value.trim() || (base.type === 'goal_box' ? goalDefaultName : defaultName);
@@ -2417,10 +2443,14 @@
                 [rootA, rootB].forEach(b => {
                     const otherBody = (b === rootA) ? rootB : rootA;
                     const isHittingValidTarget = isMarbleLabel(otherBody.label) || (otherBody.plugin && otherBody.plugin.type === 'pushable');
+                    const isBasket = b.plugin?.shape === 'basket';
 
                     // 밀리는 길 횟수 충돌 로직
                     if (b.plugin && b.plugin.type === 'pushable' && isHittingValidTarget) {
-                        if (b.plugin.hitThreshold > 1 && b.isStatic) {
+                        if (isBasket && b.plugin.hitThreshold > 1 && b.isStatic) {
+                            b.plugin.currentHits = getPushableBasketMarbleCount(b);
+                            b.render.opacity = 0.8;
+                        } else if (b.plugin.hitThreshold > 1 && b.isStatic) {
                             b.plugin.currentHits = (b.plugin.currentHits || 0) + 1;
                             
                             // 통과 횟수 도달하면 밀리게 만듦
@@ -2606,6 +2636,18 @@
             pushables.forEach(body => {
                 if (body.plugin) {
                     body.plugin.escalatorContact = null;
+                }
+            });
+        });
+
+        Events.on(engine, 'beforeUpdate', () => {
+            pushables.forEach(body => {
+                if (!body.plugin || body.plugin.shape !== 'basket' || body.plugin.hitThreshold <= 1 || !body.isStatic) return;
+                body.plugin.currentHits = getPushableBasketMarbleCount(body);
+                if (body.plugin.currentHits >= body.plugin.hitThreshold) {
+                    Body.setStatic(body, false);
+                    Sleeping.set(body, false);
+                    body.render.opacity = 1.0;
                 }
             });
         });
