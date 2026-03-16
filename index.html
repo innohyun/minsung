@@ -102,7 +102,7 @@
         }
 
         /* -- Modals -- */
-        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal {
+        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal, #sound-block-setup-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
             background: rgba(255,255,255,0.97); backdrop-filter: blur(24px);
             padding: 22px; border-radius: 16px; border: 1px solid var(--border);
@@ -115,6 +115,7 @@
         #pushable-setup-modal { z-index: 400; width: 280px; text-align: center; }
         #magnet-setup-modal { z-index: 400; width: 300px; text-align: center; }
         #goal-setup-modal { z-index: 400; width: 300px; text-align: center; }
+        #sound-block-setup-modal { z-index: 400; width: 320px; text-align: center; }
 
         #library-modal h2, #marble-modal h2 {
             margin: 0 0 14px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text);
@@ -126,6 +127,8 @@
         #magnet-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
         #goal-setup-modal h3 { margin: 0 0 12px; color: #0f766e; font-size: 13px; font-weight: 700; }
         #goal-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
+        #sound-block-setup-modal h3 { margin: 0 0 12px; color: #0b5ed7; font-size: 13px; font-weight: 700; }
+        #sound-block-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
 
         .library-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
         .lib-item {
@@ -151,12 +154,13 @@
             background: #f7f8fa; color: var(--text);
             font-family: 'Inter', sans-serif; font-weight: 600;
         }
-        #magnet-setup-modal input[type=number], #magnet-setup-modal select {
+        #magnet-setup-modal input[type=number], #magnet-setup-modal select, #sound-block-setup-modal select {
             width: 118px; padding: 8px; border: 1px solid #dde1e6;
             border-radius: 8px; font-size: 13px; text-align: center;
             background: #f7f8fa; color: var(--text);
             font-family: 'Inter', sans-serif; font-weight: 600;
         }
+        #sound-block-setup-modal select { width: 160px; }
         #goal-setup-modal input[type=number] {
             width: 72px; padding: 8px; border: 1px solid #dde1e6;
             border-radius: 8px; font-size: 13px; text-align: center;
@@ -165,7 +169,8 @@
         }
         .marble-row input:focus, #pushable-setup-modal input:focus,
         #custom-save-modal input:focus, #magnet-setup-modal input:focus,
-        #magnet-setup-modal select:focus, #goal-setup-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        #magnet-setup-modal select:focus, #goal-setup-modal input:focus,
+        #sound-block-setup-modal select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 
         .marble-dot {
             width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
@@ -351,6 +356,17 @@
         <button class="btn-marble-modal" onclick="closeGoalSetup()" style="background:#999;">취소</button>
     </div>
 
+    <div id="sound-block-setup-modal">
+        <h3>🎵 소리 블록 설정</h3>
+        <p>부딪히면 재생할 음을 고릅니다. 샵과 플랫은 같은 음으로 묶여 있습니다.</p>
+        <div class="magnet-row">
+            <label for="sound-block-note-input">음계</label>
+            <select id="sound-block-note-input"></select>
+        </div>
+        <button class="btn-marble-modal" onclick="saveSoundBlockConfig()" style="background:#0b5ed7; margin-bottom:8px;">적용</button>
+        <button class="btn-marble-modal" onclick="closeSoundBlockSetup()" style="background:#999;">취소</button>
+    </div>
+
     <!-- Marble Setup Modal -->
     <div id="marble-modal">
         <span class="close-btn" onclick="closeMarbleModal()">✕</span>
@@ -445,6 +461,7 @@
             'giant':  { id: 'giant', name: '거대 벽', w: 100, h: 200,color: '#8a8a8a', restitution: 0.0, pw: 10, ph: 25 },
             'slime':  { id: 'slime', name: '슬라임', w: 120, h: 30, color: '#66bb6a', restitution: 1.2, pw: 20, ph: 10 }, 
             'shock_absorber': { id: 'shock_absorber', name: '충격 흡수', w: 130, h: 26, color: '#e66a4f', restitution: 0.0, pw: 22, ph: 8, type: 'shock_absorber' },
+            'sound_block': { id: 'sound_block', name: '소리 블록', w: 96, h: 24, color: '#3f8efc', restitution: 0.0, pw: 18, ph: 8, type: 'sound_block', noteKey: 'c4' },
             'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
             'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
             'escalator_l_l': { id: 'escalator_l_l', name: '에스컬[←긺]', w: 200, h: 20, color: '#e0a030', restitution: 0.0, pw: 30, ph: 5 },
@@ -458,12 +475,33 @@
             'magnet':    { id: 'magnet', name: '붙어있는 자석', w: 16, h: 16, color: '#e53935', restitution: 0.0, pw: 10, ph: 10, type: 'magnet', isAttached: true, magnetStrength: 3 }
         };
 
+        const SOUND_BLOCK_NOTES = [
+            { key: 'c4', label: '도', frequency: 261.63 },
+            { key: 'cs4', label: '도#/레b', frequency: 277.18 },
+            { key: 'd4', label: '레', frequency: 293.66 },
+            { key: 'ds4', label: '레#/미b', frequency: 311.13 },
+            { key: 'e4', label: '미', frequency: 329.63 },
+            { key: 'f4', label: '파', frequency: 349.23 },
+            { key: 'fs4', label: '파#/솔b', frequency: 369.99 },
+            { key: 'g4', label: '솔', frequency: 392.00 },
+            { key: 'gs4', label: '솔#/라b', frequency: 415.30 },
+            { key: 'a4', label: '라', frequency: 440.00 },
+            { key: 'as4', label: '라#/시b', frequency: 466.16 },
+            { key: 'b4', label: '시', frequency: 493.88 },
+            { key: 'c5', label: '높은 도', frequency: 523.25 }
+        ];
+        const SOUND_BLOCK_NOTE_MAP = Object.fromEntries(SOUND_BLOCK_NOTES.map(note => [note.key, note]));
+
         function isEscalatorKey(key) {
             return typeof key === 'string' && key.startsWith('escalator');
         }
 
         function getShockAbsorberBorderRadius() {
             return '9999px';
+        }
+
+        function getSoundBlockNote(noteKey) {
+            return SOUND_BLOCK_NOTE_MAP[noteKey] || SOUND_BLOCK_NOTE_MAP.c4;
         }
 
         function resolveRoadBaseKey(key) {
@@ -559,6 +597,24 @@
         function closeGoalSetup() {
             document.getElementById('goal-setup-modal').style.display = 'none';
         }
+        function populateSoundBlockNoteOptions() {
+            const select = document.getElementById('sound-block-note-input');
+            if (!select || select.options.length > 0) return;
+            SOUND_BLOCK_NOTES.forEach(note => {
+                const option = document.createElement('option');
+                option.value = note.key;
+                option.textContent = note.label;
+                select.appendChild(option);
+            });
+        }
+        function openSoundBlockSetup(conf) {
+            populateSoundBlockNoteOptions();
+            document.getElementById('sound-block-note-input').value = conf?.noteKey || 'c4';
+            document.getElementById('sound-block-setup-modal').style.display = 'block';
+        }
+        function closeSoundBlockSetup() {
+            document.getElementById('sound-block-setup-modal').style.display = 'none';
+        }
         function openPushableSetup(conf) {
             const titleEl = document.getElementById('pushable-setup-title');
             const textEl = document.getElementById('pushable-setup-text');
@@ -570,6 +626,28 @@
         }
         function getPushableThresholdSuffix(base, count) {
             return base?.type === 'pushable_basket' ? `${count}개` : `${count}타`;
+        }
+        function saveSoundBlockConfig() {
+            const base = ROAD_LIB.sound_block;
+            const note = getSoundBlockNote(document.getElementById('sound-block-note-input').value);
+            const id = `custom_sound_${Date.now()}`;
+            const roadData = {
+                ...base,
+                baseKey: 'sound_block',
+                name: `소리 블록(${note.label})`,
+                noteKey: note.key
+            };
+
+            ROAD_LIB[id] = { ...roadData, id };
+            slots[currentSlotIndex] = id;
+            renderSlots();
+            renderLibrary();
+            updateGhostStyle();
+            closeSoundBlockSetup();
+            closeLibrary();
+            saveCustomRoadToFirestore(id, roadData).catch(error => {
+                console.error('Failed to save sound block config to Firestore:', error);
+            });
         }
         function saveMagnetConfig() {
             const base = ROAD_LIB.magnet;
@@ -633,6 +711,8 @@
                     } else if (conf.type === 'goal_box') {
                         pendingGoalCount = conf.targetCount || 1;
                         openGoalSetup();
+                    } else if (conf.type === 'sound_block') {
+                        openSoundBlockSetup(conf);
                     } else if (conf.type === 'magnet') {
                         pendingMagnetMode = conf.isAttached === false ? 'free' : 'attached';
                         pendingMagnetStrength = conf.magnetStrength || 3;
@@ -1118,7 +1198,7 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
-        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice']);
+        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block']);
 
         function isTunnelGuardSurface(body) {
             const root = getCollisionRoot(body);
@@ -1170,6 +1250,77 @@
                 x: vector.x * cos + vector.y * sin,
                 y: -vector.x * sin + vector.y * cos
             };
+        }
+
+        let audioContext = null;
+        let audioMasterGain = null;
+
+        function ensureAudioContext() {
+            const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextCtor) return null;
+
+            if (!audioContext) {
+                audioContext = new AudioContextCtor();
+                audioMasterGain = audioContext.createGain();
+                audioMasterGain.gain.value = 0.28;
+                audioMasterGain.connect(audioContext.destination);
+            }
+
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(() => {});
+            }
+
+            return audioContext;
+        }
+
+        function isSoundBlockBody(body) {
+            const root = getCollisionRoot(body);
+            return root?.label === 'sound_block' || root?.plugin?.baseKey === 'sound_block' || root?.plugin?.type === 'sound_block';
+        }
+
+        function playSoundBlockNote(block) {
+            const ctx = ensureAudioContext();
+            if (!ctx || !audioMasterGain) return;
+
+            const note = getSoundBlockNote(block?.plugin?.noteKey);
+            const now = ctx.currentTime;
+            const mainOsc = ctx.createOscillator();
+            const overtoneOsc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            mainOsc.type = 'triangle';
+            mainOsc.frequency.setValueAtTime(note.frequency, now);
+            overtoneOsc.type = 'sine';
+            overtoneOsc.frequency.setValueAtTime(note.frequency * 2, now);
+
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.linearRampToValueAtTime(0.18, now + 0.01);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+
+            mainOsc.connect(gain);
+            overtoneOsc.connect(gain);
+            gain.connect(audioMasterGain);
+
+            mainOsc.start(now);
+            overtoneOsc.start(now);
+            mainOsc.stop(now + 0.45);
+            overtoneOsc.stop(now + 0.32);
+        }
+
+        function applySoundBlockImpact(block, targetBody, pair) {
+            if (!block || !targetBody || targetBody.isStatic || targetBody.isSensor) return;
+
+            const { normalX, normalY } = getEscalatorContactData(pair, targetBody, block);
+            const tangentX = -normalY;
+            const tangentY = normalX;
+            const tangentSpeed = targetBody.velocity.x * tangentX + targetBody.velocity.y * tangentY;
+            const bounceSpeed = 6.4;
+
+            Body.setVelocity(targetBody, {
+                x: tangentX * tangentSpeed * 0.72 + normalX * bounceSpeed,
+                y: tangentY * tangentSpeed * 0.72 + normalY * bounceSpeed
+            });
+            Body.setAngularVelocity(targetBody, targetBody.angularVelocity * 0.45);
         }
 
         function isShockAbsorberBody(body) {
@@ -1594,7 +1745,8 @@
         });
 
         window.addEventListener('mousedown', (e) => {
-            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal')) return;
+            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal')) return;
+            ensureAudioContext();
 
             if (e.button === 2) { 
                 isPanning = true;
@@ -1755,7 +1907,8 @@
                     // 일반 블록
                     const behaviorKey = resolveRoadBaseKey(conf.baseKey || conf.id);
                     const isShockAbsorber = behaviorKey === 'shock_absorber';
-                    const bodyLabel = (behaviorKey === 'slime' || isEscalatorKey(behaviorKey) || isShockAbsorber) ? behaviorKey : conf.id;
+                    const isSoundBlock = behaviorKey === 'sound_block';
+                    const bodyLabel = (behaviorKey === 'slime' || isEscalatorKey(behaviorKey) || isShockAbsorber || isSoundBlock) ? behaviorKey : conf.id;
                     const basePlugin = { w: conf.w, h: conf.h, baseKey: behaviorKey };
                     if (isEscalatorKey(behaviorKey)) {
                         basePlugin.isActivated = false;
@@ -1771,6 +1924,12 @@
                             side: -1,
                             highlight: 0
                         };
+                    }
+                    if (isSoundBlock) {
+                        basePlugin.type = 'sound_block';
+                        basePlugin.color = conf.color;
+                        basePlugin.noteKey = conf.noteKey || 'c4';
+                        basePlugin.lastSoundAt = 0;
                     }
                     newBody = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, {
                         isStatic: true,
@@ -1858,7 +2017,7 @@
                     box.style.borderRadius = '0';
                 }
             } else {
-                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal')) {
+                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal')) {
                     ghost.style.display = 'none';
                 } else if (!isCustomMode) {
                     ghost.style.display = 'block';
@@ -1989,6 +2148,7 @@
         }
 
         window.addEventListener('keydown', (e) => {
+            ensureAudioContext();
             if (e.key.startsWith('Arrow')) {
                 handleRotation(e.key.replace('Arrow', ''));
                 e.preventDefault();
@@ -2390,6 +2550,7 @@
                 const rootA = getCollisionRoot(bodyA);
                 const rootB = getCollisionRoot(bodyB);
                 const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
+                const isBallLabel = l => l === 'marble' || l === 'steel_marble' || l === 'place_marble';
                 const theMarble = isMarbleLabel(bodyA.label) ? bodyA : (isMarbleLabel(bodyB.label) ? bodyB : null);
                 const theSlime = bodyA.label === 'slime' ? bodyA : (bodyB.label === 'slime' ? bodyB : null);
                 const goalSensor = bodyA.plugin?.type === 'goal_sensor' ? bodyA : (bodyB.plugin?.type === 'goal_sensor' ? bodyB : null);
@@ -2429,6 +2590,18 @@
                 const shockTarget = shockBlock ? (shockBlock === rootA ? rootB : rootA) : null;
                 if (shockBlock && shockTarget && shockTarget !== ground && !shockTarget.isSensor && !shockTarget.isStatic) {
                     applyShockAbsorberImpact(shockBlock, shockTarget, pair);
+                }
+
+                const soundBlock = isSoundBlockBody(rootA) ? rootA : (isSoundBlockBody(rootB) ? rootB : null);
+                const soundTarget = soundBlock ? ((isBallLabel(rootA.label) ? rootA : (isBallLabel(rootB.label) ? rootB : null))) : null;
+                if (soundBlock && soundTarget && !soundTarget.isStatic) {
+                    const now = performance.now();
+                    soundBlock.plugin = soundBlock.plugin || {};
+                    if (!soundBlock.plugin.lastSoundAt || now - soundBlock.plugin.lastSoundAt > 90) {
+                        soundBlock.plugin.lastSoundAt = now;
+                        playSoundBlockNote(soundBlock);
+                    }
+                    applySoundBlockImpact(soundBlock, soundTarget, pair);
                 }
 
                 [rootA, rootB].forEach(b => {
