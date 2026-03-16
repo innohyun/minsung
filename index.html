@@ -1114,22 +1114,28 @@
             const wall = Math.max(10, Math.round(Math.min(w, h) * 0.12));
             const threshold = conf.hitThreshold || 1;
             const isInitiallyStatic = threshold > 1;
+            const friction = 0.05;
+            const frictionStatic = 0.1;
+            const restitution = conf.restitution || 0.0;
+            const density = 0.8;
             const common = {
-                friction: 0.05,
-                frictionStatic: 0.1,
-                restitution: conf.restitution || 0.0,
-                density: 0.8,
+                friction,
+                frictionStatic,
+                restitution,
+                density,
                 render: { fillStyle: conf.color, opacity: isInitiallyStatic ? 0.8 : 1.0 }
             };
             const leftWall = Bodies.rectangle(x - (w / 2) + (wall / 2), y, wall, h, common);
             const rightWall = Bodies.rectangle(x + (w / 2) - (wall / 2), y, wall, h, common);
             const bottomWall = Bodies.rectangle(x, y + (h / 2) - (wall / 2), w, wall, common);
-            return Body.create({
+            const basketBody = Body.create({
                 isStatic: isInitiallyStatic,
                 isSleeping: !isInitiallyStatic,
                 label: conf.id,
-                angle,
-                parts: [leftWall, rightWall, bottomWall],
+                friction,
+                frictionStatic,
+                restitution,
+                density,
                 render: { fillStyle: conf.color, opacity: isInitiallyStatic ? 0.8 : 1.0 },
                 plugin: {
                     type: 'pushable',
@@ -1145,6 +1151,13 @@
                 },
                 slop: 0
             });
+            Body.setParts(basketBody, [leftWall, rightWall, bottomWall], false);
+            if (angle) {
+                Body.setAngle(basketBody, angle);
+            }
+            basketBody.plugin.originX = basketBody.position.x;
+            basketBody.plugin.originY = basketBody.position.y;
+            return basketBody;
         }
 
         function getSupportCenter(supports, fallback) {
