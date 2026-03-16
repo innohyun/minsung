@@ -1014,25 +1014,19 @@
             const w = conf.w;
             const h = conf.h;
             const wall = Math.max(10, Math.round(Math.min(w, h) * 0.12));
-            const leftWall = Bodies.rectangle(x - (w / 2) + (wall / 2), y, wall, h, {
-                isStatic: true,
+            const wallOptions = {
                 render: { fillStyle: conf.color }
-            });
-            const rightWall = Bodies.rectangle(x + (w / 2) - (wall / 2), y, wall, h, {
-                isStatic: true,
-                render: { fillStyle: conf.color }
-            });
-            const bottomWall = Bodies.rectangle(x, y + (h / 2) - (wall / 2), w, wall, {
-                isStatic: true,
-                render: { fillStyle: conf.color }
-            });
+            };
+            const leftWall = Bodies.rectangle(x - (w / 2) + (wall / 2), y, wall, h, wallOptions);
+            const rightWall = Bodies.rectangle(x + (w / 2) - (wall / 2), y, wall, h, wallOptions);
+            const bottomWall = Bodies.rectangle(x, y + (h / 2) - (wall / 2), w, wall, wallOptions);
             const sensor = Bodies.rectangle(x, y + wall * 0.1, w - wall * 2, h - wall * 1.4, {
-                isStatic: true,
                 isSensor: true,
                 render: { visible: false }
             });
             const goalBody = Body.create({
                 isStatic: true,
+                label: conf.id,
                 angle: angle,
                 parts: [leftWall, rightWall, bottomWall, sensor],
                 render: { fillStyle: conf.color },
@@ -1055,37 +1049,16 @@
         function createShockAbsorberBody(x, y, conf, angle) {
             const w = conf.w;
             const h = conf.h;
-            const common = {
-                isStatic: true,
-                friction: 0,
-                frictionStatic: 0,
-                restitution: 0,
-                render: { visible: false }
-            };
-            const parts = [];
-
-            if (w > h + 0.5) {
-                const radius = h / 2;
-                const centerWidth = Math.max(1, w - h);
-                parts.push(Bodies.rectangle(x, y, centerWidth, h, common));
-                parts.push(Bodies.circle(x - centerWidth / 2, y, radius, common));
-                parts.push(Bodies.circle(x + centerWidth / 2, y, radius, common));
-            } else if (h > w + 0.5) {
-                const radius = w / 2;
-                const centerHeight = Math.max(1, h - w);
-                parts.push(Bodies.rectangle(x, y, w, centerHeight, common));
-                parts.push(Bodies.circle(x, y - centerHeight / 2, radius, common));
-                parts.push(Bodies.circle(x, y + centerHeight / 2, radius, common));
-            } else {
-                parts.push(Bodies.circle(x, y, Math.min(w, h) / 2, common));
-            }
-
-            return Body.create({
+            const radius = Math.max(6, Math.min(w, h) / 2);
+            return Bodies.rectangle(x, y, w, h, {
                 isStatic: true,
                 label: 'shock_absorber',
                 angle,
-                parts,
+                friction: 0,
+                frictionStatic: 0,
+                restitution: 0,
                 render: { visible: false },
+                chamfer: { radius },
                 plugin: {
                     type: 'shock_absorber',
                     baseKey: 'shock_absorber',
@@ -1198,14 +1171,14 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
-        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block']);
+        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block', 'shock_absorber']);
 
         function isTunnelGuardSurface(body) {
             const root = getCollisionRoot(body);
             if (!root || root.isSensor || !root.isStatic) return false;
             if (root === ground) return true;
             if (root.label === 'slime') return false;
-            if (root.plugin?.type === 'shock_absorber' || root.plugin?.type === 'goal_box' || root.plugin?.type === 'pushable') return false;
+            if (root.plugin?.type === 'goal_box' || root.plugin?.type === 'pushable') return false;
             if (root.label && isEscalatorKey(root.label)) return false;
             const surfaceKey = root.plugin?.baseKey || root.label;
             return TUNNEL_GUARD_SURFACE_KEYS.has(surfaceKey);
