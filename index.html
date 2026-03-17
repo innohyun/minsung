@@ -388,13 +388,13 @@
 
     <div id="curve-road-setup-modal">
         <h3>〰️ 곡선 길 설정</h3>
-        <p>크기를 먼저 정한 뒤 축 개수를 고릅니다. 원하면 축 없이 그냥 직선 길로 저장할 수 있습니다.</p>
+        <p>먼저 일반 크기 조정인지, 축을 단 곡선 길인지 고릅니다. 곡선 길을 고르면 이어서 크기를 정합니다.</p>
         <div class="magnet-row">
             <label for="curve-road-axis-input">축 개수</label>
             <input type="number" id="curve-road-axis-input" min="3" max="9" value="3">
         </div>
-        <button class="btn-marble-modal" onclick="saveCurveRoadConfig()" style="background:#8b5a2b; margin-bottom:8px;">곡선으로 저장</button>
-        <button class="btn-marble-modal" onclick="saveStraightRoadConfig()" style="background:#a66a32; margin-bottom:8px;">축 없이 저장</button>
+        <button class="btn-marble-modal" onclick="startCurveRoadCustomSize()" style="background:#8b5a2b; margin-bottom:8px;">축 달린 길</button>
+        <button class="btn-marble-modal" onclick="startStraightRoadCustomSize()" style="background:#a66a32; margin-bottom:8px;">크기만 조정</button>
         <button class="btn-marble-modal" onclick="closeCurveRoadSetup()" style="background:#999;">취소</button>
     </div>
 
@@ -660,17 +660,14 @@
         }
         function openCurveRoadSetup(conf) {
             pendingCurveAxisCount = Math.max(3, parseInt(conf?.curveAxisCount, 10) || 3);
+            pendingCurveSetupAfterSize = false;
             document.getElementById('curve-road-axis-input').value = pendingCurveAxisCount;
             document.getElementById('curve-road-setup-modal').style.display = 'block';
         }
         function closeCurveRoadSetup() {
             pendingCurveAxisCount = 0;
             pendingCurveSetupAfterSize = false;
-            pendingCustomW = 0;
-            pendingCustomH = 0;
-            isCustomMode = false;
             document.getElementById('curve-road-setup-modal').style.display = 'none';
-            updateGhostStyle();
         }
         function populateSoundBlockNoteOptions() {
             const select = document.getElementById('sound-block-note-input');
@@ -792,56 +789,47 @@
                 errorMsg.style.borderColor = '#d32f2f';
             }, 2500);
         }
-        function savePendingSizedRoad(curveAxisCount = 0) {
-            const base = ROAD_LIB[customBaseKey];
-            if (!base || !pendingCustomW || !pendingCustomH) {
-                closeCurveRoadSetup();
-                cancelCustomSave();
-                return;
-            }
-            const resolvedBaseKey = resolveRoadBaseKey(base?.baseKey || customBaseKey);
-            const baseName = ROAD_LIB[resolvedBaseKey]?.name || base.name;
-            const axisCount = curveAxisCount >= 3 ? Math.max(3, Math.min(9, curveAxisCount)) : 0;
-            const id = `custom_curve_${Date.now()}`;
-            const roadData = {
-                ...base,
-                baseKey: resolvedBaseKey,
-                w: pendingCustomW,
-                h: pendingCustomH,
-                pw: Math.min(30, Math.round(pendingCustomW / 5)),
-                ph: Math.min(25, Math.round(pendingCustomH / 3)),
-                name: axisCount
-                    ? `${baseName}(${pendingCustomW}×${pendingCustomH}, ${axisCount}축)`
-                    : `${baseName}(${pendingCustomW}×${pendingCustomH})`
-            };
-            if (axisCount) {
-                roadData.curveAxisCount = axisCount;
-            } else {
-                delete roadData.curveAxisCount;
-            }
-
-            ROAD_LIB[id] = { ...roadData, id };
-            slots[currentSlotIndex] = id;
-            renderSlots();
-            renderLibrary();
-            updateGhostStyle();
-            closeCurveRoadSetup();
+        function startCurveRoadCustomSize() {
+            pendingCurveSetupAfterSize = true;
+            pendingCurveAxisCount = Math.max(3, Math.min(9, parseInt(document.getElementById('curve-road-axis-input').value, 10) || 3));
+            document.getElementById('curve-road-setup-modal').style.display = 'none';
+            const conf = ROAD_LIB[customBaseKey];
+            isCustomMode = true;
+            ghost.style.display = 'none';
             closeLibrary();
-            pendingCurveAxisCount = 0;
+            container.style.cursor = 'crosshair';
+            errorMsg.innerText = `〰️ [${conf.name}] 크기 맞추기: 맵에서 드래그하세요`;
+            errorMsg.style.color = '#8b5a2b';
+            errorMsg.style.borderColor = '#8b5a2b';
+            errorMsg.style.display = 'block';
+            if (errorTimeout) clearTimeout(errorTimeout);
+            errorTimeout = setTimeout(() => {
+                errorMsg.style.display = 'none';
+                errorMsg.innerText = '❌ 길이 겹쳐서 놓을 수 없습니다!';
+                errorMsg.style.color = '#d32f2f';
+                errorMsg.style.borderColor = '#d32f2f';
+            }, 2500);
+        }
+        function startStraightRoadCustomSize() {
             pendingCurveSetupAfterSize = false;
-            pendingCustomW = 0;
-            pendingCustomH = 0;
-            saveCustomRoadToFirestore(id, roadData).catch(error => {
-                console.error('Failed to save curve road config to Firestore:', error);
-            });
-        }
-        function saveCurveRoadConfig() {
-            const axisCount = Math.max(3, Math.min(9, parseInt(document.getElementById('curve-road-axis-input').value, 10) || 3));
-            pendingCurveAxisCount = axisCount;
-            savePendingSizedRoad(axisCount);
-        }
-        function saveStraightRoadConfig() {
-            savePendingSizedRoad(0);
+            pendingCurveAxisCount = 0;
+            document.getElementById('curve-road-setup-modal').style.display = 'none';
+            const conf = ROAD_LIB[customBaseKey];
+            isCustomMode = true;
+            ghost.style.display = 'none';
+            closeLibrary();
+            container.style.cursor = 'crosshair';
+            errorMsg.innerText = `📏 [${conf.name}] 크기 맞추기: 맵에서 드래그하세요`;
+            errorMsg.style.color = '#8b5a2b';
+            errorMsg.style.borderColor = '#8b5a2b';
+            errorMsg.style.display = 'block';
+            if (errorTimeout) clearTimeout(errorTimeout);
+            errorTimeout = setTimeout(() => {
+                errorMsg.style.display = 'none';
+                errorMsg.innerText = '❌ 길이 겹쳐서 놓을 수 없습니다!';
+                errorMsg.style.color = '#d32f2f';
+                errorMsg.style.borderColor = '#d32f2f';
+            }, 2500);
         }
         function saveMagnetConfig() {
             const base = ROAD_LIB.magnet;
@@ -915,23 +903,7 @@
                     } else if (resolvedBaseKey === 'slime') {
                         openSlimeSetup(conf);
                     } else if (isBendableRoadBaseKey(resolvedBaseKey)) {
-                        pendingCurveSetupAfterSize = true;
-                        pendingCurveAxisCount = Math.max(3, parseInt(conf?.curveAxisCount, 10) || 3);
-                        isCustomMode = true;
-                        ghost.style.display = 'none';
-                        closeLibrary();
-                        container.style.cursor = 'crosshair';
-                        errorMsg.innerText = `📏 [${conf.name}] 크기 맞추기: 맵에서 드래그하세요`;
-                        errorMsg.style.color = '#8b5a2b';
-                        errorMsg.style.borderColor = '#8b5a2b';
-                        errorMsg.style.display = 'block';
-                        if(errorTimeout) clearTimeout(errorTimeout);
-                        errorTimeout = setTimeout(() => {
-                            errorMsg.style.display = 'none';
-                            errorMsg.innerText = '❌ 길이 겹쳐서 놓을 수 없습니다!';
-                            errorMsg.style.color = '#d32f2f';
-                            errorMsg.style.borderColor = '#d32f2f';
-                        }, 2500);
+                        openCurveRoadSetup(conf);
                     } else {
                         isCustomMode = true;
                         ghost.style.display = 'none';
@@ -1437,27 +1409,69 @@
             return points;
         }
 
-        function buildCurveRoadParts(controlPoints, thickness, common) {
+        function getCurveRoadFrames(controlPoints, thickness) {
             const samples = sampleCurveRoadPoints(controlPoints);
+            if (samples.length < 2) return [];
+
+            const halfThickness = Math.max(2, thickness / 2);
+            const frames = [];
+
+            for (let i = 0; i < samples.length; i++) {
+                const prev = samples[Math.max(0, i - 1)];
+                const next = samples[Math.min(samples.length - 1, i + 1)];
+                let tangentX = next.x - prev.x;
+                let tangentY = next.y - prev.y;
+                const tangentLength = Math.hypot(tangentX, tangentY);
+
+                if (tangentLength < 0.0001) {
+                    tangentX = 1;
+                    tangentY = 0;
+                } else {
+                    tangentX /= tangentLength;
+                    tangentY /= tangentLength;
+                }
+
+                const normalX = -tangentY;
+                const normalY = tangentX;
+                const point = samples[i];
+                frames.push({
+                    point,
+                    left: {
+                        x: point.x + normalX * halfThickness,
+                        y: point.y + normalY * halfThickness
+                    },
+                    right: {
+                        x: point.x - normalX * halfThickness,
+                        y: point.y - normalY * halfThickness
+                    }
+                });
+            }
+
+            return frames;
+        }
+
+        function buildCurveRoadParts(controlPoints, thickness, common) {
+            const frames = getCurveRoadFrames(controlPoints, thickness);
             const parts = [];
 
-            for (let i = 1; i < samples.length; i++) {
-                const a = samples[i - 1];
-                const b = samples[i];
-                const dx = b.x - a.x;
-                const dy = b.y - a.y;
-                const length = Math.hypot(dx, dy);
+            for (let i = 1; i < frames.length; i++) {
+                const a = frames[i - 1];
+                const b = frames[i];
+                const length = Math.hypot(b.point.x - a.point.x, b.point.y - a.point.y);
                 if (length < 0.5) continue;
-                parts.push(Bodies.rectangle(
-                    (a.x + b.x) / 2,
-                    (a.y + b.y) / 2,
-                    length + 1,
-                    thickness,
-                    {
-                        ...common,
-                        angle: Math.atan2(dy, dx)
-                    }
-                ));
+                const quad = [
+                    { x: a.left.x, y: a.left.y },
+                    { x: b.left.x, y: b.left.y },
+                    { x: b.right.x, y: b.right.y },
+                    { x: a.right.x, y: a.right.y }
+                ];
+                const part = Bodies.fromVertices(0, 0, [quad], common, true);
+
+                if (Array.isArray(part)) {
+                    part.forEach(child => parts.push(child));
+                } else if (part) {
+                    parts.push(part);
+                }
             }
 
             return parts;
@@ -1479,11 +1493,35 @@
                 slop: 0
             };
             const parts = buildCurveRoadParts(controlPoints, conf.h, common);
+            if (!parts.length) {
+                return Bodies.rectangle(x, y, conf.w, conf.h, {
+                    isStatic: true,
+                    angle,
+                    label: conf.id,
+                    friction: 0,
+                    frictionStatic: 0,
+                    restitution: conf.restitution,
+                    render: { fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
+                    slop: 0,
+                    plugin: {
+                        type: 'bendable_road',
+                        baseKey: resolveRoadBaseKey(conf.baseKey || conf.id),
+                        color: conf.color,
+                        w: conf.w,
+                        h: conf.h,
+                        curveAxisCount: axisCount,
+                        controlPoints,
+                        originX: x,
+                        originY: y,
+                        originAngle: angle
+                    }
+                });
+            }
             const body = Body.create({
                 isStatic: true,
                 label: conf.id,
                 parts,
-                render: { visible: false },
+                render: { visible: true, fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
                 friction: 0,
                 frictionStatic: 0,
                 restitution: conf.restitution,
@@ -3048,13 +3086,9 @@
                     if (w >= 10 && h >= 5) {
                         pendingCustomW = Math.round(w);
                         pendingCustomH = Math.round(h);
-                        if (pendingCurveSetupAfterSize && isBendableRoadBaseKey(resolveRoadBaseKey(baseConf?.baseKey || customBaseKey))) {
-                            openCurveRoadSetup(baseConf);
-                        } else {
-                            document.getElementById('custom-size-info').innerText = `크기: ${pendingCustomW} × ${pendingCustomH} px`;
-                            document.getElementById('custom-name-input').value = '';
-                            document.getElementById('custom-save-modal').style.display = 'block';
-                        }
+                        document.getElementById('custom-size-info').innerText = `크기: ${pendingCustomW} × ${pendingCustomH} px`;
+                        document.getElementById('custom-name-input').value = '';
+                        document.getElementById('custom-save-modal').style.display = 'block';
                     }
                 }
                 return;
@@ -3270,23 +3304,23 @@
             const base = ROAD_LIB[customBaseKey];
             if (!base) { cancelCustomSave(); return; }
             const resolvedBaseKey = resolveRoadBaseKey(base.baseKey || customBaseKey);
+            const baseName = ROAD_LIB[resolvedBaseKey]?.name || base.name;
             const isEscalatorBase = isEscalatorKey(resolvedBaseKey);
             const customW = pendingCustomW;
             const customH = isEscalatorBase ? base.h : pendingCustomH;
             const thresholdSuffix = getPushableThresholdSuffix(base, pendingHitCount);
             const soundNote = getSoundBlockNote(pendingSoundBlockNoteKey || base.noteKey || 'c4');
             const slimeStrength = getConfiguredSlimeStrength({ slimeStrength: pendingSlimeStrength || base.slimeStrength });
-            const hasCurveConfig = pendingCurveAxisCount >= 3 || (parseInt(base.curveAxisCount, 10) || 0) >= 3;
-            const curveAxisCount = (isBendableRoadBaseKey(resolvedBaseKey) && hasCurveConfig)
-                ? Math.max(3, pendingCurveAxisCount || parseInt(base.curveAxisCount, 10) || 3)
+            const curveAxisCount = (isBendableRoadBaseKey(resolvedBaseKey) && pendingCurveSetupAfterSize && pendingCurveAxisCount >= 3)
+                ? Math.max(3, pendingCurveAxisCount)
                 : 0;
             const defaultName = pendingHitCount > 1 
-                ? `${base.name}(${customW}×${customH}, ${thresholdSuffix})` 
-                : `${base.name}(${customW}×${customH})`;
-            const goalDefaultName = `${base.name}(${customW}×${customH}, ${pendingGoalCount}개)`;
+                ? `${baseName}(${customW}×${customH}, ${thresholdSuffix})` 
+                : `${baseName}(${customW}×${customH})`;
+            const goalDefaultName = `${baseName}(${customW}×${customH}, ${pendingGoalCount}개)`;
             const soundDefaultName = `소리 블록(${soundNote.label}, ${customW}×${customH})`;
-            const slimeDefaultName = `${ROAD_LIB[resolvedBaseKey]?.name || base.name}(${customW}×${customH}, ${slimeStrength})`;
-            const curveDefaultName = `${ROAD_LIB[resolvedBaseKey]?.name || base.name}(${customW}×${customH}, ${curveAxisCount}축)`;
+            const slimeDefaultName = `${baseName}(${customW}×${customH}, ${slimeStrength})`;
+            const curveDefaultName = `${baseName}(${customW}×${customH}, ${curveAxisCount}축)`;
             const name = document.getElementById('custom-name-input').value.trim() || (base.type === 'goal_box' ? goalDefaultName : (resolvedBaseKey === 'sound_block' ? soundDefaultName : (resolvedBaseKey === 'slime' ? slimeDefaultName : (curveAxisCount ? curveDefaultName : defaultName))));
             const id = 'custom_' + Date.now();
             const roadData = {
@@ -3312,6 +3346,8 @@
             }
             if (curveAxisCount) {
                 roadData.curveAxisCount = curveAxisCount;
+            } else {
+                delete roadData.curveAxisCount;
             }
             ROAD_LIB[id] = { ...roadData, id: id };
             // 현재 슬롯에 자동 장착
@@ -3325,6 +3361,7 @@
             pendingSoundBlockNoteKey = 'c4';
             pendingSlimeStrength = 20;
             pendingCurveAxisCount = 0;
+            pendingCurveSetupAfterSize = false;
             saveCustomRoadToFirestore(id, roadData).catch(error => {
                 console.error('Failed to save custom road to Firestore:', error);
             });
@@ -3339,6 +3376,7 @@
             pendingSoundBlockNoteKey = 'c4';
             pendingSlimeStrength = 20;
             pendingCurveAxisCount = 0;
+            pendingCurveSetupAfterSize = false;
             updateGhostStyle();
         }
 
