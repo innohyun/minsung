@@ -402,7 +402,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script>
-        const { Engine, Render, Runner, World, Bodies, Composite, Body, Query, Events, Sleeping } = Matter;
+        const { Engine, Render, Runner, World, Bodies, Composite, Body, Constraint, Query, Events, Sleeping } = Matter;
 
         const firebaseConfig = {
             apiKey: "AIzaSyCTKcgo-O2RjisW6fH-Dw0PudNtrAWu2VI",
@@ -791,6 +791,8 @@
         let pendingMagnetStrength = 3;
         let pendingGoalCount = 1;
         let pendingSoundBlockNoteKey = 'c4';
+        let nextPushableLinkGroup = -1;
+        let pushableLinkCounter = 0;
         let endMessageTimer = null;
         const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
 
@@ -1605,8 +1607,261 @@
             return body?.plugin?.type === 'pushable' && body.plugin?.shape === 'basket';
         }
 
+        function isAttachablePushable(body) {
+            return body?.plugin?.type === 'pushable' && body.plugin?.shape !== 'basket';
+        }
+
         function findBodyById(bodyId) {
             return Composite.allBodies(world).find(body => body.id === bodyId) || null;
+        }
+
+        function getPushableSize(body) {
+            return {
+                w: body?.plugin?.w || 0,
+                h: body?.plugin?.h || 0
+            };
+        }
+
+        function bodyLocalToWorld(body, point) {
+            const cos = Math.cos(body.angle);
+            const sin = Math.sin(body.angle);
+            return {
+                x: body.position.x + point.x * cos - point.y * sin,
+                y: body.position.y + point.x * sin + point.y * cos
+            };
+        }
+
+        function getPushableLinkConstraints() {
+            return Composite.allConstraints(world).filter(constraint => constraint.plugin?.type === 'pushable_link');
+        }
+
+        function getParallelAngleDifference(a, b) {
+            let diff = Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+            if (diff > Math.PI / 2) diff = Math.PI - diff;
+            return Math.abs(diff);
+        }
+
+        function getLinkedPushableCluster(startBody) {
+            if (!isAttachablePushable(startBody)) return [];
+            const constraints = getPushableLinkConstraints();
+            const queue = [startBody];
+            const seen = new Set([startBody.id]);
+            const cluster = [];
+
+            while (queue.length > 0) {
+                const current = queue.shift();
+                cluster.push(current);
+                constraints.forEach(constraint => {
+                    const bodyA = getCollisionRoot(constraint.bodyA);
+                    const bodyB = getCollisionRoot(constraint.bodyB);
+                    let next = null;
+                    if (bodyA === current && isAttachablePushable(bodyB)) next = bodyB;
+                    else if (bodyB === current && isAttachablePushable(bodyA)) next = bodyA;
+                    if (next && !seen.has(next.id)) {
+                        seen.add(next.id);
+                        queue.push(next);
+                    }
+                });
+            }
+
+            return cluster;
+        }
+
+        function arePushablesConnected(bodyA, bodyB) {
+            if (!isAttachablePushable(bodyA) || !isAttachablePushable(bodyB)) return false;
+            return getLinkedPushableCluster(bodyA).some(body => body.id === bodyB.id);
+        }
+
+        function rebuildPushableLinkGroups() {
+            pushables.forEach(body => {
+                if (isAttachablePushable(body)) {
+                    body.collisionFilter.group = 0;
+                }
+            });
+
+            const visited = new Set();
+            pushables.forEach(body => {
+                if (!isAttachablePushable(body) || visited.has(body.id)) return;
+                const cluster = getLinkedPushableCluster(body);
+                cluster.forEach(item => visited.add(item.id));
+                if (cluster.length <= 1) return;
+                const group = nextPushableLinkGroup--;
+                cluster.forEach(item => {
+                    item.collisionFilter.group = group;
+                });
+            });
+        }
+
+        function removePushableLinksForBody(body) {
+            getPushableLinkConstraints().forEach(constraint => {
+                if (constraint.bodyA === body || constraint.bodyB === body) {
+                    World.remove(world, constraint);
+                }
+            });
+            rebuildPushableLinkGroups();
+        }
+
+        function clearAllPushableLinks() {
+            getPushableLinkConstraints().forEach(constraint => World.remove(world, constraint));
+            rebuildPushableLinkGroups();
+        }
+
+        function getPushableAttachmentSpec(body, targetBody) {
+            if (!isAttachablePushable(body) || !isAttachablePushable(targetBody)) return null;
+            const angleDiff = getParallelAngleDifference(body.angle, targetBody.angle);
+            if (angleDiff > Math.PI / 36) return null;
+
+            const targetSize = getPushableSize(targetBody);
+            const bodySize = getPushableSize(body);
+            const targetHalfW = targetSize.w / 2;
+            const targetHalfH = targetSize.h / 2;
+            const bodyHalfW = bodySize.w / 2;
+            const bodyHalfH = bodySize.h / 2;
+            const local = worldToBodyLocal(targetBody, body.position);
+            const overlapY = Math.min(targetHalfH, local.y + bodyHalfH) - Math.max(-targetHalfH, local.y - bodyHalfH);
+            const overlapX = Math.min(targetHalfW, local.x + bodyHalfW) - Math.max(-targetHalfW, local.x - bodyHalfW);
+            const minSideOverlap = Math.max(6, Math.min(targetSize.h, bodySize.h) * 0.45);
+            const minTopOverlap = Math.max(18, Math.min(targetSize.w, bodySize.w) * 0.22);
+            const snapDistance = 18;
+            const candidates = [];
+
+            if (overlapY >= minSideOverlap) {
+                candidates.push({
+                    axis: 'x',
+                    side: 1,
+                    error: Math.abs(local.x - (targetHalfW + bodyHalfW)),
+                    localX: targetHalfW + bodyHalfW,
+                    localY: local.y
+                });
+                candidates.push({
+                    axis: 'x',
+                    side: -1,
+                    error: Math.abs(local.x + targetHalfW + bodyHalfW),
+                    localX: -(targetHalfW + bodyHalfW),
+                    localY: local.y
+                });
+            }
+
+            if (overlapX >= minTopOverlap) {
+                candidates.push({
+                    axis: 'y',
+                    side: 1,
+                    error: Math.abs(local.y - (targetHalfH + bodyHalfH)),
+                    localX: local.x,
+                    localY: targetHalfH + bodyHalfH
+                });
+                candidates.push({
+                    axis: 'y',
+                    side: -1,
+                    error: Math.abs(local.y + targetHalfH + bodyHalfH),
+                    localX: local.x,
+                    localY: -(targetHalfH + bodyHalfH)
+                });
+            }
+
+            const best = candidates
+                .filter(candidate => candidate.error <= snapDistance)
+                .sort((a, b) => a.error - b.error)[0];
+
+            if (!best) return null;
+
+            return {
+                ...best,
+                targetBody,
+                angle: targetBody.angle,
+                position: bodyLocalToWorld(targetBody, { x: best.localX, y: best.localY })
+            };
+        }
+
+        function canSnapPushableToTarget(body, spec) {
+            const size = getPushableSize(body);
+            const mock = Bodies.rectangle(spec.position.x, spec.position.y, size.w, size.h, { angle: spec.angle });
+            const collisions = Query.collides(mock, Composite.allBodies(world).filter(other =>
+                other !== body && other !== spec.targetBody && other !== ground
+            ));
+            return collisions.length === 0;
+        }
+
+        function createPushableLink(body, targetBody, spec) {
+            if (arePushablesConnected(body, targetBody)) return;
+
+            const targetSize = getPushableSize(targetBody);
+            const bodySize = getPushableSize(body);
+            const targetHalfW = targetSize.w / 2;
+            const targetHalfH = targetSize.h / 2;
+            const bodyHalfW = bodySize.w / 2;
+            const bodyHalfH = bodySize.h / 2;
+            const linkId = `pushable_link_${++pushableLinkCounter}`;
+            const constraintDefs = [];
+
+            if (spec.axis === 'x') {
+                const overlapMin = Math.max(-targetHalfH, spec.localY - bodyHalfH);
+                const overlapMax = Math.min(targetHalfH, spec.localY + bodyHalfH);
+                const center = (overlapMin + overlapMax) / 2;
+                const spread = Math.max(4, Math.min(16, (overlapMax - overlapMin) * 0.28));
+                const anchorYs = [center - spread, center + spread].map(value => Math.max(overlapMin, Math.min(overlapMax, value)));
+                const targetEdgeX = spec.side * targetHalfW;
+                const bodyEdgeX = -spec.side * bodyHalfW;
+
+                anchorYs.forEach(anchorY => {
+                    constraintDefs.push({
+                        pointA: { x: targetEdgeX, y: anchorY },
+                        pointB: { x: bodyEdgeX, y: anchorY - spec.localY }
+                    });
+                });
+            } else {
+                const overlapMin = Math.max(-targetHalfW, spec.localX - bodyHalfW);
+                const overlapMax = Math.min(targetHalfW, spec.localX + bodyHalfW);
+                const center = (overlapMin + overlapMax) / 2;
+                const spread = Math.max(10, Math.min(24, (overlapMax - overlapMin) * 0.28));
+                const anchorXs = [center - spread, center + spread].map(value => Math.max(overlapMin, Math.min(overlapMax, value)));
+                const targetEdgeY = spec.side * targetHalfH;
+                const bodyEdgeY = -spec.side * bodyHalfH;
+
+                anchorXs.forEach(anchorX => {
+                    constraintDefs.push({
+                        pointA: { x: anchorX, y: targetEdgeY },
+                        pointB: { x: anchorX - spec.localX, y: bodyEdgeY }
+                    });
+                });
+            }
+
+            constraintDefs.forEach(def => {
+                const constraint = Constraint.create({
+                    bodyA: targetBody,
+                    pointA: def.pointA,
+                    bodyB: body,
+                    pointB: def.pointB,
+                    length: 0,
+                    stiffness: 1,
+                    damping: 0.18,
+                    render: { visible: false },
+                    plugin: { type: 'pushable_link', linkId }
+                });
+                World.add(world, constraint);
+            });
+
+            rebuildPushableLinkGroups();
+        }
+
+        function tryAttachPushable(body) {
+            if (!isAttachablePushable(body)) return false;
+
+            const spec = pushables
+                .filter(candidate => candidate !== body && isAttachablePushable(candidate) && !arePushablesConnected(body, candidate))
+                .map(candidate => getPushableAttachmentSpec(body, candidate))
+                .filter(Boolean)
+                .sort((a, b) => a.error - b.error)[0];
+
+            if (!spec || !canSnapPushableToTarget(body, spec)) return false;
+
+            Body.setAngle(body, spec.angle);
+            Body.setPosition(body, spec.position);
+            Body.setVelocity(body, { x: 0, y: 0 });
+            Body.setAngularVelocity(body, 0);
+            createPushableLink(body, spec.targetBody, spec);
+            getLinkedPushableCluster(body).forEach(updateBodyOrigin);
+            return true;
         }
 
         function clearPushableBasketCarrierState(pushable) {
@@ -1888,6 +2143,22 @@
                         showError();
                         return;
                     }
+                } else if (conf.type === 'pushable') {
+                    const mockRoad = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, { angle: ghostAngle });
+                    mockRoad.plugin = { type: 'pushable', w: conf.w, h: conf.h };
+                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    const collisions = Query.collides(mockRoad, existingRoads);
+                    if (collisions.length > 0) {
+                        const spec = pushables
+                            .filter(isAttachablePushable)
+                            .map(candidate => getPushableAttachmentSpec(mockRoad, candidate))
+                            .filter(Boolean)
+                            .sort((a, b) => a.error - b.error)[0];
+                        if (!spec || !canSnapPushableToTarget(mockRoad, spec)) {
+                            showError();
+                            return;
+                        }
+                    }
                 } else if (conf.type === 'pushable_basket') {
                     const mockBasket = createPushableBasketBody(worldPos.x, worldPos.y, conf, ghostAngle);
                     const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
@@ -2022,6 +2293,9 @@
                     });
                 }
                 World.add(world, newBody);
+                if (isAttachablePushable(newBody)) {
+                    tryAttachPushable(newBody);
+                }
                 selectedBody = newBody;
             }
         });
@@ -2156,9 +2430,14 @@
 
             if (isDraggingBody && selectedBody) {
                 // 드래그가 끝났을 때 현재 위치를 새로운 '되돌리기 기준점'으로 저장
+                tryAttachPushable(selectedBody);
                 Body.setVelocity(selectedBody, { x: 0, y: 0 });
                 Body.setAngularVelocity(selectedBody, 0);
-                updateBodyOrigin(selectedBody);
+                if (isAttachablePushable(selectedBody)) {
+                    getLinkedPushableCluster(selectedBody).forEach(updateBodyOrigin);
+                } else {
+                    updateBodyOrigin(selectedBody);
+                }
             }
             isPanning = false;
             isDraggingBody = false;
@@ -2229,6 +2508,7 @@
             } else if (e.code === 'Space') {
                 startMarbleSequence();
             } else if (e.key.toLowerCase() === 'r') {
+                clearAllPushableLinks();
                 const bodies = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
                 World.remove(world, bodies);
                 selectedBody = null;
@@ -2241,6 +2521,7 @@
                 toggleFollowMode();
             } else if (e.key === 'Delete' || e.key === 'Backspace') {
                 if (selectedBody) {
+                    removePushableLinksForBody(selectedBody);
                     placedMarbles = placedMarbles.filter(b => b !== selectedBody);
                     magnets = magnets.filter(b => b !== selectedBody);
                     pushables = pushables.filter(b => b !== selectedBody);
