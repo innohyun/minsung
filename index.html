@@ -1451,27 +1451,29 @@
         }
 
         function buildCurveRoadParts(controlPoints, thickness, common) {
-            const frames = getCurveRoadFrames(controlPoints, thickness);
+            const samples = sampleCurveRoadPoints(controlPoints);
             const parts = [];
 
-            for (let i = 1; i < frames.length; i++) {
-                const a = frames[i - 1];
-                const b = frames[i];
-                const length = Math.hypot(b.point.x - a.point.x, b.point.y - a.point.y);
+            for (let i = 1; i < samples.length; i++) {
+                const a = samples[i - 1];
+                const b = samples[i];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const length = Math.hypot(dx, dy);
                 if (length < 0.5) continue;
-                const quad = [
-                    { x: a.left.x, y: a.left.y },
-                    { x: b.left.x, y: b.left.y },
-                    { x: b.right.x, y: b.right.y },
-                    { x: a.right.x, y: a.right.y }
-                ];
-                const part = Bodies.fromVertices(0, 0, [quad], common, true);
-
-                if (Array.isArray(part)) {
-                    part.forEach(child => parts.push(child));
-                } else if (part) {
-                    parts.push(part);
-                }
+                const overlap = i === 1 || i === samples.length - 1
+                    ? 2
+                    : Math.max(4, thickness * 0.9);
+                parts.push(Bodies.rectangle(
+                    (a.x + b.x) / 2,
+                    (a.y + b.y) / 2,
+                    length + overlap,
+                    thickness,
+                    {
+                        ...common,
+                        angle: Math.atan2(dy, dx)
+                    }
+                ));
             }
 
             return parts;
@@ -1489,7 +1491,7 @@
                 friction: 0,
                 frictionStatic: 0,
                 restitution: conf.restitution,
-                render: { visible: true, fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
+                render: { visible: false, fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
                 slop: 0
             };
             const parts = buildCurveRoadParts(controlPoints, conf.h, common);
@@ -1501,7 +1503,7 @@
                     friction: 0,
                     frictionStatic: 0,
                     restitution: conf.restitution,
-                    render: { fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
+                    render: { visible: false, fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
                     slop: 0,
                     plugin: {
                         type: 'bendable_road',
@@ -1521,7 +1523,7 @@
                 isStatic: true,
                 label: conf.id,
                 parts,
-                render: { visible: true, fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
+                render: { visible: false, fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
                 friction: 0,
                 frictionStatic: 0,
                 restitution: conf.restitution,
@@ -2074,25 +2076,45 @@
 
         function drawBendableRoadBody(ctx, body, isSelected = false) {
             if (!isBendableRoadBody(body)) return;
-            if (!isSelected) return;
-
-            const points = sampleCurveRoadPoints(body.plugin.controlPoints || []);
-            if (points.length < 2) return;
+            const frames = getCurveRoadFrames(body.plugin.controlPoints || [], body.plugin.h || 15);
+            if (frames.length < 2) return;
 
             ctx.save();
             ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
             ctx.rotate(body.angle);
 
             ctx.beginPath();
-            ctx.moveTo(points[0].x, points[0].y);
-            for (let i = 1; i < points.length; i++) {
-                ctx.lineTo(points[i].x, points[i].y);
+            ctx.moveTo(frames[0].left.x, frames[0].left.y);
+            for (let i = 1; i < frames.length; i++) {
+                ctx.lineTo(frames[i].left.x, frames[i].left.y);
+            }
+            for (let i = frames.length - 1; i >= 0; i--) {
+                ctx.lineTo(frames[i].right.x, frames[i].right.y);
+            }
+            ctx.closePath();
+
+            ctx.fillStyle = body.plugin.color || '#7a6652';
+            ctx.fill();
+
+            ctx.strokeStyle = mixColor(body.plugin.color || '#7a6652', '#4a3c2c', 0.22);
+            ctx.lineWidth = 1.2;
+            ctx.lineJoin = 'miter';
+            ctx.stroke();
+
+            if (!isSelected) {
+                ctx.restore();
+                return;
             }
 
             ctx.lineCap = 'butt';
             ctx.lineJoin = 'miter';
             ctx.strokeStyle = 'rgba(255,255,255,0.45)';
             ctx.lineWidth = Math.max(2, (body.plugin.h || 15) * 0.14);
+            ctx.beginPath();
+            ctx.moveTo(frames[0].point.x, frames[0].point.y);
+            for (let i = 1; i < frames.length; i++) {
+                ctx.lineTo(frames[i].point.x, frames[i].point.y);
+            }
             ctx.stroke();
 
             const controlPoints = body.plugin.controlPoints || [];
