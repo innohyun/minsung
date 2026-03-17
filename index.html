@@ -100,6 +100,16 @@
             z-index: 500;
             letter-spacing: 0.04em;
         }
+        #teleport-fade {
+            position: absolute;
+            inset: 0;
+            background: #000;
+            opacity: 0;
+            display: none;
+            pointer-events: none;
+            z-index: 460;
+            transition: opacity 0.28s ease;
+        }
 
         /* -- Modals -- */
         #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal, #sound-block-setup-modal, #slime-setup-modal, #curve-road-setup-modal {
@@ -268,6 +278,7 @@
 <body>
     <div id="error-msg">❌ 길이 겹쳐서 놓을 수 없습니다!</div>
     <div id="end-msg">The end</div>
+    <div id="teleport-fade"></div>
     
     <div id="ui-top">
         <div class="info-panel">
@@ -494,6 +505,7 @@
             'anti_gravity_slime': { id: 'anti_gravity_slime', name: '무중력 슬라임', w: 120, h: 30, color: '#6f7cff', restitution: 1.2, pw: 20, ph: 10, floatLaunchSpeed: 7 },
             'shock_absorber': { id: 'shock_absorber', name: '충격 흡수', w: 130, h: 26, color: '#e66a4f', restitution: 0.0, pw: 22, ph: 8, type: 'shock_absorber' },
             'sound_block': { id: 'sound_block', name: '소리 블록', w: 96, h: 24, color: '#3f8efc', restitution: 0.0, pw: 18, ph: 8, type: 'sound_block', noteKey: 'c4' },
+            'teleport_portal': { id: 'teleport_portal', name: '순간이동', w: 56, h: 78, color: '#151923', restitution: 0.0, pw: 13, ph: 18, type: 'teleport_portal' },
             'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
             'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
             'escalator_l_l': { id: 'escalator_l_l', name: '에스컬[←긺]', w: 200, h: 20, color: '#e0a030', restitution: 0.0, pw: 30, ph: 5 },
@@ -531,6 +543,10 @@
 
         function getShockAbsorberBorderRadius() {
             return '9999px';
+        }
+
+        function getTeleportPortalBorderRadius() {
+            return '14px';
         }
 
         function getSoundBlockNote(noteKey) {
@@ -616,7 +632,9 @@
                 const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
                 const borderR = isCircle
                     ? 'border-radius:50%;'
-                    : (conf.type === 'shock_absorber' ? `border-radius:${getShockAbsorberBorderRadius()};` : '');
+                    : (conf.type === 'shock_absorber'
+                        ? `border-radius:${getShockAbsorberBorderRadius()};`
+                        : (conf.type === 'teleport_portal' ? `border-radius:${getTeleportPortalBorderRadius()};` : ''));
                 slotEls[i].innerHTML = `
                     <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
                     <span>${conf.name}</span>
@@ -870,7 +888,9 @@
                 const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
                 const borderR = isCircle
                     ? 'border-radius:50%;'
-                    : (conf.type === 'shock_absorber' ? `border-radius:${getShockAbsorberBorderRadius()};` : '');
+                    : (conf.type === 'shock_absorber'
+                        ? `border-radius:${getShockAbsorberBorderRadius()};`
+                        : (conf.type === 'teleport_portal' ? `border-radius:${getTeleportPortalBorderRadius()};` : ''));
                 el.innerHTML = `
                     <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
                     <span>${conf.name}</span>
@@ -964,6 +984,9 @@
         let nextPushableLinkGroup = -1;
         let pushableLinkCounter = 0;
         let endMessageTimer = null;
+        let nextTeleportGroupId = 1;
+        let teleportFadeHideTimer = null;
+        const teleportTimeouts = new Map();
         const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
         const CURVE_HANDLE_HOLD_DELAY = 220;
         const CURVE_HANDLE_RADIUS = 14;
@@ -973,6 +996,7 @@
         const spawnerNode = document.getElementById('spawner-indicator');
         const errorMsg = document.getElementById('error-msg');
         const endMsg = document.getElementById('end-msg');
+        const teleportFade = document.getElementById('teleport-fade');
         const minimapPanel = document.getElementById('minimap-panel');
         const minimapCanvas = document.getElementById('minimap-canvas');
         const minimapCtx = minimapCanvas.getContext('2d');
@@ -994,6 +1018,7 @@
             goalBoxes: [],
             shockAbsorbers: [],
             bendableRoads: [],
+            teleportPortals: [],
             escalators: [],
             staticSolids: [],
             candidateBallBodies: [],
@@ -1027,6 +1052,7 @@
             worldCache.goalBoxes = bodies.filter(body => body.plugin?.type === 'goal_box');
             worldCache.shockAbsorbers = bodies.filter(body => isShockAbsorberBody(body));
             worldCache.bendableRoads = bodies.filter(body => isBendableRoadBody(body));
+            worldCache.teleportPortals = bodies.filter(body => isTeleportPortalBody(body));
             worldCache.escalators = bodies.filter(body => body.label && body.label.startsWith('escalator'));
             worldCache.staticSolids = bodies.filter(body => isTunnelGuardSurface(body));
             worldCache.candidateBallBodies = bodies.filter(body =>
@@ -1297,6 +1323,101 @@
                 endMsg.style.display = 'none';
                 endMessageTimer = null;
             }, 5000);
+        }
+
+        function setTeleportFadeActive(active, immediate = false) {
+            if (teleportFadeHideTimer) {
+                clearTimeout(teleportFadeHideTimer);
+                teleportFadeHideTimer = null;
+            }
+
+            if (active) {
+                teleportFade.style.display = 'block';
+                if (immediate) {
+                    teleportFade.style.opacity = '1';
+                } else {
+                    requestAnimationFrame(() => {
+                        teleportFade.style.opacity = '1';
+                    });
+                }
+                return;
+            }
+
+            teleportFade.style.opacity = '0';
+            if (immediate) {
+                teleportFade.style.display = 'none';
+                return;
+            }
+
+            teleportFadeHideTimer = setTimeout(() => {
+                if (teleportTimeouts.size === 0) {
+                    teleportFade.style.display = 'none';
+                }
+                teleportFadeHideTimer = null;
+            }, 300);
+        }
+
+        function isTeleportPortalBody(body) {
+            const root = getCollisionRoot(body);
+            return root?.plugin?.type === 'teleport_portal';
+        }
+
+        function getTeleportPortals() {
+            return getWorldCache().teleportPortals;
+        }
+
+        function getTeleportPartner(body) {
+            if (!isTeleportPortalBody(body)) return null;
+            const groupId = body.plugin?.teleportGroupId;
+            if (!groupId) return null;
+            return getTeleportPortals().find(other => other !== body && other.plugin?.teleportGroupId === groupId) || null;
+        }
+
+        function assignTeleportGroup(body) {
+            if (!isTeleportPortalBody(body)) return;
+
+            const partner = getTeleportPortals()
+                .filter(other => other !== body && isTeleportPortalBody(other) && !getTeleportPartner(other))
+                .sort((a, b) => {
+                    const da = Math.hypot(a.position.x - body.position.x, a.position.y - body.position.y);
+                    const db = Math.hypot(b.position.x - body.position.x, b.position.y - body.position.y);
+                    return da - db;
+                })[0];
+
+            if (partner) {
+                body.plugin.teleportGroupId = partner.plugin.teleportGroupId;
+            } else {
+                body.plugin.teleportGroupId = nextTeleportGroupId++;
+            }
+        }
+
+        function createTeleportPortalBody(x, y, conf, angle) {
+            return Bodies.rectangle(x, y, conf.w, conf.h, {
+                isStatic: true,
+                isSensor: true,
+                angle,
+                label: 'teleport_portal',
+                friction: 0,
+                frictionStatic: 0,
+                restitution: 0,
+                render: {
+                    visible: false,
+                    fillStyle: conf.color,
+                    strokeStyle: conf.color
+                },
+                plugin: {
+                    type: 'teleport_portal',
+                    baseKey: resolveRoadBaseKey(conf.baseKey || conf.id),
+                    color: conf.color,
+                    w: conf.w,
+                    h: conf.h,
+                    teleportGroupId: 0,
+                    originX: x,
+                    originY: y,
+                    originAngle: angle
+                },
+                slop: 0
+            });
         }
 
         function createGoalBoxBody(x, y, conf, angle) {
@@ -2074,6 +2195,24 @@
             ctx.closePath();
         }
 
+        function addRoundedRectPath(ctx, width, height, radius) {
+            const halfW = width / 2;
+            const halfH = height / 2;
+            const r = Math.max(0, Math.min(radius, halfW, halfH));
+
+            ctx.beginPath();
+            ctx.moveTo(-halfW + r, -halfH);
+            ctx.lineTo(halfW - r, -halfH);
+            ctx.arcTo(halfW, -halfH, halfW, -halfH + r, r);
+            ctx.lineTo(halfW, halfH - r);
+            ctx.arcTo(halfW, halfH, halfW - r, halfH, r);
+            ctx.lineTo(-halfW + r, halfH);
+            ctx.arcTo(-halfW, halfH, -halfW, halfH - r, r);
+            ctx.lineTo(-halfW, -halfH + r);
+            ctx.arcTo(-halfW, -halfH, -halfW + r, -halfH, r);
+            ctx.closePath();
+        }
+
         function drawBendableRoadBody(ctx, body, isSelected = false) {
             if (!isBendableRoadBody(body)) return;
             const frames = getCurveRoadFrames(body.plugin.controlPoints || [], body.plugin.h || 15);
@@ -2222,6 +2361,46 @@
             ctx.restore();
         }
 
+        function drawTeleportPortalBody(ctx, body, isSelected = false) {
+            if (!isTeleportPortalBody(body)) return;
+
+            const partner = getTeleportPartner(body);
+            const w = body.plugin?.w || 56;
+            const h = body.plugin?.h || 78;
+            const outerRadius = Math.max(8, Math.min(w, h) * 0.18);
+            const innerW = Math.max(14, w * 0.46);
+            const innerH = Math.max(24, h * 0.7);
+            const groupLabel = body.plugin?.teleportGroupId || '?';
+            const accent = partner ? '#7c3aed' : '#6b7280';
+
+            ctx.save();
+            ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
+            ctx.rotate(body.angle);
+
+            ctx.fillStyle = '#171b26';
+            ctx.strokeStyle = isSelected ? '#ffffff' : accent;
+            ctx.lineWidth = isSelected ? 3 : 2;
+            addRoundedRectPath(ctx, w, h, outerRadius);
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.fillStyle = partner ? 'rgba(76,29,149,0.9)' : 'rgba(31,41,55,0.8)';
+            addRoundedRectPath(ctx, innerW, innerH, Math.max(10, innerW * 0.45));
+            ctx.fill();
+
+            ctx.strokeStyle = partner ? 'rgba(196,181,253,0.9)' : 'rgba(156,163,175,0.6)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.font = `700 ${Math.max(11, Math.min(18, w * 0.24))}px Inter`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(String(groupLabel), 0, -h * 0.34);
+
+            ctx.restore();
+        }
+
         function isEscalatorCarrierPushable(body) {
             return body?.plugin?.type === 'pushable';
         }
@@ -2236,6 +2415,116 @@
 
         function findBodyById(bodyId) {
             return getWorldCache().bodyById.get(bodyId) || null;
+        }
+
+        function cleanupTeleportState(body, restoreVisible = true) {
+            if (!body?.plugin) return;
+
+            if (teleportTimeouts.has(body.id)) {
+                clearTimeout(teleportTimeouts.get(body.id));
+                teleportTimeouts.delete(body.id);
+            }
+
+            if (restoreVisible && body.render && body.plugin.teleportSavedOpacity !== undefined) {
+                body.render.opacity = body.plugin.teleportSavedOpacity;
+            }
+
+            delete body.plugin.teleportPending;
+            delete body.plugin.teleportSourcePortalId;
+            delete body.plugin.teleportTargetPortalId;
+            delete body.plugin.teleportEntrySpeed;
+            delete body.plugin.teleportSavedOpacity;
+
+            setTeleportFadeActive(teleportTimeouts.size > 0);
+        }
+
+        function cancelAllTeleportTransitions() {
+            getWorldCache().candidateBallBodies.forEach(body => cleanupTeleportState(body, false));
+            teleportTimeouts.clear();
+            setTeleportFadeActive(false, true);
+        }
+
+        function getTeleportExitState(portal, body, entrySpeed) {
+            const radius = body.circleRadius || 15;
+            const normalX = Math.sin(portal.angle);
+            const normalY = -Math.cos(portal.angle);
+            const offset = (portal.plugin?.h || 78) / 2 + radius + 8;
+            const speed = Math.max(6, Math.min(14, entrySpeed || 7));
+
+            return {
+                position: {
+                    x: portal.position.x + normalX * offset,
+                    y: portal.position.y + normalY * offset
+                },
+                velocity: {
+                    x: normalX * speed,
+                    y: normalY * speed
+                }
+            };
+        }
+
+        function completeTeleportTransition(bodyId) {
+            const body = findBodyById(bodyId);
+            if (!body?.plugin?.teleportPending) {
+                teleportTimeouts.delete(bodyId);
+                setTeleportFadeActive(teleportTimeouts.size > 0);
+                return;
+            }
+
+            const targetPortal = findBodyById(body.plugin.teleportTargetPortalId);
+            const savedOpacity = body.plugin.teleportSavedOpacity ?? 1;
+            const entrySpeed = body.plugin.teleportEntrySpeed || Math.hypot(body.velocity.x, body.velocity.y);
+
+            cleanupTeleportState(body, false);
+
+            Body.setStatic(body, false);
+            Sleeping.set(body, false);
+            body.render.opacity = savedOpacity;
+            body.plugin.teleportCooldownUntil = engine.timing.timestamp + 900;
+
+            if (!isTeleportPortalBody(targetPortal)) {
+                Body.setVelocity(body, { x: 0, y: 0 });
+                Body.setAngularVelocity(body, 0);
+                return;
+            }
+
+            const exit = getTeleportExitState(targetPortal, body, entrySpeed);
+            Body.setPosition(body, exit.position);
+            Body.setVelocity(body, exit.velocity);
+            Body.setAngularVelocity(body, 0);
+        }
+
+        function startTeleportTransition(body, sourcePortal) {
+            if (!body || !sourcePortal || body.isStatic || body.isSensor || !isTeleportPortalBody(sourcePortal)) return;
+            body.plugin = body.plugin || {};
+
+            if (body.plugin.teleportPending) return;
+            if ((body.plugin.teleportCooldownUntil || 0) > engine.timing.timestamp) return;
+
+            const partner = getTeleportPartner(sourcePortal);
+            if (!partner) return;
+
+            if (body.plugin.attachedMagnetId) {
+                body.plugin.attachedMagnetId = null;
+                body.plugin.attachedOffset = null;
+            }
+
+            body.plugin.teleportPending = true;
+            body.plugin.teleportSourcePortalId = sourcePortal.id;
+            body.plugin.teleportTargetPortalId = partner.id;
+            body.plugin.teleportEntrySpeed = Math.hypot(body.velocity.x, body.velocity.y);
+            body.plugin.teleportSavedOpacity = body.render?.opacity ?? 1;
+
+            Body.setVelocity(body, { x: 0, y: 0 });
+            Body.setAngularVelocity(body, 0);
+            Body.setStatic(body, true);
+            if (body.render) {
+                body.render.opacity = 0;
+            }
+
+            const timeoutId = setTimeout(() => completeTeleportTransition(body.id), 3000);
+            teleportTimeouts.set(body.id, timeoutId);
+            setTeleportFadeActive(true);
         }
 
         function getPushableSize(body) {
@@ -2660,7 +2949,9 @@
             ghost.style.background = conf.color;
             ghost.style.borderRadius = isCircle
                 ? '50%'
-                : (conf.type === 'shock_absorber' ? getShockAbsorberBorderRadius() : '0');
+                : (conf.type === 'shock_absorber'
+                    ? getShockAbsorberBorderRadius()
+                    : (conf.type === 'teleport_portal' ? getTeleportPortalBorderRadius() : '0'));
             ghost.style.display = 'block';
             ghost.style.transform = `rotate(${ghostAngle}rad)`;
         }
@@ -2730,7 +3021,9 @@
                 const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
                 box.style.borderRadius = isCircleBase
                     ? '50%'
-                    : (baseConf?.type === 'shock_absorber' ? getShockAbsorberBorderRadius() : '0');
+                    : (baseConf?.type === 'shock_absorber'
+                        ? getShockAbsorberBorderRadius()
+                        : (baseConf?.type === 'teleport_portal' ? getTeleportPortalBorderRadius() : '0'));
                 box.style.left = e.clientX + 'px';
                 box.style.top = e.clientY + 'px';
                 box.style.width = '0px';
@@ -2769,6 +3062,13 @@
                     const mockShockAbsorber = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
                     const existingRoads = getPlacementBodies();
                     if (Query.collides(mockShockAbsorber, existingRoads).length > 0) {
+                        showError();
+                        return;
+                    }
+                } else if (conf.type === 'teleport_portal') {
+                    const mockPortal = createTeleportPortalBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                    const existingPortals = getPlacementBodies().filter(body => isTeleportPortalBody(body));
+                    if (Query.collides(mockPortal, existingPortals).length > 0) {
                         showError();
                         return;
                     }
@@ -2888,6 +3188,8 @@
                     newBody = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else if (conf.type === 'shock_absorber') {
                     newBody = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                } else if (conf.type === 'teleport_portal') {
+                    newBody = createTeleportPortalBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else {
                     // 일반 블록
                     const behaviorKey = resolveRoadBaseKey(conf.baseKey || conf.id);
@@ -2942,6 +3244,9 @@
                     }
                 }
                 addWorldItem(newBody);
+                if (isTeleportPortalBody(newBody)) {
+                    assignTeleportGroup(newBody);
+                }
                 if (isAttachablePushable(newBody)) {
                     tryAttachPushable(newBody);
                 }
@@ -3038,7 +3343,7 @@
                     box.style.top = y + 'px';
                     box.style.width = w + 'px';
                     box.style.height = h + 'px';
-                    box.style.borderRadius = '0';
+                    box.style.borderRadius = baseConf?.type === 'teleport_portal' ? getTeleportPortalBorderRadius() : '0';
                 }
             } else {
                 if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) {
@@ -3197,6 +3502,7 @@
             } else if (e.code === 'Space') {
                 startMarbleSequence();
             } else if (e.key.toLowerCase() === 'r') {
+                cancelAllTeleportTransitions();
                 clearAllPushableLinks();
                 const bodies = getPlacementBodies();
                 removeWorldItem(bodies);
@@ -3204,6 +3510,7 @@
                 placedMarbles = [];
                 magnets = [];
                 pushables = [];
+                nextTeleportGroupId = 1;
                 hideEndMessage();
                 setCameraPosition(0, 0);
             } else if (e.key.toLowerCase() === 'f') {
@@ -3409,6 +3716,7 @@
             isLaunching = false;
             document.getElementById('btn-drop').innerText = '구슬 투하';
             document.getElementById('btn-drop').style.background = '';
+            cancelAllTeleportTransitions();
 
             // 발사된 구슬들 (맵에 떨어진 marble/steel_marble) 제거
             const launchedBalls = getWorldCache().bodies.filter(b => 
@@ -3629,6 +3937,10 @@
                 const theSlime = rootA.label === 'slime' ? rootA : (rootB.label === 'slime' ? rootB : null);
                 const theAntiGravityTarget = isSlimeBounceLabel(rootA.label) ? rootA : (isSlimeBounceLabel(rootB.label) ? rootB : null);
                 const theAntiGravity = isAntiGravitySlimeBody(rootA) ? rootA : (isAntiGravitySlimeBody(rootB) ? rootB : null);
+                const teleportPortal = isTeleportPortalBody(rootA) ? rootA : (isTeleportPortalBody(rootB) ? rootB : null);
+                const teleportTarget = teleportPortal
+                    ? ((isBallLabel(rootA.label) && !rootA.isStatic) ? rootA : (((isBallLabel(rootB.label) && !rootB.isStatic) ? rootB : null)))
+                    : null;
                 const goalSensor = bodyA.plugin?.type === 'goal_sensor' ? bodyA : (bodyB.plugin?.type === 'goal_sensor' ? bodyB : null);
                 const countedMarble = (
                     bodyA.label === 'marble' || bodyA.label === 'steel_marble' || bodyA.label === 'place_marble'
@@ -3649,6 +3961,10 @@
 
                 if (theAntiGravityTarget && theAntiGravity) {
                     applyAntiGravityBounce(theAntiGravityTarget, theAntiGravity, pair);
+                }
+
+                if (teleportPortal && teleportTarget) {
+                    startTeleportTransition(teleportTarget, teleportPortal);
                 }
 
                 if (goalSensor && countedMarble) {
@@ -4188,6 +4504,7 @@
 
             cache.bendableRoads.forEach(body => drawBendableRoadBody(ctx, body, body === selectedBody));
             cache.shockAbsorbers.forEach(body => drawShockAbsorberBody(ctx, body));
+            cache.teleportPortals.forEach(body => drawTeleportPortalBody(ctx, body, body === selectedBody));
 
             const now = performance.now();
             if (shouldRefreshMinimap() && now - lastMinimapDrawAt >= MINIMAP_REDRAW_INTERVAL) {
