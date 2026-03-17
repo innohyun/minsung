@@ -1136,6 +1136,7 @@
                 frictionStatic,
                 restitution,
                 density,
+                parts: [leftWall, rightWall, bottomWall],
                 render: { fillStyle: conf.color, opacity: isInitiallyStatic ? 0.8 : 1.0 },
                 plugin: {
                     type: 'pushable',
@@ -1151,12 +1152,12 @@
                 },
                 slop: 0
             });
-            Body.setParts(basketBody, [leftWall, rightWall, bottomWall], false);
             if (angle) {
                 Body.setAngle(basketBody, angle);
             }
             basketBody.plugin.originX = basketBody.position.x;
             basketBody.plugin.originY = basketBody.position.y;
+            basketBody.plugin.originAngle = basketBody.angle;
             return basketBody;
         }
 
