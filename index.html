@@ -1497,7 +1497,20 @@
         function setBallGravitySuppressed(body, suppressed) {
             if (!body) return;
             body.plugin = body.plugin || {};
-            body.plugin.gravitySuppressed = !!suppressed;
+            if (suppressed) {
+                if (!body.plugin.gravitySuppressed) {
+                    body.plugin.gravityRestoreFrictionAir = body.frictionAir;
+                }
+                body.plugin.gravitySuppressed = true;
+                body.frictionAir = Math.max(body.plugin.gravityRestoreFrictionAir ?? 0, 0.006);
+                return;
+            }
+
+            body.plugin.gravitySuppressed = false;
+            if (body.plugin.gravityRestoreFrictionAir !== undefined) {
+                body.frictionAir = body.plugin.gravityRestoreFrictionAir;
+                delete body.plugin.gravityRestoreFrictionAir;
+            }
         }
 
         function shouldRestoreBallGravity(ballBody, otherBody, otherRoot) {
