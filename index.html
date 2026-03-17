@@ -102,7 +102,7 @@
         }
 
         /* -- Modals -- */
-        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal, #sound-block-setup-modal, #slime-setup-modal {
+        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal, #sound-block-setup-modal, #slime-setup-modal, #curve-road-setup-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
             background: rgba(255,255,255,0.97); backdrop-filter: blur(24px);
             padding: 22px; border-radius: 16px; border: 1px solid var(--border);
@@ -117,6 +117,7 @@
         #goal-setup-modal { z-index: 400; width: 300px; text-align: center; }
         #sound-block-setup-modal { z-index: 400; width: 320px; text-align: center; }
         #slime-setup-modal { z-index: 400; width: 300px; text-align: center; }
+        #curve-road-setup-modal { z-index: 400; width: 320px; text-align: center; }
 
         #library-modal h2, #marble-modal h2 {
             margin: 0 0 14px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text);
@@ -132,6 +133,8 @@
         #sound-block-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
         #slime-setup-modal h3 { margin: 0 0 12px; color: #2e7d32; font-size: 13px; font-weight: 700; }
         #slime-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
+        #curve-road-setup-modal h3 { margin: 0 0 12px; color: #8b5a2b; font-size: 13px; font-weight: 700; }
+        #curve-road-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
 
         .library-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
         .lib-item {
@@ -151,7 +154,7 @@
         .marble-row, .magnet-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
         .marble-row label { flex: 1; font-weight: 500; font-size: 12px; color: var(--text-dim); }
         .magnet-row label { flex: 1; font-weight: 600; font-size: 12px; color: var(--text-dim); text-align: left; }
-        .marble-row input[type=number], #pushable-setup-modal input[type=number] {
+        .marble-row input[type=number], #pushable-setup-modal input[type=number], #curve-road-setup-modal input[type=number] {
             width: 52px; padding: 8px; border: 1px solid #dde1e6;
             border-radius: 8px; font-size: 14px; text-align: center;
             background: #f7f8fa; color: var(--text);
@@ -173,7 +176,7 @@
         .marble-row input:focus, #pushable-setup-modal input:focus,
         #custom-save-modal input:focus, #magnet-setup-modal input:focus,
         #magnet-setup-modal select:focus, #goal-setup-modal input:focus,
-        #sound-block-setup-modal select:focus, #slime-setup-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        #sound-block-setup-modal select:focus, #slime-setup-modal input:focus, #curve-road-setup-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 
         .marble-dot {
             width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
@@ -383,6 +386,18 @@
         <button class="btn-marble-modal" onclick="closeSlimeSetup()" style="background:#999;">취소</button>
     </div>
 
+    <div id="curve-road-setup-modal">
+        <h3>〰️ 곡선 길 설정</h3>
+        <p>축 개수를 정한 뒤 배치하면, 길을 선택하고 축을 길게 눌러 곡선으로 구부릴 수 있습니다.</p>
+        <div class="magnet-row">
+            <label for="curve-road-axis-input">축 개수</label>
+            <input type="number" id="curve-road-axis-input" min="3" max="9" value="3">
+        </div>
+        <button class="btn-marble-modal" onclick="startCurveRoadCustomSize()" style="background:#8b5a2b; margin-bottom:8px;">다음 (크기 그리기)</button>
+        <button class="btn-marble-modal" onclick="saveCurveRoadConfig()" style="background:#a66a32; margin-bottom:8px;">건너뛰기 (기본 크기 저장)</button>
+        <button class="btn-marble-modal" onclick="closeCurveRoadSetup()" style="background:#999;">취소</button>
+    </div>
+
     <!-- Marble Setup Modal -->
     <div id="marble-modal">
         <span class="close-btn" onclick="closeMarbleModal()">✕</span>
@@ -508,6 +523,7 @@
             { key: 'c5', label: '높은 도', frequency: 523.25 }
         ];
         const SOUND_BLOCK_NOTE_MAP = Object.fromEntries(SOUND_BLOCK_NOTES.map(note => [note.key, note]));
+        const BENDABLE_ROAD_BASE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice']);
 
         function isEscalatorKey(key) {
             return typeof key === 'string' && key.startsWith('escalator');
@@ -529,6 +545,16 @@
         function getConfiguredFloatLaunchSpeed(source) {
             const value = Number(source?.plugin?.floatLaunchSpeed ?? source?.floatLaunchSpeed);
             return Number.isFinite(value) && value > 0 ? Math.min(value, 7) : 7;
+        }
+
+        function isBendableRoadBaseKey(key) {
+            return BENDABLE_ROAD_BASE_KEYS.has(resolveRoadBaseKey(key));
+        }
+
+        function isBendableRoadConfig(conf) {
+            if (!conf) return false;
+            const axisCount = parseInt(conf.curveAxisCount, 10) || 0;
+            return axisCount >= 3 && isBendableRoadBaseKey(conf.baseKey || conf.id);
         }
 
         function resolveRoadBaseKey(key) {
@@ -631,6 +657,15 @@
         }
         function closeSlimeSetup() {
             document.getElementById('slime-setup-modal').style.display = 'none';
+        }
+        function openCurveRoadSetup(conf) {
+            pendingCurveAxisCount = Math.max(3, parseInt(conf?.curveAxisCount, 10) || 3);
+            document.getElementById('curve-road-axis-input').value = pendingCurveAxisCount;
+            document.getElementById('curve-road-setup-modal').style.display = 'block';
+        }
+        function closeCurveRoadSetup() {
+            pendingCurveAxisCount = 0;
+            document.getElementById('curve-road-setup-modal').style.display = 'none';
         }
         function populateSoundBlockNoteOptions() {
             const select = document.getElementById('sound-block-note-input');
@@ -752,6 +787,51 @@
                 errorMsg.style.borderColor = '#d32f2f';
             }, 2500);
         }
+        function saveCurveRoadConfig() {
+            const base = ROAD_LIB[customBaseKey];
+            const resolvedBaseKey = resolveRoadBaseKey(base?.baseKey || customBaseKey);
+            const baseName = ROAD_LIB[resolvedBaseKey]?.name || base.name;
+            const axisCount = Math.max(3, Math.min(9, parseInt(document.getElementById('curve-road-axis-input').value, 10) || 3));
+            const id = `custom_curve_${Date.now()}`;
+            const roadData = {
+                ...base,
+                baseKey: resolvedBaseKey,
+                curveAxisCount: axisCount,
+                name: `${baseName}(${axisCount}축)`
+            };
+            pendingCurveAxisCount = axisCount;
+            ROAD_LIB[id] = { ...roadData, id };
+            slots[currentSlotIndex] = id;
+            renderSlots();
+            renderLibrary();
+            updateGhostStyle();
+            closeCurveRoadSetup();
+            closeLibrary();
+            pendingCurveAxisCount = 0;
+            saveCustomRoadToFirestore(id, roadData).catch(error => {
+                console.error('Failed to save curve road config to Firestore:', error);
+            });
+        }
+        function startCurveRoadCustomSize() {
+            pendingCurveAxisCount = Math.max(3, Math.min(9, parseInt(document.getElementById('curve-road-axis-input').value, 10) || 3));
+            document.getElementById('curve-road-setup-modal').style.display = 'none';
+            const conf = ROAD_LIB[customBaseKey];
+            isCustomMode = true;
+            ghost.style.display = 'none';
+            closeLibrary();
+            container.style.cursor = 'crosshair';
+            errorMsg.innerText = `〰️ [${conf.name}] 크기 맞추기: 맵에서 드래그하세요`;
+            errorMsg.style.color = '#8b5a2b';
+            errorMsg.style.borderColor = '#8b5a2b';
+            errorMsg.style.display = 'block';
+            if (errorTimeout) clearTimeout(errorTimeout);
+            errorTimeout = setTimeout(() => {
+                errorMsg.style.display = 'none';
+                errorMsg.innerText = '❌ 길이 겹쳐서 놓을 수 없습니다!';
+                errorMsg.style.color = '#d32f2f';
+                errorMsg.style.borderColor = '#d32f2f';
+            }, 2500);
+        }
         function saveMagnetConfig() {
             const base = ROAD_LIB.magnet;
             const mode = document.getElementById('magnet-mode-input').value === 'free' ? 'free' : 'attached';
@@ -823,6 +903,8 @@
                         openMagnetSetup();
                     } else if (resolvedBaseKey === 'slime') {
                         openSlimeSetup(conf);
+                    } else if (isBendableRoadBaseKey(resolvedBaseKey)) {
+                        openCurveRoadSetup(conf);
                     } else {
                         isCustomMode = true;
                         ghost.style.display = 'none';
@@ -874,10 +956,17 @@
         let pendingGoalCount = 1;
         let pendingSoundBlockNoteKey = 'c4';
         let pendingSlimeStrength = 20;
+        let pendingCurveAxisCount = 0;
+        let curveHandleHoldTimer = null;
+        let pendingCurveHandle = null;
+        let isDraggingCurveHandle = false;
+        let activeCurveHandleIndex = -1;
         let nextPushableLinkGroup = -1;
         let pushableLinkCounter = 0;
         let endMessageTimer = null;
         const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
+        const CURVE_HANDLE_HOLD_DELAY = 220;
+        const CURVE_HANDLE_RADIUS = 14;
 
         const ghost = document.getElementById('ghost-element');
         const indicator = document.getElementById('selection-indicator');
@@ -904,6 +993,7 @@
             minimapBodies: [],
             goalBoxes: [],
             shockAbsorbers: [],
+            bendableRoads: [],
             escalators: [],
             staticSolids: [],
             candidateBallBodies: [],
@@ -936,6 +1026,7 @@
             );
             worldCache.goalBoxes = bodies.filter(body => body.plugin?.type === 'goal_box');
             worldCache.shockAbsorbers = bodies.filter(body => isShockAbsorberBody(body));
+            worldCache.bendableRoads = bodies.filter(body => isBendableRoadBody(body));
             worldCache.escalators = bodies.filter(body => body.label && body.label.startsWith('escalator'));
             worldCache.staticSolids = bodies.filter(body => isTunnelGuardSurface(body));
             worldCache.candidateBallBodies = bodies.filter(body =>
@@ -1279,6 +1370,172 @@
                 },
                 slop: 0
             });
+        }
+
+        function getDefaultCurveControlPoints(width, axisCount) {
+            const count = Math.max(3, axisCount);
+            const halfW = width / 2;
+            return Array.from({ length: count }, (_, index) => {
+                const ratio = count === 1 ? 0.5 : index / (count - 1);
+                return {
+                    x: -halfW + ratio * width,
+                    y: 0
+                };
+            });
+        }
+
+        function sampleCurveRoadPoints(controlPoints, samplesPerSpan = 14) {
+            if (!controlPoints || controlPoints.length < 2) return controlPoints || [];
+            if (controlPoints.length === 2) return controlPoints.slice();
+
+            const points = [];
+            for (let i = 0; i < controlPoints.length - 1; i++) {
+                const p0 = controlPoints[Math.max(0, i - 1)];
+                const p1 = controlPoints[i];
+                const p2 = controlPoints[i + 1];
+                const p3 = controlPoints[Math.min(controlPoints.length - 1, i + 2)];
+
+                for (let step = 0; step < samplesPerSpan; step++) {
+                    const t = step / samplesPerSpan;
+                    const t2 = t * t;
+                    const t3 = t2 * t;
+                    points.push({
+                        x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+                        y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+                    });
+                }
+            }
+            points.push(controlPoints[controlPoints.length - 1]);
+            return points;
+        }
+
+        function buildCurveRoadParts(controlPoints, thickness, common) {
+            const samples = sampleCurveRoadPoints(controlPoints);
+            const parts = [];
+
+            for (let i = 1; i < samples.length; i++) {
+                const a = samples[i - 1];
+                const b = samples[i];
+                const dx = b.x - a.x;
+                const dy = b.y - a.y;
+                const length = Math.hypot(dx, dy);
+                if (length < 0.5) continue;
+                parts.push(Bodies.rectangle(
+                    (a.x + b.x) / 2,
+                    (a.y + b.y) / 2,
+                    length + Math.max(2, thickness * 0.35),
+                    thickness,
+                    {
+                        ...common,
+                        angle: Math.atan2(dy, dx)
+                    }
+                ));
+            }
+
+            return parts;
+        }
+
+        function createBendableRoadBody(x, y, conf, angle = 0, controlPointsInput = null) {
+            const axisCount = Math.max(3, parseInt(conf.curveAxisCount, 10) || 3);
+            const controlPoints = (controlPointsInput && controlPointsInput.length >= 3
+                ? controlPointsInput
+                : getDefaultCurveControlPoints(conf.w, axisCount)
+            ).map(point => ({ x: Number(point.x) || 0, y: Number(point.y) || 0 }));
+
+            const common = {
+                isStatic: true,
+                friction: 0,
+                frictionStatic: 0,
+                restitution: conf.restitution,
+                render: { visible: true, fillStyle: conf.color, strokeStyle: conf.color, lineWidth: 0 },
+                slop: 0
+            };
+            const parts = buildCurveRoadParts(controlPoints, conf.h, common);
+            const body = Body.create({
+                isStatic: true,
+                label: conf.id,
+                parts,
+                render: { visible: false },
+                friction: 0,
+                frictionStatic: 0,
+                restitution: conf.restitution,
+                slop: 0,
+                plugin: {
+                    type: 'bendable_road',
+                    baseKey: resolveRoadBaseKey(conf.baseKey || conf.id),
+                    color: conf.color,
+                    w: conf.w,
+                    h: conf.h,
+                    curveAxisCount: axisCount,
+                    controlPoints
+                }
+            });
+
+            const offset = { x: body.position.x, y: body.position.y };
+            if (Math.abs(offset.x) > 0.001 || Math.abs(offset.y) > 0.001) {
+                Body.translate(body, { x: -offset.x, y: -offset.y });
+                body.plugin.controlPoints = controlPoints.map(point => ({
+                    x: point.x - offset.x,
+                    y: point.y - offset.y
+                }));
+            }
+
+            Body.setPosition(body, { x, y });
+            if (angle) {
+                Body.setAngle(body, angle);
+            }
+
+            body.plugin.originX = body.position.x;
+            body.plugin.originY = body.position.y;
+            body.plugin.originAngle = body.angle;
+            return body;
+        }
+
+        function isBendableRoadBody(body) {
+            const root = getCollisionRoot(body);
+            return root?.plugin?.type === 'bendable_road';
+        }
+
+        function getBendableRoadHandlePoints(body) {
+            if (!isBendableRoadBody(body)) return [];
+            return (body.plugin.controlPoints || []).map(point => bodyLocalToWorld(body, point));
+        }
+
+        function findBendableRoadHandleIndex(body, worldPoint) {
+            if (!isBendableRoadBody(body)) return -1;
+            let bestIndex = -1;
+            let bestDistance = CURVE_HANDLE_RADIUS;
+
+            getBendableRoadHandlePoints(body).forEach((point, index) => {
+                const distance = Math.hypot(point.x - worldPoint.x, point.y - worldPoint.y);
+                if (distance <= bestDistance) {
+                    bestDistance = distance;
+                    bestIndex = index;
+                }
+            });
+
+            return bestIndex;
+        }
+
+        function replaceBendableRoadBody(body, nextControlPoints) {
+            if (!isBendableRoadBody(body)) return body;
+
+            const conf = {
+                id: body.label || body.plugin.baseKey,
+                baseKey: body.plugin.baseKey,
+                w: body.plugin.w,
+                h: body.plugin.h,
+                color: body.plugin.color,
+                restitution: body.restitution,
+                curveAxisCount: body.plugin.curveAxisCount
+            };
+            const replacement = createBendableRoadBody(body.position.x, body.position.y, conf, body.angle, nextControlPoints);
+            removeWorldItem(body);
+            addWorldItem(replacement);
+            if (selectedBody === body) {
+                selectedBody = replacement;
+            }
+            return replacement;
         }
 
         function createPushableBasketBody(x, y, conf, angle) {
@@ -1747,6 +2004,57 @@
             ctx.lineTo(-halfW, -halfH + radius);
             ctx.arcTo(-halfW, -halfH, -halfW + radius, -halfH, radius);
             ctx.closePath();
+        }
+
+        function drawBendableRoadBody(ctx, body, isSelected = false) {
+            if (!isBendableRoadBody(body)) return;
+            if (!isSelected) return;
+
+            const points = sampleCurveRoadPoints(body.plugin.controlPoints || []);
+            if (points.length < 2) return;
+
+            ctx.save();
+            ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
+            ctx.rotate(body.angle);
+
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+            ctx.lineWidth = Math.max(2, (body.plugin.h || 15) * 0.14);
+            ctx.stroke();
+
+            const controlPoints = body.plugin.controlPoints || [];
+            const axisExtent = Math.max((body.plugin.w || 100) * 0.45, 90);
+            ctx.setLineDash([6, 6]);
+            ctx.strokeStyle = 'rgba(59,130,246,0.42)';
+            ctx.lineWidth = 1.5;
+            controlPoints.forEach(point => {
+                ctx.beginPath();
+                ctx.moveTo(point.x, -axisExtent);
+                ctx.lineTo(point.x, axisExtent);
+                ctx.stroke();
+            });
+            ctx.setLineDash([]);
+
+            controlPoints.forEach((point, index) => {
+                ctx.beginPath();
+                ctx.fillStyle = index === activeCurveHandleIndex && isDraggingCurveHandle
+                    ? '#2563eb'
+                    : '#ffffff';
+                ctx.strokeStyle = '#2563eb';
+                ctx.lineWidth = 2;
+                ctx.arc(point.x, point.y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
+            });
+
+            ctx.restore();
         }
 
         function drawShockAbsorberBody(ctx, body) {
@@ -2296,7 +2604,7 @@
         });
 
         window.addEventListener('mousedown', (e) => {
-            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal')) return;
+            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) return;
             ensureAudioContext();
 
             if (e.button === 2) { 
@@ -2307,6 +2615,21 @@
             }
 
             const worldPos = { x: e.clientX + cameraPos.x, y: e.clientY + cameraPos.y };
+
+            if (e.button === 0 && selectedBody && isBendableRoadBody(selectedBody)) {
+                const handleIndex = findBendableRoadHandleIndex(selectedBody, worldPos);
+                if (handleIndex !== -1) {
+                    pendingCurveHandle = { body: selectedBody, handleIndex, startX: e.clientX, startY: e.clientY };
+                    curveHandleHoldTimer = setTimeout(() => {
+                        isDraggingCurveHandle = true;
+                        activeCurveHandleIndex = handleIndex;
+                        pendingCurveHandle = null;
+                        curveHandleHoldTimer = null;
+                        container.style.cursor = 'ns-resize';
+                    }, CURVE_HANDLE_HOLD_DELAY);
+                    return;
+                }
+            }
 
             // 커스텀 그리기 모드
             if (isCustomMode) {
@@ -2381,6 +2704,13 @@
                     const mockBasket = createPushableBasketBody(worldPos.x, worldPos.y, conf, ghostAngle);
                     const existingRoads = getPlacementBodies();
                     if (Query.collides(mockBasket, existingRoads).length > 0) {
+                        showError();
+                        return;
+                    }
+                } else if (isBendableRoadConfig(conf)) {
+                    const mockRoad = createBendableRoadBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                    const existingRoads = getPlacementBodies();
+                    if (Query.collides(mockRoad, existingRoads).length > 0) {
                         showError();
                         return;
                     }
@@ -2473,6 +2803,9 @@
                 } else {
                     // 일반 블록
                     const behaviorKey = resolveRoadBaseKey(conf.baseKey || conf.id);
+                    if (isBendableRoadConfig(conf)) {
+                        newBody = createBendableRoadBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                    } else {
                     const isShockAbsorber = behaviorKey === 'shock_absorber';
                     const isSoundBlock = behaviorKey === 'sound_block';
                     const isSlime = behaviorKey === 'slime';
@@ -2518,6 +2851,7 @@
                         plugin: basePlugin,
                         slop: 0
                     });
+                    }
                 }
                 addWorldItem(newBody);
                 if (isAttachablePushable(newBody)) {
@@ -2541,6 +2875,28 @@
                     lastMousePos = { x: e.clientX, y: e.clientY };
                     return;
                 }
+            }
+
+            if (curveHandleHoldTimer && pendingCurveHandle) {
+                const moved = Math.hypot(e.clientX - pendingCurveHandle.startX, e.clientY - pendingCurveHandle.startY);
+                if (moved > 6) {
+                    clearTimeout(curveHandleHoldTimer);
+                    curveHandleHoldTimer = null;
+                    pendingCurveHandle = null;
+                }
+            }
+
+            if (isDraggingCurveHandle && selectedBody && isBendableRoadBody(selectedBody)) {
+                const worldPos = { x: e.clientX + cameraPos.x, y: e.clientY + cameraPos.y };
+                const local = worldToBodyLocal(selectedBody, worldPos);
+                const nextPoints = (selectedBody.plugin.controlPoints || []).map(point => ({ ...point }));
+                if (nextPoints[activeCurveHandleIndex]) {
+                    const maxOffset = Math.max(40, (selectedBody.plugin.w || 100) * 0.75);
+                    nextPoints[activeCurveHandleIndex].y = Math.max(-maxOffset, Math.min(maxOffset, local.y));
+                    selectedBody = replaceBendableRoadBody(selectedBody, nextPoints);
+                    invalidateMinimap();
+                }
+                return;
             }
 
             if (isDraggingBody && selectedBody) {
@@ -2597,7 +2953,7 @@
                     box.style.borderRadius = '0';
                 }
             } else {
-                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal')) {
+                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) {
                     ghost.style.display = 'none';
                 } else if (!isCustomMode) {
                     ghost.style.display = 'block';
@@ -2608,6 +2964,22 @@
         });
 
         window.addEventListener('mouseup', (e) => {
+            if (curveHandleHoldTimer) {
+                clearTimeout(curveHandleHoldTimer);
+                curveHandleHoldTimer = null;
+                pendingCurveHandle = null;
+            }
+
+            if (isDraggingCurveHandle) {
+                if (selectedBody && isBendableRoadBody(selectedBody)) {
+                    updateBodyOrigin(selectedBody);
+                }
+                isDraggingCurveHandle = false;
+                activeCurveHandleIndex = -1;
+                container.style.cursor = isCustomMode ? 'crosshair' : 'crosshair';
+                return;
+            }
+
             if (isCustomDrawing) {
                 isCustomDrawing = false;
                 const box = document.getElementById('custom-draw-box');
@@ -2872,13 +3244,18 @@
             const thresholdSuffix = getPushableThresholdSuffix(base, pendingHitCount);
             const soundNote = getSoundBlockNote(pendingSoundBlockNoteKey || base.noteKey || 'c4');
             const slimeStrength = getConfiguredSlimeStrength({ slimeStrength: pendingSlimeStrength || base.slimeStrength });
+            const hasCurveConfig = pendingCurveAxisCount >= 3 || (parseInt(base.curveAxisCount, 10) || 0) >= 3;
+            const curveAxisCount = (isBendableRoadBaseKey(resolvedBaseKey) && hasCurveConfig)
+                ? Math.max(3, pendingCurveAxisCount || parseInt(base.curveAxisCount, 10) || 3)
+                : 0;
             const defaultName = pendingHitCount > 1 
                 ? `${base.name}(${customW}×${customH}, ${thresholdSuffix})` 
                 : `${base.name}(${customW}×${customH})`;
             const goalDefaultName = `${base.name}(${customW}×${customH}, ${pendingGoalCount}개)`;
             const soundDefaultName = `소리 블록(${soundNote.label}, ${customW}×${customH})`;
             const slimeDefaultName = `${ROAD_LIB[resolvedBaseKey]?.name || base.name}(${customW}×${customH}, ${slimeStrength})`;
-            const name = document.getElementById('custom-name-input').value.trim() || (base.type === 'goal_box' ? goalDefaultName : (resolvedBaseKey === 'sound_block' ? soundDefaultName : (resolvedBaseKey === 'slime' ? slimeDefaultName : defaultName)));
+            const curveDefaultName = `${ROAD_LIB[resolvedBaseKey]?.name || base.name}(${customW}×${customH}, ${curveAxisCount}축)`;
+            const name = document.getElementById('custom-name-input').value.trim() || (base.type === 'goal_box' ? goalDefaultName : (resolvedBaseKey === 'sound_block' ? soundDefaultName : (resolvedBaseKey === 'slime' ? slimeDefaultName : (curveAxisCount ? curveDefaultName : defaultName))));
             const id = 'custom_' + Date.now();
             const roadData = {
                 ...base,
@@ -2901,6 +3278,9 @@
             if (resolvedBaseKey === 'slime') {
                 roadData.slimeStrength = slimeStrength;
             }
+            if (curveAxisCount) {
+                roadData.curveAxisCount = curveAxisCount;
+            }
             ROAD_LIB[id] = { ...roadData, id: id };
             // 현재 슬롯에 자동 장착
             slots[currentSlotIndex] = id;
@@ -2912,6 +3292,7 @@
             pendingHitCount = 1; // 리셋
             pendingSoundBlockNoteKey = 'c4';
             pendingSlimeStrength = 20;
+            pendingCurveAxisCount = 0;
             saveCustomRoadToFirestore(id, roadData).catch(error => {
                 console.error('Failed to save custom road to Firestore:', error);
             });
@@ -2925,6 +3306,7 @@
             pendingHitCount = 1; // 리셋
             pendingSoundBlockNoteKey = 'c4';
             pendingSlimeStrength = 20;
+            pendingCurveAxisCount = 0;
             updateGhostStyle();
         }
 
@@ -3712,6 +4094,7 @@
                 }
             });
 
+            cache.bendableRoads.forEach(body => drawBendableRoadBody(ctx, body, body === selectedBody));
             cache.shockAbsorbers.forEach(body => drawShockAbsorberBody(ctx, body));
 
             const now = performance.now();
