@@ -811,6 +811,97 @@
             minY: -200,
             maxY: 1000
         };
+        const MINIMAP_REDRAW_INTERVAL = 140;
+        let minimapDirty = true;
+        let lastMinimapDrawAt = 0;
+        const worldCache = {
+            dirty: true,
+            bodies: [],
+            nonGroundBodies: [],
+            minimapBodies: [],
+            goalBoxes: [],
+            shockAbsorbers: [],
+            escalators: [],
+            staticSolids: [],
+            candidateBallBodies: [],
+            steelBodies: [],
+            sleepCheckBodies: [],
+            bodyIdSet: new Set(),
+            bodyById: new Map()
+        };
+
+        function invalidateMinimap() {
+            minimapDirty = true;
+        }
+
+        function markWorldCacheDirty() {
+            worldCache.dirty = true;
+            invalidateMinimap();
+        }
+
+        function refreshWorldCache() {
+            if (!worldCache.dirty) return worldCache;
+
+            const bodies = Composite.allBodies(world);
+            worldCache.bodies = bodies;
+            worldCache.nonGroundBodies = bodies.filter(body => body !== ground);
+            worldCache.minimapBodies = bodies.filter(body =>
+                body !== ground &&
+                body.label !== 'marble' &&
+                body.label !== 'steel_marble' &&
+                body.label !== 'place_marble'
+            );
+            worldCache.goalBoxes = bodies.filter(body => body.plugin?.type === 'goal_box');
+            worldCache.shockAbsorbers = bodies.filter(body => isShockAbsorberBody(body));
+            worldCache.escalators = bodies.filter(body => body.label && body.label.startsWith('escalator'));
+            worldCache.staticSolids = bodies.filter(body => isTunnelGuardSurface(body));
+            worldCache.candidateBallBodies = bodies.filter(body =>
+                body.circleRadius &&
+                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble')
+            );
+            worldCache.steelBodies = bodies.filter(body => body.label === 'steel_marble');
+            worldCache.sleepCheckBodies = bodies.filter(body =>
+                body !== ground &&
+                (!body.plugin || body.plugin.type !== 'pushable')
+            );
+            worldCache.bodyIdSet = new Set(bodies.map(body => body.id));
+            worldCache.bodyById = new Map(bodies.map(body => [body.id, body]));
+            worldCache.dirty = false;
+            return worldCache;
+        }
+
+        function getWorldCache() {
+            return refreshWorldCache();
+        }
+
+        function getPlacementBodies() {
+            return getWorldCache().nonGroundBodies.filter(body => body !== marble);
+        }
+
+        function addWorldItem(item) {
+            World.add(world, item);
+            markWorldCacheDirty();
+        }
+
+        function removeWorldItem(item) {
+            World.remove(world, item);
+            markWorldCacheDirty();
+        }
+
+        function isBodyActivelyMoving(body) {
+            if (!body || body.isStatic) return false;
+            return (body.speed || 0) > 0.05 ||
+                Math.abs(body.angularVelocity || 0) > 0.01 ||
+                !!body.plugin?.carrierState;
+        }
+
+        function shouldRefreshMinimap() {
+            const cache = getWorldCache();
+            if (minimapDirty || isLaunching || isFollowMode) return true;
+            if (pushables.some(body => cache.bodyIdSet.has(body.id) && isBodyActivelyMoving(body))) return true;
+            if (magnets.some(body => cache.bodyIdSet.has(body.id) && body.plugin?.isAttached === false && isBodyActivelyMoving(body))) return true;
+            return false;
+        }
 
         function syncCameraBounds() {
             render.bounds.min.x = cameraPos.x;
@@ -824,6 +915,7 @@
             cameraPos.x = x;
             cameraPos.y = y;
             syncCameraBounds();
+            invalidateMinimap();
         }
 
         function centerCameraOn(x, y) {
@@ -834,15 +926,11 @@
             const rect = minimapPanel.getBoundingClientRect();
             minimapCanvas.width = Math.max(120, Math.round(rect.width));
             minimapCanvas.height = Math.max(90, Math.round(rect.height));
+            invalidateMinimap();
         }
 
         function getMinimapBodies() {
-            return Composite.allBodies(world).filter(body =>
-                body !== ground &&
-                body.label !== 'marble' &&
-                body.label !== 'steel_marble' &&
-                body.label !== 'place_marble'
-            );
+            return getWorldCache().minimapBodies;
         }
 
         function getMinimapExtent() {
@@ -1612,7 +1700,7 @@
         }
 
         function findBodyById(bodyId) {
-            return Composite.allBodies(world).find(body => body.id === bodyId) || null;
+            return getWorldCache().bodyById.get(bodyId) || null;
         }
 
         function getPushableSize(body) {
@@ -1695,14 +1783,14 @@
         function removePushableLinksForBody(body) {
             getPushableLinkConstraints().forEach(constraint => {
                 if (constraint.bodyA === body || constraint.bodyB === body) {
-                    World.remove(world, constraint);
+                    removeWorldItem(constraint);
                 }
             });
             rebuildPushableLinkGroups();
         }
 
         function clearAllPushableLinks() {
-            getPushableLinkConstraints().forEach(constraint => World.remove(world, constraint));
+            getPushableLinkConstraints().forEach(constraint => removeWorldItem(constraint));
             rebuildPushableLinkGroups();
         }
 
@@ -1776,7 +1864,7 @@
         function canSnapPushableToTarget(body, spec) {
             const size = getPushableSize(body);
             const mock = Bodies.rectangle(spec.position.x, spec.position.y, size.w, size.h, { angle: spec.angle });
-            const collisions = Query.collides(mock, Composite.allBodies(world).filter(other =>
+            const collisions = Query.collides(mock, getWorldCache().bodies.filter(other =>
                 other !== body && other !== spec.targetBody && other !== ground
             ));
             return collisions.length === 0;
@@ -1838,7 +1926,7 @@
                     render: { visible: false },
                     plugin: { type: 'pushable_link', linkId }
                 });
-                World.add(world, constraint);
+                addWorldItem(constraint);
             });
 
             rebuildPushableLinkGroups();
@@ -1966,20 +2054,11 @@
         }
 
         function getCarryableMarbles() {
-            return Composite.allBodies(world).filter(body =>
-                body.circleRadius &&
-                !body.isStatic &&
-                !body.isSensor &&
-                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble')
-            );
+            return getWorldCache().candidateBallBodies.filter(body => !body.isStatic && !body.isSensor);
         }
 
         function getBasketCountableMarbles() {
-            return Composite.allBodies(world).filter(body =>
-                body.circleRadius &&
-                !body.isSensor &&
-                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble')
-            );
+            return getWorldCache().candidateBallBodies.filter(body => !body.isSensor);
         }
 
         function isMarbleInsidePushableBasket(basket, marble) {
@@ -2110,7 +2189,7 @@
                 return;
             }
 
-            const bodies = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+            const bodies = getPlacementBodies();
             const clicked = Query.point(bodies, worldPos);
 
             if (clicked.length > 0) {
@@ -2124,21 +2203,21 @@
                 // 자석: 다른 자석과는 겹칠 수 없지만 일반 길 위에는 겹쳐 놓을 수 있음
                 if (conf.type === 'magnet') {
                     const mockMag = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2);
-                    const existingMagnets = magnets.filter(m => Composite.allBodies(world).includes(m));
+                    const existingMagnets = magnets.filter(m => getWorldCache().bodyIdSet.has(m.id));
                     if (existingMagnets.length > 0 && Query.collides(mockMag, existingMagnets).length > 0) {
                         showError();
                         return;
                     }
                 } else if (conf.type === 'goal_box') {
                     const mockGoal = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
-                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    const existingRoads = getPlacementBodies();
                     if (Query.collides(mockGoal, existingRoads).length > 0) {
                         showError();
                         return;
                     }
                 } else if (conf.type === 'shock_absorber') {
                     const mockShockAbsorber = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
-                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    const existingRoads = getPlacementBodies();
                     if (Query.collides(mockShockAbsorber, existingRoads).length > 0) {
                         showError();
                         return;
@@ -2146,7 +2225,7 @@
                 } else if (conf.type === 'pushable') {
                     const mockRoad = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, { angle: ghostAngle });
                     mockRoad.plugin = { type: 'pushable', w: conf.w, h: conf.h };
-                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    const existingRoads = getPlacementBodies();
                     const collisions = Query.collides(mockRoad, existingRoads);
                     if (collisions.length > 0) {
                         const spec = pushables
@@ -2161,7 +2240,7 @@
                     }
                 } else if (conf.type === 'pushable_basket') {
                     const mockBasket = createPushableBasketBody(worldPos.x, worldPos.y, conf, ghostAngle);
-                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    const existingRoads = getPlacementBodies();
                     if (Query.collides(mockBasket, existingRoads).length > 0) {
                         showError();
                         return;
@@ -2170,7 +2249,7 @@
                     const mockRoad = isCircleType 
                         ? Bodies.circle(worldPos.x, worldPos.y, conf.w / 2)
                         : Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, { angle: ghostAngle });
-                    const existingRoads = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
+                    const existingRoads = getPlacementBodies();
                     
                     if (Query.collides(mockRoad, existingRoads).length > 0) {
                         showError(); 
@@ -2292,7 +2371,7 @@
                         slop: 0
                     });
                 }
-                World.add(world, newBody);
+                addWorldItem(newBody);
                 if (isAttachablePushable(newBody)) {
                     tryAttachPushable(newBody);
                 }
@@ -2319,6 +2398,7 @@
             if (isDraggingBody && selectedBody) {
                 const worldPos = { x: e.clientX + cameraPos.x, y: e.clientY + cameraPos.y };
                 Body.setPosition(selectedBody, worldPos);
+                invalidateMinimap();
             } else if (isCustomDrawing && customStartScreen) {
                 // 커스텀 드래그 박스 업데이트
                 const box = document.getElementById('custom-draw-box');
@@ -2493,6 +2573,7 @@
             const factor = (dir === 'Left' || dir === 'Up') ? -1 : 1;
             const newAngle = selectedBody.angle + (amount * factor);
             Body.setAngle(selectedBody, newAngle);
+            invalidateMinimap();
             
             // 회전시켰을 때 현재 각도를 새로운 '되돌리기 기준점'으로 저장
             if (selectedBody.plugin) {
@@ -2509,8 +2590,8 @@
                 startMarbleSequence();
             } else if (e.key.toLowerCase() === 'r') {
                 clearAllPushableLinks();
-                const bodies = Composite.allBodies(world).filter(b => b !== ground && b !== marble);
-                World.remove(world, bodies);
+                const bodies = getPlacementBodies();
+                removeWorldItem(bodies);
                 selectedBody = null;
                 placedMarbles = [];
                 magnets = [];
@@ -2525,7 +2606,7 @@
                     placedMarbles = placedMarbles.filter(b => b !== selectedBody);
                     magnets = magnets.filter(b => b !== selectedBody);
                     pushables = pushables.filter(b => b !== selectedBody);
-                    World.remove(world, selectedBody);
+                    removeWorldItem(selectedBody);
                     selectedBody = null;
                 }
             }
@@ -2701,22 +2782,20 @@
             document.getElementById('btn-drop').style.background = '';
 
             // 발사된 구슬들 (맵에 떨어진 marble/steel_marble) 제거
-            const launchedBalls = Composite.allBodies(world).filter(b => 
+            const launchedBalls = getWorldCache().bodies.filter(b => 
                 b !== ground && !placedMarbles.includes(b) && !magnets.includes(b) &&
                 (b.label === 'marble' || b.label === 'steel_marble')
             );
-            launchedBalls.forEach(b => World.remove(world, b));
+            if (launchedBalls.length > 0) {
+                removeWorldItem(launchedBalls);
+            }
             marble = null;
             hideEndMessage();
 
-            Composite.allBodies(world).forEach(body => {
-                if (body.plugin && body.plugin.type === 'goal_box') {
-                    body.plugin.enteredMarbleIds = [];
-                }
-                if (isShockAbsorberBody(body)) {
-                    resetShockAbsorberState(body);
-                }
+            getWorldCache().goalBoxes.forEach(body => {
+                body.plugin.enteredMarbleIds = [];
             });
+            getWorldCache().shockAbsorbers.forEach(resetShockAbsorberState);
 
             // 배치 구슬들 원래 위치로 복원 + sleeping
             placedMarbles.forEach(pm => {
@@ -2764,11 +2843,12 @@
                 }
             });
 
-            Composite.allBodies(world).forEach(body => {
-                if (body.label && body.label.startsWith('escalator') && body.plugin) {
+            getWorldCache().escalators.forEach(body => {
+                if (body.plugin) {
                     body.plugin.isActivated = false;
                 }
             });
+            invalidateMinimap();
         }
 
         let isFollowMode = false;
@@ -2862,7 +2942,7 @@
                     density: 1.5, render: { fillStyle: '#e74c3c' },
                     bullet: true, slop: 0
                 });
-            World.add(world, m);
+            addWorldItem(m);
             marble = m; // 팔로우 카메라용
             return m;
         }
@@ -3094,8 +3174,7 @@
         });
 
         Events.on(engine, 'afterUpdate', () => {
-            Composite.allBodies(world).forEach(body => {
-                if (!isShockAbsorberBody(body)) return;
+            getWorldCache().shockAbsorbers.forEach(body => {
                 const state = ensureShockAbsorberState(body);
                 state.velocity += (state.target - state.display) * 0.22;
                 state.velocity *= 0.72;
@@ -3144,11 +3223,7 @@
         }
 
         function getTunnelSensitiveBodies() {
-            return Composite.allBodies(world).filter(body =>
-                !body.isStatic &&
-                body.circleRadius &&
-                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble')
-            );
+            return getWorldCache().candidateBallBodies.filter(body => !body.isStatic);
         }
 
         Events.on(engine, 'beforeUpdate', () => {
@@ -3179,8 +3254,9 @@
         });
 
         Events.on(engine, 'beforeUpdate', () => {
-            const steelBodies = Composite.allBodies(world).filter(b => b.label === 'steel_marble');
-            const activeMagnets = magnets.filter(m => Composite.allBodies(world).includes(m));
+            const cache = getWorldCache();
+            const steelBodies = cache.steelBodies;
+            const activeMagnets = magnets.filter(m => cache.bodyIdSet.has(m.id));
 
             steelBodies.forEach(steel => {
                 steel.plugin = steel.plugin || {};
@@ -3304,12 +3380,9 @@
 
             // 잠자는 배치 구슬이 공중에 떠 있으면 깨우기 (밀리는 벽은 제외)
             // → 아래에 지지체가 없으면 sleeping 해제
-            const allBodies = Composite.allBodies(world);
-            allBodies.forEach(b => {
+            const allBodies = cache.bodies;
+            cache.sleepCheckBodies.forEach(b => {
                 if (!b.isSleeping) return;
-                if (b === ground) return;
-                // 밀리는 벽(pushable)은 이 체크에서 제외 (충돌로만 깨어남)
-                if (b.plugin && b.plugin.type === 'pushable') return;
                 
                 // 이 바디 아래쪽으로 짧은 거리에 다른 바디가 있는지 확인
                 const checkY = b.position.y + ((b.circleRadius || 15) + 3);
@@ -3326,9 +3399,7 @@
         });
 
         Events.on(engine, 'afterUpdate', () => {
-            const staticSolids = Composite.allBodies(world).filter(body =>
-                isTunnelGuardSurface(body)
-            );
+            const staticSolids = getWorldCache().staticSolids;
 
             getTunnelSensitiveBodies().forEach(body => {
                 const prev = body.plugin?.prevPosition;
@@ -3416,10 +3487,10 @@
         // 에스컬레이터 탱크 바퀴(무한궤도) 애니메이션 렌더링
         Events.on(render, 'afterRender', () => {
             const ctx = render.context;
-            const bodies = Composite.allBodies(world);
+            const cache = getWorldCache();
             const time = engine.timing.timestamp;
             
-            bodies.forEach(b => {
+            cache.escalators.forEach(b => {
                 if (b.label && b.label.startsWith('escalator')) {
                     const w = b.plugin?.w;
                     const h = b.plugin?.h;
@@ -3460,9 +3531,14 @@
                 }
             });
 
-            bodies.forEach(body => drawShockAbsorberBody(ctx, body));
+            cache.shockAbsorbers.forEach(body => drawShockAbsorberBody(ctx, body));
 
-            drawMinimap();
+            const now = performance.now();
+            if (shouldRefreshMinimap() && now - lastMinimapDrawAt >= MINIMAP_REDRAW_INTERVAL) {
+                drawMinimap();
+                minimapDirty = false;
+                lastMinimapDrawAt = now;
+            }
         });
 
         window.addEventListener('resize', () => {
