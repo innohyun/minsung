@@ -1502,7 +1502,7 @@
                     body.plugin.gravityRestoreFrictionAir = body.frictionAir;
                 }
                 body.plugin.gravitySuppressed = true;
-                body.frictionAir = Math.max(body.plugin.gravityRestoreFrictionAir ?? 0, 0.012);
+                body.frictionAir = body.plugin.gravityRestoreFrictionAir ?? body.frictionAir;
                 return;
             }
 
