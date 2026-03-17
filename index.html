@@ -1582,31 +1582,25 @@
         function addShockAbsorberPath(ctx, width, height) {
             const halfW = width / 2;
             const halfH = height / 2;
+            const radius = Math.min(halfW, halfH);
 
-            if (Math.abs(width - height) < 0.001) {
+            if (radius <= 0) {
                 ctx.beginPath();
-                ctx.arc(0, 0, Math.min(halfW, halfH), 0, Math.PI * 2);
+                ctx.rect(-halfW, -halfH, width, height);
                 ctx.closePath();
                 return;
             }
 
             ctx.beginPath();
-
-            if (width >= height) {
-                const radius = halfH;
-                ctx.moveTo(-halfW + radius, -halfH);
-                ctx.lineTo(halfW - radius, -halfH);
-                ctx.arc(halfW - radius, 0, radius, -Math.PI / 2, Math.PI / 2);
-                ctx.lineTo(-halfW + radius, halfH);
-                ctx.arc(-halfW + radius, 0, radius, Math.PI / 2, -Math.PI / 2);
-            } else {
-                const radius = halfW;
-                ctx.moveTo(-halfW, -halfH + radius);
-                ctx.lineTo(-halfW, halfH - radius);
-                ctx.arc(0, halfH - radius, radius, Math.PI, 0);
-                ctx.lineTo(halfW, -halfH + radius);
-                ctx.arc(0, -halfH + radius, radius, 0, Math.PI);
-            }
+            ctx.moveTo(-halfW + radius, -halfH);
+            ctx.lineTo(halfW - radius, -halfH);
+            ctx.arcTo(halfW, -halfH, halfW, -halfH + radius, radius);
+            ctx.lineTo(halfW, halfH - radius);
+            ctx.arcTo(halfW, halfH, halfW - radius, halfH, radius);
+            ctx.lineTo(-halfW + radius, halfH);
+            ctx.arcTo(-halfW, halfH, -halfW, halfH - radius, radius);
+            ctx.lineTo(-halfW, -halfH + radius);
+            ctx.arcTo(-halfW, -halfH, -halfW + radius, -halfH, radius);
             ctx.closePath();
         }
 
