@@ -1007,13 +1007,172 @@
             minY: -200,
             maxY: 1000
         };
+        const SPATIAL_INDEX_CELL_SIZE = 160;
         const MINIMAP_REDRAW_INTERVAL = 140;
         let minimapDirty = true;
+        let minimapExtentDirty = true;
+        let minimapExtentCache = null;
         let lastMinimapDrawAt = 0;
+        function createSpatialIndex(cellSize = SPATIAL_INDEX_CELL_SIZE) {
+            const buckets = new Map();
+            const bodyKeys = new Map();
+
+            function getCellKey(x, y) {
+                return `${x}:${y}`;
+            }
+
+            function getKeysForBounds(bounds) {
+                const minCellX = Math.floor(bounds.min.x / cellSize);
+                const maxCellX = Math.floor(bounds.max.x / cellSize);
+                const minCellY = Math.floor(bounds.min.y / cellSize);
+                const maxCellY = Math.floor(bounds.max.y / cellSize);
+                const keys = [];
+
+                for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+                    for (let cellY = minCellY; cellY <= maxCellY; cellY++) {
+                        keys.push(getCellKey(cellX, cellY));
+                    }
+                }
+
+                return keys;
+            }
+
+            function addToBuckets(body, keys) {
+                keys.forEach(key => {
+                    let bucket = buckets.get(key);
+                    if (!bucket) {
+                        bucket = new Set();
+                        buckets.set(key, bucket);
+                    }
+                    bucket.add(body);
+                });
+            }
+
+            function removeFromBuckets(body, keys) {
+                keys.forEach(key => {
+                    const bucket = buckets.get(key);
+                    if (!bucket) return;
+                    bucket.delete(body);
+                    if (bucket.size === 0) {
+                        buckets.delete(key);
+                    }
+                });
+            }
+
+            function areKeysEqual(a, b) {
+                if (!a || !b || a.length !== b.length) return false;
+                for (let i = 0; i < a.length; i++) {
+                    if (a[i] !== b[i]) return false;
+                }
+                return true;
+            }
+
+            function getQueryBounds(bounds, padding = 0) {
+                return {
+                    min: {
+                        x: bounds.min.x - padding,
+                        y: bounds.min.y - padding
+                    },
+                    max: {
+                        x: bounds.max.x + padding,
+                        y: bounds.max.y + padding
+                    }
+                };
+            }
+
+            function intersectsBounds(body, bounds) {
+                return !(
+                    body.bounds.max.x < bounds.min.x ||
+                    body.bounds.min.x > bounds.max.x ||
+                    body.bounds.max.y < bounds.min.y ||
+                    body.bounds.min.y > bounds.max.y
+                );
+            }
+
+            return {
+                insert(body) {
+                    const root = getCollisionRoot(body);
+                    if (!root || bodyKeys.has(root.id)) return;
+                    const keys = getKeysForBounds(root.bounds);
+                    bodyKeys.set(root.id, keys);
+                    addToBuckets(root, keys);
+                },
+                update(body) {
+                    const root = getCollisionRoot(body);
+                    if (!root) return false;
+
+                    const nextKeys = getKeysForBounds(root.bounds);
+                    const prevKeys = bodyKeys.get(root.id);
+
+                    if (!prevKeys) {
+                        bodyKeys.set(root.id, nextKeys);
+                        addToBuckets(root, nextKeys);
+                        return true;
+                    }
+
+                    if (areKeysEqual(prevKeys, nextKeys)) {
+                        return false;
+                    }
+
+                    removeFromBuckets(root, prevKeys);
+                    bodyKeys.set(root.id, nextKeys);
+                    addToBuckets(root, nextKeys);
+                    return true;
+                },
+                remove(body) {
+                    const root = getCollisionRoot(body);
+                    if (!root) return;
+                    const keys = bodyKeys.get(root.id);
+                    if (!keys) return;
+                    removeFromBuckets(root, keys);
+                    bodyKeys.delete(root.id);
+                },
+                queryBounds(bounds, padding = 0) {
+                    const queryBounds = getQueryBounds(bounds, padding);
+                    const keys = getKeysForBounds(queryBounds);
+                    const results = [];
+                    const seen = new Set();
+
+                    keys.forEach(key => {
+                        const bucket = buckets.get(key);
+                        if (!bucket) return;
+                        bucket.forEach(body => {
+                            if (seen.has(body.id)) return;
+                            if (!intersectsBounds(body, queryBounds)) return;
+                            seen.add(body.id);
+                            results.push(body);
+                        });
+                    });
+
+                    return results;
+                },
+                queryPoint(point, padding = 0) {
+                    return this.queryBounds({
+                        min: { x: point.x, y: point.y },
+                        max: { x: point.x, y: point.y }
+                    }, padding);
+                },
+                queryRay(start, end, padding = 0) {
+                    return this.queryBounds({
+                        min: {
+                            x: Math.min(start.x, end.x),
+                            y: Math.min(start.y, end.y)
+                        },
+                        max: {
+                            x: Math.max(start.x, end.x),
+                            y: Math.max(start.y, end.y)
+                        }
+                    }, padding);
+                }
+            };
+        }
+
+        const placementSpatialIndex = createSpatialIndex();
+        const staticSolidSpatialIndex = createSpatialIndex();
         const worldCache = {
-            dirty: true,
             bodies: [],
             nonGroundBodies: [],
+            placementBodies: [],
             minimapBodies: [],
             goalBoxes: [],
             shockAbsorbers: [],
@@ -1024,69 +1183,216 @@
             candidateBallBodies: [],
             steelBodies: [],
             sleepCheckBodies: [],
+            pushableLinkConstraints: [],
             bodyIdSet: new Set(),
             bodyById: new Map()
         };
 
-        function invalidateMinimap() {
+        function invalidateMinimap(structureChanged = false) {
             minimapDirty = true;
+            if (structureChanged) {
+                minimapExtentDirty = true;
+                minimapExtentCache = null;
+            }
         }
 
-        function markWorldCacheDirty() {
-            worldCache.dirty = true;
-            invalidateMinimap();
+        function isRuntimeLaunchedBall(body) {
+            if (!body) return false;
+            return (body.label === 'marble' || body.label === 'steel_marble') && !body.plugin?.isPlacedMarble;
         }
 
-        function refreshWorldCache() {
-            if (!worldCache.dirty) return worldCache;
+        function isPlacementBody(body) {
+            return !!body && body !== ground && !isRuntimeLaunchedBall(body);
+        }
 
-            const bodies = Composite.allBodies(world);
-            worldCache.bodies = bodies;
-            worldCache.nonGroundBodies = bodies.filter(body => body !== ground);
-            worldCache.minimapBodies = bodies.filter(body =>
+        function isMinimapTrackedBody(body) {
+            return !!body &&
                 body !== ground &&
                 body.label !== 'marble' &&
                 body.label !== 'steel_marble' &&
-                body.label !== 'place_marble'
-            );
-            worldCache.goalBoxes = bodies.filter(body => body.plugin?.type === 'goal_box');
-            worldCache.shockAbsorbers = bodies.filter(body => isShockAbsorberBody(body));
-            worldCache.bendableRoads = bodies.filter(body => isBendableRoadBody(body));
-            worldCache.teleportPortals = bodies.filter(body => isTeleportPortalBody(body));
-            worldCache.escalators = bodies.filter(body => body.label && body.label.startsWith('escalator'));
-            worldCache.staticSolids = bodies.filter(body => isTunnelGuardSurface(body));
-            worldCache.candidateBallBodies = bodies.filter(body =>
-                body.circleRadius &&
-                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble')
-            );
-            worldCache.steelBodies = bodies.filter(body => body.label === 'steel_marble');
-            worldCache.sleepCheckBodies = bodies.filter(body =>
-                body !== ground &&
-                (!body.plugin || body.plugin.type !== 'pushable')
-            );
-            worldCache.bodyIdSet = new Set(bodies.map(body => body.id));
-            worldCache.bodyById = new Map(bodies.map(body => [body.id, body]));
-            worldCache.dirty = false;
-            return worldCache;
+                body.label !== 'place_marble';
+        }
+
+        function isCandidateBallBody(body) {
+            return !!body &&
+                !!body.circleRadius &&
+                (body.label === 'marble' || body.label === 'steel_marble' || body.label === 'place_marble');
+        }
+
+        function isSleepCheckBody(body) {
+            return !!body && (body.plugin?.type === 'place_marble' || body.plugin?.isPlacedMarble);
+        }
+
+        function removeCachedEntry(list, entry) {
+            const index = list.findIndex(item => item === entry || item?.id === entry?.id);
+            if (index !== -1) {
+                list.splice(index, 1);
+            }
+        }
+
+        function registerWorldBody(body) {
+            const root = getCollisionRoot(body);
+            if (!root || worldCache.bodyIdSet.has(root.id)) return;
+
+            worldCache.bodies.push(root);
+            worldCache.bodyIdSet.add(root.id);
+            worldCache.bodyById.set(root.id, root);
+
+            if (root !== ground) {
+                worldCache.nonGroundBodies.push(root);
+            }
+            if (isPlacementBody(root)) {
+                worldCache.placementBodies.push(root);
+                placementSpatialIndex.insert(root);
+            }
+            if (isMinimapTrackedBody(root)) {
+                worldCache.minimapBodies.push(root);
+            }
+            if (root.plugin?.type === 'goal_box') {
+                worldCache.goalBoxes.push(root);
+            }
+            if (isShockAbsorberBody(root)) {
+                worldCache.shockAbsorbers.push(root);
+            }
+            if (isBendableRoadBody(root)) {
+                worldCache.bendableRoads.push(root);
+            }
+            if (isTeleportPortalBody(root)) {
+                worldCache.teleportPortals.push(root);
+            }
+            if (root.label && root.label.startsWith('escalator')) {
+                worldCache.escalators.push(root);
+            }
+            if (isTunnelGuardSurface(root)) {
+                worldCache.staticSolids.push(root);
+                staticSolidSpatialIndex.insert(root);
+            }
+            if (isCandidateBallBody(root)) {
+                worldCache.candidateBallBodies.push(root);
+            }
+            if (root.label === 'steel_marble') {
+                worldCache.steelBodies.push(root);
+            }
+            if (isSleepCheckBody(root)) {
+                worldCache.sleepCheckBodies.push(root);
+            }
+
+            if (isMinimapTrackedBody(root) || root === ground) {
+                invalidateMinimap(true);
+            }
+        }
+
+        function unregisterWorldBody(body) {
+            const root = getCollisionRoot(body);
+            if (!root || !worldCache.bodyIdSet.has(root.id)) return;
+
+            worldCache.bodyIdSet.delete(root.id);
+            worldCache.bodyById.delete(root.id);
+            placementSpatialIndex.remove(root);
+            staticSolidSpatialIndex.remove(root);
+
+            removeCachedEntry(worldCache.bodies, root);
+            removeCachedEntry(worldCache.nonGroundBodies, root);
+            removeCachedEntry(worldCache.placementBodies, root);
+            removeCachedEntry(worldCache.minimapBodies, root);
+            removeCachedEntry(worldCache.goalBoxes, root);
+            removeCachedEntry(worldCache.shockAbsorbers, root);
+            removeCachedEntry(worldCache.bendableRoads, root);
+            removeCachedEntry(worldCache.teleportPortals, root);
+            removeCachedEntry(worldCache.escalators, root);
+            removeCachedEntry(worldCache.staticSolids, root);
+            removeCachedEntry(worldCache.candidateBallBodies, root);
+            removeCachedEntry(worldCache.steelBodies, root);
+            removeCachedEntry(worldCache.sleepCheckBodies, root);
+
+            if (isMinimapTrackedBody(root) || root === ground) {
+                invalidateMinimap(true);
+            }
+        }
+
+        function registerWorldConstraint(constraint) {
+            if (!constraint?.plugin || constraint.plugin.type !== 'pushable_link') return;
+            if (worldCache.pushableLinkConstraints.includes(constraint)) return;
+            worldCache.pushableLinkConstraints.push(constraint);
+        }
+
+        function unregisterWorldConstraint(constraint) {
+            if (!constraint) return;
+            removeCachedEntry(worldCache.pushableLinkConstraints, constraint);
+        }
+
+        function visitWorldItems(item, bodyVisitor, constraintVisitor) {
+            if (!item) return;
+            if (Array.isArray(item)) {
+                item.forEach(entry => visitWorldItems(entry, bodyVisitor, constraintVisitor));
+                return;
+            }
+            if (item.type === 'constraint') {
+                constraintVisitor(item);
+                return;
+            }
+            bodyVisitor(item);
+        }
+
+        function syncWorldBodyRegistration(body, structureChanged = false) {
+            const root = getCollisionRoot(body);
+            if (!root || !worldCache.bodyIdSet.has(root.id)) return false;
+
+            let didMoveCell = false;
+            if (isPlacementBody(root)) {
+                didMoveCell = placementSpatialIndex.update(root) || didMoveCell;
+            }
+            if (isTunnelGuardSurface(root)) {
+                didMoveCell = staticSolidSpatialIndex.update(root) || didMoveCell;
+            }
+
+            if (didMoveCell) {
+                invalidateMinimap(structureChanged);
+            } else if (structureChanged && isMinimapTrackedBody(root)) {
+                invalidateMinimap(true);
+            }
+
+            return didMoveCell;
         }
 
         function getWorldCache() {
-            return refreshWorldCache();
+            return worldCache;
+        }
+
+        function getPlacementCandidatesInBounds(bounds, padding = 10, excludedBodies = []) {
+            const excludedIds = new Set(excludedBodies.filter(Boolean).map(body => getCollisionRoot(body).id));
+            return placementSpatialIndex
+                .queryBounds(bounds, padding)
+                .filter(body => !excludedIds.has(body.id));
+        }
+
+        function getPlacementCandidatesForBody(body, padding = 10, excludedBodies = []) {
+            return getPlacementCandidatesInBounds(body.bounds, padding, excludedBodies);
+        }
+
+        function getPlacementCandidatesAtPoint(point, padding = 12) {
+            return placementSpatialIndex.queryPoint(point, padding);
+        }
+
+        function getStaticSolidsNearRay(start, end, padding = 0) {
+            return staticSolidSpatialIndex.queryRay(start, end, padding);
         }
 
         function getPlacementBodies() {
-            return getWorldCache().nonGroundBodies.filter(body => body !== marble);
+            return getWorldCache().placementBodies.slice();
         }
 
         function addWorldItem(item) {
             World.add(world, item);
-            markWorldCacheDirty();
+            visitWorldItems(item, registerWorldBody, registerWorldConstraint);
         }
 
         function removeWorldItem(item) {
             World.remove(world, item);
-            markWorldCacheDirty();
+            visitWorldItems(item, unregisterWorldBody, unregisterWorldConstraint);
         }
+
+        registerWorldBody(ground);
 
         function isBodyActivelyMoving(body) {
             if (!body || body.isStatic) return false;
@@ -1134,9 +1440,15 @@
         }
 
         function getMinimapExtent() {
+            if (!minimapExtentDirty && minimapExtentCache) {
+                return minimapExtentCache;
+            }
+
             const bodies = getMinimapBodies();
             if (bodies.length === 0) {
-                return { ...DEFAULT_MINIMAP_EXTENT };
+                minimapExtentCache = { ...DEFAULT_MINIMAP_EXTENT };
+                minimapExtentDirty = false;
+                return minimapExtentCache;
             }
 
             let minX = Infinity;
@@ -1151,12 +1463,14 @@
                 maxY = Math.max(maxY, body.bounds.max.y);
             });
 
-            return {
+            minimapExtentCache = {
                 minX: minX - MINIMAP_PADDING,
                 maxX: maxX + MINIMAP_PADDING,
                 minY: minY - MINIMAP_PADDING,
                 maxY: maxY + MINIMAP_PADDING
             };
+            minimapExtentDirty = false;
+            return minimapExtentCache;
         }
 
         function getMinimapTransform(extent) {
@@ -2544,7 +2858,7 @@
         }
 
         function getPushableLinkConstraints() {
-            return Composite.allConstraints(world).filter(constraint => constraint.plugin?.type === 'pushable_link');
+            return getWorldCache().pushableLinkConstraints.slice();
         }
 
         function getParallelAngleDifference(a, b) {
@@ -2688,9 +3002,7 @@
         function canSnapPushableToTarget(body, spec) {
             const size = getPushableSize(body);
             const mock = Bodies.rectangle(spec.position.x, spec.position.y, size.w, size.h, { angle: spec.angle });
-            const collisions = Query.collides(mock, getWorldCache().bodies.filter(other =>
-                other !== body && other !== spec.targetBody && other !== ground
-            ));
+            const collisions = Query.collides(mock, getPlacementCandidatesForBody(mock, 18, [body, spec.targetBody]));
             return collisions.length === 0;
         }
 
@@ -2759,8 +3071,8 @@
         function tryAttachPushable(body) {
             if (!isAttachablePushable(body)) return false;
 
-            const spec = pushables
-                .filter(candidate => candidate !== body && isAttachablePushable(candidate) && !arePushablesConnected(body, candidate))
+            const spec = getPlacementCandidatesForBody(body, 36, [body])
+                .filter(candidate => isAttachablePushable(candidate) && !arePushablesConnected(body, candidate))
                 .map(candidate => getPushableAttachmentSpec(body, candidate))
                 .filter(Boolean)
                 .sort((a, b) => a.error - b.error)[0];
@@ -2771,6 +3083,7 @@
             Body.setPosition(body, spec.position);
             Body.setVelocity(body, { x: 0, y: 0 });
             Body.setAngularVelocity(body, 0);
+            syncWorldBodyRegistration(body, true);
             createPushableLink(body, spec.targetBody, spec);
             getLinkedPushableCluster(body).forEach(updateBodyOrigin);
             return true;
@@ -2864,6 +3177,7 @@
                 y: state.tangentY * state.speed
             });
             Body.setAngularVelocity(pushable, 0);
+            syncWorldBodyRegistration(pushable);
         }
 
         function worldToBodyLocal(body, point) {
@@ -3032,8 +3346,7 @@
                 return;
             }
 
-            const bodies = getPlacementBodies();
-            const clicked = Query.point(bodies, worldPos);
+            const clicked = Query.point(getPlacementCandidatesAtPoint(worldPos, 10), worldPos);
 
             if (clicked.length > 0) {
                 selectedBody = clicked[0].parent && clicked[0].parent !== clicked[0] ? clicked[0].parent : clicked[0];
@@ -3046,28 +3359,28 @@
                 // 자석: 다른 자석과는 겹칠 수 없지만 일반 길 위에는 겹쳐 놓을 수 있음
                 if (conf.type === 'magnet') {
                     const mockMag = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2);
-                    const existingMagnets = magnets.filter(m => getWorldCache().bodyIdSet.has(m.id));
+                    const existingMagnets = getPlacementCandidatesForBody(mockMag, 12).filter(body => body.label === 'magnet');
                     if (existingMagnets.length > 0 && Query.collides(mockMag, existingMagnets).length > 0) {
                         showError();
                         return;
                     }
                 } else if (conf.type === 'goal_box') {
                     const mockGoal = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
-                    const existingRoads = getPlacementBodies();
+                    const existingRoads = getPlacementCandidatesForBody(mockGoal, 14);
                     if (Query.collides(mockGoal, existingRoads).length > 0) {
                         showError();
                         return;
                     }
                 } else if (conf.type === 'shock_absorber') {
                     const mockShockAbsorber = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
-                    const existingRoads = getPlacementBodies();
+                    const existingRoads = getPlacementCandidatesForBody(mockShockAbsorber, 14);
                     if (Query.collides(mockShockAbsorber, existingRoads).length > 0) {
                         showError();
                         return;
                     }
                 } else if (conf.type === 'teleport_portal') {
                     const mockPortal = createTeleportPortalBody(worldPos.x, worldPos.y, conf, ghostAngle);
-                    const existingPortals = getPlacementBodies().filter(body => isTeleportPortalBody(body));
+                    const existingPortals = getPlacementCandidatesForBody(mockPortal, 14).filter(body => isTeleportPortalBody(body));
                     if (Query.collides(mockPortal, existingPortals).length > 0) {
                         showError();
                         return;
@@ -3075,10 +3388,10 @@
                 } else if (conf.type === 'pushable') {
                     const mockRoad = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, { angle: ghostAngle });
                     mockRoad.plugin = { type: 'pushable', w: conf.w, h: conf.h };
-                    const existingRoads = getPlacementBodies();
+                    const existingRoads = getPlacementCandidatesForBody(mockRoad, 16);
                     const collisions = Query.collides(mockRoad, existingRoads);
                     if (collisions.length > 0) {
-                        const spec = pushables
+                        const spec = getPlacementCandidatesForBody(mockRoad, 40)
                             .filter(isAttachablePushable)
                             .map(candidate => getPushableAttachmentSpec(mockRoad, candidate))
                             .filter(Boolean)
@@ -3090,14 +3403,14 @@
                     }
                 } else if (conf.type === 'pushable_basket') {
                     const mockBasket = createPushableBasketBody(worldPos.x, worldPos.y, conf, ghostAngle);
-                    const existingRoads = getPlacementBodies();
+                    const existingRoads = getPlacementCandidatesForBody(mockBasket, 14);
                     if (Query.collides(mockBasket, existingRoads).length > 0) {
                         showError();
                         return;
                     }
                 } else if (isBendableRoadConfig(conf)) {
                     const mockRoad = createBendableRoadBody(worldPos.x, worldPos.y, conf, ghostAngle);
-                    const existingRoads = getPlacementBodies();
+                    const existingRoads = getPlacementCandidatesForBody(mockRoad, 16);
                     if (Query.collides(mockRoad, existingRoads).length > 0) {
                         showError();
                         return;
@@ -3106,7 +3419,7 @@
                     const mockRoad = isCircleType 
                         ? Bodies.circle(worldPos.x, worldPos.y, conf.w / 2)
                         : Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, { angle: ghostAngle });
-                    const existingRoads = getPlacementBodies();
+                    const existingRoads = getPlacementCandidatesForBody(mockRoad, 14);
                     
                     if (Query.collides(mockRoad, existingRoads).length > 0) {
                         showError(); 
@@ -3287,7 +3600,6 @@
                     const maxOffset = Math.max(40, (selectedBody.plugin.w || 100) * 0.75);
                     nextPoints[activeCurveHandleIndex].y = Math.max(-maxOffset, Math.min(maxOffset, local.y));
                     selectedBody = replaceBendableRoadBody(selectedBody, nextPoints);
-                    invalidateMinimap();
                 }
                 return;
             }
@@ -3295,7 +3607,7 @@
             if (isDraggingBody && selectedBody) {
                 const worldPos = { x: e.clientX + cameraPos.x, y: e.clientY + cameraPos.y };
                 Body.setPosition(selectedBody, worldPos);
-                invalidateMinimap();
+                syncWorldBodyRegistration(selectedBody, true);
             } else if (isCustomDrawing && customStartScreen) {
                 // 커스텀 드래그 박스 업데이트
                 const box = document.getElementById('custom-draw-box');
@@ -3426,6 +3738,7 @@
                 tryAttachPushable(selectedBody);
                 Body.setVelocity(selectedBody, { x: 0, y: 0 });
                 Body.setAngularVelocity(selectedBody, 0);
+                syncWorldBodyRegistration(selectedBody, true);
                 if (isAttachablePushable(selectedBody)) {
                     getLinkedPushableCluster(selectedBody).forEach(updateBodyOrigin);
                 } else {
@@ -3486,7 +3799,7 @@
             const factor = (dir === 'Left' || dir === 'Up') ? -1 : 1;
             const newAngle = selectedBody.angle + (amount * factor);
             Body.setAngle(selectedBody, newAngle);
-            invalidateMinimap();
+            syncWorldBodyRegistration(selectedBody, true);
             
             // 회전시켰을 때 현재 각도를 새로운 '되돌리기 기준점'으로 저장
             if (selectedBody.plugin) {
@@ -3746,6 +4059,7 @@
                     Body.setAngularVelocity(pm, 0);
                     Body.setAngle(pm, 0);
                     pm.render.opacity = 0.5;
+                    syncWorldBodyRegistration(pm, true);
                 }
             });
 
@@ -3756,6 +4070,7 @@
                     Body.setVelocity(mag, { x: 0, y: 0 });
                     Body.setAngularVelocity(mag, 0);
                     Body.setAngle(mag, 0);
+                    syncWorldBodyRegistration(mag, true);
                 }
             });
 
@@ -3778,6 +4093,7 @@
                         Sleeping.set(p, true);
                         p.render.opacity = 1.0;
                     }
+                    syncWorldBodyRegistration(p, true);
                 }
             });
 
@@ -4133,6 +4449,25 @@
         });
 
         Events.on(engine, 'afterUpdate', () => {
+            const cache = getWorldCache();
+            pushables.forEach(body => {
+                if (cache.bodyIdSet.has(body.id)) {
+                    syncWorldBodyRegistration(body);
+                }
+            });
+            magnets.forEach(body => {
+                if (body.plugin?.isAttached === false && cache.bodyIdSet.has(body.id)) {
+                    syncWorldBodyRegistration(body);
+                }
+            });
+            placedMarbles.forEach(body => {
+                if (!body.isStatic && cache.bodyIdSet.has(body.id)) {
+                    syncWorldBodyRegistration(body);
+                }
+            });
+        });
+
+        Events.on(engine, 'afterUpdate', () => {
             getWorldCache().shockAbsorbers.forEach(body => {
                 const state = ensureShockAbsorberState(body);
                 state.velocity += (state.target - state.display) * 0.22;
@@ -4351,15 +4686,19 @@
 
             // 잠자는 배치 구슬이 공중에 떠 있으면 깨우기 (밀리는 벽은 제외)
             // → 아래에 지지체가 없으면 sleeping 해제
-            const allBodies = cache.bodies;
             cache.sleepCheckBodies.forEach(b => {
                 if (!b.isSleeping) return;
                 
                 // 이 바디 아래쪽으로 짧은 거리에 다른 바디가 있는지 확인
                 const checkY = b.position.y + ((b.circleRadius || 15) + 3);
-                const pointBodies = Query.point(allBodies, { x: b.position.x, y: checkY });
-                // 자기 자신 제외, 실제 지지체가 있는지 확인
-                const supporters = pointBodies.filter(s => s !== b);
+                const supportPoint = { x: b.position.x, y: checkY };
+                const supporters = [
+                    ...getPlacementCandidatesAtPoint(supportPoint, 16),
+                    ...staticSolidSpatialIndex.queryPoint(supportPoint, 16)
+                ].filter((supporter, index, list) =>
+                    supporter !== b &&
+                    list.findIndex(candidate => candidate.id === supporter.id) === index
+                );
                 
                 if (supporters.length === 0) {
                     // 지지체가 없으면 깨우기 (공중에 떠있는 상태)
@@ -4370,8 +4709,6 @@
         });
 
         Events.on(engine, 'afterUpdate', () => {
-            const staticSolids = getWorldCache().staticSolids;
-
             getTunnelSensitiveBodies().forEach(body => {
                 const prev = body.plugin?.prevPosition;
                 if (!prev) return;
@@ -4382,6 +4719,8 @@
                 if (travel < Math.max(8, body.circleRadius * 0.75)) return;
 
                 const radius = body.circleRadius || 0;
+                const staticSolids = getStaticSolidsNearRay(prev, body.position, radius + 8);
+                if (staticSolids.length === 0) return;
                 const nx = dx / travel;
                 const ny = dy / travel;
                 const px = -ny;
