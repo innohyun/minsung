@@ -505,6 +505,7 @@
             'anti_gravity_slime': { id: 'anti_gravity_slime', name: '무중력 슬라임', w: 120, h: 30, color: '#6f7cff', restitution: 1.2, pw: 20, ph: 10, floatLaunchSpeed: 7 },
             'shock_absorber': { id: 'shock_absorber', name: '충격 흡수', w: 130, h: 26, color: '#e66a4f', restitution: 0.0, pw: 22, ph: 8, type: 'shock_absorber' },
             'sound_block': { id: 'sound_block', name: '소리 블록', w: 96, h: 24, color: '#3f8efc', restitution: 0.0, pw: 18, ph: 8, type: 'sound_block', noteKey: 'c4' },
+            'metal_cup': { id: 'metal_cup', name: '알루미늄 컵', w: 52, h: 52, color: '#b7c2cf', restitution: 0.04, pw: 14, ph: 14, type: 'metal_cup' },
             'teleport_portal': { id: 'teleport_portal', name: '순간이동', w: 56, h: 78, color: '#151923', restitution: 0.0, pw: 13, ph: 18, type: 'teleport_portal' },
             'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
             'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
@@ -535,7 +536,7 @@
             { key: 'c5', label: '높은 도', frequency: 523.25 }
         ];
         const SOUND_BLOCK_NOTE_MAP = Object.fromEntries(SOUND_BLOCK_NOTES.map(note => [note.key, note]));
-        const BENDABLE_ROAD_BASE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice']);
+        const BENDABLE_ROAD_BASE_KEYS = new Set();
 
         function isEscalatorKey(key) {
             return typeof key === 'string' && key.startsWith('escalator');
@@ -547,6 +548,10 @@
 
         function getTeleportPortalBorderRadius() {
             return '14px';
+        }
+
+        function isCircularRoadConfig(conf) {
+            return conf?.type === 'place_marble' || conf?.type === 'steel_marble' || conf?.type === 'magnet' || conf?.type === 'metal_cup';
         }
 
         function getSoundBlockNote(noteKey) {
@@ -587,6 +592,7 @@
 
         function mergeCustomRoad(docId, data) {
             if (!data || !data.baseKey) return;
+            if ((parseInt(data.curveAxisCount, 10) || 0) >= 3) return;
             const resolvedBaseKey = resolveRoadBaseKey(data.baseKey);
             if (!ROAD_LIB[resolvedBaseKey]) return;
             const base = ROAD_LIB[resolvedBaseKey];
@@ -629,7 +635,7 @@
             const slotEls = document.querySelectorAll('.road-slot');
             slots.forEach((roadId, i) => {
                 const conf = ROAD_LIB[roadId];
-                const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
+                const isCircle = isCircularRoadConfig(conf);
                 const borderR = isCircle
                     ? 'border-radius:50%;'
                     : (conf.type === 'shock_absorber'
@@ -885,7 +891,7 @@
                 const conf = ROAD_LIB[key];
                 const el = document.createElement('div');
                 el.className = 'lib-item';
-                const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
+                const isCircle = isCircularRoadConfig(conf);
                 const borderR = isCircle
                     ? 'border-radius:50%;'
                     : (conf.type === 'shock_absorber'
@@ -2158,6 +2164,30 @@
             return replacement;
         }
 
+        function createMetalCupBody(x, y, conf) {
+            return Bodies.circle(x, y, conf.w / 2, {
+                isStatic: true,
+                label: 'metal_cup',
+                friction: 0,
+                frictionStatic: 0,
+                restitution: conf.restitution,
+                render: {
+                    fillStyle: conf.color,
+                    strokeStyle: '#e7edf3',
+                    lineWidth: 2
+                },
+                plugin: {
+                    type: 'metal_cup',
+                    baseKey: resolveRoadBaseKey(conf.baseKey || conf.id),
+                    w: conf.w,
+                    h: conf.h,
+                    color: conf.color,
+                    lastSoundAt: 0
+                },
+                slop: 0
+            });
+        }
+
         function createPushableBasketBody(x, y, conf, angle) {
             const w = conf.w;
             const h = conf.h;
@@ -2281,7 +2311,7 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
-        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block', 'shock_absorber']);
+        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block', 'shock_absorber', 'metal_cup']);
 
         function isTunnelGuardSurface(body) {
             const root = getCollisionRoot(body);
@@ -2304,6 +2334,21 @@
 
         function getTunnelSurfaceNormal(body, worldPoint) {
             if (!body) return { x: 0, y: -1 };
+
+            if (body.circleRadius) {
+                let normalX = worldPoint.x - body.position.x;
+                let normalY = worldPoint.y - body.position.y;
+                let length = Math.hypot(normalX, normalY);
+                if (length < 0.001) {
+                    normalX = 0;
+                    normalY = -1;
+                    length = 1;
+                }
+                return {
+                    x: normalX / length,
+                    y: normalY / length
+                };
+            }
 
             const width = body.plugin?.w || (body.bounds.max.x - body.bounds.min.x);
             const height = body.plugin?.h || (body.bounds.max.y - body.bounds.min.y);
@@ -2338,6 +2383,7 @@
 
         let audioContext = null;
         let audioMasterGain = null;
+        let metalCupNoiseBuffer = null;
 
         function ensureAudioContext() {
             const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
@@ -2360,6 +2406,11 @@
         function isSoundBlockBody(body) {
             const root = getCollisionRoot(body);
             return root?.label === 'sound_block' || root?.plugin?.baseKey === 'sound_block' || root?.plugin?.type === 'sound_block';
+        }
+
+        function isMetalCupBody(body) {
+            const root = getCollisionRoot(body);
+            return root?.label === 'metal_cup' || root?.plugin?.baseKey === 'metal_cup' || root?.plugin?.type === 'metal_cup';
         }
 
         function isBallLikeLabel(label) {
@@ -2426,6 +2477,84 @@
             overtoneOsc.stop(now + 0.32);
         }
 
+        function getMetalCupNoiseBuffer(ctx) {
+            if (metalCupNoiseBuffer && metalCupNoiseBuffer.sampleRate === ctx.sampleRate) {
+                return metalCupNoiseBuffer;
+            }
+
+            const duration = 0.16;
+            const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate * duration), ctx.sampleRate);
+            const channel = buffer.getChannelData(0);
+            for (let i = 0; i < channel.length; i++) {
+                const decay = 1 - (i / channel.length);
+                channel[i] = (Math.random() * 2 - 1) * decay;
+            }
+            metalCupNoiseBuffer = buffer;
+            return buffer;
+        }
+
+        function playMetalCupImpactSound(block, targetBody) {
+            const ctx = ensureAudioContext();
+            if (!ctx || !audioMasterGain) return;
+
+            const radius = block?.circleRadius || (block?.plugin?.w || 52) / 2;
+            const impactSpeed = Math.max(0.25, Math.min(1, Math.hypot(targetBody?.velocity?.x || 0, targetBody?.velocity?.y || 0) / 9));
+            const baseFreq = Math.max(540, Math.min(860, 930 - radius * 6));
+            const now = ctx.currentTime;
+            const bus = ctx.createGain();
+            const highpass = ctx.createBiquadFilter();
+            const lowpass = ctx.createBiquadFilter();
+            const resonator = ctx.createBiquadFilter();
+
+            highpass.type = 'highpass';
+            highpass.frequency.setValueAtTime(380, now);
+            lowpass.type = 'lowpass';
+            lowpass.frequency.setValueAtTime(3600, now);
+            resonator.type = 'bandpass';
+            resonator.frequency.setValueAtTime(baseFreq * 1.55, now);
+            resonator.Q.setValueAtTime(1.1, now);
+
+            bus.connect(highpass);
+            highpass.connect(lowpass);
+            lowpass.connect(resonator);
+            resonator.connect(audioMasterGain);
+
+            [
+                { type: 'triangle', ratio: 1, gain: 0.12, decay: 0.34, detune: -5 },
+                { type: 'sine', ratio: 1.72, gain: 0.08, decay: 0.24, detune: 8 },
+                { type: 'sine', ratio: 2.43, gain: 0.045, decay: 0.18, detune: -9 }
+            ].forEach(partial => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = partial.type;
+                osc.frequency.setValueAtTime(baseFreq * partial.ratio, now);
+                osc.detune.setValueAtTime(partial.detune, now);
+                gain.gain.setValueAtTime(0.0001, now);
+                gain.gain.linearRampToValueAtTime(partial.gain * impactSpeed, now + 0.008);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + partial.decay);
+                osc.connect(gain);
+                gain.connect(bus);
+                osc.start(now);
+                osc.stop(now + partial.decay + 0.03);
+            });
+
+            const noise = ctx.createBufferSource();
+            const noiseFilter = ctx.createBiquadFilter();
+            const noiseGain = ctx.createGain();
+            noise.buffer = getMetalCupNoiseBuffer(ctx);
+            noiseFilter.type = 'bandpass';
+            noiseFilter.frequency.setValueAtTime(baseFreq * 3.3, now);
+            noiseFilter.Q.setValueAtTime(0.9, now);
+            noiseGain.gain.setValueAtTime(0.0001, now);
+            noiseGain.gain.linearRampToValueAtTime(0.05 * impactSpeed, now + 0.004);
+            noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.11);
+            noise.connect(noiseFilter);
+            noiseFilter.connect(noiseGain);
+            noiseGain.connect(bus);
+            noise.start(now);
+            noise.stop(now + 0.12);
+        }
+
         function applySoundBlockImpact(block, targetBody, pair) {
             if (!block || !targetBody || targetBody.isStatic || targetBody.isSensor) return;
 
@@ -2440,6 +2569,22 @@
                 y: tangentY * tangentSpeed * 0.72 + normalY * bounceSpeed
             });
             Body.setAngularVelocity(targetBody, targetBody.angularVelocity * 0.45);
+        }
+
+        function applyMetalCupImpact(block, targetBody, pair) {
+            if (!block || !targetBody || targetBody.isStatic || targetBody.isSensor) return;
+
+            const { normalX, normalY } = getEscalatorContactData(pair, targetBody, block);
+            const tangentX = -normalY;
+            const tangentY = normalX;
+            const tangentSpeed = targetBody.velocity.x * tangentX + targetBody.velocity.y * tangentY;
+            const bounceSpeed = Math.max(2.3, Math.min(4.1, Math.hypot(targetBody.velocity.x, targetBody.velocity.y) * 0.42 + 1.5));
+
+            Body.setVelocity(targetBody, {
+                x: tangentX * tangentSpeed * 0.84 + normalX * bounceSpeed,
+                y: tangentY * tangentSpeed * 0.84 + normalY * bounceSpeed
+            });
+            Body.setAngularVelocity(targetBody, targetBody.angularVelocity * 0.72);
         }
 
         function applySlimeBounce(marbleBody, slimeBody, pair) {
@@ -3374,7 +3519,7 @@
 
         function updateGhostStyle() {
             const conf = ROAD_LIB[slots[currentSlotIndex]];
-            const isCircle = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
+            const isCircle = isCircularRoadConfig(conf);
             ghost.style.width = conf.w + 'px';
             ghost.style.height = conf.h + 'px';
             ghost.style.background = conf.color;
@@ -3449,7 +3594,7 @@
                 const box = document.getElementById('custom-draw-box');
                 // 원형 타입인지 확인
                 const baseConf = ROAD_LIB[customBaseKey];
-                const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
+                const isCircleBase = isCircularRoadConfig(baseConf);
                 box.style.borderRadius = isCircleBase
                     ? '50%'
                     : (baseConf?.type === 'shock_absorber'
@@ -3471,7 +3616,7 @@
                 container.style.cursor = 'move';
             } else {
                 const conf = ROAD_LIB[slots[currentSlotIndex]];
-                const isCircleType = conf.type === 'place_marble' || conf.type === 'steel_marble' || conf.type === 'magnet';
+                const isCircleType = isCircularRoadConfig(conf);
                 
                 // 자석: 다른 자석과는 겹칠 수 없지만 일반 길 위에는 겹쳐 놓을 수 있음
                 if (conf.type === 'magnet') {
@@ -3620,6 +3765,8 @@
                     newBody = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else if (conf.type === 'teleport_portal') {
                     newBody = createTeleportPortalBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                } else if (conf.type === 'metal_cup') {
+                    newBody = createMetalCupBody(worldPos.x, worldPos.y, conf);
                 } else {
                     // 일반 블록
                     const behaviorKey = resolveRoadBaseKey(conf.baseKey || conf.id);
@@ -3729,7 +3876,7 @@
                 // 커스텀 드래그 박스 업데이트
                 const box = document.getElementById('custom-draw-box');
                 const baseConf = ROAD_LIB[customBaseKey];
-                const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
+                const isCircleBase = isCircularRoadConfig(baseConf);
                 const isEscalatorBase = isEscalatorKey(resolveRoadBaseKey(baseConf?.baseKey || customBaseKey));
                 const isShockAbsorberBase = baseConf?.type === 'shock_absorber';
                 
@@ -3809,7 +3956,7 @@
                 box.style.borderRadius = '0';
                 
                 const baseConf = ROAD_LIB[customBaseKey];
-                const isCircleBase = baseConf && (baseConf.type === 'place_marble' || baseConf.type === 'magnet');
+                const isCircleBase = isCircularRoadConfig(baseConf);
                 const isEscalatorBase = isEscalatorKey(resolveRoadBaseKey(baseConf?.baseKey || customBaseKey));
                 
                 if (isCircleBase) {
@@ -4427,6 +4574,18 @@
                         playSoundBlockNote(soundBlock);
                     }
                     applySoundBlockImpact(soundBlock, soundTarget, pair);
+                }
+
+                const metalCup = isMetalCupBody(rootA) ? rootA : (isMetalCupBody(rootB) ? rootB : null);
+                const metalCupTarget = metalCup ? ((isBallLabel(rootA.label) ? rootA : (isBallLabel(rootB.label) ? rootB : null))) : null;
+                if (metalCup && metalCupTarget && !metalCupTarget.isStatic) {
+                    const now = performance.now();
+                    metalCup.plugin = metalCup.plugin || {};
+                    if (!metalCup.plugin.lastSoundAt || now - metalCup.plugin.lastSoundAt > 110) {
+                        metalCup.plugin.lastSoundAt = now;
+                        playMetalCupImpactSound(metalCup, metalCupTarget);
+                    }
+                    applyMetalCupImpact(metalCup, metalCupTarget, pair);
                 }
 
                 [rootA, rootB].forEach(b => {
