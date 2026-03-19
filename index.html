@@ -1871,8 +1871,6 @@
                 const point = samples[i];
                 frames.push({
                     point,
-                    tangent: { x: tangentX, y: tangentY },
-                    normal: { x: normalX, y: normalY },
                     left: {
                         x: point.x + normalX * halfThickness,
                         y: point.y + normalY * halfThickness
@@ -1901,111 +1899,19 @@
                 const overlap = i === 1 || i === samples.length - 1
                     ? 2
                     : Math.max(4, thickness * 0.9);
-                const partLength = length + overlap;
-                const chamferRadius = Math.max(2, Math.min(thickness * 0.48, partLength * 0.28));
                 parts.push(Bodies.rectangle(
                     (a.x + b.x) / 2,
                     (a.y + b.y) / 2,
-                    partLength,
+                    length + overlap,
                     thickness,
                     {
                         ...common,
-                        angle: Math.atan2(dy, dx),
-                        chamfer: { radius: chamferRadius }
+                        angle: Math.atan2(dy, dx)
                     }
                 ));
             }
 
             return parts;
-        }
-
-        function getBendableRoadFrames(body) {
-            if (!isBendableRoadBody(body)) return [];
-            const controlPoints = body.plugin?.controlPoints || [];
-            const thickness = body.plugin?.h || 15;
-            const cached = body.plugin?.curveFrames;
-            if (cached && body.plugin?.curveFrameThickness === thickness && body.plugin?.curveFramePointCount === controlPoints.length) {
-                return cached;
-            }
-            const frames = getCurveRoadFrames(controlPoints, thickness);
-            body.plugin.curveFrames = frames;
-            body.plugin.curveFrameThickness = thickness;
-            body.plugin.curveFramePointCount = controlPoints.length;
-            return frames;
-        }
-
-        function rotateBodyVectorToWorld(body, vector) {
-            const cos = Math.cos(body.angle);
-            const sin = Math.sin(body.angle);
-            return {
-                x: vector.x * cos - vector.y * sin,
-                y: vector.x * sin + vector.y * cos
-            };
-        }
-
-        function getBendableRoadSurfaceInfo(body, worldPoint) {
-            if (!isBendableRoadBody(body)) return null;
-
-            const frames = getBendableRoadFrames(body);
-            if (frames.length < 2) return null;
-
-            const localPoint = worldToBodyLocal(body, worldPoint);
-            let best = null;
-
-            for (let i = 1; i < frames.length; i++) {
-                const start = frames[i - 1].point;
-                const end = frames[i].point;
-                const segX = end.x - start.x;
-                const segY = end.y - start.y;
-                const segLenSq = segX * segX + segY * segY;
-                if (segLenSq < 0.0001) continue;
-
-                const segLen = Math.sqrt(segLenSq);
-                const tangentX = segX / segLen;
-                const tangentY = segY / segLen;
-                const clampedT = Math.max(0, Math.min(1, (
-                    ((localPoint.x - start.x) * segX) + ((localPoint.y - start.y) * segY)
-                ) / segLenSq));
-                const center = {
-                    x: start.x + segX * clampedT,
-                    y: start.y + segY * clampedT
-                };
-                const offsetX = localPoint.x - center.x;
-                const offsetY = localPoint.y - center.y;
-                const normalX = -tangentY;
-                const normalY = tangentX;
-                const signedDistance = (offsetX * normalX) + (offsetY * normalY);
-                const distanceSq = offsetX * offsetX + offsetY * offsetY;
-
-                if (!best || distanceSq < best.distanceSq) {
-                    best = {
-                        center,
-                        tangent: { x: tangentX, y: tangentY },
-                        normal: { x: normalX, y: normalY },
-                        signedDistance,
-                        distanceSq
-                    };
-                }
-            }
-
-            if (!best) return null;
-
-            if (best.signedDistance < 0) {
-                best.normal.x *= -1;
-                best.normal.y *= -1;
-                best.signedDistance *= -1;
-            }
-
-            return {
-                centerLocal: best.center,
-                centerWorld: bodyLocalToWorld(body, best.center),
-                tangentLocal: best.tangent,
-                tangentWorld: rotateBodyVectorToWorld(body, best.tangent),
-                normalLocal: best.normal,
-                normalWorld: rotateBodyVectorToWorld(body, best.normal),
-                surfaceDistance: best.signedDistance,
-                halfThickness: Math.max(2, (body.plugin?.h || 15) / 2)
-            };
         }
 
         function createBendableRoadBody(x, y, conf, angle = 0, controlPointsInput = null) {
@@ -2042,9 +1948,6 @@
                         h: conf.h,
                         curveAxisCount: axisCount,
                         controlPoints,
-                        curveFrames: getCurveRoadFrames(controlPoints, conf.h),
-                        curveFrameThickness: conf.h,
-                        curveFramePointCount: controlPoints.length,
                         originX: x,
                         originY: y,
                         originAngle: angle
@@ -2067,10 +1970,7 @@
                     w: conf.w,
                     h: conf.h,
                     curveAxisCount: axisCount,
-                    controlPoints,
-                    curveFrames: [],
-                    curveFrameThickness: conf.h,
-                    curveFramePointCount: controlPoints.length
+                    controlPoints
                 }
             });
 
@@ -2091,9 +1991,6 @@
             body.plugin.originX = body.position.x;
             body.plugin.originY = body.position.y;
             body.plugin.originAngle = body.angle;
-            body.plugin.curveFrames = getCurveRoadFrames(body.plugin.controlPoints, body.plugin.h);
-            body.plugin.curveFrameThickness = body.plugin.h;
-            body.plugin.curveFramePointCount = body.plugin.controlPoints.length;
             return body;
         }
 
@@ -2276,7 +2173,6 @@
             if (root.label === 'slime') return false;
             if (root.label === 'anti_gravity_slime') return false;
             if (root.plugin?.type === 'goal_box' || root.plugin?.type === 'pushable') return false;
-            if (root.plugin?.type === 'bendable_road') return true;
             if (root.label && isEscalatorKey(root.label)) return false;
             const surfaceKey = root.plugin?.baseKey || root.label;
             return TUNNEL_GUARD_SURFACE_KEYS.has(surfaceKey);
@@ -2291,10 +2187,6 @@
 
         function getTunnelSurfaceNormal(body, worldPoint) {
             if (!body) return { x: 0, y: -1 };
-            if (isBendableRoadBody(body)) {
-                const surfaceInfo = getBendableRoadSurfaceInfo(body, worldPoint);
-                if (surfaceInfo) return surfaceInfo.normalWorld;
-            }
 
             const width = body.plugin?.w || (body.bounds.max.x - body.bounds.min.x);
             const height = body.plugin?.h || (body.bounds.max.y - body.bounds.min.y);
@@ -2485,50 +2377,6 @@
             setBallGravitySuppressed(marbleBody, true);
         }
 
-        function stabilizeBallOnBendableRoad(ballBody, roadBody, pair) {
-            if (!ballBody || !roadBody || ballBody.isSensor || ballBody.isStatic) return;
-
-            const support = getSupportCenter(pair?.collision?.supports, ballBody.position);
-            const surfaceInfo = getBendableRoadSurfaceInfo(roadBody, support);
-            if (!surfaceInfo) return;
-
-            const radius = ballBody.circleRadius || 0;
-            const tangent = surfaceInfo.tangentWorld;
-            const normal = surfaceInfo.normalWorld;
-            const tangentSpeed = (ballBody.velocity.x * tangent.x) + (ballBody.velocity.y * tangent.y);
-            const normalSpeed = (ballBody.velocity.x * normal.x) + (ballBody.velocity.y * normal.y);
-            const tangentAbs = Math.abs(tangentSpeed);
-            const targetDistance = surfaceInfo.halfThickness + radius + 0.45;
-            const correction = targetDistance - surfaceInfo.surfaceDistance;
-            const shouldCorrectPosition = correction > 0.1 && correction < (radius + surfaceInfo.halfThickness + 8);
-
-            if (shouldCorrectPosition) {
-                if (ballBody.isSleeping) {
-                    Sleeping.set(ballBody, false);
-                }
-                Body.setPosition(ballBody, {
-                    x: ballBody.position.x + normal.x * correction,
-                    y: ballBody.position.y + normal.y * correction
-                });
-            }
-
-            // 곡선 세그먼트 이음매에서 생기는 과도한 바깥 방향 속도를 눌러서,
-            // 구슬이 중간에 튕겨 나가는 현상을 줄인다.
-            if (tangentAbs < 0.35 && normalSpeed <= 1.5 && !shouldCorrectPosition) return;
-
-            const clampedNormalSpeed = Math.min(
-                Math.max(normalSpeed, 0),
-                Math.max(0.35, tangentAbs * 0.12)
-            );
-
-            if (Math.abs(clampedNormalSpeed - normalSpeed) < 0.01) return;
-
-            Body.setVelocity(ballBody, {
-                x: tangent.x * tangentSpeed + normal.x * clampedNormalSpeed,
-                y: tangent.y * tangentSpeed + normal.y * clampedNormalSpeed
-            });
-        }
-
         function updateBodyOrigin(body) {
             if (!body?.plugin) return;
             body.plugin.originX = body.position.x;
@@ -2681,7 +2529,7 @@
 
         function drawBendableRoadBody(ctx, body, isSelected = false) {
             if (!isBendableRoadBody(body)) return;
-            const frames = getBendableRoadFrames(body);
+            const frames = getCurveRoadFrames(body.plugin.controlPoints || [], body.plugin.h || 15);
             if (frames.length < 2) return;
 
             ctx.save();
@@ -4528,14 +4376,6 @@
                     (isMarbleLabel(rootB.label) || rootB.plugin?.type === 'pushable') ? rootB : null
                 );
                 const theEscalator = (rootA.label && rootA.label.startsWith('escalator')) ? rootA : ((rootB.label && rootB.label.startsWith('escalator')) ? rootB : null);
-                const bendableRoad = isBendableRoadBody(rootA) ? rootA : (isBendableRoadBody(rootB) ? rootB : null);
-                const bendableBall = bendableRoad
-                    ? (isBallLikeLabel(rootA.label) ? rootA : (isBallLikeLabel(rootB.label) ? rootB : null))
-                    : null;
-
-                if (bendableRoad && bendableBall) {
-                    stabilizeBallOnBendableRoad(bendableBall, bendableRoad, pair);
-                }
 
                 if (theEscalatorTarget && theEscalator && theEscalator.plugin?.isActivated) {
                     const angle = theEscalator.angle;
