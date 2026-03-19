@@ -1844,6 +1844,8 @@
             return points;
         }
 
+        const BENDABLE_ROAD_PHYSICS_SAMPLES = 18;
+
         function getCurveRoadFrames(controlPoints, thickness) {
             const samples = sampleCurveRoadPoints(controlPoints);
             if (samples.length < 2) return [];
@@ -1886,7 +1888,7 @@
         }
 
         function buildCurveRoadParts(controlPoints, thickness, common) {
-            const samples = sampleCurveRoadPoints(controlPoints, 18);
+            const samples = sampleCurveRoadPoints(controlPoints, BENDABLE_ROAD_PHYSICS_SAMPLES);
             const parts = [];
             const halfThickness = Math.max(2, thickness / 2);
             const segmentOverlap = Math.max(1.5, thickness * 0.2);
@@ -1918,6 +1920,115 @@
             }
 
             return parts;
+        }
+
+        function getBendableRoadCollisionSamples(body) {
+            if (!isBendableRoadBody(body)) return [];
+            body.plugin = body.plugin || {};
+            const controlPoints = body.plugin.controlPoints || [];
+            const thickness = body.plugin.h || 15;
+            if (
+                body.plugin.collisionSamples &&
+                body.plugin.collisionSamplesPointCount === controlPoints.length &&
+                body.plugin.collisionSamplesThickness === thickness
+            ) {
+                return body.plugin.collisionSamples;
+            }
+
+            const samples = sampleCurveRoadPoints(controlPoints, BENDABLE_ROAD_PHYSICS_SAMPLES);
+            body.plugin.collisionSamples = samples;
+            body.plugin.collisionSamplesPointCount = controlPoints.length;
+            body.plugin.collisionSamplesThickness = thickness;
+            return samples;
+        }
+
+        function rotateBodyVectorToWorld(body, vector) {
+            const cos = Math.cos(body.angle);
+            const sin = Math.sin(body.angle);
+            return {
+                x: vector.x * cos - vector.y * sin,
+                y: vector.x * sin + vector.y * cos
+            };
+        }
+
+        function getBendableRoadSurfaceInfo(body, worldPoint) {
+            if (!isBendableRoadBody(body)) return null;
+
+            const samples = getBendableRoadCollisionSamples(body);
+            if (samples.length < 2) return null;
+
+            const localPoint = worldToBodyLocal(body, worldPoint);
+            let best = null;
+
+            for (let i = 1; i < samples.length; i++) {
+                const start = samples[i - 1];
+                const end = samples[i];
+                const segX = end.x - start.x;
+                const segY = end.y - start.y;
+                const segLengthSq = segX * segX + segY * segY;
+                if (segLengthSq < 0.0001) continue;
+
+                const projection = Math.max(0, Math.min(1, (
+                    ((localPoint.x - start.x) * segX) + ((localPoint.y - start.y) * segY)
+                ) / segLengthSq));
+                const centerX = start.x + segX * projection;
+                const centerY = start.y + segY * projection;
+                const diffX = localPoint.x - centerX;
+                const diffY = localPoint.y - centerY;
+                const distanceSq = diffX * diffX + diffY * diffY;
+
+                if (!best || distanceSq < best.distanceSq) {
+                    const segLength = Math.sqrt(segLengthSq);
+                    best = {
+                        center: { x: centerX, y: centerY },
+                        tangent: { x: segX / segLength, y: segY / segLength },
+                        distanceSq
+                    };
+                }
+            }
+
+            if (!best) return null;
+
+            let normal = {
+                x: -best.tangent.y,
+                y: best.tangent.x
+            };
+            const toPoint = {
+                x: localPoint.x - best.center.x,
+                y: localPoint.y - best.center.y
+            };
+            if ((normal.x * toPoint.x) + (normal.y * toPoint.y) < 0) {
+                normal = { x: -normal.x, y: -normal.y };
+            }
+
+            return {
+                tangentWorld: rotateBodyVectorToWorld(body, best.tangent),
+                normalWorld: rotateBodyVectorToWorld(body, normal)
+            };
+        }
+
+        function softenBounceOnBendableRoad(ballBody, roadBody, pair) {
+            if (!ballBody || !roadBody || ballBody.isStatic || ballBody.isSensor) return;
+
+            const support = getSupportCenter(pair.collision?.supports, ballBody.position);
+            const surfaceInfo = getBendableRoadSurfaceInfo(roadBody, support);
+            if (!surfaceInfo) return;
+
+            const tangent = surfaceInfo.tangentWorld;
+            const normal = surfaceInfo.normalWorld;
+            if (normal.y > 0.25) return;
+
+            const tangentSpeed = (ballBody.velocity.x * tangent.x) + (ballBody.velocity.y * tangent.y);
+            const normalSpeed = (ballBody.velocity.x * normal.x) + (ballBody.velocity.y * normal.y);
+            if (normalSpeed <= 0.04) return;
+
+            const allowedNormalSpeed = Math.max(0.02, Math.abs(tangentSpeed) * 0.035);
+            if (normalSpeed <= allowedNormalSpeed) return;
+
+            Body.setVelocity(ballBody, {
+                x: tangent.x * tangentSpeed + normal.x * allowedNormalSpeed,
+                y: tangent.y * tangentSpeed + normal.y * allowedNormalSpeed
+            });
         }
 
         function createBendableRoadBody(x, y, conf, angle = 0, controlPointsInput = null) {
@@ -4376,12 +4487,20 @@
                 const rootA = getCollisionRoot(bodyA);
                 const rootB = getCollisionRoot(bodyB);
                 const isMarbleLabel = l => l === 'marble' || l === 'steel_marble';
+                const bendableRoad = isBendableRoadBody(rootA) ? rootA : (isBendableRoadBody(rootB) ? rootB : null);
+                const bendableBall = bendableRoad
+                    ? (isBallLikeLabel(rootA.label) ? rootA : (isBallLikeLabel(rootB.label) ? rootB : null))
+                    : null;
                 const theEscalatorTarget = (
                     isMarbleLabel(rootA.label) || rootA.plugin?.type === 'pushable'
                 ) ? rootA : (
                     (isMarbleLabel(rootB.label) || rootB.plugin?.type === 'pushable') ? rootB : null
                 );
                 const theEscalator = (rootA.label && rootA.label.startsWith('escalator')) ? rootA : ((rootB.label && rootB.label.startsWith('escalator')) ? rootB : null);
+
+                if (bendableRoad && bendableBall) {
+                    softenBounceOnBendableRoad(bendableBall, bendableRoad, pair);
+                }
 
                 if (theEscalatorTarget && theEscalator && theEscalator.plugin?.isActivated) {
                     const angle = theEscalator.angle;
