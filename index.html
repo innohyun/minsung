@@ -506,7 +506,7 @@
             'shock_absorber': { id: 'shock_absorber', name: '충격 흡수', w: 130, h: 26, color: '#e66a4f', restitution: 0.0, pw: 22, ph: 8, type: 'shock_absorber' },
             'sound_block': { id: 'sound_block', name: '소리 블록', w: 96, h: 24, color: '#3f8efc', restitution: 0.0, pw: 18, ph: 8, type: 'sound_block', noteKey: 'c4' },
             'metal_cup': { id: 'metal_cup', name: '알루미늄 컵', w: 52, h: 52, color: '#b7c2cf', restitution: 0.04, pw: 14, ph: 14, type: 'metal_cup' },
-            'teleport_portal': { id: 'teleport_portal', name: '순간이동', w: 56, h: 78, color: '#151923', restitution: 0.0, pw: 13, ph: 18, type: 'teleport_portal' },
+            'teleport_portal': { id: 'teleport_portal', name: '순간이동', w: 56, h: 78, color: '#f4cf3a', restitution: 0.0, pw: 13, ph: 18, type: 'teleport_portal' },
             'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
             'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
             'escalator_l_l': { id: 'escalator_l_l', name: '에스컬[←긺]', w: 200, h: 20, color: '#e0a030', restitution: 0.0, pw: 30, ph: 5 },
@@ -547,7 +547,7 @@
         }
 
         function getTeleportPortalBorderRadius() {
-            return '14px';
+            return '50%';
         }
 
         function isCircularRoadConfig(conf) {
@@ -596,11 +596,13 @@
             const resolvedBaseKey = resolveRoadBaseKey(data.baseKey);
             if (!ROAD_LIB[resolvedBaseKey]) return;
             const base = ROAD_LIB[resolvedBaseKey];
+            const mergedColor = resolvedBaseKey === 'teleport_portal' ? base.color : (data.color || base.color);
             ROAD_LIB[docId] = {
                 ...base,
                 ...data,
                 id: docId,
                 baseKey: resolvedBaseKey,
+                color: mergedColor,
                 w: Number(data.w) || base.w,
                 h: Number(data.h) || base.h,
                 pw: Number(data.pw) || Math.min(30, Math.round((Number(data.w) || base.w) / 5)),
@@ -1650,31 +1652,8 @@
                 clearTimeout(teleportFadeHideTimer);
                 teleportFadeHideTimer = null;
             }
-
-            if (active) {
-                teleportFade.style.display = 'block';
-                if (immediate) {
-                    teleportFade.style.opacity = '1';
-                } else {
-                    requestAnimationFrame(() => {
-                        teleportFade.style.opacity = '1';
-                    });
-                }
-                return;
-            }
-
             teleportFade.style.opacity = '0';
-            if (immediate) {
-                teleportFade.style.display = 'none';
-                return;
-            }
-
-            teleportFadeHideTimer = setTimeout(() => {
-                if (teleportTimeouts.size === 0) {
-                    teleportFade.style.display = 'none';
-                }
-                teleportFadeHideTimer = null;
-            }, 300);
+            teleportFade.style.display = 'none';
         }
 
         function isTeleportPortalBody(body) {
@@ -1691,6 +1670,29 @@
             const groupId = body.plugin?.teleportGroupId;
             if (!groupId) return null;
             return getTeleportPortals().find(other => other !== body && other.plugin?.teleportGroupId === groupId) || null;
+        }
+
+        function canEnterTeleportPortal(body, portal, pair) {
+            if (!body || !portal || body.isStatic || body.isSensor || !isTeleportPortalBody(portal)) return false;
+
+            const radius = body.circleRadius || 15;
+            const entryPoint = getSupportCenter(pair?.collision?.supports, body.position);
+            const localPoint = worldToBodyLocal(portal, entryPoint);
+            const localVelocity = rotateWorldVectorToBody(portal, body.velocity || { x: 0, y: 0 });
+            const width = portal.plugin?.w || 56;
+            const height = portal.plugin?.h || 78;
+            const mouthHalfWidth = width * 0.34 + radius * 0.32;
+            const frontMinY = -(height * 0.62 + radius);
+            const frontMaxY = height * 0.16 + radius * 0.25;
+            const inwardSpeed = localVelocity.y;
+            const lateralSpeed = Math.abs(localVelocity.x);
+
+            return (
+                Math.abs(localPoint.x) <= mouthHalfWidth &&
+                localPoint.y >= frontMinY &&
+                localPoint.y <= frontMaxY &&
+                inwardSpeed > Math.max(0.05, lateralSpeed * 0.12)
+            );
         }
 
         function assignTeleportGroup(body) {
@@ -2943,36 +2945,53 @@
             const partner = getTeleportPartner(body);
             const w = body.plugin?.w || 56;
             const h = body.plugin?.h || 78;
-            const outerRadius = Math.max(8, Math.min(w, h) * 0.18);
-            const innerW = Math.max(14, w * 0.46);
-            const innerH = Math.max(24, h * 0.7);
+            const mouthHalfAngle = 0.52;
             const groupLabel = body.plugin?.teleportGroupId || '?';
-            const accent = partner ? '#7c3aed' : '#6b7280';
+            const bodyColor = partner ? (body.plugin?.color || '#f4cf3a') : mixColor(body.plugin?.color || '#f4cf3a', '#9ca3af', 0.45);
+            const accent = isSelected ? '#ffffff' : (partner ? '#f97316' : '#6b7280');
+            const eyeRadius = Math.max(3, Math.min(w, h) * 0.07);
+            const badgeRadius = Math.max(9, Math.min(w, h) * 0.17);
 
             ctx.save();
             ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
             ctx.rotate(body.angle);
 
-            ctx.fillStyle = '#171b26';
-            ctx.strokeStyle = isSelected ? '#ffffff' : accent;
+            const fill = ctx.createRadialGradient(-w * 0.16, -h * 0.26, 2, 0, 0, Math.max(w, h) * 0.72);
+            fill.addColorStop(0, mixColor(bodyColor, '#fff7c2', 0.42));
+            fill.addColorStop(0.58, bodyColor);
+            fill.addColorStop(1, mixColor(bodyColor, '#7c4a02', 0.3));
+
+            ctx.fillStyle = fill;
+            ctx.strokeStyle = accent;
             ctx.lineWidth = isSelected ? 3 : 2;
-            addRoundedRectPath(ctx, w, h, outerRadius);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.ellipse(0, 0, w / 2, h / 2, 0, -Math.PI / 2 + mouthHalfAngle, Math.PI * 1.5 - mouthHalfAngle);
+            ctx.closePath();
             ctx.fill();
             ctx.stroke();
 
-            ctx.fillStyle = partner ? 'rgba(76,29,149,0.9)' : 'rgba(31,41,55,0.8)';
-            addRoundedRectPath(ctx, innerW, innerH, Math.max(10, innerW * 0.45));
+            ctx.strokeStyle = partner ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.35)';
+            ctx.lineWidth = 1.6;
+            ctx.beginPath();
+            ctx.arc(0, 0, Math.max(8, Math.min(w, h) * 0.22), -Math.PI / 2 + mouthHalfAngle + 0.18, Math.PI * 1.5 - mouthHalfAngle - 0.18);
+            ctx.stroke();
+
+            ctx.fillStyle = '#111827';
+            ctx.beginPath();
+            ctx.arc(-w * 0.12, -h * 0.18, eyeRadius, 0, Math.PI * 2);
             ctx.fill();
 
-            ctx.strokeStyle = partner ? 'rgba(196,181,253,0.9)' : 'rgba(156,163,175,0.6)';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+            ctx.fillStyle = partner ? '#111827' : '#4b5563';
+            ctx.beginPath();
+            ctx.arc(0, h * 0.24, badgeRadius, 0, Math.PI * 2);
+            ctx.fill();
 
             ctx.fillStyle = '#f8fafc';
             ctx.font = `700 ${Math.max(11, Math.min(18, w * 0.24))}px Inter`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(String(groupLabel), 0, -h * 0.34);
+            ctx.fillText(String(groupLabel), 0, h * 0.24);
 
             ctx.restore();
         }
@@ -3070,12 +3089,13 @@
             Body.setAngularVelocity(body, 0);
         }
 
-        function startTeleportTransition(body, sourcePortal) {
+        function startTeleportTransition(body, sourcePortal, pair = null) {
             if (!body || !sourcePortal || body.isStatic || body.isSensor || !isTeleportPortalBody(sourcePortal)) return;
             body.plugin = body.plugin || {};
 
             if (body.plugin.teleportPending) return;
             if ((body.plugin.teleportCooldownUntil || 0) > engine.timing.timestamp) return;
+            if (!canEnterTeleportPortal(body, sourcePortal, pair)) return;
 
             const partner = getTeleportPartner(sourcePortal);
             if (!partner) return;
@@ -4544,7 +4564,7 @@
                 }
 
                 if (teleportPortal && teleportTarget) {
-                    startTeleportTransition(teleportTarget, teleportPortal);
+                    startTeleportTransition(teleportTarget, teleportPortal, pair);
                 }
 
                 if (goalSensor && countedMarble) {
@@ -4656,9 +4676,17 @@
                     (isMarbleLabel(rootB.label) || rootB.plugin?.type === 'pushable') ? rootB : null
                 );
                 const theEscalator = (rootA.label && rootA.label.startsWith('escalator')) ? rootA : ((rootB.label && rootB.label.startsWith('escalator')) ? rootB : null);
+                const teleportPortal = isTeleportPortalBody(rootA) ? rootA : (isTeleportPortalBody(rootB) ? rootB : null);
+                const teleportTarget = teleportPortal
+                    ? ((isBallLikeLabel(rootA.label) && !rootA.isStatic) ? rootA : (((isBallLikeLabel(rootB.label) && !rootB.isStatic) ? rootB : null)))
+                    : null;
 
                 if (bendableRoad && bendableBall) {
                     softenBounceOnBendableRoad(bendableBall, bendableRoad, pair);
+                }
+
+                if (teleportPortal && teleportTarget) {
+                    startTeleportTransition(teleportTarget, teleportPortal, pair);
                 }
 
                 if (theEscalatorTarget && theEscalator && theEscalator.plugin?.isActivated) {
