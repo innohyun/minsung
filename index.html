@@ -1890,7 +1890,7 @@
             const parts = [];
             const halfThickness = Math.max(2, thickness / 2);
             const segmentOverlap = Math.max(1.5, thickness * 0.2);
-            const jointRadius = Math.max(2, halfThickness * 0.98);
+            const edgeRadius = Math.max(2, halfThickness * 0.98);
 
             for (let i = 1; i < samples.length; i++) {
                 const a = samples[i - 1];
@@ -1903,7 +1903,7 @@
                     ? segmentOverlap
                     : segmentOverlap * 1.2;
                 const partLength = length + overlap;
-                const chamferRadius = Math.max(1.5, Math.min(jointRadius, partLength * 0.24));
+                const chamferRadius = Math.max(1.5, Math.min(edgeRadius, partLength * 0.24));
                 parts.push(Bodies.rectangle(
                     (a.x + b.x) / 2,
                     (a.y + b.y) / 2,
@@ -1915,15 +1915,6 @@
                         chamfer: { radius: chamferRadius }
                     }
                 ));
-            }
-
-            // Segment joints are the main source of bounce on bendable roads.
-            // Add round join caps so marbles hit a continuous surface instead of sharp seams.
-            for (let i = 1; i < samples.length - 1; i++) {
-                const point = samples[i];
-                parts.push(Bodies.circle(point.x, point.y, jointRadius, {
-                    ...common
-                }));
             }
 
             return parts;
