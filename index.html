@@ -1811,9 +1811,13 @@
             const pocketWidth = 36;
             const pocketHeight = 52;
             const pocketHalfWidth = pocketWidth / 2;
-            const pocketTopY = -radius - 2;
-            const pocketBottomY = Math.min(radius - wallThickness, pocketTopY + pocketHeight);
-            const sliceHeight = Math.max(5, Math.round(radius / 14));
+            const pocketOpenTopY = -radius - 2;
+            const pocketWallTopY = -Math.sqrt(Math.max(0, radius * radius - pocketHalfWidth * pocketHalfWidth));
+            const pocketBottomY = Math.min(radius - wallThickness, pocketWallTopY + pocketHeight);
+            const mouthHalfAngle = Math.max(0.28, Math.asin(Math.min(0.94, (pocketHalfWidth + wallThickness * 0.3) / radius)));
+            const segmentCount = 30;
+            const centerRadius = radius - wallThickness / 2;
+            const segmentLength = Math.max(18, (Math.PI * 2 * centerRadius / segmentCount) * 1.08);
             const common = {
                 isStatic: true,
                 friction: 0,
@@ -1824,42 +1828,54 @@
             };
             const parts = [];
 
-            for (let localY = -radius + sliceHeight / 2; localY <= radius - sliceHeight / 2 + 0.001; localY += sliceHeight) {
-                const halfSpan = Math.sqrt(Math.max(0, radius * radius - localY * localY));
-                const isHoleRow = localY >= pocketTopY && localY <= pocketBottomY;
-                if (!isHoleRow) {
-                    parts.push(Bodies.rectangle(
-                        0,
-                        localY,
-                        halfSpan * 2,
-                        sliceHeight + 0.8,
-                        common
-                    ));
-                    continue;
-                }
-
-                const leftWidth = halfSpan - pocketHalfWidth;
-                if (leftWidth > 2) {
-                    parts.push(Bodies.rectangle(
-                        -(pocketHalfWidth + leftWidth / 2),
-                        localY,
-                        leftWidth,
-                        sliceHeight + 0.8,
-                        common
-                    ));
-                }
-
-                const rightWidth = halfSpan - pocketHalfWidth;
-                if (rightWidth > 2) {
-                    parts.push(Bodies.rectangle(
-                        pocketHalfWidth + rightWidth / 2,
-                        localY,
-                        rightWidth,
-                        sliceHeight + 0.8,
-                        common
-                    ));
-                }
+            for (let index = 0; index < segmentCount; index++) {
+                const ringAngle = (-Math.PI) + (Math.PI * 2 * index / segmentCount);
+                const distanceFromMouth = Math.abs(Math.atan2(Math.sin(ringAngle + Math.PI / 2), Math.cos(ringAngle + Math.PI / 2)));
+                if (distanceFromMouth <= mouthHalfAngle + 0.08) continue;
+                parts.push(Bodies.rectangle(
+                    Math.cos(ringAngle) * centerRadius,
+                    Math.sin(ringAngle) * centerRadius,
+                    segmentLength,
+                    wallThickness,
+                    {
+                        ...common,
+                        angle: ringAngle + Math.PI / 2,
+                        chamfer: { radius: Math.max(3, wallThickness * 0.24) }
+                    }
+                ));
             }
+
+            const sideWallHeight = Math.max(8, pocketBottomY - pocketWallTopY);
+            parts.push(Bodies.rectangle(
+                -(pocketHalfWidth + wallThickness / 2),
+                pocketWallTopY + sideWallHeight / 2,
+                wallThickness,
+                sideWallHeight,
+                {
+                    ...common,
+                    chamfer: { radius: Math.max(2, wallThickness * 0.18) }
+                }
+            ));
+            parts.push(Bodies.rectangle(
+                pocketHalfWidth + wallThickness / 2,
+                pocketWallTopY + sideWallHeight / 2,
+                wallThickness,
+                sideWallHeight,
+                {
+                    ...common,
+                    chamfer: { radius: Math.max(2, wallThickness * 0.18) }
+                }
+            ));
+            parts.push(Bodies.rectangle(
+                0,
+                pocketBottomY + wallThickness / 2,
+                pocketWidth + wallThickness * 2,
+                wallThickness,
+                {
+                    ...common,
+                    chamfer: { radius: Math.max(2, wallThickness * 0.18) }
+                }
+            ));
 
             const body = Body.create({
                 isStatic: true,
@@ -1880,7 +1896,8 @@
                     wallThickness,
                     pocketWidth,
                     pocketHeight,
-                    pocketTopY,
+                    pocketOpenTopY,
+                    pocketWallTopY,
                     pocketBottomY,
                     rotationSpeed: getConfiguredRotatingCupSpeed(conf),
                     stopAfterEntries: getConfiguredRotatingCupEntryCount(conf),
@@ -1916,8 +1933,8 @@
             const local = worldToBodyLocal(cupBody, marbleBody.position);
             const radius = marbleBody.circleRadius || 15;
             const pocketHalfWidth = (cupBody.plugin?.pocketWidth || 36) / 2 - radius * 0.12;
-            const minY = (cupBody.plugin?.pocketTopY || 0) + radius * 0.15;
-            const maxY = (cupBody.plugin?.pocketBottomY || ((cupBody.plugin?.pocketTopY || 0) + (cupBody.plugin?.pocketHeight || 52))) - radius * 0.15;
+            const minY = (cupBody.plugin?.pocketWallTopY ?? 0) + radius * 0.15;
+            const maxY = (cupBody.plugin?.pocketBottomY || (((cupBody.plugin?.pocketWallTopY ?? 0)) + (cupBody.plugin?.pocketHeight || 52))) - radius * 0.15;
             return (
                 local.x >= -pocketHalfWidth &&
                 local.x <= pocketHalfWidth &&
@@ -2570,7 +2587,7 @@
                 const localPoint = worldToBodyLocal(body, worldPoint);
                 const cupRadius = body.plugin?.radius || 1;
                 const pocketHalfWidth = (body.plugin?.pocketWidth || 36) / 2;
-                const pocketTopY = body.plugin?.pocketTopY ?? (-cupRadius - 2);
+                const pocketTopY = body.plugin?.pocketWallTopY ?? (-Math.sqrt(Math.max(0, cupRadius * cupRadius - pocketHalfWidth * pocketHalfWidth)));
                 const pocketBottomY = body.plugin?.pocketBottomY || (pocketTopY + (body.plugin?.pocketHeight || 52));
                 const holeCandidates = [];
 
@@ -3205,7 +3222,7 @@
 
             const radius = body.plugin?.radius || 78;
             const pocketWidth = body.plugin?.pocketWidth || 36;
-            const pocketTopY = body.plugin?.pocketTopY ?? (-radius - 2);
+            const pocketTopY = body.plugin?.pocketOpenTopY ?? (-radius - 2);
             const pocketBottomY = body.plugin?.pocketBottomY || (pocketTopY + (body.plugin?.pocketHeight || 52));
             const bodyColor = body.plugin?.color || '#f59e0b';
 
