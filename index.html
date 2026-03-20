@@ -5146,27 +5146,7 @@
 
                 const deltaAngle = getConfiguredRotatingCupSpeed(cup) * delta;
                 if (Math.abs(deltaAngle) < 0.00001) return;
-
-                const carriedMarbles = activeMarbles
-                    .filter(marbleBody => nextInside.has(marbleBody.id))
-                    .map(marbleBody => ({
-                        body: marbleBody,
-                        local: worldToBodyLocal(cup, marbleBody.position),
-                        previous: { x: marbleBody.position.x, y: marbleBody.position.y }
-                    }));
-
                 Body.setAngle(cup, cup.angle + deltaAngle);
-                carriedMarbles.forEach(entry => {
-                    const nextPosition = bodyLocalToWorld(cup, entry.local);
-                    Body.setPosition(entry.body, nextPosition);
-                    Body.setVelocity(entry.body, {
-                        x: nextPosition.x - entry.previous.x,
-                        y: nextPosition.y - entry.previous.y
-                    });
-                    if (entry.body.isSleeping) {
-                        Sleeping.set(entry.body, false);
-                    }
-                });
             });
         });
 
