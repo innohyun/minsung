@@ -112,7 +112,7 @@
         }
 
         /* -- Modals -- */
-        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal, #sound-block-setup-modal, #slime-setup-modal, #curve-road-setup-modal {
+        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal, #sound-block-setup-modal, #slime-setup-modal, #curve-road-setup-modal, #rotating-cup-setup-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
             background: rgba(255,255,255,0.97); backdrop-filter: blur(24px);
             padding: 22px; border-radius: 16px; border: 1px solid var(--border);
@@ -128,6 +128,7 @@
         #sound-block-setup-modal { z-index: 400; width: 320px; text-align: center; }
         #slime-setup-modal { z-index: 400; width: 300px; text-align: center; }
         #curve-road-setup-modal { z-index: 400; width: 320px; text-align: center; }
+        #rotating-cup-setup-modal { z-index: 400; width: 320px; text-align: center; }
 
         #library-modal h2, #marble-modal h2 {
             margin: 0 0 14px; text-align: center; font-size: 14px; font-weight: 700; color: var(--text);
@@ -145,6 +146,8 @@
         #slime-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
         #curve-road-setup-modal h3 { margin: 0 0 12px; color: #8b5a2b; font-size: 13px; font-weight: 700; }
         #curve-road-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
+        #rotating-cup-setup-modal h3 { margin: 0 0 12px; color: #d97706; font-size: 13px; font-weight: 700; }
+        #rotating-cup-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
 
         .library-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; }
         .lib-item {
@@ -170,7 +173,7 @@
             background: #f7f8fa; color: var(--text);
             font-family: 'Inter', sans-serif; font-weight: 600;
         }
-        #magnet-setup-modal input[type=number], #magnet-setup-modal select, #sound-block-setup-modal select, #slime-setup-modal input[type=number] {
+        #magnet-setup-modal input[type=number], #magnet-setup-modal select, #sound-block-setup-modal select, #slime-setup-modal input[type=number], #rotating-cup-setup-modal input[type=number] {
             width: 118px; padding: 8px; border: 1px solid #dde1e6;
             border-radius: 8px; font-size: 13px; text-align: center;
             background: #f7f8fa; color: var(--text);
@@ -186,7 +189,7 @@
         .marble-row input:focus, #pushable-setup-modal input:focus,
         #custom-save-modal input:focus, #magnet-setup-modal input:focus,
         #magnet-setup-modal select:focus, #goal-setup-modal input:focus,
-        #sound-block-setup-modal select:focus, #slime-setup-modal input:focus, #curve-road-setup-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+        #sound-block-setup-modal select:focus, #slime-setup-modal input:focus, #curve-road-setup-modal input:focus, #rotating-cup-setup-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 
         .marble-dot {
             width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
@@ -409,6 +412,21 @@
         <button class="btn-marble-modal" onclick="closeCurveRoadSetup()" style="background:#999;">취소</button>
     </div>
 
+    <div id="rotating-cup-setup-modal">
+        <h3>🟠 회전컵 설정</h3>
+        <p>구멍에 구슬이 몇 번 들어오면, 몇 초 뒤에 회전을 멈출지 정합니다. 이 블록은 크기를 바꿀 수 없습니다.</p>
+        <div class="magnet-row">
+            <label for="rotating-cup-count-input">정지 조건</label>
+            <input type="number" id="rotating-cup-count-input" min="1" max="100" value="3">
+        </div>
+        <div class="magnet-row">
+            <label for="rotating-cup-delay-input">정지까지 시간</label>
+            <input type="number" id="rotating-cup-delay-input" min="0" max="30" step="0.1" value="2">
+        </div>
+        <button class="btn-marble-modal" onclick="saveRotatingCupConfig()" style="background:#d97706; margin-bottom:8px;">적용</button>
+        <button class="btn-marble-modal" onclick="closeRotatingCupSetup()" style="background:#999;">취소</button>
+    </div>
+
     <!-- Marble Setup Modal -->
     <div id="marble-modal">
         <span class="close-btn" onclick="closeMarbleModal()">✕</span>
@@ -506,6 +524,7 @@
             'shock_absorber': { id: 'shock_absorber', name: '충격 흡수', w: 130, h: 26, color: '#e66a4f', restitution: 0.0, pw: 22, ph: 8, type: 'shock_absorber' },
             'sound_block': { id: 'sound_block', name: '소리 블록', w: 96, h: 24, color: '#3f8efc', restitution: 0.0, pw: 18, ph: 8, type: 'sound_block', noteKey: 'c4' },
             'metal_cup': { id: 'metal_cup', name: '알루미늄 컵', w: 52, h: 52, color: '#b7c2cf', restitution: 0.04, pw: 14, ph: 14, type: 'metal_cup' },
+            'rotating_cup': { id: 'rotating_cup', name: '회전컵', w: 156, h: 156, color: '#f59e0b', restitution: 0.0, pw: 18, ph: 18, type: 'rotating_cup', stopAfterEntries: 3, stopDelaySeconds: 2, rotationSpeed: 0.00024 },
             'teleport_portal': { id: 'teleport_portal', name: '순간이동', w: 64, h: 64, color: '#ffd400', restitution: 0.0, pw: 15, ph: 15, type: 'teleport_portal' },
             'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
             'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
@@ -555,7 +574,7 @@
         }
 
         function isCircularRoadConfig(conf) {
-            return conf?.type === 'place_marble' || conf?.type === 'steel_marble' || conf?.type === 'magnet' || conf?.type === 'metal_cup';
+            return conf?.type === 'place_marble' || conf?.type === 'steel_marble' || conf?.type === 'magnet' || conf?.type === 'metal_cup' || conf?.type === 'rotating_cup';
         }
 
         function getSoundBlockNote(noteKey) {
@@ -570,6 +589,21 @@
         function getConfiguredFloatLaunchSpeed(source) {
             const value = Number(source?.plugin?.floatLaunchSpeed ?? source?.floatLaunchSpeed);
             return Number.isFinite(value) && value > 0 ? Math.min(value, 7) : 7;
+        }
+
+        function getConfiguredRotatingCupEntryCount(source) {
+            const value = Number(source?.plugin?.stopAfterEntries ?? source?.stopAfterEntries);
+            return Number.isFinite(value) && value >= 1 ? Math.min(100, Math.round(value)) : 3;
+        }
+
+        function getConfiguredRotatingCupStopDelaySeconds(source) {
+            const value = Number(source?.plugin?.stopDelaySeconds ?? source?.stopDelaySeconds);
+            return Number.isFinite(value) && value >= 0 ? Math.min(30, value) : 2;
+        }
+
+        function getConfiguredRotatingCupSpeed(source) {
+            const value = Number(source?.plugin?.rotationSpeed ?? source?.rotationSpeed);
+            return Number.isFinite(value) && value > 0 ? Math.min(0.001, value) : 0.00024;
         }
 
         function isBendableRoadBaseKey(key) {
@@ -688,6 +722,16 @@
         function closeSlimeSetup() {
             document.getElementById('slime-setup-modal').style.display = 'none';
         }
+        function openRotatingCupSetup(conf) {
+            pendingRotatingCupEntryCount = getConfiguredRotatingCupEntryCount(conf);
+            pendingRotatingCupStopDelaySeconds = getConfiguredRotatingCupStopDelaySeconds(conf);
+            document.getElementById('rotating-cup-count-input').value = pendingRotatingCupEntryCount;
+            document.getElementById('rotating-cup-delay-input').value = pendingRotatingCupStopDelaySeconds;
+            document.getElementById('rotating-cup-setup-modal').style.display = 'block';
+        }
+        function closeRotatingCupSetup() {
+            document.getElementById('rotating-cup-setup-modal').style.display = 'none';
+        }
         function openCurveRoadSetup(conf) {
             pendingCurveAxisCount = Math.max(3, parseInt(conf?.curveAxisCount, 10) || 3);
             pendingCurveSetupAfterSize = false;
@@ -797,6 +841,33 @@
             closeLibrary();
             saveCustomRoadToFirestore(id, roadData).catch(error => {
                 console.error('Failed to save slime config to Firestore:', error);
+            });
+        }
+        function saveRotatingCupConfig() {
+            const base = ROAD_LIB[customBaseKey] || ROAD_LIB.rotating_cup;
+            const resolvedBaseKey = resolveRoadBaseKey(base?.baseKey || customBaseKey || 'rotating_cup');
+            const entryCount = Math.max(1, Math.min(100, parseInt(document.getElementById('rotating-cup-count-input').value, 10) || 3));
+            const stopDelaySeconds = Math.max(0, Math.min(30, parseFloat(document.getElementById('rotating-cup-delay-input').value) || 0));
+            const id = `custom_rotating_cup_${Date.now()}`;
+            const roadData = {
+                ...base,
+                baseKey: resolvedBaseKey,
+                name: `${base.name}(${entryCount}회, ${stopDelaySeconds}초)`,
+                stopAfterEntries: entryCount,
+                stopDelaySeconds: stopDelaySeconds
+            };
+
+            pendingRotatingCupEntryCount = entryCount;
+            pendingRotatingCupStopDelaySeconds = stopDelaySeconds;
+            ROAD_LIB[id] = { ...roadData, id };
+            slots[currentSlotIndex] = id;
+            renderSlots();
+            renderLibrary();
+            updateGhostStyle();
+            closeRotatingCupSetup();
+            closeLibrary();
+            saveCustomRoadToFirestore(id, roadData).catch(error => {
+                console.error('Failed to save rotating cup config to Firestore:', error);
             });
         }
         function startSlimeCustomSize() {
@@ -932,6 +1003,8 @@
                         pendingMagnetMode = conf.isAttached === false ? 'free' : 'attached';
                         pendingMagnetStrength = conf.magnetStrength || 3;
                         openMagnetSetup();
+                    } else if (conf.type === 'rotating_cup') {
+                        openRotatingCupSetup(conf);
                     } else if (resolvedBaseKey === 'slime') {
                         openSlimeSetup(conf);
                     } else if (isBendableRoadBaseKey(resolvedBaseKey)) {
@@ -988,6 +1061,8 @@
         let pendingGoalCount = 1;
         let pendingSoundBlockNoteKey = 'c4';
         let pendingSlimeStrength = 20;
+        let pendingRotatingCupEntryCount = 3;
+        let pendingRotatingCupStopDelaySeconds = 2;
         let pendingCurveAxisCount = 0;
         let pendingCurveSetupAfterSize = false;
         let curveHandleHoldTimer = null;
@@ -1190,6 +1265,7 @@
             goalBoxes: [],
             shockAbsorbers: [],
             bendableRoads: [],
+            rotatingCups: [],
             teleportPortals: [],
             escalators: [],
             staticSolids: [],
@@ -1270,6 +1346,9 @@
             if (isBendableRoadBody(root)) {
                 worldCache.bendableRoads.push(root);
             }
+            if (isRotatingCupBody(root)) {
+                worldCache.rotatingCups.push(root);
+            }
             if (isTeleportPortalBody(root)) {
                 worldCache.teleportPortals.push(root);
             }
@@ -1311,6 +1390,7 @@
             removeCachedEntry(worldCache.goalBoxes, root);
             removeCachedEntry(worldCache.shockAbsorbers, root);
             removeCachedEntry(worldCache.bendableRoads, root);
+            removeCachedEntry(worldCache.rotatingCups, root);
             removeCachedEntry(worldCache.teleportPortals, root);
             removeCachedEntry(worldCache.escalators, root);
             removeCachedEntry(worldCache.staticSolids, root);
@@ -1576,8 +1656,9 @@
                 minimapCtx.rotate(body.angle);
                 minimapCtx.fillStyle = body.render?.fillStyle || '#7a6652';
 
-                if (body.circleRadius) {
-                    const radius = Math.max(2, body.circleRadius * scale);
+                const minimapRadius = body.circleRadius || body.plugin?.radius || 0;
+                if (minimapRadius) {
+                    const radius = Math.max(2, minimapRadius * scale);
                     minimapCtx.beginPath();
                     minimapCtx.arc(0, 0, radius, 0, Math.PI * 2);
                     minimapCtx.fill();
@@ -1716,6 +1797,151 @@
                 body.plugin.teleportGroupId = partner.plugin.teleportGroupId;
             } else {
                 body.plugin.teleportGroupId = nextTeleportGroupId++;
+            }
+        }
+
+        function getAngleDifference(a, b) {
+            return Math.atan2(Math.sin(a - b), Math.cos(a - b));
+        }
+
+        function isRotatingCupBody(body) {
+            const root = getCollisionRoot(body);
+            return root?.plugin?.type === 'rotating_cup';
+        }
+
+        function createRotatingCupBody(x, y, conf, angle = 0) {
+            const radius = Math.max(52, Math.min(conf.w, conf.h) / 2);
+            const wallThickness = Math.max(12, Math.round(radius * 0.22));
+            const pocketWidth = 36;
+            const pocketHeight = 52;
+            const pocketTopY = -radius + wallThickness * 0.4;
+            const mouthHalfAngle = Math.max(0.32, Math.asin(Math.min(0.94, (pocketWidth / 2 + wallThickness * 0.35) / radius)));
+            const segmentCount = 22;
+            const centerRadius = radius - wallThickness / 2;
+            const segmentLength = Math.max(18, (Math.PI * 2 * centerRadius / segmentCount) * 1.08);
+            const common = {
+                isStatic: true,
+                friction: 0,
+                frictionStatic: 0,
+                restitution: conf.restitution || 0,
+                render: { visible: false },
+                slop: 0
+            };
+            const parts = [];
+
+            for (let index = 0; index < segmentCount; index++) {
+                const ringAngle = (-Math.PI) + (Math.PI * 2 * index / segmentCount);
+                if (Math.abs(getAngleDifference(ringAngle, -Math.PI / 2)) <= mouthHalfAngle + 0.12) {
+                    continue;
+                }
+                parts.push(Bodies.rectangle(
+                    Math.cos(ringAngle) * centerRadius,
+                    Math.sin(ringAngle) * centerRadius,
+                    segmentLength,
+                    wallThickness,
+                    {
+                        ...common,
+                        angle: ringAngle + Math.PI / 2,
+                        chamfer: { radius: Math.max(3, wallThickness * 0.28) }
+                    }
+                ));
+            }
+
+            parts.push(Bodies.rectangle(
+                -(pocketWidth + wallThickness) / 2,
+                pocketTopY + pocketHeight / 2,
+                wallThickness,
+                pocketHeight,
+                { ...common, chamfer: { radius: Math.max(3, wallThickness * 0.22) } }
+            ));
+            parts.push(Bodies.rectangle(
+                (pocketWidth + wallThickness) / 2,
+                pocketTopY + pocketHeight / 2,
+                wallThickness,
+                pocketHeight,
+                { ...common, chamfer: { radius: Math.max(3, wallThickness * 0.22) } }
+            ));
+            parts.push(Bodies.rectangle(
+                0,
+                pocketTopY + pocketHeight - wallThickness / 2,
+                pocketWidth + wallThickness * 2,
+                wallThickness,
+                { ...common, chamfer: { radius: Math.max(3, wallThickness * 0.22) } }
+            ));
+
+            const body = Body.create({
+                isStatic: true,
+                label: 'rotating_cup',
+                parts,
+                friction: 0,
+                frictionStatic: 0,
+                restitution: conf.restitution || 0,
+                render: { visible: false },
+                slop: 0,
+                plugin: {
+                    type: 'rotating_cup',
+                    baseKey: resolveRoadBaseKey(conf.baseKey || conf.id),
+                    color: conf.color,
+                    w: conf.w,
+                    h: conf.h,
+                    radius,
+                    wallThickness,
+                    pocketWidth,
+                    pocketHeight,
+                    pocketTopY,
+                    mouthHalfAngle,
+                    rotationSpeed: getConfiguredRotatingCupSpeed(conf),
+                    stopAfterEntries: getConfiguredRotatingCupEntryCount(conf),
+                    stopDelaySeconds: getConfiguredRotatingCupStopDelaySeconds(conf),
+                    stopDelayMs: getConfiguredRotatingCupStopDelaySeconds(conf) * 1000,
+                    currentEntries: 0,
+                    pendingStopAt: null,
+                    isStopped: false,
+                    insideMarbleIds: new Set()
+                }
+            });
+
+            const offset = { x: body.position.x, y: body.position.y };
+            if (Math.abs(offset.x) > 0.001 || Math.abs(offset.y) > 0.001) {
+                Body.translate(body, { x: -offset.x, y: -offset.y });
+            }
+
+            Body.setPosition(body, { x, y });
+            if (angle) {
+                Body.setAngle(body, angle);
+            }
+
+            body.plugin.originX = body.position.x;
+            body.plugin.originY = body.position.y;
+            body.plugin.originAngle = body.angle;
+            return body;
+        }
+
+        function isMarbleInsideRotatingCupPocket(cupBody, marbleBody) {
+            if (!isRotatingCupBody(cupBody) || !marbleBody || marbleBody.isSensor) return false;
+            if (!isBallLikeLabel(marbleBody.label) || marbleBody.isStatic) return false;
+
+            const local = worldToBodyLocal(cupBody, marbleBody.position);
+            const radius = marbleBody.circleRadius || 15;
+            const pocketHalfWidth = (cupBody.plugin?.pocketWidth || 36) / 2 - radius * 0.12;
+            const minY = (cupBody.plugin?.pocketTopY || 0) + radius * 0.15;
+            const maxY = (cupBody.plugin?.pocketTopY || 0) + (cupBody.plugin?.pocketHeight || 52) - (cupBody.plugin?.wallThickness || 14) - radius * 0.15;
+            return (
+                local.x >= -pocketHalfWidth &&
+                local.x <= pocketHalfWidth &&
+                local.y >= minY &&
+                local.y <= maxY
+            );
+        }
+
+        function resetRotatingCupState(body) {
+            if (!isRotatingCupBody(body)) return;
+            body.plugin.currentEntries = 0;
+            body.plugin.pendingStopAt = null;
+            body.plugin.isStopped = false;
+            body.plugin.insideMarbleIds = new Set();
+            if (body.plugin.originAngle !== undefined) {
+                Body.setAngle(body, body.plugin.originAngle);
             }
         }
 
@@ -2324,7 +2550,7 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
-        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block', 'shock_absorber', 'metal_cup']);
+        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block', 'shock_absorber', 'metal_cup', 'rotating_cup']);
 
         function isTunnelGuardSurface(body) {
             const root = getCollisionRoot(body);
@@ -2348,7 +2574,7 @@
         function getTunnelSurfaceNormal(body, worldPoint) {
             if (!body) return { x: 0, y: -1 };
 
-            if (body.circleRadius) {
+            if (body.circleRadius || isRotatingCupBody(body)) {
                 let normalX = worldPoint.x - body.position.x;
                 let normalY = worldPoint.y - body.position.y;
                 let length = Math.hypot(normalX, normalY);
@@ -2947,6 +3173,64 @@
             }
 
             ctx.restore();
+            ctx.restore();
+        }
+
+        function drawRotatingCupBody(ctx, body, isSelected = false) {
+            if (!isRotatingCupBody(body)) return;
+
+            const radius = body.plugin?.radius || 78;
+            const pocketWidth = body.plugin?.pocketWidth || 36;
+            const pocketHeight = body.plugin?.pocketHeight || 52;
+            const pocketTopY = body.plugin?.pocketTopY || (-radius + 12);
+            const wallThickness = body.plugin?.wallThickness || 14;
+            const bodyColor = body.plugin?.color || '#f59e0b';
+
+            ctx.save();
+            ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
+            ctx.rotate(body.angle);
+
+            const fill = ctx.createRadialGradient(-radius * 0.24, -radius * 0.28, 4, 0, 0, radius * 1.08);
+            fill.addColorStop(0, mixColor(bodyColor, '#fde68a', 0.45));
+            fill.addColorStop(0.62, bodyColor);
+            fill.addColorStop(1, mixColor(bodyColor, '#78350f', 0.18));
+
+            ctx.fillStyle = fill;
+            ctx.strokeStyle = isSelected ? '#fff7ed' : mixColor(bodyColor, '#7c2d12', 0.22);
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.rect(-pocketWidth / 2, pocketTopY, pocketWidth, pocketHeight);
+            ctx.fill('evenodd');
+
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.strokeStyle = mixColor(bodyColor, '#7c2d12', 0.34);
+            ctx.lineWidth = Math.max(2, wallThickness * 0.2);
+            ctx.beginPath();
+            ctx.moveTo(-pocketWidth / 2, pocketTopY);
+            ctx.lineTo(-pocketWidth / 2, pocketTopY + pocketHeight);
+            ctx.lineTo(pocketWidth / 2, pocketTopY + pocketHeight);
+            ctx.lineTo(pocketWidth / 2, pocketTopY);
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(15,23,42,0.08)';
+            ctx.fillRect(
+                -pocketWidth / 2 + wallThickness * 0.15,
+                pocketTopY + wallThickness * 0.25,
+                pocketWidth - wallThickness * 0.3,
+                pocketHeight - wallThickness * 0.85
+            );
+
+            if (body.plugin?.isStopped) {
+                ctx.fillStyle = '#111827';
+                ctx.beginPath();
+                ctx.arc(0, radius * 0.34, Math.max(8, radius * 0.16), 0, Math.PI * 2);
+                ctx.fill();
+            }
+
             ctx.restore();
         }
 
@@ -3573,7 +3857,7 @@
         });
 
         window.addEventListener('mousedown', (e) => {
-            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) {
+            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal') || e.target.closest('#rotating-cup-setup-modal')) {
                 activeTeleportLabelId = null;
                 return;
             }
@@ -3667,6 +3951,13 @@
                     const mockPortal = createTeleportPortalBody(worldPos.x, worldPos.y, conf, ghostAngle);
                     const existingPortals = getPlacementCandidatesForBody(mockPortal, 14).filter(body => isTeleportPortalBody(body));
                     if (Query.collides(mockPortal, existingPortals).length > 0) {
+                        showError();
+                        return;
+                    }
+                } else if (conf.type === 'rotating_cup') {
+                    const mockCup = createRotatingCupBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                    const existingRoads = getPlacementCandidatesForBody(mockCup, 16);
+                    if (Query.collides(mockCup, existingRoads).length > 0) {
                         showError();
                         return;
                     }
@@ -3788,6 +4079,8 @@
                     newBody = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else if (conf.type === 'teleport_portal') {
                     newBody = createTeleportPortalBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                } else if (conf.type === 'rotating_cup') {
+                    newBody = createRotatingCupBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else if (conf.type === 'metal_cup') {
                     newBody = createMetalCupBody(worldPos.x, worldPos.y, conf);
                 } else {
@@ -3948,7 +4241,7 @@
                     box.style.borderRadius = baseConf?.type === 'teleport_portal' ? getTeleportPortalBorderRadius() : '0';
                 }
             } else {
-                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) {
+                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal') || e.target.closest('#rotating-cup-setup-modal')) {
                     ghost.style.display = 'none';
                 } else if (!isCustomMode) {
                     ghost.style.display = 'block';
@@ -4337,6 +4630,7 @@
                 body.plugin.enteredMarbleIds = [];
             });
             getWorldCache().shockAbsorbers.forEach(resetShockAbsorberState);
+            getWorldCache().rotatingCups.forEach(resetRotatingCupState);
 
             // 배치 구슬들 원래 위치로 복원 + sleeping
             placedMarbles.forEach(pm => {
@@ -4816,6 +5110,67 @@
             }
         });
 
+        Events.on(engine, 'beforeUpdate', () => {
+            const cups = getWorldCache().rotatingCups;
+            if (cups.length === 0) return;
+
+            const delta = engine.timing.lastDelta || 1000 / 60;
+            const now = engine.timing.timestamp;
+            const activeMarbles = getWorldCache().candidateBallBodies.filter(body =>
+                !body.isStatic && !body.isSensor && !body.plugin?.teleportPending
+            );
+
+            cups.forEach(cup => {
+                if (!cup?.plugin) return;
+                if (!(cup.plugin.insideMarbleIds instanceof Set)) {
+                    cup.plugin.insideMarbleIds = new Set(cup.plugin.insideMarbleIds || []);
+                }
+
+                const nextInside = new Set();
+                activeMarbles.forEach(marbleBody => {
+                    if (!isMarbleInsideRotatingCupPocket(cup, marbleBody)) return;
+                    nextInside.add(marbleBody.id);
+                    if (!cup.plugin.insideMarbleIds.has(marbleBody.id)) {
+                        cup.plugin.currentEntries = (cup.plugin.currentEntries || 0) + 1;
+                        if (!cup.plugin.pendingStopAt && !cup.plugin.isStopped && cup.plugin.currentEntries >= getConfiguredRotatingCupEntryCount(cup)) {
+                            cup.plugin.pendingStopAt = now + (cup.plugin.stopDelayMs || 0);
+                        }
+                    }
+                });
+                cup.plugin.insideMarbleIds = nextInside;
+
+                if (!cup.plugin.isStopped && cup.plugin.pendingStopAt && now >= cup.plugin.pendingStopAt) {
+                    cup.plugin.isStopped = true;
+                    cup.plugin.pendingStopAt = null;
+                }
+                if (cup.plugin.isStopped) return;
+
+                const deltaAngle = getConfiguredRotatingCupSpeed(cup) * delta;
+                if (Math.abs(deltaAngle) < 0.00001) return;
+
+                const carriedMarbles = activeMarbles
+                    .filter(marbleBody => nextInside.has(marbleBody.id))
+                    .map(marbleBody => ({
+                        body: marbleBody,
+                        local: worldToBodyLocal(cup, marbleBody.position),
+                        previous: { x: marbleBody.position.x, y: marbleBody.position.y }
+                    }));
+
+                Body.setAngle(cup, cup.angle + deltaAngle);
+                carriedMarbles.forEach(entry => {
+                    const nextPosition = bodyLocalToWorld(cup, entry.local);
+                    Body.setPosition(entry.body, nextPosition);
+                    Body.setVelocity(entry.body, {
+                        x: nextPosition.x - entry.previous.x,
+                        y: nextPosition.y - entry.previous.y
+                    });
+                    if (entry.body.isSleeping) {
+                        Sleeping.set(entry.body, false);
+                    }
+                });
+            });
+        });
+
         // 자석이 쇠구슬과 이동형 자석을 끌어당기는 로직
         function getMagnetRange(magnetBody) {
             const strength = magnetBody.plugin?.magnetStrength || 3;
@@ -5162,6 +5517,7 @@
 
             cache.bendableRoads.forEach(body => drawBendableRoadBody(ctx, body, body === selectedBody));
             cache.shockAbsorbers.forEach(body => drawShockAbsorberBody(ctx, body));
+            cache.rotatingCups.forEach(body => drawRotatingCupBody(ctx, body, body === selectedBody));
             cache.teleportPortals.forEach(body => drawTeleportPortalBody(ctx, body, body === selectedBody));
 
             const now = performance.now();
