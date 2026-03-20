@@ -550,6 +550,10 @@
             return '50%';
         }
 
+        function getTeleportPortalFill(color) {
+            return `conic-gradient(from -55deg, transparent 0deg 110deg, ${color} 110deg 360deg)`;
+        }
+
         function isCircularRoadConfig(conf) {
             return conf?.type === 'place_marble' || conf?.type === 'steel_marble' || conf?.type === 'magnet' || conf?.type === 'metal_cup';
         }
@@ -1683,7 +1687,7 @@
             const portalRadius = portal.circleRadius || portal.plugin?.radius || Math.min(portal.plugin?.w || 64, portal.plugin?.h || 64) / 2;
             const mouthHalfWidth = portalRadius * 0.9 + radius * 0.28;
             const frontMinY = -(portalRadius + radius * 0.85);
-            const frontMaxY = portalRadius * 0.28 + radius * 0.22;
+            const frontMaxY = portalRadius * 0.44 + radius * 0.24;
             const inwardSpeed = localVelocity.y;
             const lateralSpeed = Math.abs(localVelocity.x);
             const radialDistance = Math.hypot(localPoint.x, localPoint.y);
@@ -1719,7 +1723,6 @@
             const radius = Math.max(18, Math.min(conf.w, conf.h) / 2);
             const body = Bodies.circle(x, y, radius, {
                 isStatic: true,
-                isSensor: true,
                 angle,
                 label: 'teleport_portal',
                 friction: 0,
@@ -2953,10 +2956,10 @@
             const w = body.plugin?.w || 64;
             const h = body.plugin?.h || 64;
             const radius = body.circleRadius || body.plugin?.radius || Math.min(w, h) / 2;
-            const mouthHalfAngle = 0.4;
+            const mouthHalfAngle = 0.62;
             const groupLabel = body.plugin?.teleportGroupId || '?';
             const bodyColor = body.plugin?.color || '#ffd400';
-            const accent = isSelected ? '#ffffff' : mixColor(bodyColor, '#eab308', 0.28);
+            const accent = isSelected ? '#fff7a8' : mixColor(bodyColor, '#eab308', 0.18);
             const showLabel = activeTeleportLabelId === body.id;
 
             ctx.save();
@@ -2976,12 +2979,6 @@
             ctx.arc(0, 0, radius, -Math.PI / 2 + mouthHalfAngle, Math.PI * 1.5 - mouthHalfAngle);
             ctx.closePath();
             ctx.fill();
-            ctx.stroke();
-
-            ctx.strokeStyle = 'rgba(255,255,180,0.75)';
-            ctx.lineWidth = Math.max(1.4, radius * 0.08);
-            ctx.beginPath();
-            ctx.arc(-radius * 0.04, -radius * 0.02, radius * 0.58, -Math.PI / 2 + mouthHalfAngle + 0.16, Math.PI * 1.5 - mouthHalfAngle - 0.16);
             ctx.stroke();
 
             if (showLabel) {
@@ -3536,12 +3533,15 @@
             const isCircle = isCircularRoadConfig(conf);
             ghost.style.width = conf.w + 'px';
             ghost.style.height = conf.h + 'px';
-            ghost.style.background = conf.color;
+            ghost.style.background = conf.type === 'teleport_portal'
+                ? getTeleportPortalFill(conf.color)
+                : conf.color;
             ghost.style.borderRadius = isCircle
                 ? '50%'
                 : (conf.type === 'shock_absorber'
                     ? getShockAbsorberBorderRadius()
                     : (conf.type === 'teleport_portal' ? getTeleportPortalBorderRadius() : '0'));
+            ghost.style.clipPath = 'none';
             ghost.style.display = 'block';
             ghost.style.transform = `rotate(${ghostAngle}rad)`;
         }
@@ -3613,6 +3613,9 @@
                 // 원형 타입인지 확인
                 const baseConf = ROAD_LIB[customBaseKey];
                 const isCircleBase = isCircularRoadConfig(baseConf);
+                box.style.background = baseConf?.type === 'teleport_portal'
+                    ? getTeleportPortalFill(baseConf.color)
+                    : 'rgba(59,130,246,0.08)';
                 box.style.borderRadius = isCircleBase
                     ? '50%'
                     : (baseConf?.type === 'shock_absorber'
@@ -3899,6 +3902,9 @@
                 const isCircleBase = isCircularRoadConfig(baseConf);
                 const isEscalatorBase = isEscalatorKey(resolveRoadBaseKey(baseConf?.baseKey || customBaseKey));
                 const isShockAbsorberBase = baseConf?.type === 'shock_absorber';
+                box.style.background = baseConf?.type === 'teleport_portal'
+                    ? getTeleportPortalFill(baseConf.color)
+                    : 'rgba(59,130,246,0.08)';
                 
                 if (isCircleBase) {
                     // 원형: 드래그 거리를 지름으로 사용
@@ -3974,6 +3980,7 @@
                 const box = document.getElementById('custom-draw-box');
                 box.style.display = 'none';
                 box.style.borderRadius = '0';
+                box.style.background = 'rgba(59,130,246,0.08)';
                 
                 const baseConf = ROAD_LIB[customBaseKey];
                 const isCircleBase = isCircularRoadConfig(baseConf);
