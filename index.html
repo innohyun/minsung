@@ -1811,8 +1811,8 @@
             const pocketWidth = 36;
             const pocketHeight = 52;
             const pocketHalfWidth = pocketWidth / 2;
-            const pocketTopY = -pocketHeight / 2;
-            const pocketBottomY = pocketHeight / 2;
+            const pocketTopY = -radius - 2;
+            const pocketBottomY = Math.min(radius - wallThickness, pocketTopY + pocketHeight);
             const sliceHeight = Math.max(5, Math.round(radius / 14));
             const common = {
                 isStatic: true,
@@ -2570,7 +2570,7 @@
                 const localPoint = worldToBodyLocal(body, worldPoint);
                 const cupRadius = body.plugin?.radius || 1;
                 const pocketHalfWidth = (body.plugin?.pocketWidth || 36) / 2;
-                const pocketTopY = body.plugin?.pocketTopY ?? (-cupRadius * 0.5);
+                const pocketTopY = body.plugin?.pocketTopY ?? (-cupRadius - 2);
                 const pocketBottomY = body.plugin?.pocketBottomY || (pocketTopY + (body.plugin?.pocketHeight || 52));
                 const holeCandidates = [];
 
@@ -2582,7 +2582,6 @@
                 }
                 if (localPoint.x >= -pocketHalfWidth - 8 && localPoint.x <= pocketHalfWidth + 8) {
                     holeCandidates.push(
-                        { distance: Math.abs(localPoint.y - pocketTopY), x: 0, y: -1 },
                         { distance: Math.abs(pocketBottomY - localPoint.y), x: 0, y: 1 }
                     );
                 }
@@ -3206,7 +3205,7 @@
 
             const radius = body.plugin?.radius || 78;
             const pocketWidth = body.plugin?.pocketWidth || 36;
-            const pocketTopY = body.plugin?.pocketTopY ?? (-radius * 0.5);
+            const pocketTopY = body.plugin?.pocketTopY ?? (-radius - 2);
             const pocketBottomY = body.plugin?.pocketBottomY || (pocketTopY + (body.plugin?.pocketHeight || 52));
             const bodyColor = body.plugin?.color || '#f59e0b';
 
