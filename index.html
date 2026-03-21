@@ -506,6 +506,7 @@
             'shock_absorber': { id: 'shock_absorber', name: '충격 흡수', w: 130, h: 26, color: '#e66a4f', restitution: 0.0, pw: 22, ph: 8, type: 'shock_absorber' },
             'sound_block': { id: 'sound_block', name: '소리 블록', w: 96, h: 24, color: '#3f8efc', restitution: 0.0, pw: 18, ph: 8, type: 'sound_block', noteKey: 'c4' },
             'metal_cup': { id: 'metal_cup', name: '알루미늄 컵', w: 52, h: 52, color: '#b7c2cf', restitution: 0.04, pw: 14, ph: 14, type: 'metal_cup' },
+            'moving_hole_disc': { id: 'moving_hole_disc', name: '움직이는 원', w: 140, h: 140, color: '#d97706', restitution: 0.0, pw: 18, ph: 18, type: 'moving_hole_disc' },
             'teleport_portal': { id: 'teleport_portal', name: '순간이동', w: 64, h: 64, color: '#ffd400', restitution: 0.0, pw: 15, ph: 15, type: 'teleport_portal' },
             'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
             'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
@@ -555,7 +556,7 @@
         }
 
         function isCircularRoadConfig(conf) {
-            return conf?.type === 'place_marble' || conf?.type === 'steel_marble' || conf?.type === 'magnet' || conf?.type === 'metal_cup';
+            return conf?.type === 'place_marble' || conf?.type === 'steel_marble' || conf?.type === 'magnet' || conf?.type === 'metal_cup' || conf?.type === 'moving_hole_disc';
         }
 
         function getSoundBlockNote(noteKey) {
@@ -932,6 +933,8 @@
                         pendingMagnetMode = conf.isAttached === false ? 'free' : 'attached';
                         pendingMagnetStrength = conf.magnetStrength || 3;
                         openMagnetSetup();
+                    } else if (conf.type === 'moving_hole_disc') {
+                        return;
                     } else if (resolvedBaseKey === 'slime') {
                         openSlimeSetup(conf);
                     } else if (isBendableRoadBaseKey(resolvedBaseKey)) {
@@ -1190,6 +1193,7 @@
             goalBoxes: [],
             shockAbsorbers: [],
             bendableRoads: [],
+            movingHoleDiscs: [],
             teleportPortals: [],
             escalators: [],
             staticSolids: [],
@@ -1270,6 +1274,9 @@
             if (isBendableRoadBody(root)) {
                 worldCache.bendableRoads.push(root);
             }
+            if (isMovingHoleDiscBody(root)) {
+                worldCache.movingHoleDiscs.push(root);
+            }
             if (isTeleportPortalBody(root)) {
                 worldCache.teleportPortals.push(root);
             }
@@ -1311,6 +1318,7 @@
             removeCachedEntry(worldCache.goalBoxes, root);
             removeCachedEntry(worldCache.shockAbsorbers, root);
             removeCachedEntry(worldCache.bendableRoads, root);
+            removeCachedEntry(worldCache.movingHoleDiscs, root);
             removeCachedEntry(worldCache.teleportPortals, root);
             removeCachedEntry(worldCache.escalators, root);
             removeCachedEntry(worldCache.staticSolids, root);
@@ -1417,6 +1425,7 @@
         function shouldRefreshMinimap() {
             const cache = getWorldCache();
             if (minimapDirty || isLaunching || isFollowMode) return true;
+            if (cache.movingHoleDiscs.length > 0) return true;
             if (pushables.some(body => cache.bodyIdSet.has(body.id) && isBodyActivelyMoving(body))) return true;
             if (magnets.some(body => cache.bodyIdSet.has(body.id) && body.plugin?.isAttached === false && isBodyActivelyMoving(body))) return true;
             return false;
@@ -2202,6 +2211,95 @@
             });
         }
 
+        function isMovingHoleDiscBody(body) {
+            const root = getCollisionRoot(body);
+            return root?.plugin?.type === 'moving_hole_disc';
+        }
+
+        function createMovingHoleDiscBody(x, y, conf, angle = 0) {
+            const radius = Math.max(54, Math.min(conf.w, conf.h) / 2);
+            const holeWidth = 34;
+            const holeHeight = 42;
+            const holeHalfWidth = holeWidth / 2;
+            const holeHalfHeight = holeHeight / 2;
+            const sliceHeight = 4;
+            const common = {
+                isStatic: true,
+                friction: 0,
+                frictionStatic: 0,
+                restitution: conf.restitution || 0,
+                render: { visible: false },
+                slop: 0
+            };
+            const parts = [];
+
+            for (let localY = -radius + sliceHeight / 2; localY <= radius - sliceHeight / 2 + 0.001; localY += sliceHeight) {
+                const halfSpan = Math.sqrt(Math.max(0, radius * radius - localY * localY));
+                const inHoleBand = localY >= -holeHalfHeight && localY <= holeHalfHeight;
+                if (!inHoleBand) {
+                    parts.push(Bodies.rectangle(0, localY, halfSpan * 2, sliceHeight + 0.8, common));
+                    continue;
+                }
+
+                const sideWidth = halfSpan - holeHalfWidth;
+                if (sideWidth > 1.5) {
+                    parts.push(Bodies.rectangle(
+                        -(holeHalfWidth + sideWidth / 2),
+                        localY,
+                        sideWidth,
+                        sliceHeight + 0.8,
+                        common
+                    ));
+                    parts.push(Bodies.rectangle(
+                        holeHalfWidth + sideWidth / 2,
+                        localY,
+                        sideWidth,
+                        sliceHeight + 0.8,
+                        common
+                    ));
+                }
+            }
+
+            const body = Body.create({
+                isStatic: true,
+                label: 'moving_hole_disc',
+                parts,
+                friction: 0,
+                frictionStatic: 0,
+                restitution: conf.restitution || 0,
+                render: { visible: false },
+                slop: 0,
+                plugin: {
+                    type: 'moving_hole_disc',
+                    baseKey: resolveRoadBaseKey(conf.baseKey || conf.id),
+                    color: conf.color,
+                    w: conf.w,
+                    h: conf.h,
+                    radius,
+                    holeWidth,
+                    holeHeight,
+                    motionAmplitude: 18,
+                    motionSpeed: 0.0011,
+                    motionPhase: 0,
+                    originX: x,
+                    originY: y,
+                    originAngle: angle
+                }
+            });
+
+            const offset = { x: body.position.x, y: body.position.y };
+            if (Math.abs(offset.x) > 0.001 || Math.abs(offset.y) > 0.001) {
+                Body.translate(body, { x: -offset.x, y: -offset.y });
+            }
+
+            Body.setPosition(body, { x, y });
+            if (angle) {
+                Body.setAngle(body, angle);
+            }
+
+            return body;
+        }
+
         function createPushableBasketBody(x, y, conf, angle) {
             const w = conf.w;
             const h = conf.h;
@@ -2325,7 +2423,7 @@
             return body && body.parent && body.parent !== body ? body.parent : body;
         }
 
-        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block', 'shock_absorber', 'metal_cup']);
+        const TUNNEL_GUARD_SURFACE_KEYS = new Set(['long', 'medium', 'short', 'thick', 'thin', 'giant', 'ice', 'sound_block', 'shock_absorber', 'metal_cup', 'moving_hole_disc']);
 
         function isTunnelGuardSurface(body) {
             const root = getCollisionRoot(body);
@@ -2348,6 +2446,38 @@
 
         function getTunnelSurfaceNormal(body, worldPoint) {
             if (!body) return { x: 0, y: -1 };
+
+            if (isMovingHoleDiscBody(body)) {
+                const localPoint = worldToBodyLocal(body, worldPoint);
+                const radius = body.plugin?.radius || 1;
+                const holeHalfWidth = (body.plugin?.holeWidth || 34) / 2;
+                const holeHalfHeight = (body.plugin?.holeHeight || 42) / 2;
+                const holeCandidates = [];
+
+                if (localPoint.y >= -holeHalfHeight - 8 && localPoint.y <= holeHalfHeight + 8) {
+                    holeCandidates.push(
+                        { distance: Math.abs(localPoint.x + holeHalfWidth), x: -1, y: 0 },
+                        { distance: Math.abs(holeHalfWidth - localPoint.x), x: 1, y: 0 }
+                    );
+                }
+                if (localPoint.x >= -holeHalfWidth - 8 && localPoint.x <= holeHalfWidth + 8) {
+                    holeCandidates.push(
+                        { distance: Math.abs(localPoint.y + holeHalfHeight), x: 0, y: -1 },
+                        { distance: Math.abs(holeHalfHeight - localPoint.y), x: 0, y: 1 }
+                    );
+                }
+
+                const outerDistance = Math.abs(Math.hypot(localPoint.x, localPoint.y) - radius);
+                const bestHole = holeCandidates.sort((a, b) => a.distance - b.distance)[0];
+                if (bestHole && bestHole.distance < outerDistance) {
+                    const cos = Math.cos(body.angle);
+                    const sin = Math.sin(body.angle);
+                    return {
+                        x: bestHole.x * cos - bestHole.y * sin,
+                        y: bestHole.x * sin + bestHole.y * cos
+                    };
+                }
+            }
 
             if (body.circleRadius) {
                 let normalX = worldPoint.x - body.position.x;
@@ -2948,6 +3078,38 @@
             }
 
             ctx.restore();
+            ctx.restore();
+        }
+
+        function drawMovingHoleDiscBody(ctx, body, isSelected = false) {
+            if (!isMovingHoleDiscBody(body)) return;
+
+            const radius = body.plugin?.radius || 70;
+            const holeWidth = body.plugin?.holeWidth || 34;
+            const holeHeight = body.plugin?.holeHeight || 42;
+            const bodyColor = body.plugin?.color || '#d97706';
+
+            ctx.save();
+            ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
+            ctx.rotate(body.angle);
+
+            const fill = ctx.createRadialGradient(-radius * 0.24, -radius * 0.28, 4, 0, 0, radius * 1.08);
+            fill.addColorStop(0, mixColor(bodyColor, '#fdba74', 0.44));
+            fill.addColorStop(0.62, bodyColor);
+            fill.addColorStop(1, mixColor(bodyColor, '#7c2d12', 0.18));
+
+            ctx.fillStyle = fill;
+            ctx.strokeStyle = isSelected ? '#fff7ed' : mixColor(bodyColor, '#7c2d12', 0.22);
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.rect(-holeWidth / 2, -holeHeight / 2, holeWidth, holeHeight);
+            ctx.fill('evenodd');
+
+            ctx.beginPath();
+            ctx.arc(0, 0, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
             ctx.restore();
         }
 
@@ -3671,6 +3833,13 @@
                         showError();
                         return;
                     }
+                } else if (conf.type === 'moving_hole_disc') {
+                    const mockDisc = createMovingHoleDiscBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                    const existingRoads = getPlacementCandidatesForBody(mockDisc, 16);
+                    if (Query.collides(mockDisc, existingRoads).length > 0) {
+                        showError();
+                        return;
+                    }
                 } else if (conf.type === 'pushable') {
                     const mockRoad = Bodies.rectangle(worldPos.x, worldPos.y, conf.w, conf.h, { angle: ghostAngle });
                     mockRoad.plugin = { type: 'pushable', w: conf.w, h: conf.h };
@@ -3789,6 +3958,8 @@
                     newBody = createShockAbsorberBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else if (conf.type === 'teleport_portal') {
                     newBody = createTeleportPortalBody(worldPos.x, worldPos.y, conf, ghostAngle);
+                } else if (conf.type === 'moving_hole_disc') {
+                    newBody = createMovingHoleDiscBody(worldPos.x, worldPos.y, conf, ghostAngle);
                 } else if (conf.type === 'metal_cup') {
                     newBody = createMetalCupBody(worldPos.x, worldPos.y, conf);
                 } else {
@@ -4785,6 +4956,11 @@
                     syncWorldBodyRegistration(body);
                 }
             });
+            cache.movingHoleDiscs.forEach(body => {
+                if (cache.bodyIdSet.has(body.id)) {
+                    syncWorldBodyRegistration(body);
+                }
+            });
         });
 
         Events.on(engine, 'afterUpdate', () => {
@@ -4815,6 +4991,32 @@
                     cameraPos.y + (targetY - cameraPos.y) * 0.1
                 );
             }
+        });
+
+        Events.on(engine, 'beforeUpdate', () => {
+            const discs = getWorldCache().movingHoleDiscs;
+            if (discs.length === 0) return;
+
+            const now = engine.timing.timestamp;
+            discs.forEach(body => {
+                if (!body?.plugin) return;
+                if (body === selectedBody && isDraggingBody) return;
+
+                const amplitude = body.plugin.motionAmplitude || 18;
+                const speed = body.plugin.motionSpeed || 0.0011;
+                const phase = body.plugin.motionPhase || 0;
+                const originX = body.plugin.originX ?? body.position.x;
+                const originY = body.plugin.originY ?? body.position.y;
+                const targetX = originX + Math.sin(now * speed + phase) * amplitude;
+                const targetY = originY;
+
+                if (Math.abs(body.position.x - targetX) < 0.01 && Math.abs(body.position.y - targetY) < 0.01) {
+                    return;
+                }
+
+                Body.setPosition(body, { x: targetX, y: targetY });
+                syncWorldBodyRegistration(body);
+            });
         });
 
         // 자석이 쇠구슬과 이동형 자석을 끌어당기는 로직
@@ -5163,6 +5365,7 @@
 
             cache.bendableRoads.forEach(body => drawBendableRoadBody(ctx, body, body === selectedBody));
             cache.shockAbsorbers.forEach(body => drawShockAbsorberBody(ctx, body));
+            cache.movingHoleDiscs.forEach(body => drawMovingHoleDiscBody(ctx, body, body === selectedBody));
             cache.teleportPortals.forEach(body => drawTeleportPortalBody(ctx, body, body === selectedBody));
 
             const now = performance.now();
