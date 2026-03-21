@@ -2376,6 +2376,49 @@
             };
         }
 
+        function hasBodySupportBelow(body) {
+            if (!body?.circleRadius) return true;
+
+            const radius = body.circleRadius || 15;
+            const probe = Bodies.rectangle(
+                body.position.x,
+                body.bounds.max.y + 2,
+                Math.max(10, radius * 1.35),
+                5,
+                {
+                    isStatic: true,
+                    isSensor: true,
+                    render: { visible: false }
+                }
+            );
+            const probeBounds = probe.bounds;
+            const candidates = [
+                ...placementSpatialIndex.queryBounds(probeBounds, 6),
+                ...staticSolidSpatialIndex.queryBounds(probeBounds, 6),
+                ...getWorldCache().candidateBallBodies.filter(candidate =>
+                    candidate !== body &&
+                    !candidate.isSensor &&
+                    !(
+                        candidate.bounds.max.x < probeBounds.min.x ||
+                        candidate.bounds.min.x > probeBounds.max.x ||
+                        candidate.bounds.max.y < probeBounds.min.y ||
+                        candidate.bounds.min.y > probeBounds.max.y
+                    )
+                )
+            ].filter((candidate, index, list) =>
+                candidate !== body &&
+                !candidate.isSensor &&
+                list.findIndex(item => item.id === candidate.id) === index
+            );
+
+            if (candidates.length === 0) return false;
+
+            return Query.collides(probe, candidates).some(hit => {
+                const other = hit.bodyA === probe ? hit.bodyB : hit.bodyA;
+                return !!other && other !== body && !other.isSensor;
+            });
+        }
+
         function getBodyNormalExtent(body, normal) {
             return body.vertices.reduce((maxExtent, vertex) => {
                 const projection = (vertex.x - body.position.x) * normal.x + (vertex.y - body.position.y) * normal.y;
@@ -5178,27 +5221,17 @@
                 }
             }
 
-            // 잠자는 배치 구슬이 공중에 떠 있으면 깨우기 (밀리는 벽은 제외)
-            // → 아래에 지지체가 없으면 sleeping 해제
-            cache.sleepCheckBodies.forEach(b => {
-                if (!b.isSleeping) return;
-                
-                // 이 바디 아래쪽으로 짧은 거리에 다른 바디가 있는지 확인
-                const checkY = b.position.y + ((b.circleRadius || 15) + 3);
-                const supportPoint = { x: b.position.x, y: checkY };
-                const supporters = [
-                    ...getPlacementCandidatesAtPoint(supportPoint, 16),
-                    ...staticSolidSpatialIndex.queryPoint(supportPoint, 16)
-                ].filter((supporter, index, list) =>
-                    supporter !== b &&
-                    list.findIndex(candidate => candidate.id === supporter.id) === index
-                );
-                
-                if (supporters.length === 0) {
-                    // 지지체가 없으면 깨우기 (공중에 떠있는 상태)
-                    Sleeping.set(b, false);
-                    if (b.render) b.render.opacity = 1.0;
+            // 정지해 있는 구슬은 지지대가 사라지면 바로 다시 떨어지게 한다.
+            cache.candidateBallBodies.forEach(ball => {
+                const shouldCheck = ball.isSleeping || (ball.plugin?.type === 'place_marble' && ball.isStatic);
+                if (!shouldCheck) return;
+                if (hasBodySupportBelow(ball)) return;
+
+                if (ball.isStatic) {
+                    Body.setStatic(ball, false);
                 }
+                Sleeping.set(ball, false);
+                if (ball.render) ball.render.opacity = 1.0;
             });
         });
 
