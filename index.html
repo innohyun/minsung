@@ -506,7 +506,7 @@
             'shock_absorber': { id: 'shock_absorber', name: '충격 흡수', w: 130, h: 26, color: '#e66a4f', restitution: 0.0, pw: 22, ph: 8, type: 'shock_absorber' },
             'sound_block': { id: 'sound_block', name: '소리 블록', w: 96, h: 24, color: '#3f8efc', restitution: 0.0, pw: 18, ph: 8, type: 'sound_block', noteKey: 'c4' },
             'metal_cup': { id: 'metal_cup', name: '알루미늄 컵', w: 52, h: 52, color: '#b7c2cf', restitution: 0.04, pw: 14, ph: 14, type: 'metal_cup' },
-            'moving_hole_disc': { id: 'moving_hole_disc', name: '움직이는 원', w: 140, h: 140, color: '#d97706', restitution: 0.0, pw: 18, ph: 18, type: 'moving_hole_disc' },
+            'moving_hole_disc': { id: 'moving_hole_disc', name: '회전 원', w: 140, h: 140, color: '#d97706', restitution: 0.0, pw: 18, ph: 18, type: 'moving_hole_disc' },
             'teleport_portal': { id: 'teleport_portal', name: '순간이동', w: 64, h: 64, color: '#ffd400', restitution: 0.0, pw: 15, ph: 15, type: 'teleport_portal' },
             'ice':    { id: 'ice', name: '얼음',   w: 150, h: 15, color: '#81d4fa', restitution: 0.0, pw: 25, ph: 5 },
             'escalator_l_s': { id: 'escalator_l_s', name: '에스컬[←짧]', w: 100, h: 20, color: '#e0a030', restitution: 0.0, pw: 20, ph: 5 },
@@ -2221,8 +2221,11 @@
             const holeWidth = 34;
             const holeHeight = 42;
             const holeHalfWidth = holeWidth / 2;
-            const holeHalfHeight = holeHeight / 2;
-            const sliceHeight = 4;
+            const holeOpenTopY = -radius - 2;
+            const holeWallTopY = -Math.sqrt(Math.max(0, radius * radius - holeHalfWidth * holeHalfWidth));
+            const wallThickness = Math.max(12, Math.round(radius * 0.2));
+            const holeBottomY = Math.min(radius - wallThickness, holeWallTopY + holeHeight);
+            const sliceHeight = 3;
             const common = {
                 isStatic: true,
                 friction: 0,
@@ -2235,29 +2238,36 @@
 
             for (let localY = -radius + sliceHeight / 2; localY <= radius - sliceHeight / 2 + 0.001; localY += sliceHeight) {
                 const halfSpan = Math.sqrt(Math.max(0, radius * radius - localY * localY));
-                const inHoleBand = localY >= -holeHalfHeight && localY <= holeHalfHeight;
-                if (!inHoleBand) {
-                    parts.push(Bodies.rectangle(0, localY, halfSpan * 2, sliceHeight + 0.8, common));
+                if (halfSpan <= 1) continue;
+
+                if (localY <= holeBottomY + sliceHeight * 0.5) {
+                    const sideWidth = halfSpan - holeHalfWidth;
+                    if (sideWidth > 1) {
+                        parts.push(Bodies.rectangle(
+                            -(holeHalfWidth + sideWidth / 2),
+                            localY,
+                            sideWidth,
+                            sliceHeight + 0.8,
+                            common
+                        ));
+                        parts.push(Bodies.rectangle(
+                            holeHalfWidth + sideWidth / 2,
+                            localY,
+                            sideWidth,
+                            sliceHeight + 0.8,
+                            common
+                        ));
+                    }
                     continue;
                 }
 
-                const sideWidth = halfSpan - holeHalfWidth;
-                if (sideWidth > 1.5) {
-                    parts.push(Bodies.rectangle(
-                        -(holeHalfWidth + sideWidth / 2),
-                        localY,
-                        sideWidth,
-                        sliceHeight + 0.8,
-                        common
-                    ));
-                    parts.push(Bodies.rectangle(
-                        holeHalfWidth + sideWidth / 2,
-                        localY,
-                        sideWidth,
-                        sliceHeight + 0.8,
-                        common
-                    ));
-                }
+                parts.push(Bodies.rectangle(
+                    0,
+                    localY,
+                    halfSpan * 2,
+                    sliceHeight + 0.8,
+                    common
+                ));
             }
 
             const body = Body.create({
@@ -2278,9 +2288,10 @@
                     radius,
                     holeWidth,
                     holeHeight,
-                    motionAmplitude: 18,
-                    motionSpeed: 0.0011,
-                    motionPhase: 0,
+                    holeOpenTopY,
+                    holeWallTopY,
+                    holeBottomY,
+                    rotationSpeed: 0.00022,
                     originX: x,
                     originY: y,
                     originAngle: angle
@@ -2451,10 +2462,11 @@
                 const localPoint = worldToBodyLocal(body, worldPoint);
                 const radius = body.plugin?.radius || 1;
                 const holeHalfWidth = (body.plugin?.holeWidth || 34) / 2;
-                const holeHalfHeight = (body.plugin?.holeHeight || 42) / 2;
+                const holeTopY = body.plugin?.holeWallTopY ?? (-Math.sqrt(Math.max(0, radius * radius - holeHalfWidth * holeHalfWidth)));
+                const holeBottomY = body.plugin?.holeBottomY ?? (holeTopY + (body.plugin?.holeHeight || 42));
                 const holeCandidates = [];
 
-                if (localPoint.y >= -holeHalfHeight - 8 && localPoint.y <= holeHalfHeight + 8) {
+                if (localPoint.y >= holeTopY - 8 && localPoint.y <= holeBottomY + 8) {
                     holeCandidates.push(
                         { distance: Math.abs(localPoint.x + holeHalfWidth), x: -1, y: 0 },
                         { distance: Math.abs(holeHalfWidth - localPoint.x), x: 1, y: 0 }
@@ -2462,8 +2474,7 @@
                 }
                 if (localPoint.x >= -holeHalfWidth - 8 && localPoint.x <= holeHalfWidth + 8) {
                     holeCandidates.push(
-                        { distance: Math.abs(localPoint.y + holeHalfHeight), x: 0, y: -1 },
-                        { distance: Math.abs(holeHalfHeight - localPoint.y), x: 0, y: 1 }
+                        { distance: Math.abs(holeBottomY - localPoint.y), x: 0, y: 1 }
                     );
                 }
 
@@ -3086,7 +3097,8 @@
 
             const radius = body.plugin?.radius || 70;
             const holeWidth = body.plugin?.holeWidth || 34;
-            const holeHeight = body.plugin?.holeHeight || 42;
+            const holeTopY = body.plugin?.holeOpenTopY ?? (-radius - 2);
+            const holeBottomY = body.plugin?.holeBottomY ?? (holeTopY + (body.plugin?.holeHeight || 42));
             const bodyColor = body.plugin?.color || '#d97706';
 
             ctx.save();
@@ -3103,7 +3115,7 @@
             ctx.lineWidth = isSelected ? 3 : 2;
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
-            ctx.rect(-holeWidth / 2, -holeHeight / 2, holeWidth, holeHeight);
+            ctx.rect(-holeWidth / 2, holeTopY, holeWidth, holeBottomY - holeTopY);
             ctx.fill('evenodd');
 
             ctx.beginPath();
@@ -4997,25 +5009,15 @@
             const discs = getWorldCache().movingHoleDiscs;
             if (discs.length === 0) return;
 
-            const now = engine.timing.timestamp;
+            const delta = engine.timing.lastDelta || 1000 / 60;
             discs.forEach(body => {
                 if (!body?.plugin) return;
                 if (body === selectedBody && isDraggingBody) return;
 
-                const amplitude = body.plugin.motionAmplitude || 18;
-                const speed = body.plugin.motionSpeed || 0.0011;
-                const phase = body.plugin.motionPhase || 0;
-                const originX = body.plugin.originX ?? body.position.x;
-                const originY = body.plugin.originY ?? body.position.y;
-                const targetX = originX + Math.sin(now * speed + phase) * amplitude;
-                const targetY = originY;
-
-                if (Math.abs(body.position.x - targetX) < 0.01 && Math.abs(body.position.y - targetY) < 0.01) {
-                    return;
-                }
-
-                Body.setPosition(body, { x: targetX, y: targetY });
-                syncWorldBodyRegistration(body);
+                const rotationSpeed = body.plugin.rotationSpeed || 0.00022;
+                const deltaAngle = rotationSpeed * delta;
+                if (Math.abs(deltaAngle) < 0.00001) return;
+                Body.setAngle(body, body.angle + deltaAngle);
             });
         });
 
