@@ -2224,6 +2224,7 @@
             const holeOpenTopY = -radius - 2;
             const holeWallTopY = -Math.sqrt(Math.max(0, radius * radius - holeHalfWidth * holeHalfWidth));
             const wallThickness = Math.max(12, Math.round(radius * 0.2));
+            const holeWallThickness = Math.max(10, Math.round(radius * 0.16));
             const holeBottomY = Math.min(radius - wallThickness, holeWallTopY + holeHeight);
             const sliceHeight = 3;
             const common = {
@@ -2270,6 +2271,33 @@
                 ));
             }
 
+            const holeWallHeight = Math.max(holeWallThickness, holeBottomY - holeWallTopY + holeWallThickness);
+            const holeWallCommon = {
+                ...common,
+                chamfer: { radius: Math.max(2, holeWallThickness * 0.18) }
+            };
+            parts.push(Bodies.rectangle(
+                -(holeHalfWidth + holeWallThickness / 2),
+                (holeWallTopY + holeBottomY) / 2,
+                holeWallThickness,
+                holeWallHeight,
+                holeWallCommon
+            ));
+            parts.push(Bodies.rectangle(
+                holeHalfWidth + holeWallThickness / 2,
+                (holeWallTopY + holeBottomY) / 2,
+                holeWallThickness,
+                holeWallHeight,
+                holeWallCommon
+            ));
+            parts.push(Bodies.rectangle(
+                0,
+                holeBottomY + holeWallThickness / 2,
+                holeWidth + holeWallThickness * 2,
+                holeWallThickness,
+                holeWallCommon
+            ));
+
             const body = Body.create({
                 isStatic: true,
                 label: 'moving_hole_disc',
@@ -2291,6 +2319,7 @@
                     holeOpenTopY,
                     holeWallTopY,
                     holeBottomY,
+                    holeWallThickness,
                     rotationSpeed: 0.00022,
                     originX: x,
                     originY: y,
