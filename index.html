@@ -2298,12 +2298,13 @@
             ));
 
             const body = Body.create({
-                isStatic: true,
+                isStatic: false,
                 label: 'moving_hole_disc',
                 parts,
                 friction: 0,
                 frictionStatic: 0,
                 restitution: conf.restitution || 0,
+                frictionAir: 0,
                 render: { visible: false },
                 slop: 0,
                 plugin: {
@@ -2320,6 +2321,8 @@
                     holeBottomY,
                     holeWallThickness,
                     rotationSpeed: 0.00022,
+                    anchorX: x,
+                    anchorY: y,
                     originX: x,
                     originY: y,
                     originAngle: angle
@@ -2335,6 +2338,10 @@
             if (angle) {
                 Body.setAngle(body, angle);
             }
+            Body.setInertia(body, Infinity);
+            Body.setVelocity(body, { x: 0, y: 0 });
+            Body.setAngularVelocity(body, body.plugin.rotationSpeed || 0.00022);
+            Sleeping.set(body, false);
 
             return body;
         }
@@ -2509,8 +2516,10 @@
 
         function isTunnelGuardSurface(body) {
             const root = getCollisionRoot(body);
-            if (!root || root.isSensor || !root.isStatic) return false;
+            if (!root || root.isSensor) return false;
             if (root === ground) return true;
+            if (isMovingHoleDiscBody(root)) return true;
+            if (!root.isStatic) return false;
             if (root.label === 'slime') return false;
             if (root.label === 'anti_gravity_slime') return false;
             if (root.plugin?.type === 'goal_box' || root.plugin?.type === 'pushable') return false;
@@ -2869,6 +2878,10 @@
             if (!body?.plugin) return;
             body.plugin.originX = body.position.x;
             body.plugin.originY = body.position.y;
+            if (body.plugin.type === 'moving_hole_disc') {
+                body.plugin.anchorX = body.position.x;
+                body.plugin.anchorY = body.position.y;
+            }
             if (body.plugin.originAngle !== undefined || !body.circleRadius) {
                 body.plugin.originAngle = body.angle;
             }
@@ -5035,6 +5048,11 @@
             });
             cache.movingHoleDiscs.forEach(body => {
                 if (cache.bodyIdSet.has(body.id)) {
+                    if (body === selectedBody && isDraggingBody) return;
+                    const anchorX = body.plugin?.anchorX ?? body.plugin?.originX ?? body.position.x;
+                    const anchorY = body.plugin?.anchorY ?? body.plugin?.originY ?? body.position.y;
+                    Body.setPosition(body, { x: anchorX, y: anchorY });
+                    Body.setVelocity(body, { x: 0, y: 0 });
                     syncWorldBodyRegistration(body);
                 }
             });
@@ -5074,15 +5092,18 @@
             const discs = getWorldCache().movingHoleDiscs;
             if (discs.length === 0) return;
 
-            const delta = engine.timing.lastDelta || 1000 / 60;
             discs.forEach(body => {
                 if (!body?.plugin) return;
                 if (body === selectedBody && isDraggingBody) return;
 
                 const rotationSpeed = body.plugin.rotationSpeed || 0.00022;
-                const deltaAngle = rotationSpeed * delta;
-                if (Math.abs(deltaAngle) < 0.00001) return;
-                Body.setAngle(body, body.angle + deltaAngle, true);
+                const anchorX = body.plugin?.anchorX ?? body.plugin?.originX ?? body.position.x;
+                const anchorY = body.plugin?.anchorY ?? body.plugin?.originY ?? body.position.y;
+                Body.setPosition(body, { x: anchorX, y: anchorY });
+                Body.setVelocity(body, { x: 0, y: 0 });
+                Body.setInertia(body, Infinity);
+                Body.setAngularVelocity(body, rotationSpeed);
+                Sleeping.set(body, false);
             });
         });
 
