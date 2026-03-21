@@ -216,12 +216,78 @@
             y: 0,
             width: 46,
             height: 74,
+            pixelSize: 4,
             vy: 0,
             jumpVelocity: -910,
             gravity: 2400,
             grounded: true,
             runCycle: 0
         };
+
+        const PLAYER_SPRITES = {
+            runA: [
+                '00000111100000',
+                '00001111110000',
+                '00001111110000',
+                '00000111100000',
+                '00000111100000',
+                '00011111111000',
+                '00111111111100',
+                '00011111111000',
+                '00001111110000',
+                '00011111110000',
+                '00111111100000',
+                '00111111110000',
+                '00011101111000',
+                '00011000111100',
+                '00110000011110',
+                '01100000001110',
+                '11000000000110',
+                '00000000000000'
+            ],
+            runB: [
+                '00000111100000',
+                '00001111110000',
+                '00001111110000',
+                '00000111100000',
+                '00000111100000',
+                '00011111111000',
+                '00111111111100',
+                '00011111111000',
+                '00001111110000',
+                '00001111111000',
+                '00000111111100',
+                '00001111111100',
+                '00011110111000',
+                '00111100011000',
+                '01111000001100',
+                '01110000000110',
+                '01100000000011',
+                '00000000000000'
+            ],
+            jump: [
+                '00000111100000',
+                '00001111110000',
+                '00001111110000',
+                '00000111100000',
+                '00000111100000',
+                '00011111111000',
+                '00111111111100',
+                '00011111111000',
+                '00001111110000',
+                '00001111110000',
+                '00011111111000',
+                '00111111111100',
+                '00011111111000',
+                '00001111110000',
+                '00011100111000',
+                '00111000011100',
+                '01110000001110',
+                '00000000000000'
+            ]
+        };
+        const PLAYER_SPRITE_COLS = PLAYER_SPRITES.runA[0].length;
+        const PLAYER_SPRITE_ROWS = PLAYER_SPRITES.runA.length;
 
         function clamp(value, min, max) {
             return Math.max(min, Math.min(max, value));
@@ -235,13 +301,15 @@
             canvas.style.width = `${state.width}px`;
             canvas.style.height = `${state.height}px`;
             ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+            ctx.imageSmoothingEnabled = false;
 
             state.groundY = Math.round(state.height * 0.78);
             state.horizonY = Math.round(state.height * 0.18);
 
-            player.x = clamp(state.width * 0.16, 90, 170);
-            player.height = clamp(state.height * 0.14, 58, 84);
-            player.width = player.height * 0.58;
+            player.x = Math.round(clamp(state.width * 0.16, 90, 170));
+            player.pixelSize = Math.max(3, Math.floor(clamp(state.height * 0.14, 58, 84) / PLAYER_SPRITE_ROWS));
+            player.height = player.pixelSize * PLAYER_SPRITE_ROWS;
+            player.width = player.pixelSize * PLAYER_SPRITE_COLS;
             player.y = state.groundY - player.height;
 
             if (!state.clouds.length) {
@@ -374,10 +442,10 @@
 
         function getPlayerHitbox() {
             return {
-                x: player.x + player.width * 0.18,
-                y: player.y + player.height * 0.08,
-                width: player.width * 0.56,
-                height: player.height * 0.88
+                x: player.x + player.pixelSize * 2,
+                y: player.y + player.pixelSize,
+                width: player.pixelSize * 9,
+                height: player.pixelSize * 16
             };
         }
 
@@ -480,56 +548,35 @@
             }
         }
 
-        function drawStickRunner() {
-            const x = player.x;
-            const y = player.y;
-            const h = player.height;
-            const headR = h * 0.16;
-            const shoulderY = y + h * 0.28;
-            const hipY = y + h * 0.62;
-            const stride = player.grounded ? Math.sin(player.runCycle) : 0.18;
-            const armSwing = player.grounded ? Math.cos(player.runCycle) : -0.28;
-
-            ctx.strokeStyle = '#18130d';
-            ctx.fillStyle = '#18130d';
-            ctx.lineWidth = Math.max(3, h * 0.07);
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            ctx.beginPath();
-            ctx.arc(x + player.width * 0.52, y + headR + 2, headR, 0, Math.PI * 2);
-            ctx.fill();
-
-            ctx.beginPath();
-            ctx.moveTo(x + player.width * 0.52, shoulderY - 4);
-            ctx.lineTo(x + player.width * 0.52, hipY);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(x + player.width * 0.16, shoulderY + armSwing * 7);
-            ctx.lineTo(x + player.width * 0.52, shoulderY + 2);
-            ctx.lineTo(x + player.width * 0.82, shoulderY - armSwing * 7);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.moveTo(x + player.width * 0.52, hipY);
-            ctx.lineTo(x + player.width * (0.23 + stride * 0.12), y + h);
-            ctx.moveTo(x + player.width * 0.52, hipY);
-            ctx.lineTo(x + player.width * (0.82 - stride * 0.12), y + h);
-            ctx.stroke();
-
-            if (state.mode === 'gameover') {
-                ctx.beginPath();
-                ctx.moveTo(x + player.width * 0.42, y + headR - 2);
-                ctx.lineTo(x + player.width * 0.49, y + headR + 5);
-                ctx.moveTo(x + player.width * 0.49, y + headR - 2);
-                ctx.lineTo(x + player.width * 0.42, y + headR + 5);
-                ctx.moveTo(x + player.width * 0.56, y + headR - 2);
-                ctx.lineTo(x + player.width * 0.63, y + headR + 5);
-                ctx.moveTo(x + player.width * 0.63, y + headR - 2);
-                ctx.lineTo(x + player.width * 0.56, y + headR + 5);
-                ctx.stroke();
+        function drawPixelSprite(sprite, x, y, cellSize, color) {
+            ctx.fillStyle = color;
+            for (let row = 0; row < sprite.length; row += 1) {
+                const line = sprite[row];
+                for (let col = 0; col < line.length; col += 1) {
+                    if (line[col] !== '1') continue;
+                    ctx.fillRect(
+                        Math.round(x + col * cellSize),
+                        Math.round(y + row * cellSize),
+                        cellSize,
+                        cellSize
+                    );
+                }
             }
+        }
+
+        function getRunnerSprite() {
+            if (!player.grounded) return PLAYER_SPRITES.jump;
+            return Math.floor(player.runCycle) % 2 === 0 ? PLAYER_SPRITES.runA : PLAYER_SPRITES.runB;
+        }
+
+        function drawPixelRunner() {
+            drawPixelSprite(
+                getRunnerSprite(),
+                player.x,
+                player.y,
+                player.pixelSize,
+                '#18130d'
+            );
         }
 
         function drawCactus(obstacle) {
@@ -558,7 +605,7 @@
             drawSky();
             drawGround();
             state.obstacles.forEach(drawCactus);
-            drawStickRunner();
+            drawPixelRunner();
         }
 
         function loop(timestamp) {
