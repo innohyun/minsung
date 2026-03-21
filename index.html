@@ -5082,7 +5082,7 @@
                 const rotationSpeed = body.plugin.rotationSpeed || 0.00022;
                 const deltaAngle = rotationSpeed * delta;
                 if (Math.abs(deltaAngle) < 0.00001) return;
-                Body.setAngle(body, body.angle + deltaAngle);
+                Body.setAngle(body, body.angle + deltaAngle, true);
             });
         });
 
