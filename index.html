@@ -3127,12 +3127,8 @@
             const radius = body.plugin?.radius || 70;
             const holeWidth = body.plugin?.holeWidth || 34;
             const holeTopY = body.plugin?.holeOpenTopY ?? (-radius - 2);
-            const holeWallTopY = body.plugin?.holeWallTopY ?? (-Math.sqrt(Math.max(0, radius * radius - (holeWidth / 2) * (holeWidth / 2))));
             const holeBottomY = body.plugin?.holeBottomY ?? (holeTopY + (body.plugin?.holeHeight || 42));
             const bodyColor = body.plugin?.color || '#d97706';
-            const holeHalfWidth = holeWidth / 2;
-            const leftArcAngle = Math.atan2(holeWallTopY, -holeHalfWidth);
-            const rightArcAngle = Math.atan2(holeWallTopY, holeHalfWidth);
 
             ctx.save();
             ctx.translate(body.position.x - render.bounds.min.x, body.position.y - render.bounds.min.y);
@@ -3144,20 +3140,10 @@
             fill.addColorStop(1, mixColor(bodyColor, '#7c2d12', 0.18));
 
             ctx.fillStyle = fill;
-            ctx.strokeStyle = isSelected ? '#fff7ed' : mixColor(bodyColor, '#7c2d12', 0.22);
-            ctx.lineWidth = isSelected ? 3 : 2;
             ctx.beginPath();
             ctx.arc(0, 0, radius, 0, Math.PI * 2);
             ctx.rect(-holeWidth / 2, holeTopY, holeWidth, holeBottomY - holeTopY);
             ctx.fill('evenodd');
-
-            ctx.beginPath();
-            ctx.arc(0, 0, radius, leftArcAngle, rightArcAngle, true);
-            ctx.moveTo(-holeHalfWidth, holeWallTopY);
-            ctx.lineTo(-holeHalfWidth, holeBottomY);
-            ctx.lineTo(holeHalfWidth, holeBottomY);
-            ctx.lineTo(holeHalfWidth, holeWallTopY);
-            ctx.stroke();
 
             ctx.restore();
         }
@@ -3689,12 +3675,15 @@
             const holeTopY = disc.plugin?.holeWallTopY ?? -(disc.plugin?.radius || 70);
             const holeBottomY = disc.plugin?.holeBottomY ?? (holeTopY + (disc.plugin?.holeHeight || 42));
             const discRadius = disc.plugin?.radius || 70;
+            const innerHalfWidth = Math.max(4, holeHalfWidth - marbleRadius * 0.14);
+            const carryTopY = holeTopY + marbleRadius * 0.72;
+            const carryBottomY = holeBottomY - marbleRadius * 0.08;
 
             return (
-                local.x >= -holeHalfWidth - marbleRadius * 0.18 &&
-                local.x <= holeHalfWidth + marbleRadius * 0.18 &&
-                local.y >= holeTopY - marbleRadius * 0.3 &&
-                local.y <= holeBottomY + marbleRadius * 0.38 &&
+                local.x >= -innerHalfWidth &&
+                local.x <= innerHalfWidth &&
+                local.y >= carryTopY &&
+                local.y <= carryBottomY &&
                 Math.hypot(local.x, local.y) <= discRadius + marbleRadius * 0.4
             );
         }
