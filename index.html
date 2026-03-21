@@ -3673,63 +3673,6 @@
             };
         }
 
-        function isLocalPointInsideMovingHoleDiscPocket(body, localPoint, radiusPadding = 0) {
-            if (!isMovingHoleDiscBody(body) || !localPoint) return false;
-
-            const holeHalfWidth = (body.plugin?.holeWidth || 34) / 2;
-            const holeTopY = body.plugin?.holeWallTopY ?? -(body.plugin?.radius || 70);
-            const holeBottomY = body.plugin?.holeBottomY ?? (holeTopY + (body.plugin?.holeHeight || 42));
-
-            return (
-                localPoint.x >= -holeHalfWidth - radiusPadding * 0.2 &&
-                localPoint.x <= holeHalfWidth + radiusPadding * 0.2 &&
-                localPoint.y >= holeTopY - radiusPadding * 0.25 &&
-                localPoint.y <= holeBottomY + radiusPadding * 0.35
-            );
-        }
-
-        function rotateMarblesInsideMovingHoleDisc(body, previousAngle, nextAngle) {
-            if (!isMovingHoleDiscBody(body)) return;
-
-            const deltaAngle = nextAngle - previousAngle;
-            if (Math.abs(deltaAngle) < 0.00001) return;
-
-            const frameSeconds = Math.max(1 / 240, (engine.timing.lastDelta || (1000 / 60)) / 1000);
-            const prevCos = Math.cos(previousAngle);
-            const prevSin = Math.sin(previousAngle);
-            const nextCos = Math.cos(nextAngle);
-            const nextSin = Math.sin(nextAngle);
-
-            getWorldCache().candidateBallBodies.forEach(ball => {
-                if (!ball?.circleRadius || ball === body || ball.isSensor || ball.plugin?.attachedMagnetId) return;
-
-                const relX = ball.position.x - body.position.x;
-                const relY = ball.position.y - body.position.y;
-                const localPoint = {
-                    x: relX * prevCos + relY * prevSin,
-                    y: -relX * prevSin + relY * prevCos
-                };
-                if (!isLocalPointInsideMovingHoleDiscPocket(body, localPoint, ball.circleRadius || 0)) return;
-
-                if (!ball.isStatic && ball.isSleeping) {
-                    Sleeping.set(ball, false);
-                }
-
-                const prevX = ball.position.x;
-                const prevY = ball.position.y;
-                const nextX = body.position.x + (localPoint.x * nextCos - localPoint.y * nextSin);
-                const nextY = body.position.y + (localPoint.x * nextSin + localPoint.y * nextCos);
-                Body.setPosition(ball, { x: nextX, y: nextY });
-
-                if (!ball.isStatic) {
-                    Body.setVelocity(ball, {
-                        x: (nextX - prevX) / frameSeconds,
-                        y: (nextY - prevY) / frameSeconds
-                    });
-                }
-            });
-        }
-
         function getCarryableMarbles() {
             return getWorldCache().candidateBallBodies.filter(body => !body.isStatic && !body.isSensor);
         }
@@ -4363,10 +4306,8 @@
             if (now - lastTime < DOUBLE_CLICK_DELAY) amount = Math.PI / 2;
             lastKeyTime[dir] = now;
             const factor = (dir === 'Left' || dir === 'Up') ? -1 : 1;
-            const previousAngle = selectedBody.angle;
             const newAngle = selectedBody.angle + (amount * factor);
             Body.setAngle(selectedBody, newAngle);
-            rotateMarblesInsideMovingHoleDisc(selectedBody, previousAngle, newAngle);
             syncWorldBodyRegistration(selectedBody, true);
             
             // 회전시켰을 때 현재 각도를 새로운 '되돌리기 기준점'으로 저장
