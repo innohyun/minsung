@@ -2218,13 +2218,14 @@
 
         function createMovingHoleDiscBody(x, y, conf, angle = 0) {
             const radius = Math.max(54, Math.min(conf.w, conf.h) / 2);
-            const holeWidth = 34;
-            const holeHeight = 42;
+            const holeWidth = 38;
+            const holeHeight = 44;
             const holeHalfWidth = holeWidth / 2;
             const holeOpenTopY = -radius - 2;
             const holeWallTopY = -Math.sqrt(Math.max(0, radius * radius - holeHalfWidth * holeHalfWidth));
             const holeBottomY = Math.min(radius - 12, holeWallTopY + holeHeight);
-            const sliceHeight = 3;
+            const holeWallThickness = 4;
+            const sliceHeight = 2;
             const common = {
                 isStatic: true,
                 friction: 0,
@@ -2269,6 +2270,33 @@
                 ));
             }
 
+            const wallHeight = Math.max(6, holeBottomY - holeWallTopY);
+            const wallCommon = {
+                ...common,
+                chamfer: { radius: 1 }
+            };
+            parts.push(Bodies.rectangle(
+                -(holeHalfWidth + holeWallThickness / 2),
+                holeWallTopY + wallHeight / 2,
+                holeWallThickness,
+                wallHeight,
+                wallCommon
+            ));
+            parts.push(Bodies.rectangle(
+                holeHalfWidth + holeWallThickness / 2,
+                holeWallTopY + wallHeight / 2,
+                holeWallThickness,
+                wallHeight,
+                wallCommon
+            ));
+            parts.push(Bodies.rectangle(
+                0,
+                holeBottomY + holeWallThickness / 2,
+                holeWidth + holeWallThickness,
+                holeWallThickness,
+                wallCommon
+            ));
+
             const body = Body.create({
                 isStatic: true,
                 label: 'moving_hole_disc',
@@ -2290,6 +2318,7 @@
                     holeOpenTopY,
                     holeWallTopY,
                     holeBottomY,
+                    holeWallThickness,
                     rotationSpeed: 0.00022,
                     originX: x,
                     originY: y,
