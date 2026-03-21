@@ -3707,8 +3707,7 @@
             if (Math.abs(deltaAngle) < 0.00001) return;
 
             const frameSeconds = Math.max(1 / 240, deltaMs / 1000);
-            const cos = Math.cos(deltaAngle);
-            const sin = Math.sin(deltaAngle);
+            const angularSpeed = deltaAngle / frameSeconds;
 
             getCarryableMarbles().forEach(marble => {
                 if (marble.plugin?.attachedMagnetId) return;
@@ -3720,18 +3719,17 @@
 
                 const relX = marble.position.x - disc.position.x;
                 const relY = marble.position.y - disc.position.y;
-                const nextX = disc.position.x + (relX * cos - relY * sin);
-                const nextY = disc.position.y + (relX * sin + relY * cos);
-                const carryVX = (nextX - marble.position.x) / frameSeconds;
-                const carryVY = (nextY - marble.position.y) / frameSeconds;
+                const local = worldToBodyLocal(disc, marble.position);
+                const holeTopY = disc.plugin?.holeWallTopY ?? -(disc.plugin?.radius || 70);
+                const holeBottomY = disc.plugin?.holeBottomY ?? (holeTopY + (disc.plugin?.holeHeight || 42));
+                const depthRatio = Math.max(0, Math.min(1, (local.y - holeTopY) / Math.max(1, holeBottomY - holeTopY)));
+                const grip = 0.12 + depthRatio * 0.43;
+                const targetVX = -relY * angularSpeed;
+                const targetVY = relX * angularSpeed;
 
-                Body.setPosition(marble, {
-                    x: marble.position.x + (nextX - marble.position.x) * 0.78,
-                    y: marble.position.y + (nextY - marble.position.y) * 0.78
-                });
                 Body.setVelocity(marble, {
-                    x: marble.velocity.x * 0.35 + carryVX * 0.65,
-                    y: marble.velocity.y * 0.35 + carryVY * 0.65
+                    x: marble.velocity.x + (targetVX - marble.velocity.x) * grip,
+                    y: marble.velocity.y + (targetVY - marble.velocity.y) * grip
                 });
             });
         }
