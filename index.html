@@ -3704,65 +3704,6 @@
             };
         }
 
-        function isMarbleInsideMovingHoleDiscPocket(disc, marble, angle = disc?.angle || 0) {
-            if (!isMovingHoleDiscBody(disc) || !marble?.circleRadius) return false;
-
-            const dx = marble.position.x - disc.position.x;
-            const dy = marble.position.y - disc.position.y;
-            const cos = Math.cos(angle);
-            const sin = Math.sin(angle);
-            const localX = dx * cos + dy * sin;
-            const localY = -dx * sin + dy * cos;
-            const marbleRadius = marble.circleRadius || 15;
-            const holeHalfWidth = (disc.plugin?.holeWidth || 34) / 2;
-            const holeTopY = disc.plugin?.holeWallTopY ?? -(disc.plugin?.radius || 70);
-            const holeBottomY = disc.plugin?.holeBottomY ?? (holeTopY + (disc.plugin?.holeHeight || 42));
-            const innerHalfWidth = Math.max(4, holeHalfWidth - marbleRadius * 0.14);
-            const carryTopY = holeTopY + marbleRadius * 0.72;
-            const carryBottomY = holeBottomY - marbleRadius * 0.08;
-
-            return (
-                localX >= -innerHalfWidth &&
-                localX <= innerHalfWidth &&
-                localY >= carryTopY &&
-                localY <= carryBottomY
-            );
-        }
-
-        function carryMarblesInMovingHoleDisc(disc, previousAngle, nextAngle, deltaMs) {
-            if (!isMovingHoleDiscBody(disc)) return;
-
-            const deltaAngle = nextAngle - previousAngle;
-            if (Math.abs(deltaAngle) < 0.00001) return;
-
-            const frameSeconds = Math.max(1 / 240, deltaMs / 1000);
-            const angularSpeed = deltaAngle / frameSeconds;
-
-            getCarryableMarbles().forEach(marble => {
-                if (marble.plugin?.attachedMagnetId) return;
-                if (!isMarbleInsideMovingHoleDiscPocket(disc, marble, previousAngle)) return;
-
-                if (marble.isSleeping) {
-                    Sleeping.set(marble, false);
-                }
-
-                const relX = marble.position.x - disc.position.x;
-                const relY = marble.position.y - disc.position.y;
-                const local = worldToBodyLocal(disc, marble.position);
-                const holeTopY = disc.plugin?.holeWallTopY ?? -(disc.plugin?.radius || 70);
-                const holeBottomY = disc.plugin?.holeBottomY ?? (holeTopY + (disc.plugin?.holeHeight || 42));
-                const depthRatio = Math.max(0, Math.min(1, (local.y - holeTopY) / Math.max(1, holeBottomY - holeTopY)));
-                const grip = 0.12 + depthRatio * 0.43;
-                const targetVX = -relY * angularSpeed;
-                const targetVY = relX * angularSpeed;
-
-                Body.setVelocity(marble, {
-                    x: marble.velocity.x + (targetVX - marble.velocity.x) * grip,
-                    y: marble.velocity.y + (targetVY - marble.velocity.y) * grip
-                });
-            });
-        }
-
         function getCarryableMarbles() {
             return getWorldCache().candidateBallBodies.filter(body => !body.isStatic && !body.isSensor);
         }
@@ -5141,10 +5082,7 @@
                 const rotationSpeed = body.plugin.rotationSpeed || 0.00022;
                 const deltaAngle = rotationSpeed * delta;
                 if (Math.abs(deltaAngle) < 0.00001) return;
-                const previousAngle = body.angle;
-                const nextAngle = previousAngle + deltaAngle;
-                carryMarblesInMovingHoleDisc(body, previousAngle, nextAngle, delta);
-                Body.setAngle(body, nextAngle);
+                Body.setAngle(body, body.angle + deltaAngle);
             });
         });
 
