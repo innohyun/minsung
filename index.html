@@ -1425,6 +1425,7 @@
         function shouldRefreshMinimap() {
             const cache = getWorldCache();
             if (minimapDirty || isLaunching || isFollowMode) return true;
+            if (cache.movingHoleDiscs.length > 0) return true;
             if (pushables.some(body => cache.bodyIdSet.has(body.id) && isBodyActivelyMoving(body))) return true;
             if (magnets.some(body => cache.bodyIdSet.has(body.id) && body.plugin?.isAttached === false && isBodyActivelyMoving(body))) return true;
             return false;
@@ -2289,6 +2290,7 @@
                     holeOpenTopY,
                     holeWallTopY,
                     holeBottomY,
+                    rotationSpeed: 0.00022,
                     originX: x,
                     originY: y,
                     originAngle: angle
@@ -5002,6 +5004,11 @@
                     syncWorldBodyRegistration(body);
                 }
             });
+            cache.movingHoleDiscs.forEach(body => {
+                if (cache.bodyIdSet.has(body.id)) {
+                    syncWorldBodyRegistration(body);
+                }
+            });
         });
 
         Events.on(engine, 'afterUpdate', () => {
@@ -5032,6 +5039,22 @@
                     cameraPos.y + (targetY - cameraPos.y) * 0.1
                 );
             }
+        });
+
+        Events.on(engine, 'beforeUpdate', () => {
+            const discs = getWorldCache().movingHoleDiscs;
+            if (discs.length === 0) return;
+
+            const delta = engine.timing.lastDelta || 1000 / 60;
+            discs.forEach(body => {
+                if (!body?.plugin) return;
+                if (body === selectedBody && isDraggingBody) return;
+
+                const rotationSpeed = body.plugin.rotationSpeed || 0.00022;
+                const deltaAngle = rotationSpeed * delta;
+                if (Math.abs(deltaAngle) < 0.00001) return;
+                Body.setAngle(body, body.angle + deltaAngle);
+            });
         });
 
         // 자석이 쇠구슬과 이동형 자석을 끌어당기는 로직
