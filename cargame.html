@@ -671,9 +671,11 @@
             SHOP: "shop"
         };
         const FIXED_STEP_MS = 1000 / 60;
-        const TERRAIN_STEP = 110;
+        const TERRAIN_STEP = 72;
         const CHUNK_WIDTH = 1760;
         const TERRAIN_THICKNESS = 150;
+        const TERRAIN_JOIN_OVERLAP = 24;
+        const TERRAIN_CHAMFER = 16;
         const PICKUP_RADIUS = 18;
         const UPGRADE_MAX_LEVEL = 5;
 
@@ -872,11 +874,13 @@
                     fuelTax: 0.18 + engineLevel * 0.03
                 },
                 suspension: {
-                    stiffness: 0.52 + suspensionLevel * 0.06,
-                    damping: 0.14 + suspensionLevel * 0.02,
-                    chassisDrag: 0.018 + suspensionLevel * 0.005,
+                    stiffness: 0.34 + suspensionLevel * 0.045,
+                    damping: 0.24 + suspensionLevel * 0.025,
+                    chassisDrag: 0.026 + suspensionLevel * 0.006,
                     assist: 0.000024 + suspensionLevel * 0.00001,
-                    crashGrace: 1.35 + suspensionLevel * 0.22
+                    crashGrace: 1.35 + suspensionLevel * 0.22,
+                    wheelGrip: 1.08 + suspensionLevel * 0.08,
+                    wheelStaticGrip: 1.7 + suspensionLevel * 0.14
                 },
                 fuel: {
                     maxFuel: 100 + fuelLevel * 26,
@@ -942,7 +946,8 @@
         function createVehicle() {
             const stats = getUpgradeStats();
             const startX = 240;
-            const startY = sampleTerrainY(startX) - 96;
+            const wheelRadius = 30;
+            const startY = sampleTerrainY(startX) - 114;
             const group = Body.nextGroup(true);
 
             const chassis = Bodies.rectangle(startX, startY, 148, 38, {
@@ -953,20 +958,22 @@
                 restitution: 0.04,
                 collisionFilter: { group }
             });
-            const rearWheel = Bodies.circle(startX - 46, startY + 34, 26, {
-                label: "wheel",
-                density: 0.0018,
-                friction: 1.45,
-                frictionStatic: 2.4,
-                restitution: 0.06,
-                collisionFilter: { group }
-            });
-            const frontWheel = Bodies.circle(startX + 46, startY + 34, 26, {
+            const rearWheel = Bodies.circle(startX - 46, startY + 36, wheelRadius, {
                 label: "wheel",
                 density: 0.0017,
-                friction: 1.42,
-                frictionStatic: 2.2,
-                restitution: 0.06,
+                friction: stats.suspension.wheelGrip,
+                frictionStatic: stats.suspension.wheelStaticGrip,
+                frictionAir: 0.012,
+                restitution: 0.01,
+                collisionFilter: { group }
+            });
+            const frontWheel = Bodies.circle(startX + 46, startY + 36, wheelRadius, {
+                label: "wheel",
+                density: 0.00165,
+                friction: stats.suspension.wheelGrip,
+                frictionStatic: stats.suspension.wheelStaticGrip,
+                frictionAir: 0.012,
+                restitution: 0.01,
                 collisionFilter: { group }
             });
 
@@ -976,7 +983,7 @@
                 bodyB: rearWheel,
                 stiffness: stats.suspension.stiffness,
                 damping: stats.suspension.damping,
-                length: 16
+                length: 20
             });
             const frontSpring = Constraint.create({
                 bodyA: chassis,
@@ -984,23 +991,23 @@
                 bodyB: frontWheel,
                 stiffness: stats.suspension.stiffness,
                 damping: stats.suspension.damping,
-                length: 16
+                length: 20
             });
             const rearBrace = Constraint.create({
                 bodyA: chassis,
                 pointA: { x: -28, y: 10 },
                 bodyB: rearWheel,
-                stiffness: stats.suspension.stiffness * 0.72,
-                damping: stats.suspension.damping * 0.9,
-                length: 32
+                stiffness: stats.suspension.stiffness * 0.62,
+                damping: stats.suspension.damping,
+                length: 38
             });
             const frontBrace = Constraint.create({
                 bodyA: chassis,
                 pointA: { x: 28, y: 10 },
                 bodyB: frontWheel,
-                stiffness: stats.suspension.stiffness * 0.72,
-                damping: stats.suspension.damping * 0.9,
-                length: 32
+                stiffness: stats.suspension.stiffness * 0.62,
+                damping: stats.suspension.damping,
+                length: 38
             });
 
             vehicleState.chassis = chassis;
@@ -1036,7 +1043,7 @@
 
         function createProceduralChunk({ index, startX, startY, startSlope, seed }) {
             const rand = mulberry32(seed);
-            const points = [{ x: startX, y: startY }];
+            let points = [{ x: startX, y: startY }];
             const pickups = [];
             const bodies = [];
             const difficulty = Math.min(1.45, index * 0.085);
@@ -1045,21 +1052,21 @@
             let x = startX;
             let y = startY;
             let slope = startSlope;
-            let currentTargetSlope = (rand() - 0.5) * 0.24;
+            let currentTargetSlope = (rand() - 0.5) * 0.18;
 
             while (x < startX + CHUNK_WIDTH) {
                 x += TERRAIN_STEP;
 
-                if ((x - startX) % 440 === 0) {
-                    currentTargetSlope = (rand() - 0.5) * (0.66 + difficulty * 0.3);
+                if ((x - startX) % 360 === 0) {
+                    currentTargetSlope = (rand() - 0.5) * (0.44 + difficulty * 0.22);
                 }
 
-                slope += (currentTargetSlope - slope) * 0.26;
-                slope += (rand() - 0.5) * 0.05;
-                slope = clamp(slope, -0.72 - difficulty * 0.12, 0.72 + difficulty * 0.15);
+                slope += (currentTargetSlope - slope) * 0.16;
+                slope += (rand() - 0.5) * 0.025;
+                slope = clamp(slope, -0.54 - difficulty * 0.08, 0.54 + difficulty * 0.1);
 
-                const wave = Math.sin((x + seed * 0.1) / 220) * 16 + Math.sin((x + seed) / 470) * 24;
-                y += slope * TERRAIN_STEP + wave * 0.08;
+                const wave = Math.sin((x + seed * 0.1) / 240) * 14 + Math.sin((x + seed) / 520) * 20;
+                y += slope * TERRAIN_STEP + wave * 0.06;
 
                 if (index === 0 && x < 760) {
                     y = lerp(y, gameState.height * 0.72, 0.78);
@@ -1069,13 +1076,15 @@
                 points.push({ x, y });
             }
 
+            points = smoothTerrainPoints(points, 2);
+
             for (let i = 0; i < points.length - 1; i += 1) {
                 const a = points[i];
                 const b = points[i + 1];
                 const dx = b.x - a.x;
                 const dy = b.y - a.y;
                 const angle = Math.atan2(dy, dx);
-                const length = Math.hypot(dx, dy) + 6;
+                const length = Math.hypot(dx, dy) + TERRAIN_JOIN_OVERLAP;
                 const midX = (a.x + b.x) * 0.5;
                 const midY = (a.y + b.y) * 0.5;
                 const body = Bodies.rectangle(
@@ -1086,9 +1095,11 @@
                     {
                         isStatic: true,
                         label: "ground",
-                        friction: 1.12,
-                        frictionStatic: 2.8,
-                        restitution: 0.02
+                        friction: 1.02,
+                        frictionStatic: 1.85,
+                        restitution: 0,
+                        slop: 0.9,
+                        chamfer: { radius: TERRAIN_CHAMFER }
                     }
                 );
                 bodies.push(body);
@@ -1154,6 +1165,24 @@
                 }
             }
             return points[points.length - 1].y;
+        }
+
+        function smoothTerrainPoints(points, passes = 1) {
+            let current = points.map((point) => ({ x: point.x, y: point.y }));
+
+            for (let pass = 0; pass < passes; pass += 1) {
+                const next = [current[0]];
+                for (let i = 1; i < current.length - 1; i += 1) {
+                    next.push({
+                        x: current[i].x,
+                        y: (current[i - 1].y + current[i].y * 2 + current[i + 1].y) / 4
+                    });
+                }
+                next.push(current[current.length - 1]);
+                current = next;
+            }
+
+            return current;
         }
 
         function sampleTerrainY(x) {
