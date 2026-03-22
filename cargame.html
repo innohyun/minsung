@@ -921,10 +921,10 @@
             {
                 id: "dune",
                 label: "숲속 버기",
-                tagline: "준비 중",
-                description: "다음 차량 디자인을 준비하고 있습니다.",
-                traits: ["디자인 준비 중"],
-                available: false,
+                tagline: "선택 가능",
+                description: "첨부한 초록 버기 디자인을 적용한 두 번째 차량입니다. 차체와 바퀴를 따로 렌더링합니다.",
+                traits: ["신규 차체", "분리형 바퀴", "즉시 사용 가능"],
+                available: true,
                 engine: {
                     force: 0.000392,
                     targetSpin: 0.31,
@@ -961,12 +961,16 @@
                     body: "#db5461",
                     accent: "#ffd166",
                     glass: "#1d3557",
-                    tint: "rgba(255, 99, 132, 0.26)",
-                    spriteWidth: 188,
-                    spriteOffsetX: 4,
-                    spriteOffsetY: -14,
-                    wheelScale: 2.18,
-                    wheelOffsetY: 1
+                    tint: null,
+                    spriteWidth: 208,
+                    spriteOffsetX: 0,
+                    spriteOffsetY: -30,
+                    wheelScale: 2.3,
+                    wheelOffsetY: 1,
+                    flipX: false,
+                    spriteAccentBar: false,
+                    bodySrc: "assets/dune-body.svg",
+                    wheelSrc: "assets/dune-wheel.svg"
                 }
             },
             {
@@ -1079,10 +1083,7 @@
             Object.keys(UPGRADE_DEFS).map((key) => [key, document.querySelector(`[data-upgrade-cost="${key}"]`)])
         );
         const upgradeButtons = [...document.querySelectorAll(".upgrade-btn")];
-        const spriteAssets = {
-            body: createSpriteAsset(VEHICLE_SPRITES.body.src),
-            wheel: createSpriteAsset(VEHICLE_SPRITES.wheel.src)
-        };
+        const spriteAssetCache = new Map();
 
         const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -1174,6 +1175,27 @@
             image.src = src;
 
             return asset;
+        }
+
+        function getSpriteAsset(src) {
+            if (!spriteAssetCache.has(src)) {
+                spriteAssetCache.set(src, createSpriteAsset(src));
+            }
+            return spriteAssetCache.get(src);
+        }
+
+        function getVehicleSpriteAssets(vehicle) {
+            const appearance = vehicle.appearance || {};
+            return {
+                body: getSpriteAsset(appearance.bodySrc || VEHICLE_SPRITES.body.src),
+                wheel: getSpriteAsset(appearance.wheelSrc || VEHICLE_SPRITES.wheel.src)
+            };
+        }
+
+        function primeVehicleSpriteAssets() {
+            VEHICLE_DEFS.forEach((vehicle) => {
+                getVehicleSpriteAssets(vehicle);
+            });
         }
 
         function measureSpriteTrim(image) {
@@ -2295,17 +2317,18 @@
             }
 
             const vehicle = vehicleState.profile || getSelectedVehicle();
+            const assets = getVehicleSpriteAssets(vehicle);
 
-            if (!hasSprite(spriteAssets.body)) {
+            if (!hasSprite(assets.body)) {
                 drawSuspensionLine(vehicleState.chassis, vehicleState.rearWheel, -vehicle.chassis.springInset, vehicle.chassis.springAnchorY);
                 drawSuspensionLine(vehicleState.chassis, vehicleState.frontWheel, vehicle.chassis.springInset, vehicle.chassis.springAnchorY);
                 drawVectorBody(vehicleState.chassis, vehicle);
             } else {
-                drawSpriteBody(vehicleState.chassis, vehicle);
+                drawSpriteBody(vehicleState.chassis, vehicle, assets);
             }
 
-            drawWheel(vehicleState.rearWheel, vehicle);
-            drawWheel(vehicleState.frontWheel, vehicle);
+            drawWheel(vehicleState.rearWheel, vehicle, assets);
+            drawWheel(vehicleState.frontWheel, vehicle, assets);
         }
 
         function drawSuspensionLine(chassis, wheel, anchorX, anchorY) {
@@ -2320,22 +2343,22 @@
             ctx.stroke();
         }
 
-        function drawWheel(wheel, vehicle) {
-            if (hasSprite(spriteAssets.wheel)) {
-                drawSpriteWheel(wheel, vehicle);
+        function drawWheel(wheel, vehicle, assets) {
+            if (hasSprite(assets.wheel)) {
+                drawSpriteWheel(wheel, vehicle, assets);
                 return;
             }
 
             drawVectorWheel(wheel, vehicle);
         }
 
-        function drawSpriteBody(chassis, vehicle) {
+        function drawSpriteBody(chassis, vehicle, assets) {
             const screen = worldToScreen(chassis.position.x, chassis.position.y);
-            const trim = spriteAssets.body.trim;
+            const trim = assets.body.trim;
             const appearance = vehicle.appearance;
             const bodyWidth = appearance.spriteWidth || VEHICLE_SPRITES.body.targetWidth;
             const bodyHeight = bodyWidth * (trim.height / trim.width);
-            const flipX = VEHICLE_SPRITES.body.flipX;
+            const flipX = appearance.flipX ?? VEHICLE_SPRITES.body.flipX;
             const spriteOffsetX = appearance.spriteOffsetX ?? VEHICLE_SPRITES.body.offsetX;
             const spriteOffsetY = appearance.spriteOffsetY ?? VEHICLE_SPRITES.body.offsetY;
             const bodyX = -bodyWidth * 0.5 + (flipX ? -spriteOffsetX : spriteOffsetX);
@@ -2349,19 +2372,23 @@
             ctx.beginPath();
             ctx.ellipse(0, 34, 84, 16, 0, 0, Math.PI * 2);
             ctx.fill();
-            drawTrimmedSprite(spriteAssets.body, bodyX, bodyY, bodyWidth, bodyHeight);
-            ctx.save();
-            ctx.globalCompositeOperation = "source-atop";
-            ctx.fillStyle = appearance.tint;
-            ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
-            ctx.restore();
-            ctx.fillStyle = appearance.accent;
-            roundRect(ctx, -bodyWidth * 0.18, bodyHeight * 0.02, bodyWidth * 0.36, 9, 5);
-            ctx.fill();
+            drawTrimmedSprite(assets.body, bodyX, bodyY, bodyWidth, bodyHeight);
+            if (appearance.tint) {
+                ctx.save();
+                ctx.globalCompositeOperation = "source-atop";
+                ctx.fillStyle = appearance.tint;
+                ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
+                ctx.restore();
+            }
+            if (appearance.spriteAccentBar !== false) {
+                ctx.fillStyle = appearance.accent;
+                roundRect(ctx, -bodyWidth * 0.18, bodyHeight * 0.02, bodyWidth * 0.36, 9, 5);
+                ctx.fill();
+            }
             ctx.restore();
         }
 
-        function drawSpriteWheel(wheel, vehicle) {
+        function drawSpriteWheel(wheel, vehicle, assets) {
             const appearance = vehicle.appearance;
             const screen = worldToScreen(
                 wheel.position.x,
@@ -2372,7 +2399,7 @@
             ctx.save();
             ctx.translate(screen.x, screen.y);
             ctx.rotate(wheel.angle);
-            drawTrimmedSprite(spriteAssets.wheel, -size * 0.5, -size * 0.5, size, size);
+            drawTrimmedSprite(assets.wheel, -size * 0.5, -size * 0.5, size, size);
             ctx.restore();
         }
 
@@ -2535,6 +2562,7 @@
             updateHud();
         });
 
+        primeVehicleSpriteAssets();
         resizeCanvas();
         renderVehicleOptions();
         bindInputs();
