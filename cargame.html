@@ -687,34 +687,34 @@
     <div class="hud">
         <div class="top-row">
             <div class="panel title-panel">
-                <div class="eyebrow">Ridge Rally</div>
-                <h1 class="title">Hills,<br>Fuel, Coins.</h1>
+                <div class="eyebrow">언덕 질주</div>
+                <h1 class="title">언덕을 넘고<br>코인을 모으세요</h1>
                 <p class="subtitle">좌측은 브레이크/후진, 우측은 가속입니다. 큰 언덕 위 코인 라인을 타고 연료 캔을 이어서 먹어야 오래 갑니다.</p>
-                <p class="hint-line">키보드 `Left / Right` 또는 화면 버튼으로 플레이합니다.</p>
+                <p class="hint-line">왼쪽 방향키와 오른쪽 방향키, 또는 화면 버튼으로 플레이합니다.</p>
             </div>
 
             <div>
                 <div class="metrics">
                     <div class="metric">
-                        <span class="metric-label">Distance</span>
+                        <span class="metric-label">거리</span>
                         <span id="distanceValue" class="metric-value">0 m</span>
                     </div>
                     <div class="metric">
-                        <span class="metric-label">Best</span>
+                        <span class="metric-label">최고 기록</span>
                         <span id="bestValue" class="metric-value">0 m</span>
                     </div>
                     <div class="metric">
-                        <span class="metric-label">Run Coins</span>
+                        <span class="metric-label">이번 코인</span>
                         <span id="runCoinsValue" class="metric-value">0</span>
                     </div>
                     <div class="metric">
-                        <span class="metric-label">Speed</span>
+                        <span class="metric-label">속도</span>
                         <span id="speedValue" class="metric-value">0 km/h</span>
                     </div>
                 </div>
                 <div class="panel fuel-panel">
                     <div class="fuel-header">
-                        <span>Fuel Tank</span>
+                        <span>연료 탱크</span>
                         <span id="fuelText">100 / 100</span>
                     </div>
                     <div class="fuel-bar">
@@ -726,9 +726,9 @@
 
         <div class="bottom-row">
             <div class="run-strip">
-                <span>Vehicle <strong id="vehicleInline">Trail Scout</strong></span>
-                <span>Garage coins <strong id="walletInline">0</strong></span>
-                <span>Upgrades apply on the next run</span>
+                <span>선택 차량 <strong id="vehicleInline">노을 픽업</strong></span>
+                <span>보유 코인 <strong id="walletInline">0</strong></span>
+                <span>업그레이드는 다음 주행부터 적용됩니다</span>
             </div>
         </div>
     </div>
@@ -736,46 +736,46 @@
     <div id="overlay" class="overlay">
         <div class="overlay-shell">
             <div class="overlay-card">
-                <div class="eyebrow" id="overlayEyebrow">Run Setup</div>
-                <h2 id="overlayTitle">Build momentum.</h2>
+                <div class="eyebrow" id="overlayEyebrow">주행 준비</div>
+                <h2 id="overlayTitle">언덕을 달려보세요.</h2>
                 <p id="overlayCopy" class="overlay-copy">준물리 자동차로 언덕을 넘고, 연료와 코인을 이어 먹으며 더 멀리 갑니다. 차고에서 업그레이드를 올리면 다음 주행부터 차체 감각이 달라집니다.</p>
                 <div class="overlay-stats">
-                    <div class="stat-chip">Best <strong id="overlayBest">0 m</strong></div>
-                    <div class="stat-chip">Wallet <strong id="overlayWallet">0</strong></div>
-                    <div class="stat-chip">Last run <strong id="overlayRunResult">No run yet</strong></div>
-                </div>
-                <div class="vehicle-picker">
-                    <div class="vehicle-picker-head">
-                        <div>
-                            <div class="vehicle-picker-label">Vehicle Select</div>
-                            <p id="vehiclePickerCopy" class="vehicle-picker-copy">Trail Scout is the balanced baseline with even grip, tank, and climb response.</p>
-                        </div>
-                        <div id="vehiclePill" class="vehicle-pill">Trail Scout</div>
-                    </div>
-                    <div id="vehicleOptions" class="vehicle-options" role="radiogroup" aria-label="차량 선택"></div>
+                    <div class="stat-chip">최고 기록 <strong id="overlayBest">0 m</strong></div>
+                    <div class="stat-chip">보유 코인 <strong id="overlayWallet">0</strong></div>
+                    <div class="stat-chip">최근 주행 <strong id="overlayRunResult">아직 기록 없음</strong></div>
                 </div>
                 <div class="actions">
-                    <button id="primaryAction" class="primary-btn">Start Run</button>
-                    <button id="secondaryAction" class="secondary-btn">Open Garage</button>
+                    <button id="primaryAction" class="primary-btn">주행 시작</button>
+                    <button id="secondaryAction" class="secondary-btn">차고 보기</button>
                 </div>
             </div>
 
             <div id="garageCard" class="garage-card hidden">
                 <div class="garage-header">
                     <div>
-                        <h3 class="garage-title">Garage</h3>
-                        <p class="garage-subtitle">세 가지 핵심 업그레이드만 먼저 둡니다. 엔진은 오르막 추진력, 서스펜션은 착지 안정성, 연료 탱크는 시작 연료를 늘립니다.</p>
+                        <h3 class="garage-title">차고</h3>
+                        <p class="garage-subtitle">차량 디자인을 고르고 공통 업그레이드를 올릴 수 있습니다. 지금은 실제 디자인 1종만 선택 가능하고, 나머지 슬롯은 준비 중입니다.</p>
                     </div>
                     <div class="wallet">
-                        <span class="wallet-label">Coins</span>
+                        <span class="wallet-label">보유 코인</span>
                         <span id="walletValue" class="wallet-value">0</span>
                     </div>
+                </div>
+                <div class="vehicle-picker">
+                    <div class="vehicle-picker-head">
+                        <div>
+                            <div class="vehicle-picker-label">차량 선택</div>
+                            <p id="vehiclePickerCopy" class="vehicle-picker-copy">노을 픽업을 선택할 수 있습니다. 다른 차량 디자인은 준비 중이며, 지금은 외형만 달라지는 구조로 시작합니다.</p>
+                        </div>
+                        <div id="vehiclePill" class="vehicle-pill">노을 픽업</div>
+                    </div>
+                    <div id="vehicleOptions" class="vehicle-options" role="radiogroup" aria-label="차량 선택"></div>
                 </div>
                 <div class="upgrade-grid">
                     <button class="upgrade-btn" data-upgrade="engine">
                         <div class="upgrade-top">
-                            <span class="upgrade-name">Engine</span>
-                            <span class="upgrade-level" data-upgrade-level="engine">LV 0</span>
+                            <span class="upgrade-name">엔진</span>
+                            <span class="upgrade-level" data-upgrade-level="engine">레벨 0</span>
                         </div>
                         <p class="upgrade-desc" data-upgrade-desc="engine"></p>
                         <div class="upgrade-meta">
@@ -786,8 +786,8 @@
 
                     <button class="upgrade-btn" data-upgrade="suspension">
                         <div class="upgrade-top">
-                            <span class="upgrade-name">Suspension</span>
-                            <span class="upgrade-level" data-upgrade-level="suspension">LV 0</span>
+                            <span class="upgrade-name">서스펜션</span>
+                            <span class="upgrade-level" data-upgrade-level="suspension">레벨 0</span>
                         </div>
                         <p class="upgrade-desc" data-upgrade-desc="suspension"></p>
                         <div class="upgrade-meta">
@@ -798,8 +798,8 @@
 
                     <button class="upgrade-btn" data-upgrade="fuel">
                         <div class="upgrade-top">
-                            <span class="upgrade-name">Fuel Tank</span>
-                            <span class="upgrade-level" data-upgrade-level="fuel">LV 0</span>
+                            <span class="upgrade-name">연료 탱크</span>
+                            <span class="upgrade-level" data-upgrade-level="fuel">레벨 0</span>
                         </div>
                         <p class="upgrade-desc" data-upgrade-desc="fuel"></p>
                         <div class="upgrade-meta">
@@ -813,8 +813,8 @@
     </div>
 
     <div class="touch-controls">
-        <button id="leftTouch" class="touch-btn">Brake<br>Reverse</button>
-        <button id="rightTouch" class="touch-btn">Gas</button>
+        <button id="leftTouch" class="touch-btn">브레이크<br>후진</button>
+        <button id="rightTouch" class="touch-btn">가속</button>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
@@ -841,27 +841,27 @@
 
         const UPGRADE_DEFS = {
             engine: {
-                label: "Engine",
+                label: "엔진",
                 costs: [12, 24, 42, 68, 104],
                 description: "오르막에서 밀어주는 추진력과 최고 회전 여유를 늘립니다.",
                 effect(level) {
-                    return `Drive +${10 + level * 12}%`;
+                    return `구동력 +${10 + level * 12}%`;
                 }
             },
             suspension: {
-                label: "Suspension",
+                label: "서스펜션",
                 costs: [14, 28, 48, 72, 108],
                 description: "착지할 때 차체가 덜 튀고, 넘어질 때 복원 여유가 생깁니다.",
                 effect(level) {
-                    return `Stability +${12 + level * 11}%`;
+                    return `안정감 +${12 + level * 11}%`;
                 }
             },
             fuel: {
-                label: "Fuel Tank",
+                label: "연료 탱크",
                 costs: [10, 22, 36, 54, 78],
                 description: "시작 연료와 연료 캔 회복량을 함께 끌어올립니다.",
                 effect(level) {
-                    return `Tank +${22 + level * 8}`;
+                    return `연료량 +${22 + level * 8}`;
                 }
             }
         };
@@ -869,10 +869,11 @@
         const VEHICLE_DEFS = [
             {
                 id: "trail",
-                label: "Trail Scout",
-                tagline: "Balanced",
-                description: "기본 가속, 안정감, 연료량이 고르게 맞춰진 표준형입니다.",
-                traits: ["Even Drive", "Neutral Grip", "Standard Tank"],
+                label: "노을 픽업",
+                tagline: "선택 가능",
+                description: "현재 사용할 수 있는 기본 차량입니다. 지금은 차량 선택이 외형만 바꾸고 성능은 모두 동일하게 유지됩니다.",
+                traits: ["기본 차량", "즉시 사용 가능", "외형 전용"],
+                available: true,
                 engine: {
                     force: 0.00034,
                     targetSpin: 0.26,
@@ -919,10 +920,11 @@
             },
             {
                 id: "dune",
-                label: "Dune Burst",
-                tagline: "Quick Climb",
-                description: "가벼운 차체와 빠른 휠 회전으로 언덕 초입을 강하게 치고 나갑니다.",
-                traits: ["Fast Launch", "Light Frame", "Smaller Tank"],
+                label: "숲속 버기",
+                tagline: "준비 중",
+                description: "다음 차량 디자인을 준비하고 있습니다.",
+                traits: ["디자인 준비 중"],
+                available: false,
                 engine: {
                     force: 0.000392,
                     targetSpin: 0.31,
@@ -969,10 +971,11 @@
             },
             {
                 id: "terra",
-                label: "Terra Mule",
-                tagline: "Stable Grip",
-                description: "더 큰 타이어와 안정적인 서스펜션으로 뒤집힘에 강하고 연료도 넉넉합니다.",
-                traits: ["Safe Landing", "Heavy Grip", "Large Tank"],
+                label: "사막 트럭",
+                tagline: "준비 중",
+                description: "다음 차량 디자인을 준비하고 있습니다.",
+                traits: ["디자인 준비 중"],
+                available: false,
                 engine: {
                     force: 0.000312,
                     targetSpin: 0.235,
@@ -1220,8 +1223,13 @@
             return VEHICLE_MAP[vehicleId] || VEHICLE_MAP[DEFAULT_VEHICLE_ID];
         }
 
+        function normalizeSelectedVehicleId(vehicleId) {
+            const vehicle = getVehicleDef(vehicleId);
+            return vehicle.available ? vehicle.id : DEFAULT_VEHICLE_ID;
+        }
+
         function getSelectedVehicle() {
-            return getVehicleDef(progress.selectedVehicleId);
+            return getVehicleDef(normalizeSelectedVehicleId(progress.selectedVehicleId));
         }
 
         function loadProgress() {
@@ -1252,7 +1260,7 @@
                         suspension: clampLevel(parsed.upgrades?.suspension),
                         fuel: clampLevel(parsed.upgrades?.fuel)
                     },
-                    selectedVehicleId: getVehicleDef(parsed.selectedVehicleId).id
+                    selectedVehicleId: normalizeSelectedVehicleId(parsed.selectedVehicleId)
                 };
             } catch (error) {
                 return fallback;
@@ -1820,7 +1828,7 @@
             gameState.lastRun = {
                 distance: roundedDistance,
                 coins: gameState.sessionCoins,
-                reason: mode === RUN_MODES.OUT_OF_FUEL ? "Fuel empty" : "Flipped over"
+                reason: mode === RUN_MODES.OUT_OF_FUEL ? "연료 소진" : "전복"
             };
             saveProgress();
         }
@@ -1875,6 +1883,7 @@
                 button.dataset.vehicle = vehicle.id;
                 button.setAttribute("role", "radio");
                 button.setAttribute("aria-checked", "false");
+                button.disabled = !vehicle.available;
                 button.innerHTML = `
                     <div class="vehicle-option-top">
                         <span class="vehicle-option-name">${vehicle.label}</span>
@@ -1890,7 +1899,7 @@
 
         function updateVehicleSelectionUi() {
             const vehicle = getSelectedVehicle();
-            vehiclePickerCopy.textContent = `${vehicle.label} · ${vehicle.tagline}. ${vehicle.description}`;
+            vehiclePickerCopy.textContent = `${vehicle.label}을 선택한 상태입니다. ${vehicle.description}`;
             vehiclePill.textContent = vehicle.label;
             vehicleInline.textContent = vehicle.label;
 
@@ -1904,6 +1913,10 @@
 
         function selectVehicle(vehicleId) {
             const nextVehicle = getVehicleDef(vehicleId);
+            if (!nextVehicle.available) {
+                updateVehicleSelectionUi();
+                return;
+            }
             if (progress.selectedVehicleId === nextVehicle.id) {
                 updateVehicleSelectionUi();
                 return;
@@ -1943,10 +1956,10 @@
                 const level = progress.upgrades[type];
                 const atMax = level >= UPGRADE_MAX_LEVEL;
                 const nextCost = def.costs[level];
-                upgradeLevelEls[type].textContent = `LV ${level}`;
+                upgradeLevelEls[type].textContent = `레벨 ${level}`;
                 upgradeDescEls[type].textContent = def.description;
                 upgradeEffectEls[type].textContent = def.effect(level);
-                upgradeCostEls[type].textContent = atMax ? "Maxed" : `${nextCost} coins`;
+                upgradeCostEls[type].textContent = atMax ? "최대" : `${nextCost} 코인`;
 
                 const button = document.querySelector(`[data-upgrade="${type}"]`);
                 button.disabled = atMax || progress.coins < nextCost;
@@ -1964,35 +1977,35 @@
             overlayWallet.textContent = String(progress.coins);
 
             if (gameState.lastRun.distance > 0) {
-                overlayRunResult.textContent = `${gameState.lastRun.distance} m / +${gameState.lastRun.coins}`;
+                overlayRunResult.textContent = `${gameState.lastRun.distance}m / +${gameState.lastRun.coins}코인`;
             } else {
-                overlayRunResult.textContent = "No run yet";
+                overlayRunResult.textContent = "아직 기록 없음";
             }
 
             if (gameState.mode === RUN_MODES.READY) {
-                overlayEyebrow.textContent = "Run Setup";
-                overlayTitle.textContent = "Build momentum.";
-                overlayCopy.textContent = `${vehicle.label} 선택 중입니다. ${vehicle.description} 차고에서 업그레이드를 사면 다음 주행부터 엔진, 차체 안정감, 연료량이 같이 달라집니다.`;
-                primaryAction.textContent = "Start Run";
-                secondaryAction.textContent = "Open Garage";
+                overlayEyebrow.textContent = "주행 준비";
+                overlayTitle.textContent = "언덕을 달려보세요.";
+                overlayCopy.textContent = `${vehicle.label}을 선택한 상태입니다. 차고에서 차량 디자인을 바꾸거나 업그레이드를 올리면 다음 주행부터 바로 반영됩니다.`;
+                primaryAction.textContent = "주행 시작";
+                secondaryAction.textContent = "차고 보기";
             } else if (gameState.mode === RUN_MODES.SHOP) {
-                overlayEyebrow.textContent = "Garage";
-                overlayTitle.textContent = "Spend coins where it matters.";
-                overlayCopy.textContent = `${vehicle.label}에 공통 업그레이드를 얹는 구조입니다. 지금 산 업그레이드는 다음 주행부터 바로 반영되고, 차량은 언제든 다시 바꿀 수 있습니다.`;
-                primaryAction.textContent = "Start Run";
-                secondaryAction.textContent = "Back";
+                overlayEyebrow.textContent = "차고";
+                overlayTitle.textContent = "차량과 업그레이드를 고르세요.";
+                overlayCopy.textContent = `${vehicle.label}이 현재 선택되어 있습니다. 지금 단계에서는 차량이 외형만 바뀌고, 업그레이드는 모든 차량에 공통으로 적용됩니다.`;
+                primaryAction.textContent = "주행 시작";
+                secondaryAction.textContent = "뒤로 가기";
             } else if (gameState.mode === RUN_MODES.OUT_OF_FUEL) {
-                overlayEyebrow.textContent = "Run Over";
-                overlayTitle.textContent = "The tank ran dry.";
-                overlayCopy.textContent = `이번 주행은 ${Math.floor(gameState.distance)}m, 코인 ${gameState.sessionCoins}개입니다. ${vehicle.label}으로 다시 타거나, 연료가 넉넉한 다른 차를 골라 기록을 다시 올릴 수 있습니다.`;
-                primaryAction.textContent = "Run Again";
-                secondaryAction.textContent = "Open Garage";
+                overlayEyebrow.textContent = "주행 종료";
+                overlayTitle.textContent = "연료가 바닥났습니다.";
+                overlayCopy.textContent = `이번 주행은 ${Math.floor(gameState.distance)}m, 코인 ${gameState.sessionCoins}개입니다. 차고에서 외형을 바꾸거나 연료 탱크를 올린 뒤 다시 기록에 도전할 수 있습니다.`;
+                primaryAction.textContent = "다시 달리기";
+                secondaryAction.textContent = "차고 보기";
             } else if (gameState.mode === RUN_MODES.CRASHED) {
-                overlayEyebrow.textContent = "Run Over";
-                overlayTitle.textContent = "You stayed upside down too long.";
-                overlayCopy.textContent = `이번 주행은 ${Math.floor(gameState.distance)}m, 코인 ${gameState.sessionCoins}개입니다. ${vehicle.label}의 느낌이 맞지 않으면 더 안정적인 차로 바꾸거나 서스펜션을 올려 착지를 부드럽게 만들 수 있습니다.`;
-                primaryAction.textContent = "Run Again";
-                secondaryAction.textContent = "Open Garage";
+                overlayEyebrow.textContent = "주행 종료";
+                overlayTitle.textContent = "너무 오래 뒤집혀 있었습니다.";
+                overlayCopy.textContent = `이번 주행은 ${Math.floor(gameState.distance)}m, 코인 ${gameState.sessionCoins}개입니다. 차고에서 외형을 다시 고르거나 서스펜션을 올려 착지를 더 부드럽게 만들 수 있습니다.`;
+                primaryAction.textContent = "다시 달리기";
+                secondaryAction.textContent = "차고 보기";
             }
 
             updateUpgradeUi();
