@@ -871,8 +871,8 @@
                 id: "trail",
                 label: "노을 픽업",
                 tagline: "선택 가능",
-                description: "현재 사용할 수 있는 기본 차량입니다. 지금은 차량 선택이 외형만 바꾸고 성능은 모두 동일하게 유지됩니다.",
-                traits: ["기본 차량", "즉시 사용 가능", "외형 전용"],
+                description: "현재 사용할 수 있는 기본 차량입니다. 균형 잡힌 기본형으로 가장 무난하게 달립니다.",
+                traits: ["기본 차량", "균형형", "즉시 사용 가능"],
                 available: true,
                 engine: {
                     force: 0.00034,
@@ -910,20 +910,21 @@
                     body: "#ef8354",
                     accent: "#ffb703",
                     glass: "#163a4d",
-                    tint: "rgba(255, 196, 110, 0.24)",
+                    tint: null,
                     spriteWidth: 194,
                     spriteOffsetX: 4,
                     spriteOffsetY: -16,
                     wheelScale: 2.16,
-                    wheelOffsetY: 1
+                    wheelOffsetY: 1,
+                    spriteAccentBar: false
                 }
             },
             {
                 id: "dune",
-                label: "숲속 버기",
+                label: "오렌지 오프로더",
                 tagline: "선택 가능",
-                description: "첨부한 초록 버기 디자인을 적용한 두 번째 차량입니다. 차체와 바퀴를 따로 렌더링합니다.",
-                traits: ["신규 차체", "분리형 바퀴", "즉시 사용 가능"],
+                description: "참고 이미지의 오렌지 오프로드 차량을 기준으로 만든 두 번째 차량입니다. 차체와 바퀴가 PNG로 분리되어 렌더링됩니다.",
+                traits: ["신규 PNG", "분리형 바퀴", "즉시 사용 가능"],
                 available: true,
                 engine: {
                     force: 0.000392,
@@ -945,14 +946,14 @@
                     pickupBoost: 24
                 },
                 chassis: {
-                    width: 142,
+                    width: 158,
                     height: 34,
                     wheelRadius: 28,
-                    wheelOffsetX: 44,
-                    wheelOffsetY: 34,
-                    springInset: 43,
+                    wheelOffsetX: 54,
+                    wheelOffsetY: 36,
+                    springInset: 52,
                     springAnchorY: 17,
-                    braceInset: 26,
+                    braceInset: 33,
                     braceAnchorY: 9,
                     springLength: 18,
                     braceLength: 36
@@ -962,15 +963,15 @@
                     accent: "#ffd166",
                     glass: "#1d3557",
                     tint: null,
-                    spriteWidth: 208,
+                    spriteWidth: 196,
                     spriteOffsetX: 0,
-                    spriteOffsetY: -30,
+                    spriteOffsetY: -28,
                     wheelScale: 2.3,
                     wheelOffsetY: 1,
                     flipX: false,
                     spriteAccentBar: false,
-                    bodySrc: "assets/dune-body.svg",
-                    wheelSrc: "assets/dune-wheel.svg"
+                    bodySrc: "assets/dune-body.png",
+                    wheelSrc: "assets/dune-wheel.png"
                 }
             },
             {
@@ -1016,12 +1017,13 @@
                     body: "#6c8f7b",
                     accent: "#f4d35e",
                     glass: "#102a43",
-                    tint: "rgba(144, 190, 109, 0.22)",
+                    tint: null,
                     spriteWidth: 202,
                     spriteOffsetX: 4,
                     spriteOffsetY: -18,
                     wheelScale: 2.14,
-                    wheelOffsetY: 1
+                    wheelOffsetY: 1,
+                    spriteAccentBar: false
                 }
             }
         ];
@@ -2373,14 +2375,7 @@
             ctx.ellipse(0, 34, 84, 16, 0, 0, Math.PI * 2);
             ctx.fill();
             drawTrimmedSprite(assets.body, bodyX, bodyY, bodyWidth, bodyHeight);
-            if (appearance.tint) {
-                ctx.save();
-                ctx.globalCompositeOperation = "source-atop";
-                ctx.fillStyle = appearance.tint;
-                ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
-                ctx.restore();
-            }
-            if (appearance.spriteAccentBar !== false) {
+            if (appearance.spriteAccentBar === true) {
                 ctx.fillStyle = appearance.accent;
                 roundRect(ctx, -bodyWidth * 0.18, bodyHeight * 0.02, bodyWidth * 0.36, 9, 5);
                 ctx.fill();
