@@ -706,6 +706,20 @@
             }
         };
 
+        const VEHICLE_SPRITES = {
+            body: {
+                src: "assets/car-body.png",
+                targetWidth: 194,
+                offsetX: 4,
+                offsetY: -16
+            },
+            wheel: {
+                src: "assets/wheel.png",
+                scale: 2.16,
+                offsetY: 1
+            }
+        };
+
         const canvas = document.getElementById("game");
         const ctx = canvas.getContext("2d");
         const overlay = document.getElementById("overlay");
@@ -742,6 +756,10 @@
             Object.keys(UPGRADE_DEFS).map((key) => [key, document.querySelector(`[data-upgrade-cost="${key}"]`)])
         );
         const upgradeButtons = [...document.querySelectorAll(".upgrade-btn")];
+        const spriteAssets = {
+            body: createSpriteAsset(VEHICLE_SPRITES.body.src),
+            wheel: createSpriteAsset(VEHICLE_SPRITES.wheel.src)
+        };
 
         const DPR = Math.min(window.devicePixelRatio || 1, 2);
 
@@ -808,6 +826,74 @@
         let animationFrameId = 0;
         let accumulator = 0;
         let lastFrameTime = 0;
+
+        function createSpriteAsset(src) {
+            const image = new Image();
+            const asset = {
+                image,
+                src,
+                ready: false,
+                failed: false,
+                trim: null
+            };
+
+            image.decoding = "async";
+            image.addEventListener("load", () => {
+                asset.trim = measureSpriteTrim(image);
+                asset.ready = true;
+                asset.failed = false;
+            });
+            image.addEventListener("error", () => {
+                asset.ready = false;
+                asset.failed = true;
+            });
+            image.src = src;
+
+            return asset;
+        }
+
+        function measureSpriteTrim(image) {
+            const width = image.naturalWidth || image.width;
+            const height = image.naturalHeight || image.height;
+            const offscreen = document.createElement("canvas");
+            offscreen.width = width;
+            offscreen.height = height;
+            const offscreenCtx = offscreen.getContext("2d", { willReadFrequently: true });
+            offscreenCtx.drawImage(image, 0, 0);
+            const pixels = offscreenCtx.getImageData(0, 0, width, height).data;
+
+            let minX = width;
+            let minY = height;
+            let maxX = -1;
+            let maxY = -1;
+
+            for (let y = 0; y < height; y += 1) {
+                for (let x = 0; x < width; x += 1) {
+                    const alpha = pixels[(y * width + x) * 4 + 3];
+                    if (alpha > 8) {
+                        minX = Math.min(minX, x);
+                        minY = Math.min(minY, y);
+                        maxX = Math.max(maxX, x);
+                        maxY = Math.max(maxY, y);
+                    }
+                }
+            }
+
+            if (maxX < minX || maxY < minY) {
+                return { x: 0, y: 0, width, height };
+            }
+
+            return {
+                x: minX,
+                y: minY,
+                width: maxX - minX + 1,
+                height: maxY - minY + 1
+            };
+        }
+
+        function hasSprite(asset) {
+            return Boolean(asset && asset.ready && asset.trim && !asset.failed);
+        }
 
         function loadProgress() {
             const fallback = {
@@ -1794,12 +1880,94 @@
                 return;
             }
 
-            drawSuspensionLine(vehicleState.chassis, vehicleState.rearWheel, -45, 18);
-            drawSuspensionLine(vehicleState.chassis, vehicleState.frontWheel, 45, 18);
             drawWheel(vehicleState.rearWheel);
             drawWheel(vehicleState.frontWheel);
 
-            const chassis = vehicleState.chassis;
+            if (!hasSprite(spriteAssets.body)) {
+                drawSuspensionLine(vehicleState.chassis, vehicleState.rearWheel, -45, 18);
+                drawSuspensionLine(vehicleState.chassis, vehicleState.frontWheel, 45, 18);
+                drawVectorBody(vehicleState.chassis);
+                return;
+            }
+
+            drawSpriteBody(vehicleState.chassis);
+        }
+
+        function drawSuspensionLine(chassis, wheel, anchorX, anchorY) {
+            const anchor = rotatePoint(anchorX, anchorY, chassis.angle);
+            const start = worldToScreen(chassis.position.x + anchor.x, chassis.position.y + anchor.y);
+            const end = worldToScreen(wheel.position.x, wheel.position.y);
+            ctx.strokeStyle = "rgba(255, 241, 215, 0.65)";
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.lineTo(end.x, end.y);
+            ctx.stroke();
+        }
+
+        function drawWheel(wheel) {
+            if (hasSprite(spriteAssets.wheel)) {
+                drawSpriteWheel(wheel);
+                return;
+            }
+
+            drawVectorWheel(wheel);
+        }
+
+        function drawSpriteBody(chassis) {
+            const screen = worldToScreen(chassis.position.x, chassis.position.y);
+            const trim = spriteAssets.body.trim;
+            const bodyWidth = VEHICLE_SPRITES.body.targetWidth;
+            const bodyHeight = bodyWidth * (trim.height / trim.width);
+
+            ctx.save();
+            ctx.translate(screen.x, screen.y);
+            ctx.rotate(chassis.angle);
+            ctx.fillStyle = "rgba(21, 12, 9, 0.18)";
+            ctx.beginPath();
+            ctx.ellipse(0, 34, 84, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+            drawTrimmedSprite(
+                spriteAssets.body,
+                -bodyWidth * 0.5 + VEHICLE_SPRITES.body.offsetX,
+                -bodyHeight * 0.5 + VEHICLE_SPRITES.body.offsetY,
+                bodyWidth,
+                bodyHeight
+            );
+            ctx.restore();
+        }
+
+        function drawSpriteWheel(wheel) {
+            const screen = worldToScreen(wheel.position.x, wheel.position.y + VEHICLE_SPRITES.wheel.offsetY);
+            const size = wheel.circleRadius * VEHICLE_SPRITES.wheel.scale;
+
+            ctx.save();
+            ctx.translate(screen.x, screen.y);
+            ctx.rotate(wheel.angle);
+            ctx.fillStyle = "rgba(21, 12, 9, 0.22)";
+            ctx.beginPath();
+            ctx.ellipse(0, size * 0.47, size * 0.38, size * 0.12, 0, 0, Math.PI * 2);
+            ctx.fill();
+            drawTrimmedSprite(spriteAssets.wheel, -size * 0.5, -size * 0.5, size, size);
+            ctx.restore();
+        }
+
+        function drawTrimmedSprite(asset, dx, dy, dw, dh) {
+            const { image, trim } = asset;
+            ctx.drawImage(
+                image,
+                trim.x,
+                trim.y,
+                trim.width,
+                trim.height,
+                dx,
+                dy,
+                dw,
+                dh
+            );
+        }
+
+        function drawVectorBody(chassis) {
             const screen = worldToScreen(chassis.position.x, chassis.position.y);
 
             ctx.save();
@@ -1843,19 +2011,7 @@
             ctx.restore();
         }
 
-        function drawSuspensionLine(chassis, wheel, anchorX, anchorY) {
-            const anchor = rotatePoint(anchorX, anchorY, chassis.angle);
-            const start = worldToScreen(chassis.position.x + anchor.x, chassis.position.y + anchor.y);
-            const end = worldToScreen(wheel.position.x, wheel.position.y);
-            ctx.strokeStyle = "rgba(255, 241, 215, 0.65)";
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(start.x, start.y);
-            ctx.lineTo(end.x, end.y);
-            ctx.stroke();
-        }
-
-        function drawWheel(wheel) {
+        function drawVectorWheel(wheel) {
             const screen = worldToScreen(wheel.position.x, wheel.position.y);
             ctx.save();
             ctx.translate(screen.x, screen.y);
