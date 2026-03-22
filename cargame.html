@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Ridge Rally</title>
+    <title>언덕 질주</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
@@ -187,6 +187,8 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
+            flex-wrap: wrap;
+            row-gap: 6px;
             padding: 10px 14px;
             border-radius: 999px;
             background: rgba(42, 25, 20, 0.78);
@@ -271,6 +273,144 @@
 
         .stat-chip strong {
             color: var(--accent);
+        }
+
+        .vehicle-picker {
+            margin-top: 20px;
+            padding: 18px;
+            border-radius: 22px;
+            background: rgba(255, 247, 235, 0.05);
+            border: 1px solid rgba(255, 237, 216, 0.08);
+        }
+
+        .vehicle-picker-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .vehicle-picker-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: rgba(255, 247, 235, 0.56);
+        }
+
+        .vehicle-picker-copy {
+            margin: 8px 0 0;
+            max-width: 42ch;
+            font-size: 13px;
+            line-height: 1.6;
+            color: rgba(255, 247, 235, 0.8);
+        }
+
+        .vehicle-pill {
+            padding: 9px 12px;
+            border-radius: 999px;
+            background: rgba(255, 209, 102, 0.14);
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .vehicle-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .vehicle-option {
+            width: 100%;
+            padding: 16px;
+            border-radius: 20px;
+            text-align: left;
+            background: rgba(255, 247, 235, 0.05);
+            color: var(--text);
+            border: 1px solid rgba(255, 237, 216, 0.08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .vehicle-option:hover,
+        .vehicle-option:focus-visible {
+            transform: translateY(-2px);
+            outline: none;
+            border-color: rgba(255, 209, 102, 0.34);
+        }
+
+        .vehicle-option.active {
+            background: rgba(255, 209, 102, 0.14);
+            border-color: rgba(255, 209, 102, 0.5);
+            box-shadow: 0 18px 32px rgba(20, 10, 7, 0.2);
+        }
+
+        .vehicle-option:disabled {
+            cursor: default;
+            opacity: 0.56;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .vehicle-option-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .vehicle-option-name {
+            display: block;
+            font-family: "Sora", sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+
+        .vehicle-option-tag {
+            flex-shrink: 0;
+            padding: 5px 8px;
+            border-radius: 999px;
+            background: rgba(255, 247, 235, 0.08);
+            color: rgba(255, 247, 235, 0.76);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .vehicle-option.active .vehicle-option-tag {
+            background: rgba(43, 25, 21, 0.32);
+            color: #fff3d7;
+        }
+
+        .vehicle-option-desc {
+            margin: 10px 0 0;
+            font-size: 12px;
+            line-height: 1.55;
+            color: rgba(255, 247, 235, 0.72);
+        }
+
+        .vehicle-option-specs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .vehicle-option-spec {
+            padding: 6px 8px;
+            border-radius: 999px;
+            background: rgba(255, 247, 235, 0.08);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: rgba(255, 247, 235, 0.74);
         }
 
         .actions {
@@ -530,6 +670,14 @@
             .garage-card {
                 padding: 20px;
             }
+
+            .vehicle-picker {
+                padding: 16px;
+            }
+
+            .vehicle-options {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
@@ -578,6 +726,7 @@
 
         <div class="bottom-row">
             <div class="run-strip">
+                <span>Vehicle <strong id="vehicleInline">Trail Scout</strong></span>
                 <span>Garage coins <strong id="walletInline">0</strong></span>
                 <span>Upgrades apply on the next run</span>
             </div>
@@ -594,6 +743,16 @@
                     <div class="stat-chip">Best <strong id="overlayBest">0 m</strong></div>
                     <div class="stat-chip">Wallet <strong id="overlayWallet">0</strong></div>
                     <div class="stat-chip">Last run <strong id="overlayRunResult">No run yet</strong></div>
+                </div>
+                <div class="vehicle-picker">
+                    <div class="vehicle-picker-head">
+                        <div>
+                            <div class="vehicle-picker-label">Vehicle Select</div>
+                            <p id="vehiclePickerCopy" class="vehicle-picker-copy">Trail Scout is the balanced baseline with even grip, tank, and climb response.</p>
+                        </div>
+                        <div id="vehiclePill" class="vehicle-pill">Trail Scout</div>
+                    </div>
+                    <div id="vehicleOptions" class="vehicle-options" role="radiogroup" aria-label="차량 선택"></div>
                 </div>
                 <div class="actions">
                     <button id="primaryAction" class="primary-btn">Start Run</button>
@@ -663,6 +822,7 @@
         const { Engine, World, Bodies, Body, Constraint, Composite } = Matter;
 
         const STORAGE_KEY = "ridge_rally_progress_v1";
+        const STORAGE_VERSION = 2;
         const RUN_MODES = {
             READY: "ready",
             RUNNING: "running",
@@ -706,6 +866,161 @@
             }
         };
 
+        const VEHICLE_DEFS = [
+            {
+                id: "trail",
+                label: "Trail Scout",
+                tagline: "Balanced",
+                description: "기본 가속, 안정감, 연료량이 고르게 맞춰진 표준형입니다.",
+                traits: ["Even Drive", "Neutral Grip", "Standard Tank"],
+                engine: {
+                    force: 0.00034,
+                    targetSpin: 0.26,
+                    maxSpin: 1.4,
+                    fuelTax: 0.18
+                },
+                suspension: {
+                    stiffness: 0.34,
+                    damping: 0.24,
+                    chassisDrag: 0.026,
+                    assist: 0.000024,
+                    crashGrace: 1.35,
+                    wheelGrip: 1.08,
+                    wheelStaticGrip: 1.7
+                },
+                fuel: {
+                    maxFuel: 100,
+                    pickupBoost: 26
+                },
+                chassis: {
+                    width: 148,
+                    height: 38,
+                    wheelRadius: 30,
+                    wheelOffsetX: 46,
+                    wheelOffsetY: 36,
+                    springInset: 45,
+                    springAnchorY: 18,
+                    braceInset: 28,
+                    braceAnchorY: 10,
+                    springLength: 20,
+                    braceLength: 38
+                },
+                appearance: {
+                    body: "#ef8354",
+                    accent: "#ffb703",
+                    glass: "#163a4d",
+                    tint: "rgba(255, 196, 110, 0.24)",
+                    spriteWidth: 194,
+                    spriteOffsetX: 4,
+                    spriteOffsetY: -16,
+                    wheelScale: 2.16,
+                    wheelOffsetY: 1
+                }
+            },
+            {
+                id: "dune",
+                label: "Dune Burst",
+                tagline: "Quick Climb",
+                description: "가벼운 차체와 빠른 휠 회전으로 언덕 초입을 강하게 치고 나갑니다.",
+                traits: ["Fast Launch", "Light Frame", "Smaller Tank"],
+                engine: {
+                    force: 0.000392,
+                    targetSpin: 0.31,
+                    maxSpin: 1.56,
+                    fuelTax: 0.22
+                },
+                suspension: {
+                    stiffness: 0.31,
+                    damping: 0.21,
+                    chassisDrag: 0.024,
+                    assist: 0.000018,
+                    crashGrace: 1.12,
+                    wheelGrip: 1.01,
+                    wheelStaticGrip: 1.58
+                },
+                fuel: {
+                    maxFuel: 92,
+                    pickupBoost: 24
+                },
+                chassis: {
+                    width: 142,
+                    height: 34,
+                    wheelRadius: 28,
+                    wheelOffsetX: 44,
+                    wheelOffsetY: 34,
+                    springInset: 43,
+                    springAnchorY: 17,
+                    braceInset: 26,
+                    braceAnchorY: 9,
+                    springLength: 18,
+                    braceLength: 36
+                },
+                appearance: {
+                    body: "#db5461",
+                    accent: "#ffd166",
+                    glass: "#1d3557",
+                    tint: "rgba(255, 99, 132, 0.26)",
+                    spriteWidth: 188,
+                    spriteOffsetX: 4,
+                    spriteOffsetY: -14,
+                    wheelScale: 2.18,
+                    wheelOffsetY: 1
+                }
+            },
+            {
+                id: "terra",
+                label: "Terra Mule",
+                tagline: "Stable Grip",
+                description: "더 큰 타이어와 안정적인 서스펜션으로 뒤집힘에 강하고 연료도 넉넉합니다.",
+                traits: ["Safe Landing", "Heavy Grip", "Large Tank"],
+                engine: {
+                    force: 0.000312,
+                    targetSpin: 0.235,
+                    maxSpin: 1.28,
+                    fuelTax: 0.15
+                },
+                suspension: {
+                    stiffness: 0.392,
+                    damping: 0.278,
+                    chassisDrag: 0.03,
+                    assist: 0.000033,
+                    crashGrace: 1.72,
+                    wheelGrip: 1.18,
+                    wheelStaticGrip: 1.92
+                },
+                fuel: {
+                    maxFuel: 116,
+                    pickupBoost: 30
+                },
+                chassis: {
+                    width: 156,
+                    height: 42,
+                    wheelRadius: 32,
+                    wheelOffsetX: 48,
+                    wheelOffsetY: 38,
+                    springInset: 47,
+                    springAnchorY: 19,
+                    braceInset: 29,
+                    braceAnchorY: 11,
+                    springLength: 22,
+                    braceLength: 40
+                },
+                appearance: {
+                    body: "#6c8f7b",
+                    accent: "#f4d35e",
+                    glass: "#102a43",
+                    tint: "rgba(144, 190, 109, 0.22)",
+                    spriteWidth: 202,
+                    spriteOffsetX: 4,
+                    spriteOffsetY: -18,
+                    wheelScale: 2.14,
+                    wheelOffsetY: 1
+                }
+            }
+        ];
+        const VEHICLE_MAP = Object.fromEntries(VEHICLE_DEFS.map((vehicle) => [vehicle.id, vehicle]));
+        const DEFAULT_VEHICLE_ID = VEHICLE_DEFS[0].id;
+
         const VEHICLE_SPRITES = {
             body: {
                 src: "assets/car-body.png",
@@ -731,6 +1046,7 @@
         const speedValue = document.getElementById("speedValue");
         const fuelText = document.getElementById("fuelText");
         const fuelFill = document.getElementById("fuelFill");
+        const vehicleInline = document.getElementById("vehicleInline");
         const walletInline = document.getElementById("walletInline");
         const walletValue = document.getElementById("walletValue");
         const overlayEyebrow = document.getElementById("overlayEyebrow");
@@ -739,6 +1055,9 @@
         const overlayBest = document.getElementById("overlayBest");
         const overlayWallet = document.getElementById("overlayWallet");
         const overlayRunResult = document.getElementById("overlayRunResult");
+        const vehiclePickerCopy = document.getElementById("vehiclePickerCopy");
+        const vehiclePill = document.getElementById("vehiclePill");
+        const vehicleOptions = document.getElementById("vehicleOptions");
         const primaryAction = document.getElementById("primaryAction");
         const secondaryAction = document.getElementById("secondaryAction");
         const leftTouch = document.getElementById("leftTouch");
@@ -820,6 +1139,7 @@
             rearWheel: null,
             frontWheel: null,
             constraints: [],
+            profile: null,
             upsideDownTime: 0,
             grounded: false
         };
@@ -896,16 +1216,25 @@
             return Boolean(asset && asset.ready && asset.trim && !asset.failed);
         }
 
+        function getVehicleDef(vehicleId) {
+            return VEHICLE_MAP[vehicleId] || VEHICLE_MAP[DEFAULT_VEHICLE_ID];
+        }
+
+        function getSelectedVehicle() {
+            return getVehicleDef(progress.selectedVehicleId);
+        }
+
         function loadProgress() {
             const fallback = {
-                version: 1,
+                version: STORAGE_VERSION,
                 bestDistance: 0,
                 coins: 0,
                 upgrades: {
                     engine: 0,
                     suspension: 0,
                     fuel: 0
-                }
+                },
+                selectedVehicleId: DEFAULT_VEHICLE_ID
             };
 
             try {
@@ -915,14 +1244,15 @@
                 }
                 const parsed = JSON.parse(raw);
                 return {
-                    version: Number(parsed.version) || 1,
+                    version: Number(parsed.version) || STORAGE_VERSION,
                     bestDistance: Number(parsed.bestDistance) || 0,
                     coins: Number(parsed.coins) || 0,
                     upgrades: {
                         engine: clampLevel(parsed.upgrades?.engine),
                         suspension: clampLevel(parsed.upgrades?.suspension),
                         fuel: clampLevel(parsed.upgrades?.fuel)
-                    }
+                    },
+                    selectedVehicleId: getVehicleDef(parsed.selectedVehicleId).id
                 };
             } catch (error) {
                 return fallback;
@@ -935,10 +1265,11 @@
 
         function saveProgress() {
             const payload = {
-                version: 1,
+                version: STORAGE_VERSION,
                 bestDistance: progress.bestDistance,
                 coins: progress.coins,
-                upgrades: progress.upgrades
+                upgrades: progress.upgrades,
+                selectedVehicleId: getSelectedVehicle().id
             };
 
             try {
@@ -948,31 +1279,33 @@
             }
         }
 
-        function getUpgradeStats() {
+        function getRunStats(vehicle = getSelectedVehicle()) {
             const engineLevel = progress.upgrades.engine;
             const suspensionLevel = progress.upgrades.suspension;
             const fuelLevel = progress.upgrades.fuel;
 
             return {
+                vehicle,
                 engine: {
-                    force: 0.00034 + engineLevel * 0.000055,
-                    targetSpin: 0.26 + engineLevel * 0.065,
-                    maxSpin: 1.4 + engineLevel * 0.22,
-                    fuelTax: 0.18 + engineLevel * 0.03
+                    force: vehicle.engine.force + engineLevel * 0.000055,
+                    targetSpin: vehicle.engine.targetSpin + engineLevel * 0.065,
+                    maxSpin: vehicle.engine.maxSpin + engineLevel * 0.22,
+                    fuelTax: vehicle.engine.fuelTax + engineLevel * 0.03
                 },
                 suspension: {
-                    stiffness: 0.34 + suspensionLevel * 0.045,
-                    damping: 0.24 + suspensionLevel * 0.025,
-                    chassisDrag: 0.026 + suspensionLevel * 0.006,
-                    assist: 0.000024 + suspensionLevel * 0.00001,
-                    crashGrace: 1.35 + suspensionLevel * 0.22,
-                    wheelGrip: 1.08 + suspensionLevel * 0.08,
-                    wheelStaticGrip: 1.7 + suspensionLevel * 0.14
+                    stiffness: vehicle.suspension.stiffness + suspensionLevel * 0.045,
+                    damping: vehicle.suspension.damping + suspensionLevel * 0.025,
+                    chassisDrag: vehicle.suspension.chassisDrag + suspensionLevel * 0.006,
+                    assist: vehicle.suspension.assist + suspensionLevel * 0.00001,
+                    crashGrace: vehicle.suspension.crashGrace + suspensionLevel * 0.22,
+                    wheelGrip: vehicle.suspension.wheelGrip + suspensionLevel * 0.08,
+                    wheelStaticGrip: vehicle.suspension.wheelStaticGrip + suspensionLevel * 0.14
                 },
                 fuel: {
-                    maxFuel: 100 + fuelLevel * 26,
-                    pickupBoost: 26 + fuelLevel * 5
-                }
+                    maxFuel: vehicle.fuel.maxFuel + fuelLevel * 26,
+                    pickupBoost: vehicle.fuel.pickupBoost + fuelLevel * 5
+                },
+                chassis: { ...vehicle.chassis }
             };
         }
 
@@ -999,6 +1332,7 @@
             vehicleState.rearWheel = null;
             vehicleState.frontWheel = null;
             vehicleState.constraints = [];
+            vehicleState.profile = null;
             vehicleState.upsideDownTime = 0;
             vehicleState.grounded = false;
         }
@@ -1006,7 +1340,8 @@
         function startRun() {
             resetWorld();
 
-            const stats = getUpgradeStats();
+            const vehicle = getSelectedVehicle();
+            const stats = getRunStats(vehicle);
             gameState.mode = RUN_MODES.RUNNING;
             gameState.distance = 0;
             gameState.speedKph = 0;
@@ -1021,7 +1356,7 @@
                 addNextTerrainChunk();
             }
 
-            createVehicle();
+            createVehicle(vehicle, stats);
 
             camera.x = vehicleState.chassis.position.x;
             camera.y = vehicleState.chassis.position.y - 90;
@@ -1030,14 +1365,14 @@
             updateHud();
         }
 
-        function createVehicle() {
-            const stats = getUpgradeStats();
+        function createVehicle(vehicle, stats) {
             const startX = 240;
-            const wheelRadius = 30;
-            const startY = sampleTerrainY(startX) - 114;
+            const layout = stats.chassis;
+            const wheelRadius = layout.wheelRadius;
+            const startY = sampleTerrainY(startX) - (layout.wheelOffsetY + wheelRadius + 48);
             const group = Body.nextGroup(true);
 
-            const chassis = Bodies.rectangle(startX, startY, 148, 38, {
+            const chassis = Bodies.rectangle(startX, startY, layout.width, layout.height, {
                 label: "chassis",
                 density: 0.0023,
                 friction: 0.4,
@@ -1045,7 +1380,7 @@
                 restitution: 0.04,
                 collisionFilter: { group }
             });
-            const rearWheel = Bodies.circle(startX - 46, startY + 36, wheelRadius, {
+            const rearWheel = Bodies.circle(startX - layout.wheelOffsetX, startY + layout.wheelOffsetY, wheelRadius, {
                 label: "wheel",
                 density: 0.0017,
                 friction: stats.suspension.wheelGrip,
@@ -1054,7 +1389,7 @@
                 restitution: 0.01,
                 collisionFilter: { group }
             });
-            const frontWheel = Bodies.circle(startX + 46, startY + 36, wheelRadius, {
+            const frontWheel = Bodies.circle(startX + layout.wheelOffsetX, startY + layout.wheelOffsetY, wheelRadius, {
                 label: "wheel",
                 density: 0.00165,
                 friction: stats.suspension.wheelGrip,
@@ -1066,41 +1401,42 @@
 
             const rearSpring = Constraint.create({
                 bodyA: chassis,
-                pointA: { x: -45, y: 18 },
+                pointA: { x: -layout.springInset, y: layout.springAnchorY },
                 bodyB: rearWheel,
                 stiffness: stats.suspension.stiffness,
                 damping: stats.suspension.damping,
-                length: 20
+                length: layout.springLength
             });
             const frontSpring = Constraint.create({
                 bodyA: chassis,
-                pointA: { x: 45, y: 18 },
+                pointA: { x: layout.springInset, y: layout.springAnchorY },
                 bodyB: frontWheel,
                 stiffness: stats.suspension.stiffness,
                 damping: stats.suspension.damping,
-                length: 20
+                length: layout.springLength
             });
             const rearBrace = Constraint.create({
                 bodyA: chassis,
-                pointA: { x: -28, y: 10 },
+                pointA: { x: -layout.braceInset, y: layout.braceAnchorY },
                 bodyB: rearWheel,
                 stiffness: stats.suspension.stiffness * 0.62,
                 damping: stats.suspension.damping,
-                length: 38
+                length: layout.braceLength
             });
             const frontBrace = Constraint.create({
                 bodyA: chassis,
-                pointA: { x: 28, y: 10 },
+                pointA: { x: layout.braceInset, y: layout.braceAnchorY },
                 bodyB: frontWheel,
                 stiffness: stats.suspension.stiffness * 0.62,
                 damping: stats.suspension.damping,
-                length: 38
+                length: layout.braceLength
             });
 
             vehicleState.chassis = chassis;
             vehicleState.rearWheel = rearWheel;
             vehicleState.frontWheel = frontWheel;
             vehicleState.constraints = [rearSpring, frontSpring, rearBrace, frontBrace];
+            vehicleState.profile = vehicle;
 
             World.add(engine.world, [chassis, rearWheel, frontWheel, ...vehicleState.constraints]);
         }
@@ -1309,7 +1645,7 @@
         }
 
         function updateRun(dt) {
-            const stats = getUpgradeStats();
+            const stats = getRunStats(vehicleState.profile || getSelectedVehicle());
 
             applyDrive(dt, stats);
             Engine.update(engine, FIXED_STEP_MS);
@@ -1530,19 +1866,73 @@
             updateHud();
         }
 
+        function renderVehicleOptions() {
+            vehicleOptions.innerHTML = "";
+            VEHICLE_DEFS.forEach((vehicle) => {
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "vehicle-option";
+                button.dataset.vehicle = vehicle.id;
+                button.setAttribute("role", "radio");
+                button.setAttribute("aria-checked", "false");
+                button.innerHTML = `
+                    <div class="vehicle-option-top">
+                        <span class="vehicle-option-name">${vehicle.label}</span>
+                        <span class="vehicle-option-tag">${vehicle.tagline}</span>
+                    </div>
+                    <p class="vehicle-option-desc">${vehicle.description}</p>
+                    <div class="vehicle-option-specs">${vehicle.traits.map((trait) => `<span class="vehicle-option-spec">${trait}</span>`).join("")}</div>
+                `;
+                vehicleOptions.append(button);
+            });
+            updateVehicleSelectionUi();
+        }
+
+        function updateVehicleSelectionUi() {
+            const vehicle = getSelectedVehicle();
+            vehiclePickerCopy.textContent = `${vehicle.label} · ${vehicle.tagline}. ${vehicle.description}`;
+            vehiclePill.textContent = vehicle.label;
+            vehicleInline.textContent = vehicle.label;
+
+            vehicleOptions.querySelectorAll(".vehicle-option").forEach((button) => {
+                const active = button.dataset.vehicle === vehicle.id;
+                button.classList.toggle("active", active);
+                button.setAttribute("aria-checked", active ? "true" : "false");
+                button.setAttribute("aria-pressed", active ? "true" : "false");
+            });
+        }
+
+        function selectVehicle(vehicleId) {
+            const nextVehicle = getVehicleDef(vehicleId);
+            if (progress.selectedVehicleId === nextVehicle.id) {
+                updateVehicleSelectionUi();
+                return;
+            }
+
+            progress.selectedVehicleId = nextVehicle.id;
+            saveProgress();
+            updateVehicleSelectionUi();
+            updateHud();
+            syncOverlay();
+        }
+
         function updateHud() {
+            const activeVehicle = gameState.mode === RUN_MODES.RUNNING && vehicleState.profile
+                ? vehicleState.profile
+                : getSelectedVehicle();
             const distance = Math.floor(gameState.distance);
             const fuelRatio = gameState.maxFuel > 0 ? gameState.fuel / gameState.maxFuel : 1;
             distanceValue.textContent = `${distance} m`;
             bestValue.textContent = `${progress.bestDistance} m`;
             runCoinsValue.textContent = String(gameState.sessionCoins);
             speedValue.textContent = `${gameState.speedKph} km/h`;
-            fuelText.textContent = `${Math.round(gameState.fuel)} / ${Math.round(gameState.maxFuel || getUpgradeStats().fuel.maxFuel)}`;
+            fuelText.textContent = `${Math.round(gameState.fuel)} / ${Math.round(gameState.maxFuel || getRunStats(activeVehicle).fuel.maxFuel)}`;
             fuelFill.style.transform = `scaleX(${clamp(fuelRatio, 0, 1)})`;
             fuelFill.style.background = fuelRatio < 0.22
                 ? "linear-gradient(90deg, #ff6b6b, #ff9a62)"
                 : "linear-gradient(90deg, var(--fuel), #a9ffdb)";
             walletInline.textContent = String(progress.coins);
+            vehicleInline.textContent = activeVehicle.label;
         }
 
         function updateUpgradeUi() {
@@ -1565,6 +1955,7 @@
         }
 
         function syncOverlay() {
+            const vehicle = getSelectedVehicle();
             const visible = gameState.mode !== RUN_MODES.RUNNING;
             overlay.classList.toggle("hidden", !visible);
             garageCard.classList.toggle("hidden", gameState.mode !== RUN_MODES.SHOP);
@@ -1581,30 +1972,31 @@
             if (gameState.mode === RUN_MODES.READY) {
                 overlayEyebrow.textContent = "Run Setup";
                 overlayTitle.textContent = "Build momentum.";
-                overlayCopy.textContent = "준물리 자동차로 언덕을 넘어 기록을 올립니다. 차고에서 업그레이드를 사면 다음 주행부터 엔진, 차체 안정감, 연료량이 달라집니다.";
+                overlayCopy.textContent = `${vehicle.label} 선택 중입니다. ${vehicle.description} 차고에서 업그레이드를 사면 다음 주행부터 엔진, 차체 안정감, 연료량이 같이 달라집니다.`;
                 primaryAction.textContent = "Start Run";
                 secondaryAction.textContent = "Open Garage";
             } else if (gameState.mode === RUN_MODES.SHOP) {
                 overlayEyebrow.textContent = "Garage";
                 overlayTitle.textContent = "Spend coins where it matters.";
-                overlayCopy.textContent = "첫 버전은 세 가지 핵심 업그레이드만 둡니다. 지금 산 업그레이드는 다음 주행부터 바로 반영됩니다.";
+                overlayCopy.textContent = `${vehicle.label}에 공통 업그레이드를 얹는 구조입니다. 지금 산 업그레이드는 다음 주행부터 바로 반영되고, 차량은 언제든 다시 바꿀 수 있습니다.`;
                 primaryAction.textContent = "Start Run";
                 secondaryAction.textContent = "Back";
             } else if (gameState.mode === RUN_MODES.OUT_OF_FUEL) {
                 overlayEyebrow.textContent = "Run Over";
                 overlayTitle.textContent = "The tank ran dry.";
-                overlayCopy.textContent = `이번 주행은 ${Math.floor(gameState.distance)}m, 코인 ${gameState.sessionCoins}개입니다. 연료 탱크를 키우거나 코인 라인을 더 길게 타면 기록이 늘어납니다.`;
+                overlayCopy.textContent = `이번 주행은 ${Math.floor(gameState.distance)}m, 코인 ${gameState.sessionCoins}개입니다. ${vehicle.label}으로 다시 타거나, 연료가 넉넉한 다른 차를 골라 기록을 다시 올릴 수 있습니다.`;
                 primaryAction.textContent = "Run Again";
                 secondaryAction.textContent = "Open Garage";
             } else if (gameState.mode === RUN_MODES.CRASHED) {
                 overlayEyebrow.textContent = "Run Over";
                 overlayTitle.textContent = "You stayed upside down too long.";
-                overlayCopy.textContent = `이번 주행은 ${Math.floor(gameState.distance)}m, 코인 ${gameState.sessionCoins}개입니다. 서스펜션을 올리면 착지 후 차체가 덜 흔들립니다.`;
+                overlayCopy.textContent = `이번 주행은 ${Math.floor(gameState.distance)}m, 코인 ${gameState.sessionCoins}개입니다. ${vehicle.label}의 느낌이 맞지 않으면 더 안정적인 차로 바꾸거나 서스펜션을 올려 착지를 부드럽게 만들 수 있습니다.`;
                 primaryAction.textContent = "Run Again";
                 secondaryAction.textContent = "Open Garage";
             }
 
             updateUpgradeUi();
+            updateVehicleSelectionUi();
         }
 
         function handlePrimaryAction() {
@@ -1626,6 +2018,7 @@
 
         function bindInputs() {
             window.addEventListener("keydown", (event) => {
+                const fromButton = event.target instanceof HTMLElement && event.target.closest("button");
                 if (event.code === "ArrowLeft" || event.code === "KeyA") {
                     input.left = true;
                     updateTouchButtonState();
@@ -1637,7 +2030,7 @@
                     event.preventDefault();
                 }
                 if (event.code === "Enter" || event.code === "Space") {
-                    if (gameState.mode !== RUN_MODES.RUNNING) {
+                    if (gameState.mode !== RUN_MODES.RUNNING && !fromButton) {
                         startRun();
                         event.preventDefault();
                     }
@@ -1667,6 +2060,13 @@
 
             primaryAction.addEventListener("click", handlePrimaryAction);
             secondaryAction.addEventListener("click", handleSecondaryAction);
+            vehicleOptions.addEventListener("click", (event) => {
+                const option = event.target.closest(".vehicle-option");
+                if (!option) {
+                    return;
+                }
+                selectVehicle(option.dataset.vehicle);
+            });
 
             upgradeButtons.forEach((button) => {
                 button.addEventListener("click", () => buyUpgrade(button.dataset.upgrade));
@@ -1881,16 +2281,18 @@
                 return;
             }
 
+            const vehicle = vehicleState.profile || getSelectedVehicle();
+
             if (!hasSprite(spriteAssets.body)) {
-                drawSuspensionLine(vehicleState.chassis, vehicleState.rearWheel, -45, 18);
-                drawSuspensionLine(vehicleState.chassis, vehicleState.frontWheel, 45, 18);
-                drawVectorBody(vehicleState.chassis);
+                drawSuspensionLine(vehicleState.chassis, vehicleState.rearWheel, -vehicle.chassis.springInset, vehicle.chassis.springAnchorY);
+                drawSuspensionLine(vehicleState.chassis, vehicleState.frontWheel, vehicle.chassis.springInset, vehicle.chassis.springAnchorY);
+                drawVectorBody(vehicleState.chassis, vehicle);
             } else {
-                drawSpriteBody(vehicleState.chassis);
+                drawSpriteBody(vehicleState.chassis, vehicle);
             }
 
-            drawWheel(vehicleState.rearWheel);
-            drawWheel(vehicleState.frontWheel);
+            drawWheel(vehicleState.rearWheel, vehicle);
+            drawWheel(vehicleState.frontWheel, vehicle);
         }
 
         function drawSuspensionLine(chassis, wheel, anchorX, anchorY) {
@@ -1905,22 +2307,26 @@
             ctx.stroke();
         }
 
-        function drawWheel(wheel) {
+        function drawWheel(wheel, vehicle) {
             if (hasSprite(spriteAssets.wheel)) {
-                drawSpriteWheel(wheel);
+                drawSpriteWheel(wheel, vehicle);
                 return;
             }
 
-            drawVectorWheel(wheel);
+            drawVectorWheel(wheel, vehicle);
         }
 
-        function drawSpriteBody(chassis) {
+        function drawSpriteBody(chassis, vehicle) {
             const screen = worldToScreen(chassis.position.x, chassis.position.y);
             const trim = spriteAssets.body.trim;
-            const bodyWidth = VEHICLE_SPRITES.body.targetWidth;
+            const appearance = vehicle.appearance;
+            const bodyWidth = appearance.spriteWidth || VEHICLE_SPRITES.body.targetWidth;
             const bodyHeight = bodyWidth * (trim.height / trim.width);
             const flipX = VEHICLE_SPRITES.body.flipX;
-            const bodyX = -bodyWidth * 0.5 + (flipX ? -VEHICLE_SPRITES.body.offsetX : VEHICLE_SPRITES.body.offsetX);
+            const spriteOffsetX = appearance.spriteOffsetX ?? VEHICLE_SPRITES.body.offsetX;
+            const spriteOffsetY = appearance.spriteOffsetY ?? VEHICLE_SPRITES.body.offsetY;
+            const bodyX = -bodyWidth * 0.5 + (flipX ? -spriteOffsetX : spriteOffsetX);
+            const bodyY = -bodyHeight * 0.5 + spriteOffsetY;
 
             ctx.save();
             ctx.translate(screen.x, screen.y);
@@ -1930,19 +2336,25 @@
             ctx.beginPath();
             ctx.ellipse(0, 34, 84, 16, 0, 0, Math.PI * 2);
             ctx.fill();
-            drawTrimmedSprite(
-                spriteAssets.body,
-                bodyX,
-                -bodyHeight * 0.5 + VEHICLE_SPRITES.body.offsetY,
-                bodyWidth,
-                bodyHeight
-            );
+            drawTrimmedSprite(spriteAssets.body, bodyX, bodyY, bodyWidth, bodyHeight);
+            ctx.save();
+            ctx.globalCompositeOperation = "source-atop";
+            ctx.fillStyle = appearance.tint;
+            ctx.fillRect(bodyX, bodyY, bodyWidth, bodyHeight);
+            ctx.restore();
+            ctx.fillStyle = appearance.accent;
+            roundRect(ctx, -bodyWidth * 0.18, bodyHeight * 0.02, bodyWidth * 0.36, 9, 5);
+            ctx.fill();
             ctx.restore();
         }
 
-        function drawSpriteWheel(wheel) {
-            const screen = worldToScreen(wheel.position.x, wheel.position.y + VEHICLE_SPRITES.wheel.offsetY);
-            const size = wheel.circleRadius * VEHICLE_SPRITES.wheel.scale;
+        function drawSpriteWheel(wheel, vehicle) {
+            const appearance = vehicle.appearance;
+            const screen = worldToScreen(
+                wheel.position.x,
+                wheel.position.y + (appearance.wheelOffsetY ?? VEHICLE_SPRITES.wheel.offsetY)
+            );
+            const size = wheel.circleRadius * (appearance.wheelScale ?? VEHICLE_SPRITES.wheel.scale);
 
             ctx.save();
             ctx.translate(screen.x, screen.y);
@@ -1966,19 +2378,22 @@
             );
         }
 
-        function drawVectorBody(chassis) {
+        function drawVectorBody(chassis, vehicle) {
             const screen = worldToScreen(chassis.position.x, chassis.position.y);
+            const scale = vehicle.chassis.width / 148;
+            const appearance = vehicle.appearance;
 
             ctx.save();
             ctx.translate(screen.x, screen.y);
             ctx.rotate(chassis.angle);
+            ctx.scale(scale, scale);
             ctx.fillStyle = "rgba(19, 11, 8, 0.24)";
             ctx.beginPath();
             ctx.ellipse(0, 32, 78, 14, 0, 0, Math.PI * 2);
             ctx.fill();
 
             roundRect(ctx, -72, -22, 144, 42, 16);
-            ctx.fillStyle = "#ef8354";
+            ctx.fillStyle = appearance.body;
             ctx.fill();
 
             ctx.beginPath();
@@ -1987,7 +2402,7 @@
             ctx.lineTo(54, -50);
             ctx.lineTo(68, -22);
             ctx.closePath();
-            ctx.fillStyle = "#ffb703";
+            ctx.fillStyle = appearance.accent;
             ctx.fill();
 
             ctx.beginPath();
@@ -1996,7 +2411,7 @@
             ctx.lineTo(44, -42);
             ctx.lineTo(52, -22);
             ctx.closePath();
-            ctx.fillStyle = "#163a4d";
+            ctx.fillStyle = appearance.glass;
             ctx.fill();
 
             ctx.fillStyle = "#ffd5a8";
@@ -2010,7 +2425,7 @@
             ctx.restore();
         }
 
-        function drawVectorWheel(wheel) {
+        function drawVectorWheel(wheel, vehicle) {
             const screen = worldToScreen(wheel.position.x, wheel.position.y);
             ctx.save();
             ctx.translate(screen.x, screen.y);
@@ -2032,7 +2447,7 @@
                 ctx.lineTo(Math.cos(angle) * (wheel.circleRadius - 9), Math.sin(angle) * (wheel.circleRadius - 9));
                 ctx.stroke();
             }
-            ctx.fillStyle = "#fff5e4";
+            ctx.fillStyle = vehicle.appearance.accent;
             ctx.beginPath();
             ctx.arc(0, 0, 5, 0, Math.PI * 2);
             ctx.fill();
@@ -2108,6 +2523,7 @@
         });
 
         resizeCanvas();
+        renderVehicleOptions();
         bindInputs();
         updateHud();
         updateUpgradeUi();
