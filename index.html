@@ -112,7 +112,7 @@
         }
 
         /* -- Modals -- */
-        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #magnet-setup-modal, #goal-setup-modal, #sound-block-setup-modal, #slime-setup-modal, #curve-road-setup-modal {
+        #library-modal, #marble-modal, #custom-save-modal, #pushable-setup-modal, #goal-setup-modal, #sound-block-setup-modal, #slime-setup-modal, #curve-road-setup-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
             background: rgba(255,255,255,0.97); backdrop-filter: blur(24px);
             padding: 22px; border-radius: 16px; border: 1px solid var(--border);
@@ -123,7 +123,6 @@
         #marble-modal { z-index: 300; width: 340px; }
         #custom-save-modal { z-index: 400; width: 280px; text-align: center; }
         #pushable-setup-modal { z-index: 400; width: 280px; text-align: center; }
-        #magnet-setup-modal { z-index: 400; width: 300px; text-align: center; }
         #goal-setup-modal { z-index: 400; width: 300px; text-align: center; }
         #sound-block-setup-modal { z-index: 400; width: 320px; text-align: center; }
         #slime-setup-modal { z-index: 400; width: 300px; text-align: center; }
@@ -135,8 +134,6 @@
         #custom-save-modal h3 { margin: 0 0 12px; color: var(--accent); font-size: 13px; font-weight: 700; }
         #pushable-setup-modal h3 { margin: 0 0 12px; color: #7c3aed; font-size: 13px; font-weight: 700; }
         #pushable-setup-modal p { color: var(--text-dim); font-size: 12px; }
-        #magnet-setup-modal h3 { margin: 0 0 12px; color: #d32f2f; font-size: 13px; font-weight: 700; }
-        #magnet-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
         #goal-setup-modal h3 { margin: 0 0 12px; color: #0f766e; font-size: 13px; font-weight: 700; }
         #goal-setup-modal p { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin: 0 0 12px; }
         #sound-block-setup-modal h3 { margin: 0 0 12px; color: #0b5ed7; font-size: 13px; font-weight: 700; }
@@ -170,7 +167,7 @@
             background: #f7f8fa; color: var(--text);
             font-family: 'Inter', sans-serif; font-weight: 600;
         }
-        #magnet-setup-modal input[type=number], #magnet-setup-modal select, #sound-block-setup-modal select, #slime-setup-modal input[type=number] {
+        #sound-block-setup-modal select, #slime-setup-modal input[type=number] {
             width: 118px; padding: 8px; border: 1px solid #dde1e6;
             border-radius: 8px; font-size: 13px; text-align: center;
             background: #f7f8fa; color: var(--text);
@@ -184,8 +181,7 @@
             font-family: 'Inter', sans-serif; font-weight: 600;
         }
         .marble-row input:focus, #pushable-setup-modal input:focus,
-        #custom-save-modal input:focus, #magnet-setup-modal input:focus,
-        #magnet-setup-modal select:focus, #goal-setup-modal input:focus,
+        #custom-save-modal input:focus, #goal-setup-modal input:focus,
         #sound-block-setup-modal select:focus, #slime-setup-modal input:focus, #curve-road-setup-modal input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
 
         .marble-dot {
@@ -341,24 +337,6 @@
         <button class="btn-marble-modal" onclick="startPushableCustomSize()" style="background:#e65100; margin-bottom:8px;">다음 (두께/길이 그리기)</button>
         <button class="btn-marble-modal" onclick="skipPushableCustomSize()" style="background:#ab47bc; margin-bottom:8px;">건너뛰기 (기본 크기 저장)</button>
         <button class="btn-marble-modal" onclick="document.getElementById('pushable-setup-modal').style.display='none'" style="background:#999;">취소</button>
-    </div>
-
-    <div id="magnet-setup-modal">
-        <h3>🧲 자석 설정</h3>
-        <p>고정 자석과 이동 가능한 자석 중 하나를 고르고, 자석의 세기도 함께 정합니다.</p>
-        <div class="magnet-row">
-            <label for="magnet-mode-input">자석 종류</label>
-            <select id="magnet-mode-input">
-                <option value="attached">붙어있는 자석</option>
-                <option value="free">붙어있지 않는 자석</option>
-            </select>
-        </div>
-        <div class="magnet-row">
-            <label for="magnet-strength-input">자석 세기</label>
-            <input type="number" id="magnet-strength-input" min="1" max="10" value="3">
-        </div>
-        <button class="btn-marble-modal" onclick="saveMagnetConfig()" style="background:#d32f2f; margin-bottom:8px;">적용</button>
-        <button class="btn-marble-modal" onclick="closeMagnetSetup()" style="background:#999;">취소</button>
     </div>
 
     <div id="goal-setup-modal">
@@ -517,8 +495,7 @@
             'pushable_basket': { id: 'pushable_basket', name: '밀리는 바구니', w: 140, h: 90, color: '#7e57c2', restitution: 0.0, pw: 20, ph: 12, type: 'pushable_basket' },
             'place_marble': { id: 'place_marble', name: '배치 구슬', w: 30, h: 30, color: '#42a5f5', restitution: 0.5, pw: 15, ph: 15, type: 'place_marble', marbleType: 'normal' },
             'place_steel_marble': { id: 'place_steel_marble', name: '배치 쇠구슬', w: 30, h: 30, color: '#8d99ae', restitution: 0.3, pw: 15, ph: 15, type: 'place_marble', marbleType: 'steel' },
-            'goal_box': { id: 'goal_box', name: '엔드 박스', w: 140, h: 90, color: '#0f766e', restitution: 0.0, pw: 20, ph: 12, type: 'goal_box', targetCount: 1 },
-            'magnet':    { id: 'magnet', name: '붙어있는 자석', w: 16, h: 16, color: '#e53935', restitution: 0.0, pw: 10, ph: 10, type: 'magnet', isAttached: true, magnetStrength: 3 }
+            'goal_box': { id: 'goal_box', name: '엔드 박스', w: 140, h: 90, color: '#0f766e', restitution: 0.0, pw: 20, ph: 12, type: 'goal_box', targetCount: 1 }
         };
 
         const SOUND_BLOCK_NOTES = [
@@ -551,12 +528,45 @@
             return '50%';
         }
 
+        function getTeleportPortalRadius(source) {
+            return source?.circleRadius || source?.plugin?.radius || Math.max(18, Math.min(source?.w || source?.plugin?.w || 64, source?.h || source?.plugin?.h || 64) / 2);
+        }
+
+        function normalizeAngleDelta(angle) {
+            return Math.atan2(Math.sin(angle), Math.cos(angle));
+        }
+
+        function getTeleportPortalGeometry(source, ballRadius = 0) {
+            const radius = getTeleportPortalRadius(source);
+            const mouthHalfAngle = 0.62;
+            const mouthHalfWidth = Math.sin(mouthHalfAngle) * radius;
+            const mouthInnerY = -Math.cos(mouthHalfAngle) * radius;
+            const previewGapDegrees = mouthHalfAngle * (360 / Math.PI);
+            return {
+                radius,
+                mouthHalfAngle,
+                mouthHalfWidth,
+                mouthInnerY,
+                previewGapStartDeg: -90 - previewGapDegrees / 2,
+                previewGapDegrees,
+                supportMinY: -radius - ballRadius * 0.55,
+                supportMaxY: mouthInnerY + radius * 0.62 + ballRadius * 0.2,
+                bodyCenterMaxY: radius * 0.18 + ballRadius * 0.12,
+                radialLimit: radius + ballRadius * 0.7,
+                exitOffset: radius + ballRadius + 0.8,
+                exitTangentOffsetLimit: Math.max(ballRadius * 0.35, radius * 0.16)
+            };
+        }
+
         function getTeleportPortalFill(color) {
-            return `conic-gradient(from -55deg, transparent 0deg 110deg, ${color} 110deg 360deg)`;
+            const geometry = getTeleportPortalGeometry(ROAD_LIB.teleport_portal);
+            const start = geometry.previewGapStartDeg.toFixed(2);
+            const gap = geometry.previewGapDegrees.toFixed(2);
+            return `conic-gradient(from ${start}deg, transparent 0deg ${gap}deg, ${color} ${gap}deg 360deg)`;
         }
 
         function isCircularRoadConfig(conf) {
-            return conf?.type === 'place_marble' || conf?.type === 'steel_marble' || conf?.type === 'magnet' || conf?.type === 'metal_cup' || conf?.type === 'moving_hole_disc';
+            return conf?.type === 'place_marble' || conf?.type === 'steel_marble' || conf?.type === 'metal_cup' || conf?.type === 'moving_hole_disc';
         }
 
         function getSoundBlockNote(noteKey) {
@@ -599,6 +609,7 @@
             if (!data || !data.baseKey) return;
             if ((parseInt(data.curveAxisCount, 10) || 0) >= 3) return;
             const resolvedBaseKey = resolveRoadBaseKey(data.baseKey);
+            if (resolvedBaseKey === 'magnet' || data.type === 'magnet') return;
             if (!ROAD_LIB[resolvedBaseKey]) return;
             const base = ROAD_LIB[resolvedBaseKey];
             const mergedColor = resolvedBaseKey === 'teleport_portal' ? base.color : (data.color || base.color);
@@ -649,7 +660,7 @@
                         ? `border-radius:${getShockAbsorberBorderRadius()};`
                         : (conf.type === 'teleport_portal' ? `border-radius:${getTeleportPortalBorderRadius()};` : ''));
                 slotEls[i].innerHTML = `
-                    <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
+                    <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.type === 'teleport_portal' ? getTeleportPortalFill(conf.color) : conf.color}; ${borderR}"></div>
                     <span>${conf.name}</span>
                 `;
             });
@@ -666,14 +677,6 @@
         // Library UI
         function openLibrary() { document.getElementById('library-modal').style.display = 'block'; }
         function closeLibrary() { document.getElementById('library-modal').style.display = 'none'; }
-        function openMagnetSetup() {
-            document.getElementById('magnet-mode-input').value = pendingMagnetMode;
-            document.getElementById('magnet-strength-input').value = pendingMagnetStrength;
-            document.getElementById('magnet-setup-modal').style.display = 'block';
-        }
-        function closeMagnetSetup() {
-            document.getElementById('magnet-setup-modal').style.display = 'none';
-        }
         function openGoalSetup() {
             document.getElementById('goal-count-input').value = pendingGoalCount;
             document.getElementById('goal-setup-modal').style.display = 'block';
@@ -862,35 +865,6 @@
                 errorMsg.style.borderColor = '#d32f2f';
             }, 2500);
         }
-        function saveMagnetConfig() {
-            const base = ROAD_LIB.magnet;
-            const mode = document.getElementById('magnet-mode-input').value === 'free' ? 'free' : 'attached';
-            const strength = Math.max(1, Math.min(10, parseInt(document.getElementById('magnet-strength-input').value, 10) || 3));
-            const isAttached = mode === 'attached';
-            const id = `custom_magnet_${Date.now()}`;
-            const roadData = {
-                ...base,
-                baseKey: 'magnet',
-                name: `${isAttached ? '붙어있는 자석' : '붙어있지 않는 자석'}(${strength})`,
-                color: isAttached ? '#e53935' : '#ff6b6b',
-                isAttached: isAttached,
-                magnetStrength: strength
-            };
-
-            pendingMagnetMode = mode;
-            pendingMagnetStrength = strength;
-            ROAD_LIB[id] = { ...roadData, id: id };
-            slots[currentSlotIndex] = id;
-            renderSlots();
-            renderLibrary();
-            updateGhostStyle();
-            closeMagnetSetup();
-            closeLibrary();
-            saveCustomRoadToFirestore(id, roadData).catch(error => {
-                console.error('Failed to save magnet config to Firestore:', error);
-            });
-        }
-
         function renderLibrary() {
             const grid = document.getElementById('lib-grid');
             grid.innerHTML = '';
@@ -905,7 +879,7 @@
                         ? `border-radius:${getShockAbsorberBorderRadius()};`
                         : (conf.type === 'teleport_portal' ? `border-radius:${getTeleportPortalBorderRadius()};` : ''));
                 el.innerHTML = `
-                    <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.color}; ${borderR}"></div>
+                    <div class="road-preview-box" style="width:${conf.pw}px; height:${conf.ph}px; background:${conf.type === 'teleport_portal' ? getTeleportPortalFill(conf.color) : conf.color}; ${borderR}"></div>
                     <span>${conf.name}</span>
                 `;
                 // 왼쪽 클릭: 슬롯에 장착
@@ -929,10 +903,6 @@
                         openGoalSetup();
                     } else if (conf.type === 'sound_block') {
                         openSoundBlockSetup(conf);
-                    } else if (conf.type === 'magnet') {
-                        pendingMagnetMode = conf.isAttached === false ? 'free' : 'attached';
-                        pendingMagnetStrength = conf.magnetStrength || 3;
-                        openMagnetSetup();
                     } else if (conf.type === 'moving_hole_disc') {
                         return;
                     } else if (resolvedBaseKey === 'slime') {
@@ -975,7 +945,6 @@
         let marble = null;
         let activeTeleportLabelId = null;
         let placedMarbles = [];  // 배치된 구슬들
-        let magnets = [];        // 자석들
         let pushables = [];      // 밀리는 길들
         // 커스텀 길 그리기 모드
         let isCustomMode = false;
@@ -986,8 +955,6 @@
         let pendingCustomH = 0;
         let customCounter = 0;
         let customBaseKey = null;  // 커스텀 베이스 블록 키
-        let pendingMagnetMode = 'attached';
-        let pendingMagnetStrength = 3;
         let pendingGoalCount = 1;
         let pendingSoundBlockNoteKey = 'c4';
         let pendingSlimeStrength = 20;
@@ -1427,7 +1394,6 @@
             if (minimapDirty || isLaunching || isFollowMode) return true;
             if (cache.movingHoleDiscs.length > 0) return true;
             if (pushables.some(body => cache.bodyIdSet.has(body.id) && isBodyActivelyMoving(body))) return true;
-            if (magnets.some(body => cache.bodyIdSet.has(body.id) && body.plugin?.isAttached === false && isBodyActivelyMoving(body))) return true;
             return false;
         }
 
@@ -1687,27 +1653,35 @@
             return getTeleportPortals().find(other => other !== body && other.plugin?.teleportGroupId === groupId) || null;
         }
 
+        function getTeleportMouthAngleDistance(localPoint) {
+            return Math.abs(normalizeAngleDelta(Math.atan2(localPoint.y, localPoint.x) + Math.PI / 2));
+        }
+
         function canEnterTeleportPortal(body, portal, pair) {
             if (!body || !portal || body.isStatic || body.isSensor || !isTeleportPortalBody(portal)) return false;
 
             const radius = body.circleRadius || 15;
             const entryPoint = getSupportCenter(pair?.collision?.supports, body.position);
             const localPoint = worldToBodyLocal(portal, entryPoint);
+            const bodyLocalPoint = worldToBodyLocal(portal, body.position);
             const localVelocity = rotateWorldVectorToBody(portal, body.velocity || { x: 0, y: 0 });
-            const portalRadius = portal.circleRadius || portal.plugin?.radius || Math.min(portal.plugin?.w || 64, portal.plugin?.h || 64) / 2;
-            const mouthHalfWidth = portalRadius * 0.9 + radius * 0.28;
-            const frontMinY = -(portalRadius + radius * 0.85);
-            const frontMaxY = portalRadius * 0.44 + radius * 0.24;
+            const geometry = getTeleportPortalGeometry(portal, radius);
+            const supportAngleDistance = getTeleportMouthAngleDistance(localPoint);
+            const bodyAngleDistance = getTeleportMouthAngleDistance(bodyLocalPoint);
             const inwardSpeed = localVelocity.y;
             const lateralSpeed = Math.abs(localVelocity.x);
             const radialDistance = Math.hypot(localPoint.x, localPoint.y);
 
             return (
-                radialDistance <= portalRadius + radius * 0.55 &&
-                Math.abs(localPoint.x) <= mouthHalfWidth &&
-                localPoint.y >= frontMinY &&
-                localPoint.y <= frontMaxY &&
-                inwardSpeed > Math.max(0.05, lateralSpeed * 0.12)
+                radialDistance <= geometry.radialLimit &&
+                radialDistance >= geometry.radius * 0.42 &&
+                supportAngleDistance <= geometry.mouthHalfAngle + 0.16 &&
+                bodyAngleDistance <= geometry.mouthHalfAngle + 0.28 &&
+                Math.abs(localPoint.x) <= geometry.mouthHalfWidth + radius * 0.4 &&
+                localPoint.y >= geometry.supportMinY &&
+                localPoint.y <= geometry.supportMaxY &&
+                bodyLocalPoint.y <= geometry.bodyCenterMaxY &&
+                inwardSpeed > Math.max(0.12, lateralSpeed * 0.2)
             );
         }
 
@@ -1730,7 +1704,7 @@
         }
 
         function createTeleportPortalBody(x, y, conf, angle) {
-            const radius = Math.max(18, Math.min(conf.w, conf.h) / 2);
+            const radius = getTeleportPortalRadius(conf);
             const body = Bodies.circle(x, y, radius, {
                 isStatic: true,
                 angle,
@@ -2890,11 +2864,6 @@
         function snapshotRewindOrigins() {
             placedMarbles.forEach(updateBodyOrigin);
             pushables.forEach(updateBodyOrigin);
-            magnets.forEach(magnet => {
-                if (magnet.plugin?.isAttached === false) {
-                    updateBodyOrigin(magnet);
-                }
-            });
         }
 
         function isShockAbsorberBody(body) {
@@ -3206,10 +3175,9 @@
         function drawTeleportPortalBody(ctx, body, isSelected = false) {
             if (!isTeleportPortalBody(body)) return;
 
-            const w = body.plugin?.w || 64;
-            const h = body.plugin?.h || 64;
-            const radius = body.circleRadius || body.plugin?.radius || Math.min(w, h) / 2;
-            const mouthHalfAngle = 0.62;
+            const geometry = getTeleportPortalGeometry(body);
+            const radius = geometry.radius;
+            const mouthHalfAngle = geometry.mouthHalfAngle;
             const groupLabel = body.plugin?.teleportGroupId || '?';
             const bodyColor = body.plugin?.color || '#ffd400';
             const accent = isSelected ? '#fff7a8' : mixColor(bodyColor, '#eab308', 0.18);
@@ -3293,21 +3261,25 @@
 
         function getTeleportExitState(portal, body, entrySpeed) {
             const radius = body.circleRadius || 15;
-            const normalX = Math.sin(portal.angle);
-            const normalY = -Math.cos(portal.angle);
-            const portalRadius = portal.circleRadius || portal.plugin?.radius || Math.min(portal.plugin?.w || 64, portal.plugin?.h || 64) / 2;
-            const offset = portalRadius + radius + 6;
-            const speed = Math.max(6, Math.min(14, entrySpeed || 7));
+            const geometry = getTeleportPortalGeometry(portal, radius);
+            const entryVelocity = typeof entrySpeed === 'number'
+                ? rotateBodyVectorToWorld(portal, { x: 0, y: Math.max(0, entrySpeed) })
+                : (entrySpeed || body.velocity || { x: 0, y: 0 });
+            const localEntryVelocity = rotateWorldVectorToBody(portal, entryVelocity);
+            const tangentSpeed = Math.max(-1.8, Math.min(1.8, localEntryVelocity.x * 0.42));
+            const outwardSpeed = Math.max(0.2, Math.min(0.95, Math.abs(localEntryVelocity.y) * 0.1 + 0.22));
+            const localPosition = {
+                x: Math.max(-geometry.exitTangentOffsetLimit, Math.min(geometry.exitTangentOffsetLimit, tangentSpeed * radius * 0.18)),
+                y: -geometry.exitOffset
+            };
+            const localVelocity = {
+                x: tangentSpeed,
+                y: -outwardSpeed
+            };
 
             return {
-                position: {
-                    x: portal.position.x + normalX * offset,
-                    y: portal.position.y + normalY * offset
-                },
-                velocity: {
-                    x: normalX * speed,
-                    y: normalY * speed
-                }
+                position: bodyLocalToWorld(portal, localPosition),
+                velocity: rotateBodyVectorToWorld(portal, localVelocity)
             };
         }
 
@@ -3352,13 +3324,7 @@
             const partner = getTeleportPartner(sourcePortal);
             if (!partner) return;
 
-            if (body.plugin.attachedMagnetId) {
-                body.plugin.attachedMagnetId = null;
-                body.plugin.attachedOffset = null;
-            }
-
-            const entrySpeed = Math.hypot(body.velocity.x, body.velocity.y);
-            const exit = getTeleportExitState(partner, body, entrySpeed);
+            const exit = getTeleportExitState(partner, body, body.velocity);
             body.plugin.teleportCooldownUntil = engine.timing.timestamp + 260;
 
             Body.setPosition(body, exit.position);
@@ -3763,7 +3729,7 @@
             if (Math.abs(deltaX) < 0.001 && Math.abs(deltaY) < 0.001) return;
 
             getCarryableMarbles().forEach(marble => {
-                if (marble === basket || marble.plugin?.attachedMagnetId) return;
+                if (marble === basket) return;
                 if (!isMarbleInsidePushableBasket(basket, marble)) return;
                 if (marble.isSleeping) {
                     Sleeping.set(marble, false);
@@ -3826,7 +3792,7 @@
         });
 
         window.addEventListener('mousedown', (e) => {
-            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) {
+            if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) {
                 activeTeleportLabelId = null;
                 return;
             }
@@ -3894,15 +3860,7 @@
                 const conf = ROAD_LIB[slots[currentSlotIndex]];
                 const isCircleType = isCircularRoadConfig(conf);
                 
-                // 자석: 다른 자석과는 겹칠 수 없지만 일반 길 위에는 겹쳐 놓을 수 있음
-                if (conf.type === 'magnet') {
-                    const mockMag = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2);
-                    const existingMagnets = getPlacementCandidatesForBody(mockMag, 12).filter(body => body.label === 'magnet');
-                    if (existingMagnets.length > 0 && Query.collides(mockMag, existingMagnets).length > 0) {
-                        showError();
-                        return;
-                    }
-                } else if (conf.type === 'goal_box') {
+                if (conf.type === 'goal_box') {
                     const mockGoal = createGoalBoxBody(worldPos.x, worldPos.y, conf, ghostAngle);
                     const existingRoads = getPlacementCandidatesForBody(mockGoal, 14);
                     if (Query.collides(mockGoal, existingRoads).length > 0) {
@@ -3997,26 +3955,6 @@
                     });
                     placedMarbles.push(newBody);
 
-                } else if (conf.type === 'magnet') {
-                    const isAttached = conf.isAttached !== false;
-                    newBody = Bodies.circle(worldPos.x, worldPos.y, conf.w / 2, {
-                        isStatic: isAttached,
-                        label: 'magnet',
-                        restitution: 0,
-                        friction: 0.08,
-                        frictionAir: isAttached ? 0.04 : 0.1,
-                        density: isAttached ? 0.9 : 0.22,
-                        render: { fillStyle: conf.color, opacity: isAttached ? 1.0 : 0.95 },
-                        plugin: {
-                            type: 'magnet',
-                            isAttached: isAttached,
-                            magnetStrength: conf.magnetStrength || 3,
-                            originX: worldPos.x,
-                            originY: worldPos.y
-                        },
-                        slop: 0
-                    });
-                    magnets.push(newBody);
                 } else if (conf.type === 'pushable') {
                     // 밀리는 길: 횟수 설정에 따라 초기 상태 변경
                     const threshold = conf.hitThreshold || 1;
@@ -4210,7 +4148,7 @@
                     box.style.borderRadius = baseConf?.type === 'teleport_portal' ? getTeleportPortalBorderRadius() : '0';
                 }
             } else {
-                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#magnet-setup-modal') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) {
+                if (e.target.closest('#ui-bottom') || e.target.closest('#ui-top') || e.target.closest('#library-modal') || e.target.closest('#marble-modal') || e.target.closest('#minimap-panel') || e.target.closest('#goal-setup-modal') || e.target.closest('#sound-block-setup-modal') || e.target.closest('#slime-setup-modal') || e.target.closest('#curve-road-setup-modal')) {
                     ghost.style.display = 'none';
                 } else if (!isCustomMode) {
                     ghost.style.display = 'block';
@@ -4374,7 +4312,6 @@
                 removeWorldItem(bodies);
                 selectedBody = null;
                 placedMarbles = [];
-                magnets = [];
                 pushables = [];
                 nextTeleportGroupId = 1;
                 hideEndMessage();
@@ -4385,7 +4322,6 @@
                 if (selectedBody) {
                     removePushableLinksForBody(selectedBody);
                     placedMarbles = placedMarbles.filter(b => b !== selectedBody);
-                    magnets = magnets.filter(b => b !== selectedBody);
                     pushables = pushables.filter(b => b !== selectedBody);
                     removeWorldItem(selectedBody);
                     selectedBody = null;
@@ -4586,7 +4522,7 @@
 
             // 발사된 구슬들 (맵에 떨어진 marble/steel_marble) 제거
             const launchedBalls = getWorldCache().bodies.filter(b => 
-                b !== ground && !placedMarbles.includes(b) && !magnets.includes(b) &&
+                b !== ground && !placedMarbles.includes(b) &&
                 (b.label === 'marble' || b.label === 'steel_marble')
             );
             if (launchedBalls.length > 0) {
@@ -4603,8 +4539,6 @@
             // 배치 구슬들 원래 위치로 복원 + sleeping
             placedMarbles.forEach(pm => {
                 if (pm.plugin && pm.plugin.originX !== undefined) {
-                    pm.plugin.attachedMagnetId = null;
-                    pm.plugin.attachedOffset = null;
                     setBallGravitySuppressed(pm, false);
                     Body.setStatic(pm, true);
                     Body.setPosition(pm, { x: pm.plugin.originX, y: pm.plugin.originY });
@@ -4613,17 +4547,6 @@
                     Body.setAngle(pm, 0);
                     pm.render.opacity = 0.5;
                     syncWorldBodyRegistration(pm, true);
-                }
-            });
-
-            // 붙어있지 않은 자석은 원래 위치로 복원
-            magnets.forEach(mag => {
-                if (mag.plugin && mag.plugin.originX !== undefined && mag.plugin.isAttached === false) {
-                    Body.setPosition(mag, { x: mag.plugin.originX, y: mag.plugin.originY });
-                    Body.setVelocity(mag, { x: 0, y: 0 });
-                    Body.setAngularVelocity(mag, 0);
-                    Body.setAngle(mag, 0);
-                    syncWorldBodyRegistration(mag, true);
                 }
             });
 
@@ -5036,11 +4959,6 @@
                     syncWorldBodyRegistration(body);
                 }
             });
-            magnets.forEach(body => {
-                if (body.plugin?.isAttached === false && cache.bodyIdSet.has(body.id)) {
-                    syncWorldBodyRegistration(body);
-                }
-            });
             placedMarbles.forEach(body => {
                 if (!body.isStatic && cache.bodyIdSet.has(body.id)) {
                     syncWorldBodyRegistration(body);
@@ -5107,25 +5025,6 @@
             });
         });
 
-        // 자석이 쇠구슬과 이동형 자석을 끌어당기는 로직
-        function getMagnetRange(magnetBody) {
-            const strength = magnetBody.plugin?.magnetStrength || 3;
-            return 26 + strength * 9;
-        }
-
-        function getMagnetPull(magnetBody) {
-            const strength = magnetBody.plugin?.magnetStrength || 3;
-            return 0.16 + strength * 0.065;
-        }
-
-        function getMagnetContactDistance(magnetBody, steelBody) {
-            return (magnetBody.circleRadius || 8) + (steelBody.circleRadius || 15) + 2;
-        }
-
-        function findMagnetById(magnetId, activeMagnets) {
-            return activeMagnets.find(mag => mag.id === magnetId) || null;
-        }
-
         function getTunnelSensitiveBodies() {
             return getWorldCache().candidateBallBodies.filter(body => !body.isStatic);
         }
@@ -5171,129 +5070,6 @@
 
         Events.on(engine, 'beforeUpdate', () => {
             const cache = getWorldCache();
-            const steelBodies = cache.steelBodies;
-            const activeMagnets = magnets.filter(m => cache.bodyIdSet.has(m.id));
-
-            steelBodies.forEach(steel => {
-                steel.plugin = steel.plugin || {};
-
-                if (steel.plugin.attachedMagnetId) {
-                    const attachedMagnet = findMagnetById(steel.plugin.attachedMagnetId, activeMagnets);
-                    if (attachedMagnet) {
-                        const offset = steel.plugin.attachedOffset || { x: 0, y: -(attachedMagnet.circleRadius || 8) - (steel.circleRadius || 15) + 0.5 };
-                        Body.setPosition(steel, {
-                            x: attachedMagnet.position.x + offset.x,
-                            y: attachedMagnet.position.y + offset.y
-                        });
-                        Body.setVelocity(steel, {
-                            x: attachedMagnet.velocity.x,
-                            y: attachedMagnet.velocity.y
-                        });
-                        Body.setAngularVelocity(steel, 0);
-                        return;
-                    }
-
-                    steel.plugin.attachedMagnetId = null;
-                    steel.plugin.attachedOffset = null;
-                }
-
-                let nearestMagnet = null;
-                let nearestDist = Infinity;
-
-                activeMagnets.forEach(mag => {
-                    const dx = mag.position.x - steel.position.x;
-                    const dy = mag.position.y - steel.position.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < getMagnetRange(mag) && dist < nearestDist) {
-                        nearestMagnet = mag;
-                        nearestDist = dist;
-                    }
-                });
-
-                if (!nearestMagnet || nearestDist <= 5) return;
-
-                if (steel.isSleeping) {
-                    Sleeping.set(steel, false);
-                    steel.render.opacity = 1.0;
-                }
-
-                const dx = nearestMagnet.position.x - steel.position.x;
-                const dy = nearestMagnet.position.y - steel.position.y;
-                const nx = dx / nearestDist;
-                const ny = dy / nearestDist;
-                const magnetRange = getMagnetRange(nearestMagnet);
-                const magnetPull = getMagnetPull(nearestMagnet);
-                const ratio = Math.pow(1 - nearestDist / magnetRange, 2);
-                const pullX = nx * magnetPull * ratio;
-                const pullY = ny * magnetPull * ratio;
-
-                if (nearestMagnet.plugin?.isAttached === false) {
-                    Body.setVelocity(nearestMagnet, {
-                        x: nearestMagnet.velocity.x - pullX * 1.35,
-                        y: nearestMagnet.velocity.y - pullY * 1.35
-                    });
-                    Body.setVelocity(steel, {
-                        x: steel.velocity.x + pullX * 0.2,
-                        y: steel.velocity.y + pullY * 0.2
-                    });
-                } else {
-                    Body.setVelocity(steel, {
-                        x: steel.velocity.x + pullX * 0.5,
-                        y: steel.velocity.y + pullY * 0.5
-                    });
-                }
-
-                const contactDistance = getMagnetContactDistance(nearestMagnet, steel);
-                if (nearestDist < contactDistance) {
-                    const stickDistance = (nearestMagnet.circleRadius || 8) + (steel.circleRadius || 15) - 0.5;
-                    steel.plugin.attachedMagnetId = nearestMagnet.id;
-                    steel.plugin.attachedOffset = {
-                        x: -nx * stickDistance,
-                        y: -ny * stickDistance
-                    };
-                    Body.setPosition(steel, {
-                        x: nearestMagnet.position.x + steel.plugin.attachedOffset.x,
-                        y: nearestMagnet.position.y + steel.plugin.attachedOffset.y
-                    });
-                    Body.setVelocity(steel, {
-                        x: nearestMagnet.velocity.x,
-                        y: nearestMagnet.velocity.y
-                    });
-                    Body.setAngularVelocity(steel, 0);
-                }
-            });
-
-            for (let i = 0; i < activeMagnets.length; i++) {
-                for (let j = i + 1; j < activeMagnets.length; j++) {
-                    const magA = activeMagnets[i];
-                    const magB = activeMagnets[j];
-                    const dx = magA.position.x - magB.position.x;
-                    const dy = magA.position.y - magB.position.y;
-                    const dist = Math.sqrt(dx * dx + dy * dy);
-                    const range = Math.max(getMagnetRange(magA), getMagnetRange(magB));
-
-                    if (dist >= range || dist <= 5) continue;
-
-                    const ratio = Math.pow(1 - dist / range, 2);
-
-                    if (magA.plugin?.isAttached === false) {
-                        const pullA = getMagnetPull(magB) * ratio * 1.7;
-                        Body.setVelocity(magA, {
-                            x: magA.velocity.x - (dx / dist) * pullA,
-                            y: magA.velocity.y - (dy / dist) * pullA
-                        });
-                    }
-
-                    if (magB.plugin?.isAttached === false) {
-                        const pullB = getMagnetPull(magA) * ratio * 1.7;
-                        Body.setVelocity(magB, {
-                            x: magB.velocity.x + (dx / dist) * pullB,
-                            y: magB.velocity.y + (dy / dist) * pullB
-                        });
-                    }
-                }
-            }
-
             // 정지해 있는 구슬은 지지대가 사라지면 바로 다시 떨어지게 한다.
             cache.candidateBallBodies.forEach(ball => {
                 const shouldCheck = ball.isSleeping || (ball.plugin?.type === 'place_marble' && ball.isStatic);
