@@ -536,6 +536,14 @@
             return Math.atan2(Math.sin(angle), Math.cos(angle));
         }
 
+        function lerpValue(start, end, t) {
+            return start + (end - start) * t;
+        }
+
+        function easeOutCubic(t) {
+            return 1 - Math.pow(1 - Math.max(0, Math.min(1, t)), 3);
+        }
+
         function getTeleportPortalGeometry(source, ballRadius = 0) {
             const radius = getTeleportPortalRadius(source);
             const mouthHalfAngle = 0.62;
@@ -547,14 +555,16 @@
                 mouthHalfAngle,
                 mouthHalfWidth,
                 mouthInnerY,
-                previewGapStartDeg: -90 - previewGapDegrees / 2,
+                previewGapStartDeg: -previewGapDegrees / 2,
                 previewGapDegrees,
                 supportMinY: -radius - ballRadius * 0.55,
                 supportMaxY: mouthInnerY + radius * 0.62 + ballRadius * 0.2,
                 bodyCenterMaxY: radius * 0.18 + ballRadius * 0.12,
                 radialLimit: radius + ballRadius * 0.7,
                 exitOffset: radius + ballRadius + 0.8,
-                exitTangentOffsetLimit: Math.max(ballRadius * 0.35, radius * 0.16)
+                exitTangentOffsetLimit: Math.max(ballRadius * 0.35, radius * 0.16),
+                animationStartY: Math.max(radius * 0.18, mouthInnerY + ballRadius * 1.15),
+                animationOpacityMin: 0.2
             };
         }
 
@@ -973,6 +983,7 @@
         const SPAWN_POINT = { x: window.innerWidth / 2, y: 100 };
         const CURVE_HANDLE_HOLD_DELAY = 220;
         const CURVE_HANDLE_RADIUS = 14;
+        const TELEPORT_EXIT_ANIMATION_MS = 180;
 
         const ghost = document.getElementById('ghost-element');
         const indicator = document.getElementById('selection-indicator');
@@ -3247,8 +3258,18 @@
             delete body.plugin.teleportPending;
             delete body.plugin.teleportSourcePortalId;
             delete body.plugin.teleportTargetPortalId;
-            delete body.plugin.teleportEntrySpeed;
             delete body.plugin.teleportSavedOpacity;
+            delete body.plugin.teleportSavedSensor;
+            delete body.plugin.teleportSavedStatic;
+            delete body.plugin.teleportSavedGravitySuppressed;
+            delete body.plugin.teleportStartAt;
+            delete body.plugin.teleportDurationMs;
+            delete body.plugin.teleportLocalStartX;
+            delete body.plugin.teleportLocalStartY;
+            delete body.plugin.teleportLocalEndX;
+            delete body.plugin.teleportLocalEndY;
+            delete body.plugin.teleportExitVelocityX;
+            delete body.plugin.teleportExitVelocityY;
 
             setTeleportFadeActive(teleportTimeouts.size > 0);
         }
@@ -3259,28 +3280,105 @@
             setTeleportFadeActive(false, true);
         }
 
-        function getTeleportExitState(portal, body, entrySpeed) {
+        function getTeleportExitProfile(portal, body, entrySpeed) {
             const radius = body.circleRadius || 15;
             const geometry = getTeleportPortalGeometry(portal, radius);
             const entryVelocity = typeof entrySpeed === 'number'
                 ? rotateBodyVectorToWorld(portal, { x: 0, y: Math.max(0, entrySpeed) })
                 : (entrySpeed || body.velocity || { x: 0, y: 0 });
             const localEntryVelocity = rotateWorldVectorToBody(portal, entryVelocity);
-            const tangentSpeed = Math.max(-1.8, Math.min(1.8, localEntryVelocity.x * 0.42));
-            const outwardSpeed = Math.max(0.2, Math.min(0.95, Math.abs(localEntryVelocity.y) * 0.1 + 0.22));
-            const localPosition = {
-                x: Math.max(-geometry.exitTangentOffsetLimit, Math.min(geometry.exitTangentOffsetLimit, tangentSpeed * radius * 0.18)),
-                y: -geometry.exitOffset
-            };
+            const tangentSpeed = Math.max(-1.6, Math.min(1.6, localEntryVelocity.x * 0.38));
+            const outwardSpeed = Math.max(0.14, Math.min(0.72, Math.abs(localEntryVelocity.y) * 0.055 + 0.18));
+            const endLocalX = Math.max(-geometry.exitTangentOffsetLimit, Math.min(geometry.exitTangentOffsetLimit, tangentSpeed * radius * 0.16));
             const localVelocity = {
                 x: tangentSpeed,
                 y: -outwardSpeed
             };
 
             return {
-                position: bodyLocalToWorld(portal, localPosition),
+                startLocalPosition: {
+                    x: endLocalX * 0.18,
+                    y: geometry.animationStartY
+                },
+                endLocalPosition: {
+                    x: endLocalX,
+                    y: -geometry.exitOffset
+                },
                 velocity: rotateBodyVectorToWorld(portal, localVelocity)
             };
+        }
+
+        function getTeleportExitState(portal, body, entrySpeed) {
+            const profile = getTeleportExitProfile(portal, body, entrySpeed);
+            return {
+                position: bodyLocalToWorld(portal, profile.endLocalPosition),
+                velocity: profile.velocity
+            };
+        }
+
+        function updateTeleportPendingBody(body, now) {
+            if (!body?.plugin?.teleportPending) return;
+
+            const portal = findBodyById(body.plugin.teleportTargetPortalId);
+            if (!isTeleportPortalBody(portal)) return;
+
+            const duration = Math.max(1, body.plugin.teleportDurationMs || TELEPORT_EXIT_ANIMATION_MS);
+            const startAt = body.plugin.teleportStartAt || now;
+            const eased = easeOutCubic((now - startAt) / duration);
+            const radius = body.circleRadius || 15;
+            const geometry = getTeleportPortalGeometry(portal, radius);
+            const localPosition = {
+                x: lerpValue(body.plugin.teleportLocalStartX || 0, body.plugin.teleportLocalEndX || 0, eased),
+                y: lerpValue(body.plugin.teleportLocalStartY || 0, body.plugin.teleportLocalEndY || 0, eased)
+            };
+
+            Body.setPosition(body, bodyLocalToWorld(portal, localPosition));
+            Body.setVelocity(body, { x: 0, y: 0 });
+            Body.setAngularVelocity(body, 0);
+            Sleeping.set(body, false);
+
+            if (body.render) {
+                const savedOpacity = body.plugin.teleportSavedOpacity ?? 1;
+                body.render.opacity = savedOpacity * lerpValue(geometry.animationOpacityMin, 1, eased);
+            }
+        }
+
+        function beginTeleportExitAnimation(body, targetPortal, entrySpeed) {
+            const profile = getTeleportExitProfile(targetPortal, body, entrySpeed);
+            const savedOpacity = body.render?.opacity ?? 1;
+
+            body.plugin.teleportPending = true;
+            body.plugin.teleportTargetPortalId = targetPortal.id;
+            body.plugin.teleportSavedOpacity = savedOpacity;
+            body.plugin.teleportSavedSensor = body.isSensor ? 1 : 0;
+            body.plugin.teleportSavedStatic = body.isStatic ? 1 : 0;
+            body.plugin.teleportSavedGravitySuppressed = body.plugin?.gravitySuppressed ? 1 : 0;
+            body.plugin.teleportStartAt = engine.timing.timestamp;
+            body.plugin.teleportDurationMs = TELEPORT_EXIT_ANIMATION_MS;
+            body.plugin.teleportLocalStartX = profile.startLocalPosition.x;
+            body.plugin.teleportLocalStartY = profile.startLocalPosition.y;
+            body.plugin.teleportLocalEndX = profile.endLocalPosition.x;
+            body.plugin.teleportLocalEndY = profile.endLocalPosition.y;
+            body.plugin.teleportExitVelocityX = profile.velocity.x;
+            body.plugin.teleportExitVelocityY = profile.velocity.y;
+
+            setBallGravitySuppressed(body, true);
+            Body.setStatic(body, true);
+            body.isSensor = true;
+            Body.setVelocity(body, { x: 0, y: 0 });
+            Body.setAngularVelocity(body, 0);
+            Sleeping.set(body, false);
+
+            if (body.render) {
+                body.render.opacity = savedOpacity * getTeleportPortalGeometry(targetPortal, body.circleRadius || 15).animationOpacityMin;
+            }
+
+            updateTeleportPendingBody(body, engine.timing.timestamp);
+
+            if (teleportTimeouts.has(body.id)) {
+                clearTimeout(teleportTimeouts.get(body.id));
+            }
+            teleportTimeouts.set(body.id, setTimeout(() => completeTeleportTransition(body.id), TELEPORT_EXIT_ANIMATION_MS));
         }
 
         function completeTeleportTransition(bodyId) {
@@ -3293,13 +3391,23 @@
 
             const targetPortal = findBodyById(body.plugin.teleportTargetPortalId);
             const savedOpacity = body.plugin.teleportSavedOpacity ?? 1;
-            const entrySpeed = body.plugin.teleportEntrySpeed || Math.hypot(body.velocity.x, body.velocity.y);
+            const savedSensor = !!body.plugin.teleportSavedSensor;
+            const savedStatic = !!body.plugin.teleportSavedStatic;
+            const savedGravitySuppressed = !!body.plugin.teleportSavedGravitySuppressed;
+            const exitVelocity = {
+                x: body.plugin.teleportExitVelocityX || 0,
+                y: body.plugin.teleportExitVelocityY || 0
+            };
 
             cleanupTeleportState(body, false);
 
-            Body.setStatic(body, false);
+            body.isSensor = savedSensor;
+            setBallGravitySuppressed(body, savedGravitySuppressed);
+            Body.setStatic(body, savedStatic);
             Sleeping.set(body, false);
-            body.render.opacity = savedOpacity;
+            if (body.render) {
+                body.render.opacity = savedOpacity;
+            }
             body.plugin.teleportCooldownUntil = engine.timing.timestamp + 900;
 
             if (!isTeleportPortalBody(targetPortal)) {
@@ -3308,9 +3416,9 @@
                 return;
             }
 
-            const exit = getTeleportExitState(targetPortal, body, entrySpeed);
+            const exit = getTeleportExitState(targetPortal, body, exitVelocity);
             Body.setPosition(body, exit.position);
-            Body.setVelocity(body, exit.velocity);
+            Body.setVelocity(body, exitVelocity);
             Body.setAngularVelocity(body, 0);
         }
 
@@ -3318,19 +3426,15 @@
             if (!body || !sourcePortal || body.isStatic || body.isSensor || !isTeleportPortalBody(sourcePortal)) return;
             body.plugin = body.plugin || {};
 
+            if (body.plugin.teleportPending) return;
             if ((body.plugin.teleportCooldownUntil || 0) > engine.timing.timestamp) return;
             if (!canEnterTeleportPortal(body, sourcePortal, pair)) return;
 
             const partner = getTeleportPartner(sourcePortal);
             if (!partner) return;
 
-            const exit = getTeleportExitState(partner, body, body.velocity);
             body.plugin.teleportCooldownUntil = engine.timing.timestamp + 260;
-
-            Body.setPosition(body, exit.position);
-            Body.setVelocity(body, exit.velocity);
-            Body.setAngularVelocity(body, 0);
-            Sleeping.set(body, false);
+            beginTeleportExitAnimation(body, partner, body.velocity);
         }
 
         function getPushableSize(body) {
@@ -5028,6 +5132,11 @@
         function getTunnelSensitiveBodies() {
             return getWorldCache().candidateBallBodies.filter(body => !body.isStatic);
         }
+
+        Events.on(engine, 'beforeUpdate', () => {
+            const now = engine.timing.timestamp;
+            getWorldCache().candidateBallBodies.forEach(body => updateTeleportPendingBody(body, now));
+        });
 
         Events.on(engine, 'beforeUpdate', () => {
             getTunnelSensitiveBodies().forEach(body => {
