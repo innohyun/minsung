@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Pixel Hill Runner</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <main class="game-shell" aria-label="Pixel Hill Runner">
+        <header class="game-hud" aria-live="polite">
+            <div class="hud-brand">
+                <span class="hud-kicker">PIXEL HILL</span>
+                <h1>픽셀 힐 러너</h1>
+            </div>
+            <div class="hud-stats">
+                <span>코인 <strong id="coinCount">0</strong></span>
+                <span>시간 <strong id="timeCount">0.0</strong></span>
+                <span>최고 <strong id="bestCount">0</strong></span>
+            </div>
+        </header>
+
+        <section class="stage-wrap" aria-label="게임 화면">
+            <canvas id="gameCanvas" width="960" height="540"></canvas>
+            <div id="statusOverlay" class="status-overlay">
+                <div class="status-panel">
+                    <span id="statusKicker" class="status-kicker">READY</span>
+                    <h2 id="statusTitle">픽셀 언덕을 달려요</h2>
+                    <p id="statusText">코인을 모으고 깃발까지 도착하면 성공입니다.</p>
+                    <button id="startButton" class="primary-action" type="button">시작</button>
+                </div>
+            </div>
+        </section>
+
+        <nav class="touch-controls" aria-label="게임 조작">
+            <button class="control-button" type="button" data-control="left" aria-label="왼쪽으로 이동">←</button>
+            <button class="control-button jump-button" type="button" data-control="jump" aria-label="점프">↑</button>
+            <button class="control-button" type="button" data-control="right" aria-label="오른쪽으로 이동">→</button>
+            <button class="control-button restart-button" id="restartButton" type="button" aria-label="다시 시작">↻</button>
+        </nav>
+    </main>
+
+    <script src="./game.js"></script>
+</body>
+</html>

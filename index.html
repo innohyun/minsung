@@ -368,6 +368,44 @@
             box-shadow: 10px 10px 0 rgba(37, 99, 235, 0.12);
         }
 
+        .art-mario {
+            background:
+                linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)),
+                linear-gradient(135deg, #bfdbfe, #bbf7d0);
+        }
+
+        .art-mario::before {
+            content: "";
+            position: absolute;
+            left: 24px;
+            bottom: 24px;
+            width: 54px;
+            height: 54px;
+            border-radius: 12px 12px 8px 8px;
+            background:
+                linear-gradient(#dc2626 0 35%, #1d4ed8 35% 100%);
+            box-shadow:
+                72px -22px 0 -18px #facc15,
+                118px -54px 0 -18px #22c55e,
+                0 18px 0 -12px rgba(20, 32, 51, 0.34);
+        }
+
+        .art-mario::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 22px;
+            background: repeating-linear-gradient(
+                90deg,
+                #15803d,
+                #15803d 22px,
+                #16a34a 22px,
+                #16a34a 44px
+            );
+        }
+
         .card-copy {
             display: grid;
             gap: 8px;
@@ -442,7 +480,7 @@
             </div>
             <div class="status-pill">
                 <span class="status-dot" aria-hidden="true"></span>
-                <span>4개 앱 연결됨</span>
+                <span>5개 앱 연결됨</span>
             </div>
         </header>
 
@@ -504,6 +542,15 @@
                         <span class="file-chip">index copy.html</span>
                         <strong>Marble Builder Copy</strong>
                         <span>보관된 Marble Builder 복사본</span>
+                    </div>
+                </a>
+
+                <a class="app-card" href="mario/index.html">
+                    <div class="card-art art-mario" aria-hidden="true"></div>
+                    <div class="card-copy">
+                        <span class="file-chip">mario/index.html</span>
+                        <strong>Pixel Hill Runner</strong>
+                        <span>코인을 모으며 언덕을 달리는 마리오 스타일 게임</span>
                     </div>
                 </a>
             </div>
