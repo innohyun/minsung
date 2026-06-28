@@ -768,7 +768,6 @@
         const passwordInput = document.getElementById('passwordInput');
         const confirmInput = document.getElementById('confirmInput');
         const setupConfirmRow = document.getElementById('setupConfirmRow');
-        const customDomainLocalApiBase = 'http://127.0.0.1:4173';
         const sessionTokenKey = 'minsung_admin_session_token';
 
         let authMode = 'login';
@@ -786,7 +785,7 @@
         }
 
         function getApiBase() {
-            return isCustomLocalDomainOrigin() ? customDomainLocalApiBase : '';
+            return '';
         }
 
         function getStoredSessionToken() {
@@ -878,7 +877,7 @@
             authForm.hidden = true;
             authTitle.textContent = '로컬 서버 실행 필요';
             authCopy.textContent = isCustomLocalDomainOrigin()
-                ? '주소창은 그대로 두고, 관리자 로그인은 이 컴퓨터의 http://127.0.0.1:4173 로컬 서버에 연결합니다. 터미널에서 `npm start`를 실행하세요.'
+                ? 'Cloudflare Tunnel을 통해 이 Mac mini의 로컬 서버에 연결합니다.'
                 : '터미널에서 이 폴더로 이동한 뒤 `npm start`를 실행하고 http://127.0.0.1:4173 으로 접속하세요.';
             setStatus('error', '서버 연결 안 됨');
             setMessage(message, 'error');
