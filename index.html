@@ -726,6 +726,8 @@
         const passwordInput = document.getElementById('passwordInput');
         const confirmInput = document.getElementById('confirmInput');
         const setupConfirmRow = document.getElementById('setupConfirmRow');
+        const customDomainLocalApiBase = 'http://127.0.0.1:4173';
+        const sessionTokenKey = 'minsung_admin_session_token';
 
         let authMode = 'login';
 
@@ -741,6 +743,30 @@
                 && window.location.port === '';
         }
 
+        function getApiBase() {
+            return isCustomLocalDomainOrigin() ? customDomainLocalApiBase : '';
+        }
+
+        function getStoredSessionToken() {
+            try {
+                return window.localStorage.getItem(sessionTokenKey) || '';
+            } catch {
+                return '';
+            }
+        }
+
+        function setStoredSessionToken(token) {
+            try {
+                if (token) {
+                    window.localStorage.setItem(sessionTokenKey, token);
+                } else {
+                    window.localStorage.removeItem(sessionTokenKey);
+                }
+            } catch {
+                // Storage can be unavailable in strict browser modes; the HttpOnly cookie path still works locally.
+            }
+        }
+
         function setStatus(state, text) {
             sessionStatus.dataset.state = state;
             statusText.textContent = text;
@@ -752,12 +778,17 @@
         }
 
         async function requestJson(path, options = {}) {
-            const response = await fetch(path, {
+            const token = getStoredSessionToken();
+            const headers = {
+                ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                ...(options.headers || {})
+            };
+            const response = await fetch(`${getApiBase()}${path}`, {
                 ...options,
-                headers: {
-                    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-                    ...(options.headers || {})
-                }
+                credentials: isCustomLocalDomainOrigin() ? 'include' : 'same-origin',
+                headers,
+                mode: isCustomLocalDomainOrigin() ? 'cors' : 'same-origin'
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok) {
@@ -805,7 +836,7 @@
             authForm.hidden = true;
             authTitle.textContent = '로컬 서버 실행 필요';
             authCopy.textContent = isCustomLocalDomainOrigin()
-                ? '이 주소를 유지하려면 minsung.classaimate.com이 이 컴퓨터의 로컬 HTTPS 서버로 연결되어야 합니다.'
+                ? '주소창은 그대로 두고, 관리자 로그인은 이 컴퓨터의 http://127.0.0.1:4173 로컬 서버에 연결합니다. 터미널에서 `npm start`를 실행하세요.'
                 : '터미널에서 이 폴더로 이동한 뒤 `npm start`를 실행하고 http://127.0.0.1:4173 으로 접속하세요.';
             setStatus('error', '서버 연결 안 됨');
             setMessage(message, 'error');
@@ -823,6 +854,7 @@
                     showDashboard();
                     return;
                 }
+                setStoredSessionToken('');
                 showAuth({ setupRequired: session.setupRequired });
             } catch {
                 showServerRequired(isExpectedLocalOrigin()
@@ -843,10 +875,11 @@
             authSubmit.disabled = true;
             setMessage(authMode === 'setup' ? '비밀번호를 저장하는 중입니다.' : '로그인 중입니다.', 'success');
             try {
-                await requestJson(authMode === 'setup' ? '/api/setup' : '/api/login', {
+                const response = await requestJson(authMode === 'setup' ? '/api/setup' : '/api/login', {
                     method: 'POST',
                     body: JSON.stringify({ password })
                 });
+                setStoredSessionToken(response.sessionToken || '');
                 showDashboard();
             } catch (error) {
                 if (error.data?.error === 'password_too_short') {
@@ -868,6 +901,7 @@
             try {
                 await requestJson('/api/logout', { method: 'POST' });
             } finally {
+                setStoredSessionToken('');
                 logoutButton.disabled = false;
                 await refreshSession();
             }

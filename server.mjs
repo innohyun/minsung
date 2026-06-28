@@ -12,6 +12,9 @@ const DEFAULT_PORT = 4173;
 const COOKIE_NAME = 'minsung_admin_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_JSON_BYTES = 16 * 1024;
+const ALLOWED_BRIDGE_ORIGINS = new Set([
+    'https://minsung.classaimate.com'
+]);
 
 const PROTECTED_ENTRY_PATHS = new Set([
     '/ball.html',
@@ -66,6 +69,23 @@ function parseCookie(header) {
         if (name) cookies.set(name, decodeURIComponent(value));
     }
     return cookies;
+}
+
+function isAllowedBridgeOrigin(origin) {
+    return Boolean(origin && ALLOWED_BRIDGE_ORIGINS.has(origin));
+}
+
+function applyCorsHeaders(req, res) {
+    const origin = req.headers.origin;
+    if (!isAllowedBridgeOrigin(origin)) return;
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Vary', 'Origin');
+    if (req.headers['access-control-request-private-network'] === 'true') {
+        res.setHeader('Access-Control-Allow-Private-Network', 'true');
+    }
 }
 
 function setSessionCookie(res, token, maxAgeSeconds) {
@@ -123,7 +143,8 @@ function writeMethodNotAllowed(res) {
 function isTrustedWriteRequest(req) {
     const origin = req.headers.origin;
     if (!origin) return true;
-    return origin === `http://${req.headers.host}`;
+    const protocol = req.socket.encrypted ? 'https' : 'http';
+    return origin === `${protocol}://${req.headers.host}` || isAllowedBridgeOrigin(origin);
 }
 
 function createDatabase(dbPath) {
@@ -213,8 +234,16 @@ function getSessionToken(req) {
     return parseCookie(req.headers.cookie).get(COOKIE_NAME) || '';
 }
 
+function getAuthToken(req) {
+    const authorization = req.headers.authorization || '';
+    if (authorization.toLowerCase().startsWith('bearer ')) {
+        return authorization.slice(7).trim();
+    }
+    return getSessionToken(req);
+}
+
 function isAuthenticated(req, store) {
-    return Boolean(store.getValidSession(getSessionToken(req)));
+    return Boolean(store.getValidSession(getAuthToken(req)));
 }
 
 function normalizeRequestPath(url) {
@@ -281,8 +310,18 @@ export function createMinsungServer(options = {}) {
 
     const server = createTransportServer(async (req, res) => {
         const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
+        applyCorsHeaders(req, res);
 
         try {
+            if (req.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
+                if (!isAllowedBridgeOrigin(req.headers.origin)) {
+                    return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
+                }
+                res.writeHead(204, { 'Cache-Control': 'no-store' });
+                res.end();
+                return;
+            }
+
             if (url.pathname === '/api/session') {
                 if (req.method !== 'GET') return writeMethodNotAllowed(res);
                 return sendJson(res, 200, {
@@ -302,7 +341,7 @@ export function createMinsungServer(options = {}) {
                 store.createAdmin(password);
                 const token = store.createSession();
                 setSessionCookie(res, token, Math.floor(sessionTtlMs / 1000));
-                return sendJson(res, 200, { ok: true, authenticated: true, setupRequired: false });
+                return sendJson(res, 200, { ok: true, authenticated: true, setupRequired: false, sessionToken: token });
             }
 
             if (url.pathname === '/api/login') {
@@ -314,13 +353,13 @@ export function createMinsungServer(options = {}) {
                 if (!store.verifyPassword(password)) return sendJson(res, 401, { ok: false, error: 'invalid_password' });
                 const token = store.createSession();
                 setSessionCookie(res, token, Math.floor(sessionTtlMs / 1000));
-                return sendJson(res, 200, { ok: true, authenticated: true, setupRequired: false });
+                return sendJson(res, 200, { ok: true, authenticated: true, setupRequired: false, sessionToken: token });
             }
 
             if (url.pathname === '/api/logout') {
                 if (req.method !== 'POST') return writeMethodNotAllowed(res);
                 if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
-                store.destroySession(getSessionToken(req));
+                store.destroySession(getAuthToken(req));
                 clearSessionCookie(res);
                 return sendJson(res, 200, { ok: true, authenticated: false, setupRequired: !store.hasAdmin() });
             }

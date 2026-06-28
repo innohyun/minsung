@@ -94,6 +94,58 @@ test('sets up admin password and allows protected entries with a session cookie'
     });
 });
 
+test('allows custom domain bridge requests with bearer session tokens', async () => {
+    await withServer(async (baseUrl) => {
+        const preflight = await fetch(`${baseUrl}/api/session`, {
+            method: 'OPTIONS',
+            headers: {
+                Origin: 'https://minsung.classaimate.com',
+                'Access-Control-Request-Method': 'GET',
+                'Access-Control-Request-Headers': 'authorization',
+                'Access-Control-Request-Private-Network': 'true'
+            }
+        });
+        assert.equal(preflight.status, 204);
+        assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://minsung.classaimate.com');
+        assert.equal(preflight.headers.get('access-control-allow-private-network'), 'true');
+
+        const setup = await requestJson(baseUrl, '/api/setup', {
+            method: 'POST',
+            headers: { Origin: 'https://minsung.classaimate.com' },
+            body: JSON.stringify({ password: 'local-pass' })
+        });
+        assert.equal(setup.response.status, 200);
+        assert.equal(setup.response.headers.get('access-control-allow-origin'), 'https://minsung.classaimate.com');
+        assert.ok(setup.data.sessionToken);
+
+        const session = await requestJson(baseUrl, '/api/session', {
+            headers: {
+                Origin: 'https://minsung.classaimate.com',
+                Authorization: `Bearer ${setup.data.sessionToken}`
+            }
+        });
+        assert.equal(session.response.status, 200);
+        assert.equal(session.data.authenticated, true);
+
+        const logout = await requestJson(baseUrl, '/api/logout', {
+            method: 'POST',
+            headers: {
+                Origin: 'https://minsung.classaimate.com',
+                Authorization: `Bearer ${setup.data.sessionToken}`
+            }
+        });
+        assert.equal(logout.response.status, 200);
+
+        const afterLogout = await requestJson(baseUrl, '/api/session', {
+            headers: {
+                Origin: 'https://minsung.classaimate.com',
+                Authorization: `Bearer ${setup.data.sessionToken}`
+            }
+        });
+        assert.equal(afterLogout.data.authenticated, false);
+    });
+});
+
 test('rejects bad password and accepts correct login after setup', async () => {
     await withServer(async (baseUrl) => {
         await requestJson(baseUrl, '/api/setup', {
