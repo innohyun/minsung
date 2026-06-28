@@ -16,6 +16,7 @@
 - The server starts a `duel` match when 2 queued players are available.
 - The server starts a `survival` match when 4 queued players are available.
 - The match view uses a canvas arena with a left movement stick and a right aim/fire stick.
+- The local player's current aim direction is shown as a visible guide line from the monster.
 - The result view shows placement and kills, then allows another automatic match.
 
 ## Server Authority

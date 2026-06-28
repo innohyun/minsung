@@ -427,6 +427,7 @@
         ctx.rotate(angle);
 
         if (player.id === state.playerId) {
+            drawAimGuide(radius);
             ctx.strokeStyle = '#d7f252';
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -472,6 +473,29 @@
         ctx.restore();
 
         drawNameplate(player, point, radius);
+    }
+
+    function drawAimGuide(radius) {
+        const start = radius + 12;
+        const end = Math.max(78, radius * 5.4);
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(215, 242, 82, 0.86)';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.setLineDash([12, 8]);
+        ctx.beginPath();
+        ctx.moveTo(start, 0);
+        ctx.lineTo(end, 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#d7f252';
+        ctx.shadowColor = '#d7f252';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(end + 8, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     function drawNameplate(player, point, radius) {
