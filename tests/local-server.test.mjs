@@ -53,6 +53,38 @@ function openWebSocket(url) {
     });
 }
 
+function openWebSocketAndWaitFor(url, predicate, timeoutMs = 2000) {
+    return new Promise((resolve, reject) => {
+        const socket = new WebSocket(url);
+        const timer = setTimeout(() => {
+            cleanup();
+            socket.close();
+            reject(new Error('Timed out waiting for initial WebSocket message'));
+        }, timeoutMs);
+
+        function cleanup() {
+            clearTimeout(timer);
+            socket.off('message', onMessage);
+            socket.off('error', onError);
+        }
+
+        function onMessage(raw) {
+            const message = JSON.parse(raw.toString('utf8'));
+            if (!predicate(message)) return;
+            cleanup();
+            resolve({ socket, message });
+        }
+
+        function onError(error) {
+            cleanup();
+            reject(error);
+        }
+
+        socket.on('message', onMessage);
+        socket.once('error', onError);
+    });
+}
+
 function waitForWsMessage(socket, predicate, timeoutMs = 2000) {
     return new Promise((resolve, reject) => {
         const timer = setTimeout(() => {
@@ -201,11 +233,21 @@ test('starts a guangboo survival match through automatic WebSocket matchmaking',
 test('starts a guangboo 1:1 duel match with two players', async () => {
     await withServer(async (baseUrl) => {
         const wsBaseUrl = baseUrl.replace(/^http/, 'ws');
-        const sockets = await Promise.all(
-            Array.from({ length: 2 }, () => openWebSocket(`${wsBaseUrl}/guangboo/ws`))
+        const opened = await Promise.all(
+            Array.from({ length: 2 }, () => openWebSocketAndWaitFor(
+                `${wsBaseUrl}/guangboo/ws`,
+                message => message.type === 'hello'
+            ))
         );
+        const sockets = opened.map(entry => entry.socket);
 
         try {
+            const hellos = opened.map(entry => entry.message);
+            assert.deepEqual(
+                hellos[0].modes.find(mode => mode.key === 'duel'),
+                { key: 'duel', label: '1:1 결투', size: 2 }
+            );
+
             sockets.forEach((socket, index) => {
                 socket.send(JSON.stringify({
                     type: 'joinQueue',

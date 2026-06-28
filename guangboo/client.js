@@ -37,7 +37,9 @@
         playerId: null,
         matchId: null,
         connected: false,
+        serverReady: false,
         joining: false,
+        requestedMode: null,
         matchActive: false,
         modes: [
             { key: 'duel', label: '1:1 결투', size: 2 },
@@ -82,15 +84,26 @@
     }
 
     function setModeInputsDisabled(disabled) {
+        const supportedKeys = new Set(state.modes.map(mode => mode.key));
         elements.modeInputs.forEach(input => {
-            input.disabled = disabled;
+            input.disabled = disabled || !supportedKeys.has(input.value);
+        });
+    }
+
+    function normalizeSelectedMode() {
+        if (state.modes.some(mode => mode.key === getSelectedMode())) return;
+        const fallback = state.modes[0]?.key || 'survival';
+        elements.modeInputs.forEach(input => {
+            input.checked = input.value === fallback;
         });
     }
 
     function updateModeCopy() {
+        normalizeSelectedMode();
         const mode = getModeInfo();
         elements.queueCopy.textContent = `${mode.label} - ${mode.size}명 매칭`;
         elements.alive.textContent = String(mode.size);
+        setModeInputsDisabled(elements.joinButton.disabled);
     }
 
     function setMatchingUi(isMatching) {
@@ -104,6 +117,7 @@
             return;
         }
         state.ws = new WebSocket(wsUrl());
+        state.serverReady = false;
         elements.status.textContent = '서버 연결 중';
         elements.connection.textContent = '연결 중';
 
@@ -111,13 +125,11 @@
             state.connected = true;
             elements.status.textContent = '매칭 준비 완료';
             elements.connection.textContent = '온라인';
-            if (state.joining) {
-                joinQueue();
-            }
         });
 
         state.ws.addEventListener('close', () => {
             state.connected = false;
+            state.serverReady = false;
             state.matchActive = false;
             elements.status.textContent = '서버 연결 끊김';
             elements.connection.textContent = '오프라인';
@@ -136,7 +148,16 @@
 
     function joinQueue() {
         const nickname = (elements.nickname.value || 'Monster').trim();
-        const mode = getSelectedMode();
+        const mode = state.requestedMode || getSelectedMode();
+        if (!state.serverReady) return;
+        if (!state.modes.some(item => item.key === mode)) {
+            state.joining = false;
+            state.requestedMode = null;
+            elements.status.textContent = '서버가 이 모드를 아직 지원하지 않습니다. 서버를 재시작하세요.';
+            setMatchingUi(false);
+            updateModeCopy();
+            return;
+        }
         localStorage.setItem(STORAGE_KEY, nickname);
         localStorage.setItem(MODE_STORAGE_KEY, mode);
         setMatchingUi(true);
@@ -149,9 +170,23 @@
             state.playerId = message.playerId;
             if (Array.isArray(message.modes) && message.modes.length) {
                 state.modes = message.modes;
+            } else {
+                state.modes = [{ key: 'survival', label: '4인 생존전', size: Number(message.requiredPlayers) || 4 }];
             }
             renderLeaderboard(message.leaderboard || []);
-            updateModeCopy();
+            state.serverReady = true;
+            if (state.joining) {
+                if (state.requestedMode && !state.modes.some(mode => mode.key === state.requestedMode)) {
+                    state.joining = false;
+                    elements.status.textContent = '서버가 1:1 모드를 아직 지원하지 않습니다. 서버를 재시작하세요.';
+                    setMatchingUi(false);
+                    updateModeCopy();
+                    return;
+                }
+                joinQueue();
+            } else {
+                updateModeCopy();
+            }
             return;
         }
 
@@ -247,6 +282,7 @@
         });
         elements.joinButton.disabled = false;
         setMatchingUi(false);
+        state.requestedMode = null;
         setScreen('result');
     }
 
@@ -581,8 +617,9 @@
     elements.joinForm.addEventListener('submit', event => {
         event.preventDefault();
         state.joining = true;
+        state.requestedMode = getSelectedMode();
         connect();
-        if (state.ws?.readyState === WebSocket.OPEN) {
+        if (state.ws?.readyState === WebSocket.OPEN && state.serverReady) {
             joinQueue();
         }
     });
@@ -590,6 +627,7 @@
     elements.refreshBoard.addEventListener('click', loadLeaderboard);
     elements.modeInputs.forEach(input => {
         input.addEventListener('change', () => {
+            state.requestedMode = null;
             localStorage.setItem(MODE_STORAGE_KEY, getSelectedMode());
             updateModeCopy();
         });
@@ -597,8 +635,9 @@
     elements.playAgain.addEventListener('click', () => {
         setScreen('lobby');
         state.joining = true;
+        state.requestedMode = getSelectedMode();
         connect();
-        if (state.ws?.readyState === WebSocket.OPEN) {
+        if (state.ws?.readyState === WebSocket.OPEN && state.serverReady) {
             joinQueue();
         }
     });

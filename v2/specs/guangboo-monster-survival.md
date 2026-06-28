@@ -22,6 +22,7 @@
 - WebSocket path: `/guangboo/ws`.
 - Clients send `joinQueue`, `leaveQueue`, `input`, and `ping` messages.
 - `joinQueue` includes a `mode` of `duel` or `survival`; missing or unknown modes fall back to the server default.
+- The client waits for the server `hello` mode list before sending `joinQueue`; if the server does not advertise the selected mode, the client must not join a different mode under the selected label.
 - The server sends `hello`, `playerReady`, `queue`, `matchStart`, `state`, `matchEnd`, `pong`, and `error` messages.
 - Clients send input only; the server owns player movement, projectile spawning, projectile hits, health, deaths, placements, and match winners.
 - Match state is kept in server memory while active.
