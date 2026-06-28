@@ -18,17 +18,16 @@
 html,
 body {
     width: 100%;
-    height: auto;
+    height: 100%;
     min-height: 100%;
     overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow-y: hidden;
 }
 
 body {
     margin: 0;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
     touch-action: auto;
     color: var(--ink);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -80,12 +79,18 @@ button {
 }
 
 #app {
+    min-height: 100vh;
     min-height: 100dvh;
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: hidden;
 }
 
 body:not(.is-playing) #app {
+    height: 100vh;
+    height: 100dvh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
     touch-action: pan-y;
 }
 
@@ -103,9 +108,9 @@ body.is-playing #app {
     flex-direction: column;
     gap: 22px;
     justify-content: flex-start;
+    min-height: 100vh;
     min-height: 100dvh;
     overflow-y: visible;
-    -webkit-overflow-scrolling: touch;
     touch-action: auto;
     padding: max(22px, env(safe-area-inset-top)) 18px max(22px, env(safe-area-inset-bottom));
 }

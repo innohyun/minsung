@@ -20,7 +20,7 @@
 - The match view uses a canvas arena with a left movement stick and a right aim/fire stick.
 - The right stick and pointer controls hold to aim and fire one shot on release.
 - The local player's current aim direction is shown as a visible semi-transparent guide line from the monster.
-- The lobby and result screens remain vertically scrollable on mobile and must not use the match touch-lock state.
+- The lobby and result screens remain vertically scrollable on mobile and must not use the match touch-lock state; in non-playing states, the app uses an explicit iOS momentum scroll container so the lobby and ranking can be hand-scrolled on iPhone and iPad Safari.
 - While the match screen is active, touch selection, browser scrolling, and browser zoom gestures are suppressed so the two on-screen sticks can be used reliably.
 - The result view shows placement and kills, then allows another automatic match.
 
