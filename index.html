@@ -297,6 +297,57 @@
             margin-top: 18px;
         }
 
+        .role-actions {
+            display: grid;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .role-button {
+            min-height: 72px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #ffffff;
+            color: var(--ink);
+            cursor: pointer;
+            display: grid;
+            gap: 4px;
+            text-align: left;
+            font: inherit;
+        }
+
+        .role-button strong {
+            font-size: 1rem;
+        }
+
+        .role-button span {
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.35;
+        }
+
+        .role-button[data-variant="admin"] {
+            border-color: transparent;
+            background: var(--ink);
+            color: #ffffff;
+        }
+
+        .role-button[data-variant="admin"] span {
+            color: rgba(255, 255, 255, 0.74);
+        }
+
+        .role-button:hover,
+        .role-button:focus-visible {
+            border-color: rgba(37, 99, 235, 0.48);
+            outline: none;
+        }
+
+        .role-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.58;
+        }
+
         .form-row {
             display: grid;
             gap: 7px;
@@ -354,6 +405,14 @@
             color: var(--green);
         }
 
+        .dashboard-message {
+            margin: -2px 0 14px;
+        }
+
+        .dashboard-message:empty {
+            display: none;
+        }
+
         .section-head {
             display: flex;
             align-items: end;
@@ -395,6 +454,22 @@
             border-color: rgba(37, 99, 235, 0.42);
             box-shadow: 0 24px 58px rgba(15, 23, 42, 0.17);
             outline: none;
+        }
+
+        body[data-role="guest"] [data-guest-readonly] {
+            cursor: not-allowed;
+        }
+
+        body[data-role="guest"] .primary-link[data-guest-readonly],
+        body[data-role="guest"] .app-card[data-guest-readonly] {
+            opacity: 0.72;
+        }
+
+        body[data-role="guest"] .app-card[data-guest-readonly]:hover,
+        body[data-role="guest"] .app-card[data-guest-readonly]:focus-visible {
+            transform: none;
+            border-color: var(--line);
+            box-shadow: var(--shadow);
         }
 
         .card-art {
@@ -653,6 +728,22 @@
             </div>
         </header>
 
+        <section class="auth-panel" id="entryPanel" aria-labelledby="entryTitle" hidden>
+            <h2 id="entryTitle">입장 방식을 선택하세요</h2>
+            <p id="entryCopy">관리자는 로그인 후 앱을 열고, 손님은 앱 목록을 읽기 전용으로 볼 수 있습니다.</p>
+            <div class="role-actions">
+                <button class="role-button" id="adminEntryButton" type="button" data-variant="admin">
+                    <strong>관리자로 입장</strong>
+                    <span id="adminEntryHint">비밀번호로 로그인</span>
+                </button>
+                <button class="role-button" id="guestEntryButton" type="button">
+                    <strong>손님으로 보기</strong>
+                    <span>앱 목록만 읽기</span>
+                </button>
+            </div>
+            <p class="auth-message" id="entryMessage" role="status"></p>
+        </section>
+
         <section class="auth-panel" id="authPanel" aria-labelledby="authTitle" hidden>
             <h2 id="authTitle">관리자 로그인</h2>
             <p id="authCopy">관리자 비밀번호를 입력하면 앱 대시보드를 열 수 있습니다.</p>
@@ -675,13 +766,13 @@
                 <div class="hero-main">
                     <p class="eyebrow">Local Game Dashboard</p>
                     <h1 id="dashboardTitle">송민성 앱 대시보드</h1>
-                    <p class="hero-copy">관리자 로그인 후 폴더 안의 HTML 앱을 한 화면에서 바로 실행합니다.</p>
+                    <p class="hero-copy" id="heroCopy">관리자 로그인 후 폴더 안의 HTML 앱을 한 화면에서 바로 실행합니다.</p>
                 </div>
                 <aside class="quick-panel" aria-label="빠른 실행">
                     <div class="quick-preview" aria-hidden="true"></div>
                     <h2>Marble Builder Pro</h2>
                     <p>가장 먼저 열 앱으로 `ball/ball.html`을 배치했습니다.</p>
-                    <a class="primary-link" href="ball/ball.html">Ball 열기</a>
+                    <a class="primary-link" href="ball/ball.html" data-guest-readonly>Ball 열기</a>
                 </aside>
             </section>
 
@@ -689,12 +780,13 @@
                 <div class="section-head">
                     <div>
                         <h2 id="appListTitle">앱 목록</h2>
-                        <p>클릭하면 같은 폴더의 HTML 파일로 이동합니다.</p>
+                        <p id="appListCopy">클릭하면 같은 폴더의 HTML 파일로 이동합니다.</p>
                     </div>
                 </div>
+                <p class="auth-message dashboard-message" id="dashboardMessage" role="status"></p>
 
                 <div class="app-grid">
-                    <a class="app-card" href="ball/ball.html">
+                    <a class="app-card" href="ball/ball.html" data-guest-readonly>
                         <div class="card-art art-ball" aria-hidden="true"></div>
                         <div class="card-copy">
                             <span class="file-chip">ball/ball.html</span>
@@ -703,7 +795,7 @@
                         </div>
                     </a>
 
-                    <a class="app-card" href="cargame.html">
+                    <a class="app-card" href="cargame.html" data-guest-readonly>
                         <div class="card-art art-car" aria-hidden="true">
                             <img src="assets/car-body.png" alt="">
                         </div>
@@ -714,7 +806,7 @@
                         </div>
                     </a>
 
-                    <a class="app-card" href="gam.html">
+                    <a class="app-card" href="gam.html" data-guest-readonly>
                         <div class="card-art art-runner" aria-hidden="true"></div>
                         <div class="card-copy">
                             <span class="file-chip">gam.html</span>
@@ -723,7 +815,7 @@
                         </div>
                     </a>
 
-                    <a class="app-card" href="index%20copy.html">
+                    <a class="app-card" href="index%20copy.html" data-guest-readonly>
                         <div class="card-art art-copy" aria-hidden="true"></div>
                         <div class="card-copy">
                             <span class="file-chip">index copy.html</span>
@@ -732,7 +824,7 @@
                         </div>
                     </a>
 
-                    <a class="app-card" href="guangboo/index.html">
+                    <a class="app-card" href="guangboo/index.html" data-guest-readonly>
                         <div class="card-art art-guangboo" aria-hidden="true"></div>
                         <div class="card-copy">
                             <span class="file-chip">guangboo/index.html</span>
@@ -741,7 +833,7 @@
                         </div>
                     </a>
 
-                    <a class="app-card" href="mario/index.html">
+                    <a class="app-card" href="mario/index.html" data-guest-readonly>
                         <div class="card-art art-mario" aria-hidden="true"></div>
                         <div class="card-copy">
                             <span class="file-chip">mario/index.html</span>
@@ -755,6 +847,11 @@
     </main>
 
     <script>
+        const entryPanel = document.getElementById('entryPanel');
+        const entryMessage = document.getElementById('entryMessage');
+        const adminEntryButton = document.getElementById('adminEntryButton');
+        const adminEntryHint = document.getElementById('adminEntryHint');
+        const guestEntryButton = document.getElementById('guestEntryButton');
         const authPanel = document.getElementById('authPanel');
         const dashboardShell = document.getElementById('dashboardShell');
         const sessionStatus = document.getElementById('sessionStatus');
@@ -768,9 +865,16 @@
         const passwordInput = document.getElementById('passwordInput');
         const confirmInput = document.getElementById('confirmInput');
         const setupConfirmRow = document.getElementById('setupConfirmRow');
+        const heroCopy = document.getElementById('heroCopy');
+        const appListCopy = document.getElementById('appListCopy');
+        const dashboardMessage = document.getElementById('dashboardMessage');
+        const guestReadonlyLinks = Array.from(document.querySelectorAll('[data-guest-readonly]'));
         const sessionTokenKey = 'minsung_admin_session_token';
 
         let authMode = 'login';
+        let currentRole = '';
+        let pendingSetupRequired = false;
+        let adminEntryAvailable = true;
 
         function isExpectedLocalOrigin() {
             return window.location.protocol === 'http:'
@@ -818,6 +922,16 @@
             authMessage.dataset.kind = kind;
         }
 
+        function setEntryMessage(text, kind = '') {
+            entryMessage.textContent = text;
+            entryMessage.dataset.kind = kind;
+        }
+
+        function setDashboardMessage(text, kind = '') {
+            dashboardMessage.textContent = text;
+            dashboardMessage.dataset.kind = kind;
+        }
+
         async function requestJson(path, options = {}) {
             const token = getStoredSessionToken();
             const headers = {
@@ -841,17 +955,65 @@
             return data;
         }
 
-        function showDashboard() {
+        function setGuestReadonly(enabled) {
+            guestReadonlyLinks.forEach((link) => {
+                if (enabled) {
+                    link.setAttribute('aria-disabled', 'true');
+                    link.setAttribute('tabindex', '-1');
+                } else {
+                    link.removeAttribute('aria-disabled');
+                    link.removeAttribute('tabindex');
+                }
+            });
+        }
+
+        function showDashboard(role = 'admin') {
+            currentRole = role;
+            document.body.dataset.role = role;
+            entryPanel.hidden = true;
             authPanel.hidden = true;
             dashboardShell.hidden = false;
             logoutButton.hidden = false;
             authForm.hidden = false;
+            setGuestReadonly(role === 'guest');
+            setMessage('');
+            setEntryMessage('');
+            setDashboardMessage('');
+            if (role === 'guest') {
+                logoutButton.textContent = '나가기';
+                heroCopy.textContent = '손님 모드에서는 앱 목록을 읽기 전용으로 확인합니다.';
+                appListCopy.textContent = '손님은 앱을 실행하지 않고 목록만 볼 수 있습니다.';
+                setStatus('open', '손님 읽기 전용');
+                return;
+            }
+            logoutButton.textContent = '로그아웃';
+            heroCopy.textContent = '관리자 로그인 후 폴더 안의 HTML 앱을 한 화면에서 바로 실행합니다.';
+            appListCopy.textContent = '클릭하면 같은 폴더의 HTML 파일로 이동합니다.';
             setStatus('open', '관리자 로그인됨');
+        }
+
+        function showEntryChoice({ setupRequired = false, adminAvailable = true, message = '' } = {}) {
+            currentRole = '';
+            pendingSetupRequired = setupRequired;
+            adminEntryAvailable = adminAvailable;
+            document.body.dataset.role = '';
+            dashboardShell.hidden = true;
+            authPanel.hidden = true;
+            entryPanel.hidden = false;
+            logoutButton.hidden = true;
+            setGuestReadonly(false);
+            adminEntryButton.disabled = !adminAvailable;
+            adminEntryHint.textContent = setupRequired ? '처음 비밀번호 설정' : '비밀번호로 로그인';
+            setStatus(adminAvailable ? 'locked' : 'error', adminAvailable ? '입장 선택' : '관리자 연결 안 됨');
+            setEntryMessage(message, message ? 'error' : '');
         }
 
         function showAuth({ setupRequired = false, message = '' } = {}) {
             authMode = setupRequired ? 'setup' : 'login';
+            currentRole = '';
+            document.body.dataset.role = '';
             dashboardShell.hidden = true;
+            entryPanel.hidden = true;
             authPanel.hidden = false;
             logoutButton.hidden = true;
             authForm.hidden = false;
@@ -872,6 +1034,7 @@
 
         function showServerRequired(message) {
             dashboardShell.hidden = true;
+            entryPanel.hidden = true;
             authPanel.hidden = false;
             logoutButton.hidden = true;
             authForm.hidden = true;
@@ -885,24 +1048,43 @@
 
         async function refreshSession() {
             if (window.location.protocol === 'file:') {
-                showServerRequired('파일을 직접 열면 관리자 로그인과 로컬 DB를 사용할 수 없습니다.');
+                showEntryChoice({
+                    adminAvailable: false,
+                    message: '파일을 직접 열면 관리자 로그인과 로컬 DB를 사용할 수 없습니다.'
+                });
                 return;
             }
 
             try {
                 const session = await requestJson('/api/session');
                 if (session.authenticated) {
-                    showDashboard();
+                    showDashboard('admin');
                     return;
                 }
                 setStoredSessionToken('');
-                showAuth({ setupRequired: session.setupRequired });
+                showEntryChoice({ setupRequired: session.setupRequired, adminAvailable: true });
             } catch {
-                showServerRequired(isExpectedLocalOrigin()
-                    ? '로컬 서버 API에 연결하지 못했습니다.'
-                    : '현재 주소에는 로컬 서버 API가 없습니다.');
+                showEntryChoice({
+                    adminAvailable: false,
+                    message: isExpectedLocalOrigin()
+                        ? '로컬 서버 API에 연결하지 못했습니다.'
+                        : '현재 주소에는 로컬 서버 API가 없습니다.'
+                });
             }
         }
+
+        adminEntryButton.addEventListener('click', () => {
+            if (!adminEntryAvailable) {
+                showServerRequired('관리자 입장은 로컬 서버 API가 연결되어야 사용할 수 있습니다.');
+                return;
+            }
+            showAuth({ setupRequired: pendingSetupRequired });
+        });
+
+        guestEntryButton.addEventListener('click', () => {
+            setStoredSessionToken('');
+            showDashboard('guest');
+        });
 
         authForm.addEventListener('submit', async (event) => {
             event.preventDefault();
@@ -921,7 +1103,7 @@
                     body: JSON.stringify({ password })
                 });
                 setStoredSessionToken(response.sessionToken || '');
-                showDashboard();
+                showDashboard('admin');
             } catch (error) {
                 if (error.data?.error === 'password_too_short') {
                     setMessage('비밀번호는 4자 이상이어야 합니다.', 'error');
@@ -938,6 +1120,14 @@
         });
 
         logoutButton.addEventListener('click', async () => {
+            if (currentRole === 'guest') {
+                showEntryChoice({
+                    setupRequired: pendingSetupRequired,
+                    adminAvailable: adminEntryAvailable
+                });
+                return;
+            }
+
             logoutButton.disabled = true;
             try {
                 await requestJson('/api/logout', { method: 'POST' });
@@ -946,6 +1136,15 @@
                 logoutButton.disabled = false;
                 await refreshSession();
             }
+        });
+
+        guestReadonlyLinks.forEach((link) => {
+            link.addEventListener('click', (event) => {
+                if (currentRole !== 'guest') return;
+                event.preventDefault();
+                setStatus('open', '손님 읽기 전용');
+                setDashboardMessage('손님 모드에서는 앱을 실행할 수 없습니다.', 'error');
+            });
         });
 
         refreshSession();
