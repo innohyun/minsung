@@ -12,6 +12,7 @@
 
 - Players open `guangboo/index.html` without admin authentication.
 - The lobby accepts a nickname and lets players choose `1:1 결투` or `4인 생존전` before joining automatic matchmaking.
+- `1:1 결투` copy must make clear that the match is `1명 vs 1명` with 2 total players, not 2 players per team.
 - The server starts a `duel` match when 2 queued players are available.
 - The server starts a `survival` match when 4 queued players are available.
 - The match view uses a canvas arena with a left movement stick and a right aim/fire stick.
@@ -26,6 +27,7 @@
 - The server sends `hello`, `playerReady`, `queue`, `matchStart`, `state`, `matchEnd`, `pong`, and `error` messages.
 - Clients send input only; the server owns player movement, projectile spawning, projectile hits, health, deaths, placements, and match winners.
 - Match state is kept in server memory while active.
+- Guangboo static files are served with `Cache-Control: no-store` so browser tabs do not keep old mode-selection code after a local server update.
 
 ## Local Database
 

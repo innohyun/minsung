@@ -281,10 +281,14 @@ function serveStaticFile(req, res, rootDir, requestPath) {
     }
 
     const contentType = MIME_TYPES.get(extname(filePath).toLowerCase()) || 'application/octet-stream';
-    res.writeHead(200, {
+    const headers = {
         'Content-Type': contentType,
         'Content-Length': stat.size
-    });
+    };
+    if (requestPath.startsWith('/guangboo/')) {
+        headers['Cache-Control'] = 'no-store';
+    }
+    res.writeHead(200, headers);
     if (req.method === 'HEAD') {
         res.end();
         return;

@@ -101,7 +101,9 @@
     function updateModeCopy() {
         normalizeSelectedMode();
         const mode = getModeInfo();
-        elements.queueCopy.textContent = `${mode.label} - ${mode.size}명 매칭`;
+        elements.queueCopy.textContent = mode.key === 'duel'
+            ? `${mode.label} - 1명 vs 1명`
+            : `${mode.label} - 총 ${mode.size}명`;
         elements.alive.textContent = String(mode.size);
         setModeInputsDisabled(elements.joinButton.disabled);
     }
@@ -200,7 +202,10 @@
         if (message.type === 'queue') {
             const percent = Math.min(100, (message.playersWaiting / message.requiredPlayers) * 100);
             elements.queueFill.style.width = `${percent}%`;
-            elements.queueCopy.textContent = `${message.modeLabel || getModeInfo(message.mode).label}: ${message.playersWaiting}/${message.requiredPlayers} 대기 중`;
+            const mode = getModeInfo(message.mode);
+            const label = message.modeLabel || mode.label;
+            const totalCopy = mode.key === 'duel' ? '총 2명' : `총 ${message.requiredPlayers}명`;
+            elements.queueCopy.textContent = `${label}: ${message.playersWaiting}/${message.requiredPlayers} 대기 중 (${totalCopy})`;
             return;
         }
 
