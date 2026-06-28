@@ -726,22 +726,19 @@
         const passwordInput = document.getElementById('passwordInput');
         const confirmInput = document.getElementById('confirmInput');
         const setupConfirmRow = document.getElementById('setupConfirmRow');
-        const localDashboardUrl = 'http://127.0.0.1:4173/';
 
         let authMode = 'login';
 
-        function isLocalDashboardOrigin() {
+        function isExpectedLocalOrigin() {
             return window.location.protocol === 'http:'
                 && ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
                 && window.location.port === '4173';
         }
 
-        function redirectToLocalDashboardIfNeeded() {
-            if (window.location.protocol !== 'file:' && !isLocalDashboardOrigin()) {
-                window.location.replace(localDashboardUrl);
-                return true;
-            }
-            return false;
+        function isCustomLocalDomainOrigin() {
+            return window.location.protocol === 'https:'
+                && window.location.hostname === 'minsung.classaimate.com'
+                && window.location.port === '';
         }
 
         function setStatus(state, text) {
@@ -807,7 +804,9 @@
             logoutButton.hidden = true;
             authForm.hidden = true;
             authTitle.textContent = '로컬 서버 실행 필요';
-            authCopy.textContent = '터미널에서 이 폴더로 이동한 뒤 `npm start`를 실행하고 http://127.0.0.1:4173 으로 접속하세요.';
+            authCopy.textContent = isCustomLocalDomainOrigin()
+                ? '이 주소를 유지하려면 minsung.classaimate.com이 이 컴퓨터의 로컬 HTTPS 서버로 연결되어야 합니다.'
+                : '터미널에서 이 폴더로 이동한 뒤 `npm start`를 실행하고 http://127.0.0.1:4173 으로 접속하세요.';
             setStatus('error', '서버 연결 안 됨');
             setMessage(message, 'error');
         }
@@ -817,7 +816,6 @@
                 showServerRequired('파일을 직접 열면 관리자 로그인과 로컬 DB를 사용할 수 없습니다.');
                 return;
             }
-            if (redirectToLocalDashboardIfNeeded()) return;
 
             try {
                 const session = await requestJson('/api/session');
@@ -827,7 +825,9 @@
                 }
                 showAuth({ setupRequired: session.setupRequired });
             } catch {
-                showServerRequired('로컬 서버 API에 연결하지 못했습니다.');
+                showServerRequired(isExpectedLocalOrigin()
+                    ? '로컬 서버 API에 연결하지 못했습니다.'
+                    : '현재 주소에는 로컬 서버 API가 없습니다.');
             }
         }
 

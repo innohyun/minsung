@@ -1,6 +1,7 @@
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs';
+import { createServer as createHttpServer } from 'node:http';
+import { createServer as createHttpsServer } from 'node:https';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -263,6 +264,14 @@ function isProtectedEntry(url) {
     return PROTECTED_ENTRY_PATHS.has(url.pathname) || PROTECTED_ENTRY_PATHS.has(decodeURIComponent(url.pathname));
 }
 
+function createTransportServer(handler, tls) {
+    if (!tls) return createHttpServer(handler);
+    return createHttpsServer({
+        cert: readFileSync(tls.certPath),
+        key: readFileSync(tls.keyPath)
+    }, handler);
+}
+
 export function createMinsungServer(options = {}) {
     const rootDir = options.rootDir || ROOT_DIR;
     const dbPath = options.dbPath || process.env.MINSUNG_DB_PATH || join(rootDir, '.local', 'minsung.sqlite');
@@ -270,7 +279,7 @@ export function createMinsungServer(options = {}) {
     const db = createDatabase(dbPath);
     const store = createAuthStore(db, sessionTtlMs);
 
-    const server = createServer(async (req, res) => {
+    const server = createTransportServer(async (req, res) => {
         const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
 
         try {
@@ -336,7 +345,7 @@ export function createMinsungServer(options = {}) {
             const message = statusCode === 500 ? 'internal_error' : error.message;
             return sendJson(res, statusCode, { ok: false, error: message });
         }
-    });
+    }, options.tls);
 
     return {
         server,
@@ -349,10 +358,20 @@ export function createMinsungServer(options = {}) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     const port = Number(process.env.PORT || DEFAULT_PORT);
     const host = process.env.HOST || DEFAULT_HOST;
-    const { server, close } = createMinsungServer();
+    const tls = process.env.MINSUNG_TLS_CERT && process.env.MINSUNG_TLS_KEY
+        ? {
+            certPath: process.env.MINSUNG_TLS_CERT,
+            keyPath: process.env.MINSUNG_TLS_KEY
+        }
+        : null;
+    const protocol = tls ? 'https' : 'http';
+    const { server, close } = createMinsungServer({ tls });
 
     server.listen(port, host, () => {
-        console.log(`Minsung local dashboard running at http://${host}:${port}`);
+        const portSuffix = (protocol === 'https' && port === 443) || (protocol === 'http' && port === 80)
+            ? ''
+            : `:${port}`;
+        console.log(`Minsung local dashboard running at ${protocol}://${host}${portSuffix}`);
     });
 
     function shutdown() {
