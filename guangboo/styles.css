@@ -18,6 +18,7 @@
 html,
 body {
     width: 100%;
+    height: auto;
     min-height: 100%;
 }
 
@@ -25,7 +26,7 @@ body {
     margin: 0;
     overflow-x: hidden;
     overflow-y: auto;
-    touch-action: pan-y;
+    touch-action: auto;
     color: var(--ink);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background:
@@ -73,7 +74,6 @@ button {
 #app,
 .screen {
     width: 100%;
-    min-height: 100dvh;
 }
 
 .screen[hidden] {
@@ -85,6 +85,8 @@ button {
     flex-direction: column;
     gap: 22px;
     justify-content: flex-start;
+    min-height: 100dvh;
+    touch-action: auto;
     padding: max(22px, env(safe-area-inset-top)) 18px max(22px, env(safe-area-inset-bottom));
 }
 
@@ -225,6 +227,24 @@ h1 {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
+}
+
+.bot-toggle {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 34px;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: none;
+}
+
+.bot-toggle input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--moss);
 }
 
 input {

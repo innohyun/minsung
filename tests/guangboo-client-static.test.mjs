@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const clientSource = readFileSync(new URL('../guangboo/client.js', import.meta.url), 'utf8');
 const stylesSource = readFileSync(new URL('../guangboo/styles.css', import.meta.url), 'utf8');
+const htmlSource = readFileSync(new URL('../guangboo/index.html', import.meta.url), 'utf8');
 
 test('guangboo client requests fullscreen from active match controls', () => {
     assert.match(clientSource, /function requestGameFullscreen\(\)/);
@@ -15,11 +16,21 @@ test('guangboo client requests fullscreen from active match controls', () => {
 });
 
 test('guangboo lobby keeps document scrolling enabled', () => {
+    assert.doesNotMatch(htmlSource, /user-scalable=no|maximum-scale/);
     assert.match(stylesSource, /overflow-y: auto/);
-    assert.match(stylesSource, /touch-action: pan-y/);
+    assert.match(stylesSource, /touch-action: auto/);
+    assert.match(stylesSource, /body\.is-playing \{[\s\S]*?touch-action: none/);
     assert.match(stylesSource, /\.lobby-screen \{[\s\S]*?justify-content: flex-start/);
     assert.doesNotMatch(clientSource, /joinForm\.addEventListener\('submit'[\s\S]*?requestGameFullscreen\(\)/);
     assert.doesNotMatch(clientSource, /playAgain\.addEventListener\('click'[\s\S]*?requestGameFullscreen\(\)/);
+});
+
+test('guangboo lobby can request bot-filled solo tests', () => {
+    assert.match(htmlSource, /id="botToggle"/);
+    assert.match(htmlSource, /봇으로 혼자 테스트/);
+    assert.match(clientSource, /const BOT_STORAGE_KEY = 'guangboo_fill_bots'/);
+    assert.match(clientSource, /fillWithBots: elements\.botToggle\.checked/);
+    assert.match(stylesSource, /\.bot-toggle/);
 });
 
 test('guangboo attack input fires once after aiming is released', () => {

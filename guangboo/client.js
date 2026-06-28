@@ -3,6 +3,7 @@
     const SEND_MS = 33;
     const STORAGE_KEY = 'guangboo_nickname';
     const MODE_STORAGE_KEY = 'guangboo_match_mode';
+    const BOT_STORAGE_KEY = 'guangboo_fill_bots';
     const keys = new Set();
 
     const elements = {
@@ -11,6 +12,7 @@
         result: document.getElementById('resultScreen'),
         joinForm: document.getElementById('joinForm'),
         nickname: document.getElementById('nicknameInput'),
+        botToggle: document.getElementById('botToggle'),
         modeInputs: [...document.querySelectorAll('input[name="matchMode"]')],
         joinButton: document.getElementById('joinButton'),
         status: document.getElementById('statusLine'),
@@ -184,9 +186,10 @@
         }
         localStorage.setItem(STORAGE_KEY, nickname);
         localStorage.setItem(MODE_STORAGE_KEY, mode);
+        localStorage.setItem(BOT_STORAGE_KEY, elements.botToggle.checked ? '1' : '0');
         setMatchingUi(true);
         state.joining = true;
-        send({ type: 'joinQueue', nickname, mode });
+        send({ type: 'joinQueue', nickname, mode, fillWithBots: elements.botToggle.checked });
     }
 
     function handleServerMessage(message) {
@@ -732,6 +735,9 @@
             updateModeCopy();
         });
     });
+    elements.botToggle.addEventListener('change', () => {
+        localStorage.setItem(BOT_STORAGE_KEY, elements.botToggle.checked ? '1' : '0');
+    });
     elements.playAgain.addEventListener('click', () => {
         setScreen('lobby');
         state.joining = true;
@@ -755,6 +761,7 @@
     setupPointerAim();
 
     elements.nickname.value = localStorage.getItem(STORAGE_KEY) || '';
+    elements.botToggle.checked = localStorage.getItem(BOT_STORAGE_KEY) === '1';
     const savedMode = localStorage.getItem(MODE_STORAGE_KEY);
     if (savedMode && elements.modeInputs.some(input => input.value === savedMode)) {
         elements.modeInputs.forEach(input => {

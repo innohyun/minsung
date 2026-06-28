@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Guangboo Monster Survival</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -39,6 +39,10 @@
                         <input id="nicknameInput" name="nickname" maxlength="18" autocomplete="nickname" placeholder="Monster" required>
                         <button id="joinButton" type="submit">자동 매칭</button>
                     </div>
+                    <label class="bot-toggle">
+                        <input id="botToggle" type="checkbox">
+                        <span>봇으로 혼자 테스트</span>
+                    </label>
                     <p class="status-line" id="statusLine">서버 연결 대기</p>
                     <div class="queue-meter" aria-label="매칭 대기 인원">
                         <span id="queueFill"></span>

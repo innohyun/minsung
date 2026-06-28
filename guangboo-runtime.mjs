@@ -220,6 +220,8 @@ export function createGuangbooRealtime(server, store) {
     const clients = new Map();
     const queues = new Map(Object.keys(MODES).map(key => [key, []]));
     const matches = new Map();
+    let nextBotNumber = 1;
+    let shuttingDown = false;
 
     function queueFor(modeKey) {
         return queues.get(getMode(modeKey).key);
@@ -255,6 +257,7 @@ export function createGuangbooRealtime(server, store) {
                 id: player.id,
                 nickname: player.nickname,
                 monster: player.monster,
+                bot: Boolean(player.client.bot),
                 x: Math.round(player.x),
                 y: Math.round(player.y),
                 aimX: Number(player.aim.x.toFixed(3)),
@@ -327,6 +330,7 @@ export function createGuangbooRealtime(server, store) {
         match.tick += 1;
         const now = Date.now();
         const dt = TICK_MS / 1000;
+        updateBotInputs(match, now);
 
         match.players.forEach(player => {
             if (!player.alive || player.disconnected) return;
@@ -439,6 +443,7 @@ export function createGuangbooRealtime(server, store) {
                 id: player.id,
                 nickname: player.nickname,
                 monster: player.monster,
+                bot: Boolean(player.client.bot),
                 x: player.x,
                 y: player.y
             }))
@@ -454,6 +459,63 @@ export function createGuangbooRealtime(server, store) {
             startMatch(queue.splice(0, mode.size), mode);
             broadcastQueue(mode.key);
         }
+    }
+
+    function createBotClient(mode, botIndex) {
+        const nickname = `Bot ${botIndex}`;
+        const player = store.ensurePlayer(nickname);
+        return {
+            id: `gbb_${randomBytes(6).toString('hex')}`,
+            socket: { readyState: 0, send() {}, close() {} },
+            playerDbId: player.id,
+            nickname: player.nickname,
+            mode: mode.key,
+            bot: true,
+            match: null,
+            nextFireAt: Date.now() + 500,
+            input: { move: { x: 0, y: 0 }, aim: { x: -1, y: 0 }, firing: false }
+        };
+    }
+
+    function fillQueueWithBots(mode) {
+        const queue = queueFor(mode.key);
+        while (queue.length < mode.size) {
+            queue.push(createBotClient(mode, nextBotNumber++));
+        }
+    }
+
+    function updateBotInputs(match, now) {
+        const players = [...match.players.values()];
+        players.forEach(player => {
+            const client = player.client;
+            if (!client.bot || !player.alive) return;
+            const target = players
+                .filter(candidate => candidate.id !== player.id && candidate.alive)
+                .sort((a, b) =>
+                    Math.hypot(a.x - player.x, a.y - player.y) -
+                    Math.hypot(b.x - player.x, b.y - player.y)
+                )[0];
+
+            if (!target) {
+                client.input = { move: { x: 0, y: 0 }, aim: player.aim, firing: false };
+                return;
+            }
+
+            const dx = target.x - player.x;
+            const dy = target.y - player.y;
+            const distance = Math.hypot(dx, dy) || 1;
+            const aim = { x: dx / distance, y: dy / distance };
+            let move = { x: 0, y: 0 };
+            if (distance > 260) {
+                move = aim;
+            } else if (distance < 150) {
+                move = { x: -aim.x, y: -aim.y };
+            }
+
+            const firing = distance < 560 && now >= client.nextFireAt;
+            if (firing) client.nextFireAt = now + 650 + Math.floor(Math.random() * 350);
+            client.input = { move, aim, firing };
+        });
     }
 
     function handleMessage(client, raw) {
@@ -472,6 +534,9 @@ export function createGuangbooRealtime(server, store) {
             client.mode = mode.key;
             removeFromQueue(client);
             if (!client.match) queueFor(mode.key).push(client);
+            if (message.fillWithBots) {
+                fillQueueWithBots(mode);
+            }
             sendJson(client.socket, {
                 type: 'playerReady',
                 playerId: client.id,
@@ -511,6 +576,7 @@ export function createGuangbooRealtime(server, store) {
     function removeClient(client) {
         clients.delete(client.id);
         removeFromQueue(client);
+        if (shuttingDown) return;
         const match = client.match;
         if (!match || match.status !== 'active') return;
         const player = match.players.get(client.id);
@@ -555,8 +621,16 @@ export function createGuangbooRealtime(server, store) {
 
     return {
         close() {
+            shuttingDown = true;
             queues.forEach(queue => queue.splice(0, queue.length));
-            matches.forEach(match => clearInterval(match.timer));
+            matches.forEach(match => {
+                clearInterval(match.timer);
+                match.status = 'ended';
+                match.players.forEach(player => {
+                    player.client.match = null;
+                });
+            });
+            matches.clear();
             wss.clients.forEach(socket => socket.close());
             wss.close();
         }
