@@ -17,7 +17,7 @@ const ALLOWED_BRIDGE_ORIGINS = new Set([
 ]);
 
 const PROTECTED_ENTRY_PATHS = new Set([
-    '/ball.html',
+    '/ball/ball.html',
     '/cargame.html',
     '/gam.html',
     '/index copy.html',

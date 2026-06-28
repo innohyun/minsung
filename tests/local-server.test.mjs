@@ -51,7 +51,7 @@ test('requires setup before authentication', async () => {
         assert.equal(session.data.setupRequired, true);
         assert.equal(session.data.authenticated, false);
 
-        const appResponse = await fetch(`${baseUrl}/ball.html`, { redirect: 'manual' });
+        const appResponse = await fetch(`${baseUrl}/ball/ball.html`, { redirect: 'manual' });
         assert.equal(appResponse.status, 302);
         assert.equal(appResponse.headers.get('location'), '/');
 
@@ -77,7 +77,7 @@ test('sets up admin password and allows protected entries with a session cookie'
         assert.equal(session.data.setupRequired, false);
         assert.equal(session.data.authenticated, true);
 
-        const appResponse = await fetch(`${baseUrl}/ball.html`, {
+        const appResponse = await fetch(`${baseUrl}/ball/ball.html`, {
             headers: { Cookie: cookie },
             redirect: 'manual'
         });
