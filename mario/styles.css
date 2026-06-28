@@ -36,6 +36,10 @@ button {
     font: inherit;
 }
 
+a {
+    color: inherit;
+}
+
 .game-shell {
     min-height: 100dvh;
     display: grid;
@@ -59,6 +63,38 @@ button {
 
 .hud-brand {
     min-width: 0;
+}
+
+.hud-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.home-button {
+    width: 42px;
+    height: 42px;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgba(25, 68, 96, 0.14);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.78);
+    color: var(--ink);
+    font-size: 1.25rem;
+    font-weight: 900;
+    line-height: 1;
+    text-decoration: none;
+    box-shadow: 0 6px 14px rgba(18, 48, 71, 0.12);
+}
+
+.home-button:hover,
+.home-button:focus-visible {
+    outline: none;
+    border-color: rgba(240, 90, 79, 0.42);
+    background: #ffffff;
 }
 
 .hud-kicker,
