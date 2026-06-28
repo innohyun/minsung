@@ -15,14 +15,16 @@ test('guangboo client requests fullscreen from active match controls', () => {
     assert.match(stylesSource, /html:fullscreen/);
 });
 
-test('guangboo lobby keeps a non-playing scroll container enabled', () => {
+test('guangboo lobby keeps document scrolling enabled outside matches', () => {
     assert.doesNotMatch(htmlSource, /user-scalable=no|maximum-scale/);
-    assert.match(stylesSource, /html,\nbody \{[\s\S]*?height: 100%/);
-    assert.match(stylesSource, /html,\nbody \{[\s\S]*?overflow-y: hidden/);
-    assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?height: 100vh/);
-    assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?height: 100dvh/);
-    assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?overflow-y: auto/);
-    assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?-webkit-overflow-scrolling: touch/);
+    assert.match(stylesSource, /html,\nbody \{[\s\S]*?height: auto/);
+    assert.match(stylesSource, /html,\nbody \{[\s\S]*?overflow-y: auto/);
+    assert.match(stylesSource, /html,\nbody \{[\s\S]*?-webkit-overflow-scrolling: touch/);
+    assert.match(stylesSource, /body \{[\s\S]*?overflow-y: auto/);
+    assert.match(stylesSource, /#app \{[\s\S]*?overflow-y: visible/);
+    assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?min-height: 100vh/);
+    assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?min-height: 100dvh/);
+    assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?overflow-y: visible/);
     assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?touch-action: pan-y/);
     assert.match(stylesSource, /body\.is-playing \{[\s\S]*?touch-action: none/);
     assert.match(stylesSource, /body\.is-playing #app \{[\s\S]*?overflow: hidden/);
