@@ -20,6 +20,9 @@ body {
     width: 100%;
     height: auto;
     min-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 body {
@@ -76,6 +79,21 @@ button {
     width: 100%;
 }
 
+#app {
+    min-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: visible;
+}
+
+body:not(.is-playing) #app {
+    touch-action: pan-y;
+}
+
+body.is-playing #app {
+    height: 100%;
+    overflow: hidden;
+}
+
 .screen[hidden] {
     display: none;
 }
@@ -86,6 +104,8 @@ button {
     gap: 22px;
     justify-content: flex-start;
     min-height: 100dvh;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
     touch-action: auto;
     padding: max(22px, env(safe-area-inset-top)) 18px max(22px, env(safe-area-inset-bottom));
 }

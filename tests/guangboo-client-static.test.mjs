@@ -17,10 +17,13 @@ test('guangboo client requests fullscreen from active match controls', () => {
 
 test('guangboo lobby keeps document scrolling enabled', () => {
     assert.doesNotMatch(htmlSource, /user-scalable=no|maximum-scale/);
-    assert.match(stylesSource, /overflow-y: auto/);
-    assert.match(stylesSource, /touch-action: auto/);
+    assert.match(stylesSource, /html,\nbody \{[\s\S]*?overflow-y: auto/);
+    assert.match(stylesSource, /-webkit-overflow-scrolling: touch/);
+    assert.match(stylesSource, /body:not\(\.is-playing\) #app \{[\s\S]*?touch-action: pan-y/);
     assert.match(stylesSource, /body\.is-playing \{[\s\S]*?touch-action: none/);
+    assert.match(stylesSource, /body\.is-playing #app \{[\s\S]*?overflow: hidden/);
     assert.match(stylesSource, /\.lobby-screen \{[\s\S]*?justify-content: flex-start/);
+    assert.match(stylesSource, /\.lobby-screen \{[\s\S]*?overflow-y: visible/);
     assert.doesNotMatch(clientSource, /joinForm\.addEventListener\('submit'[\s\S]*?requestGameFullscreen\(\)/);
     assert.doesNotMatch(clientSource, /playAgain\.addEventListener\('click'[\s\S]*?requestGameFullscreen\(\)/);
 });
