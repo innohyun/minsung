@@ -726,8 +726,23 @@
         const passwordInput = document.getElementById('passwordInput');
         const confirmInput = document.getElementById('confirmInput');
         const setupConfirmRow = document.getElementById('setupConfirmRow');
+        const localDashboardUrl = 'http://127.0.0.1:4173/';
 
         let authMode = 'login';
+
+        function isLocalDashboardOrigin() {
+            return window.location.protocol === 'http:'
+                && ['127.0.0.1', 'localhost', '[::1]'].includes(window.location.hostname)
+                && window.location.port === '4173';
+        }
+
+        function redirectToLocalDashboardIfNeeded() {
+            if (window.location.protocol !== 'file:' && !isLocalDashboardOrigin()) {
+                window.location.replace(localDashboardUrl);
+                return true;
+            }
+            return false;
+        }
 
         function setStatus(state, text) {
             sessionStatus.dataset.state = state;
@@ -802,6 +817,7 @@
                 showServerRequired('파일을 직접 열면 관리자 로그인과 로컬 DB를 사용할 수 없습니다.');
                 return;
             }
+            if (redirectToLocalDashboardIfNeeded()) return;
 
             try {
                 const session = await requestJson('/api/session');
