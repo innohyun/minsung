@@ -18,6 +18,23 @@
             <div class="lobby-layout">
                 <form class="join-panel" id="joinForm">
                     <label for="nicknameInput">닉네임</label>
+                    <fieldset class="mode-picker" aria-label="매치 모드">
+                        <legend>모드</legend>
+                        <label class="mode-option">
+                            <input type="radio" name="matchMode" value="duel" checked>
+                            <span>
+                                <strong>1:1 결투</strong>
+                                <small>2명 즉시 대결</small>
+                            </span>
+                        </label>
+                        <label class="mode-option">
+                            <input type="radio" name="matchMode" value="survival">
+                            <span>
+                                <strong>4인 생존전</strong>
+                                <small>마지막 생존자 승리</small>
+                            </span>
+                        </label>
+                    </fieldset>
                     <div class="join-row">
                         <input id="nicknameInput" name="nickname" maxlength="18" autocomplete="nickname" placeholder="Monster" required>
                         <button id="joinButton" type="submit">자동 매칭</button>

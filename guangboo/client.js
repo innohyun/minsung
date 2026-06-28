@@ -2,6 +2,7 @@
     const WORLD_FALLBACK = { width: 960, height: 640, obstacles: [] };
     const SEND_MS = 33;
     const STORAGE_KEY = 'guangboo_nickname';
+    const MODE_STORAGE_KEY = 'guangboo_match_mode';
     const keys = new Set();
 
     const elements = {
@@ -10,6 +11,7 @@
         result: document.getElementById('resultScreen'),
         joinForm: document.getElementById('joinForm'),
         nickname: document.getElementById('nicknameInput'),
+        modeInputs: [...document.querySelectorAll('input[name="matchMode"]')],
         joinButton: document.getElementById('joinButton'),
         status: document.getElementById('statusLine'),
         queueFill: document.getElementById('queueFill'),
@@ -37,6 +39,10 @@
         connected: false,
         joining: false,
         matchActive: false,
+        modes: [
+            { key: 'duel', label: '1:1 결투', size: 2 },
+            { key: 'survival', label: '4인 생존전', size: 4 }
+        ],
         map: WORLD_FALLBACK,
         players: [],
         projectiles: [],
@@ -67,6 +73,32 @@
         return true;
     }
 
+    function getSelectedMode() {
+        return elements.modeInputs.find(input => input.checked)?.value || 'duel';
+    }
+
+    function getModeInfo(key = getSelectedMode()) {
+        return state.modes.find(mode => mode.key === key) || state.modes[0];
+    }
+
+    function setModeInputsDisabled(disabled) {
+        elements.modeInputs.forEach(input => {
+            input.disabled = disabled;
+        });
+    }
+
+    function updateModeCopy() {
+        const mode = getModeInfo();
+        elements.queueCopy.textContent = `${mode.label} - ${mode.size}명 매칭`;
+        elements.alive.textContent = String(mode.size);
+    }
+
+    function setMatchingUi(isMatching) {
+        elements.joinButton.disabled = isMatching;
+        elements.joinButton.textContent = isMatching ? '매칭 중' : '자동 매칭';
+        setModeInputsDisabled(isMatching);
+    }
+
     function connect() {
         if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) {
             return;
@@ -89,8 +121,7 @@
             state.matchActive = false;
             elements.status.textContent = '서버 연결 끊김';
             elements.connection.textContent = '오프라인';
-            elements.joinButton.disabled = false;
-            elements.joinButton.textContent = '자동 매칭';
+            setMatchingUi(false);
         });
 
         state.ws.addEventListener('error', () => {
@@ -105,23 +136,28 @@
 
     function joinQueue() {
         const nickname = (elements.nickname.value || 'Monster').trim();
+        const mode = getSelectedMode();
         localStorage.setItem(STORAGE_KEY, nickname);
-        elements.joinButton.disabled = true;
-        elements.joinButton.textContent = '매칭 중';
+        localStorage.setItem(MODE_STORAGE_KEY, mode);
+        setMatchingUi(true);
         state.joining = true;
-        send({ type: 'joinQueue', nickname });
+        send({ type: 'joinQueue', nickname, mode });
     }
 
     function handleServerMessage(message) {
         if (message.type === 'hello') {
             state.playerId = message.playerId;
+            if (Array.isArray(message.modes) && message.modes.length) {
+                state.modes = message.modes;
+            }
             renderLeaderboard(message.leaderboard || []);
+            updateModeCopy();
             return;
         }
 
         if (message.type === 'playerReady') {
             state.playerId = message.playerId;
-            elements.status.textContent = `${message.nickname} 매칭 대기`;
+            elements.status.textContent = `${message.nickname} ${message.modeLabel || getModeInfo(message.mode).label} 대기`;
             renderLeaderboard(message.leaderboard || []);
             return;
         }
@@ -129,7 +165,7 @@
         if (message.type === 'queue') {
             const percent = Math.min(100, (message.playersWaiting / message.requiredPlayers) * 100);
             elements.queueFill.style.width = `${percent}%`;
-            elements.queueCopy.textContent = `${message.playersWaiting}/${message.requiredPlayers} 대기 중`;
+            elements.queueCopy.textContent = `${message.modeLabel || getModeInfo(message.mode).label}: ${message.playersWaiting}/${message.requiredPlayers} 대기 중`;
             return;
         }
 
@@ -141,7 +177,7 @@
             state.map = message.map || WORLD_FALLBACK;
             state.players = message.players || [];
             state.projectiles = [];
-            elements.connection.textContent = '매치 진행';
+            elements.connection.textContent = message.modeLabel || '매치 진행';
             setScreen('match');
             resizeCanvas();
             return;
@@ -210,7 +246,7 @@
             elements.resultList.appendChild(item);
         });
         elements.joinButton.disabled = false;
-        elements.joinButton.textContent = '자동 매칭';
+        setMatchingUi(false);
         setScreen('result');
     }
 
@@ -552,6 +588,12 @@
     });
 
     elements.refreshBoard.addEventListener('click', loadLeaderboard);
+    elements.modeInputs.forEach(input => {
+        input.addEventListener('change', () => {
+            localStorage.setItem(MODE_STORAGE_KEY, getSelectedMode());
+            updateModeCopy();
+        });
+    });
     elements.playAgain.addEventListener('click', () => {
         setScreen('lobby');
         state.joining = true;
@@ -573,6 +615,13 @@
     setupPointerAim();
 
     elements.nickname.value = localStorage.getItem(STORAGE_KEY) || '';
+    const savedMode = localStorage.getItem(MODE_STORAGE_KEY);
+    if (savedMode && elements.modeInputs.some(input => input.value === savedMode)) {
+        elements.modeInputs.forEach(input => {
+            input.checked = input.value === savedMode;
+        });
+    }
+    updateModeCopy();
     loadLeaderboard();
     resizeCanvas();
     draw();

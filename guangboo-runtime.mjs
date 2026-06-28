@@ -1,9 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 
-const MATCH_SIZE = 4;
 const TICK_MS = 50;
 const WS_PATH = '/guangboo/ws';
+const DEFAULT_MODE = 'duel';
+const MODES = {
+    duel: { key: 'duel', label: '1:1 결투', size: 2 },
+    survival: { key: 'survival', label: '4인 생존전', size: 4 }
+};
 const MAP = {
     width: 960,
     height: 640,
@@ -115,6 +119,18 @@ function sendJson(socket, payload) {
     socket.send(JSON.stringify(payload));
 }
 
+function getMode(key) {
+    return MODES[key] || MODES[DEFAULT_MODE];
+}
+
+function publicModes() {
+    return Object.values(MODES).map(mode => ({
+        key: mode.key,
+        label: mode.label,
+        size: mode.size
+    }));
+}
+
 export function createGuangbooStore(db) {
     const getPlayer = db.prepare('SELECT * FROM guangboo_players WHERE nickname = ?');
     const insertPlayer = db.prepare('INSERT INTO guangboo_players (nickname, created_at, updated_at) VALUES (?, ?, ?)');
@@ -202,23 +218,33 @@ export function createGuangbooStore(db) {
 export function createGuangbooRealtime(server, store) {
     const wss = new WebSocketServer({ noServer: true });
     const clients = new Map();
-    const queue = [];
+    const queues = new Map(Object.keys(MODES).map(key => [key, []]));
     const matches = new Map();
 
-    function broadcastQueue() {
+    function queueFor(modeKey) {
+        return queues.get(getMode(modeKey).key);
+    }
+
+    function broadcastQueue(modeKey) {
+        const mode = getMode(modeKey);
+        const queue = queueFor(mode.key);
         queue.forEach(client => sendJson(client.socket, {
             type: 'queue',
+            mode: mode.key,
+            modeLabel: mode.label,
             playersWaiting: queue.length,
-            requiredPlayers: MATCH_SIZE
+            requiredPlayers: mode.size
         }));
     }
 
     function removeFromQueue(client) {
-        const index = queue.indexOf(client);
-        if (index !== -1) {
-            queue.splice(index, 1);
-            broadcastQueue();
-        }
+        queues.forEach((queue, modeKey) => {
+            const index = queue.indexOf(client);
+            if (index !== -1) {
+                queue.splice(index, 1);
+                broadcastQueue(modeKey);
+            }
+        });
     }
 
     function snapshotMatch(match) {
@@ -360,11 +386,11 @@ export function createGuangbooRealtime(server, store) {
         }
     }
 
-    function startMatch(players) {
+    function startMatch(players, mode) {
         const id = `gb_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
         const match = {
             id,
-            mode: 'survival',
+            mode: mode.key,
             status: 'active',
             startedAtMs: Date.now(),
             startedAtIso: nowIso(),
@@ -406,7 +432,8 @@ export function createGuangbooRealtime(server, store) {
             type: 'matchStart',
             matchId: match.id,
             mode: match.mode,
-            requiredPlayers: MATCH_SIZE,
+            modeLabel: mode.label,
+            requiredPlayers: mode.size,
             map: MAP,
             players: [...match.players.values()].map(player => ({
                 id: player.id,
@@ -420,10 +447,12 @@ export function createGuangbooRealtime(server, store) {
         match.timer = setInterval(() => stepMatch(match), TICK_MS);
     }
 
-    function maybeStartMatches() {
-        while (queue.length >= MATCH_SIZE) {
-            startMatch(queue.splice(0, MATCH_SIZE));
-            broadcastQueue();
+    function maybeStartMatches(modeKey) {
+        const mode = getMode(modeKey);
+        const queue = queueFor(mode.key);
+        while (queue.length >= mode.size) {
+            startMatch(queue.splice(0, mode.size), mode);
+            broadcastQueue(mode.key);
         }
     }
 
@@ -436,18 +465,24 @@ export function createGuangbooRealtime(server, store) {
         }
 
         if (message.type === 'joinQueue') {
+            const mode = getMode(message.mode || DEFAULT_MODE);
             const player = store.ensurePlayer(message.nickname);
             client.playerDbId = player.id;
             client.nickname = player.nickname;
-            if (!queue.includes(client) && !client.match) queue.push(client);
+            client.mode = mode.key;
+            removeFromQueue(client);
+            if (!client.match) queueFor(mode.key).push(client);
             sendJson(client.socket, {
                 type: 'playerReady',
                 playerId: client.id,
                 nickname: client.nickname,
+                mode: mode.key,
+                modeLabel: mode.label,
+                requiredPlayers: mode.size,
                 leaderboard: store.getLeaderboard()
             });
-            broadcastQueue();
-            maybeStartMatches();
+            broadcastQueue(mode.key);
+            maybeStartMatches(mode.key);
             return;
         }
 
@@ -498,7 +533,8 @@ export function createGuangbooRealtime(server, store) {
         sendJson(socket, {
             type: 'hello',
             playerId: client.id,
-            requiredPlayers: MATCH_SIZE,
+            defaultMode: DEFAULT_MODE,
+            modes: publicModes(),
             leaderboard: store.getLeaderboard()
         });
         socket.on('message', raw => handleMessage(client, raw));
@@ -519,7 +555,7 @@ export function createGuangbooRealtime(server, store) {
 
     return {
         close() {
-            queue.splice(0, queue.length);
+            queues.forEach(queue => queue.splice(0, queue.length));
             matches.forEach(match => clearInterval(match.timer));
             wss.clients.forEach(socket => socket.close());
             wss.close();

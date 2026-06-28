@@ -167,7 +167,8 @@ test('starts a guangboo survival match through automatic WebSocket matchmaking',
             sockets.forEach((socket, index) => {
                 socket.send(JSON.stringify({
                     type: 'joinQueue',
-                    nickname: `Monster ${index + 1}`
+                    nickname: `Monster ${index + 1}`,
+                    mode: 'survival'
                 }));
             });
 
@@ -191,6 +192,43 @@ test('starts a guangboo survival match through automatic WebSocket matchmaking',
             const leaderboard = await requestJson(baseUrl, '/api/guangboo/leaderboard');
             assert.equal(leaderboard.data.leaderboard[0].nickname, 'Monster 1');
             assert.equal(leaderboard.data.leaderboard[0].wins, 1);
+        } finally {
+            sockets.forEach(socket => socket.close());
+        }
+    });
+});
+
+test('starts a guangboo 1:1 duel match with two players', async () => {
+    await withServer(async (baseUrl) => {
+        const wsBaseUrl = baseUrl.replace(/^http/, 'ws');
+        const sockets = await Promise.all(
+            Array.from({ length: 2 }, () => openWebSocket(`${wsBaseUrl}/guangboo/ws`))
+        );
+
+        try {
+            sockets.forEach((socket, index) => {
+                socket.send(JSON.stringify({
+                    type: 'joinQueue',
+                    nickname: `Duel Monster ${index + 1}`,
+                    mode: 'duel'
+                }));
+            });
+
+            const starts = await Promise.all(
+                sockets.map(socket => waitForWsMessage(socket, message => message.type === 'matchStart'))
+            );
+            assert.equal(new Set(starts.map(message => message.matchId)).size, 1);
+            assert.equal(starts[0].mode, 'duel');
+            assert.equal(starts[0].players.length, 2);
+            assert.equal(starts[0].requiredPlayers, 2);
+
+            const state = await waitForWsMessage(sockets[0], message => message.type === 'state');
+            assert.equal(state.players.length, 2);
+            assert.equal(state.aliveCount, 2);
+
+            sockets[1].close();
+            const result = await waitForWsMessage(sockets[0], message => message.type === 'matchEnd');
+            assert.equal(result.winnerId, starts[0].playerId);
         } finally {
             sockets.forEach(socket => socket.close());
         }
