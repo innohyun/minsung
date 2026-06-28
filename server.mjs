@@ -5,6 +5,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { GUANGBOO_SCHEMA_SQL, createGuangbooRealtime, createGuangbooStore } from './guangboo-runtime.mjs';
 
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_HOST = '127.0.0.1';
@@ -166,6 +167,7 @@ function createDatabase(dbPath) {
             expires_at INTEGER NOT NULL
         );
     `);
+    db.exec(GUANGBOO_SCHEMA_SQL);
     return db;
 }
 
@@ -249,6 +251,7 @@ function isAuthenticated(req, store) {
 function normalizeRequestPath(url) {
     const rawPath = url.pathname === '/' ? '/index.html' : url.pathname;
     if (rawPath === '/mario' || rawPath === '/mario/') return '/mario/index.html';
+    if (rawPath === '/guangboo' || rawPath === '/guangboo/') return '/guangboo/index.html';
     return rawPath;
 }
 
@@ -307,6 +310,7 @@ export function createMinsungServer(options = {}) {
     const sessionTtlMs = options.sessionTtlMs || SESSION_TTL_MS;
     const db = createDatabase(dbPath);
     const store = createAuthStore(db, sessionTtlMs);
+    const guangbooStore = createGuangbooStore(db);
 
     const server = createTransportServer(async (req, res) => {
         const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
@@ -364,6 +368,11 @@ export function createMinsungServer(options = {}) {
                 return sendJson(res, 200, { ok: true, authenticated: false, setupRequired: !store.hasAdmin() });
             }
 
+            if (url.pathname === '/api/guangboo/leaderboard') {
+                if (req.method !== 'GET') return writeMethodNotAllowed(res);
+                return sendJson(res, 200, { ok: true, leaderboard: guangbooStore.getLeaderboard() });
+            }
+
             if (url.pathname.startsWith('/api/')) {
                 return sendJson(res, 404, { ok: false, error: 'not_found' });
             }
@@ -385,10 +394,12 @@ export function createMinsungServer(options = {}) {
             return sendJson(res, statusCode, { ok: false, error: message });
         }
     }, options.tls);
+    const guangbooRealtime = createGuangbooRealtime(server, guangbooStore);
 
     return {
         server,
         close() {
+            guangbooRealtime.close();
             db.close();
         }
     };

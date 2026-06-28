@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Guangboo Monster Survival</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <main id="app">
+        <section class="screen lobby-screen" id="lobbyScreen" aria-labelledby="gameTitle">
+            <div class="brand-lockup">
+                <p class="eyebrow">Mac mini arena</p>
+                <h1 id="gameTitle">Guangboo</h1>
+                <p class="tagline">괴물들이 마지막 한 자리를 두고 겨루는 실시간 생존전</p>
+            </div>
+
+            <div class="lobby-layout">
+                <form class="join-panel" id="joinForm">
+                    <label for="nicknameInput">닉네임</label>
+                    <div class="join-row">
+                        <input id="nicknameInput" name="nickname" maxlength="18" autocomplete="nickname" placeholder="Monster" required>
+                        <button id="joinButton" type="submit">자동 매칭</button>
+                    </div>
+                    <p class="status-line" id="statusLine">서버 연결 대기</p>
+                    <div class="queue-meter" aria-label="매칭 대기 인원">
+                        <span id="queueFill"></span>
+                    </div>
+                    <p class="queue-copy" id="queueCopy">4인 생존전</p>
+                </form>
+
+                <aside class="leaderboard-panel" aria-labelledby="leaderboardTitle">
+                    <div class="panel-head">
+                        <h2 id="leaderboardTitle">로컬 랭킹</h2>
+                        <button class="ghost-button" id="refreshBoardButton" type="button">새로고침</button>
+                    </div>
+                    <ol class="leaderboard-list" id="leaderboardList"></ol>
+                </aside>
+            </div>
+        </section>
+
+        <section class="screen match-screen" id="matchScreen" hidden>
+            <canvas id="gameCanvas"></canvas>
+
+            <div class="hud top-hud">
+                <div>
+                    <span class="hud-label">체력</span>
+                    <strong id="healthReadout">100</strong>
+                </div>
+                <div>
+                    <span class="hud-label">생존</span>
+                    <strong id="aliveReadout">4</strong>
+                </div>
+                <div>
+                    <span class="hud-label">킬</span>
+                    <strong id="killReadout">0</strong>
+                </div>
+            </div>
+
+            <div class="hud connection-hud" id="connectionHud">연결 중</div>
+
+            <div class="stick-zone left-stick" id="leftStick" aria-label="이동 스틱">
+                <div class="stick-thumb"></div>
+            </div>
+            <div class="stick-zone right-stick" id="rightStick" aria-label="조준 스틱">
+                <div class="stick-thumb"></div>
+            </div>
+        </section>
+
+        <section class="screen result-screen" id="resultScreen" hidden aria-labelledby="resultTitle">
+            <div class="result-panel">
+                <p class="eyebrow">Match complete</p>
+                <h2 id="resultTitle">결과</h2>
+                <ol class="result-list" id="resultList"></ol>
+                <div class="result-actions">
+                    <button id="playAgainButton" type="button">다시 매칭</button>
+                    <button class="ghost-button" id="backLobbyButton" type="button">로비</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="client.js" defer></script>
+</body>
+</html>

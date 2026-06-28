@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import WebSocket from 'ws';
 import { createMinsungServer } from '../server.mjs';
 
 async function withServer(fn) {
@@ -42,6 +43,51 @@ function cookieFrom(response) {
     const setCookie = response.headers.get('set-cookie');
     assert.ok(setCookie, 'expected Set-Cookie header');
     return setCookie.split(';')[0];
+}
+
+function openWebSocket(url) {
+    return new Promise((resolve, reject) => {
+        const socket = new WebSocket(url);
+        socket.once('open', () => resolve(socket));
+        socket.once('error', reject);
+    });
+}
+
+function waitForWsMessage(socket, predicate, timeoutMs = 2000) {
+    return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => {
+            cleanup();
+            reject(new Error('Timed out waiting for WebSocket message'));
+        }, timeoutMs);
+
+        function cleanup() {
+            clearTimeout(timer);
+            socket.off('message', onMessage);
+            socket.off('close', onClose);
+            socket.off('error', onError);
+        }
+
+        function onMessage(raw) {
+            const message = JSON.parse(raw.toString('utf8'));
+            if (!predicate(message)) return;
+            cleanup();
+            resolve(message);
+        }
+
+        function onClose() {
+            cleanup();
+            reject(new Error('WebSocket closed before expected message'));
+        }
+
+        function onError(error) {
+            cleanup();
+            reject(error);
+        }
+
+        socket.on('message', onMessage);
+        socket.once('close', onClose);
+        socket.once('error', onError);
+    });
 }
 
 test('requires setup before authentication', async () => {
@@ -91,6 +137,63 @@ test('sets up admin password and allows protected entries with a session cookie'
         });
         assert.equal(marioResponse.status, 200);
         assert.match(await marioResponse.text(), /Pixel Hill Runner/);
+    });
+});
+
+test('serves guangboo publicly and returns local leaderboard data', async () => {
+    await withServer(async (baseUrl) => {
+        const appResponse = await fetch(`${baseUrl}/guangboo/index.html`, { redirect: 'manual' });
+        assert.equal(appResponse.status, 200);
+        assert.match(appResponse.headers.get('content-type'), /text\/html/);
+        assert.match(await appResponse.text(), /Guangboo/);
+
+        const shortRoute = await fetch(`${baseUrl}/guangboo`, { redirect: 'manual' });
+        assert.equal(shortRoute.status, 200);
+
+        const leaderboard = await requestJson(baseUrl, '/api/guangboo/leaderboard');
+        assert.equal(leaderboard.response.status, 200);
+        assert.deepEqual(leaderboard.data.leaderboard, []);
+    });
+});
+
+test('starts a guangboo survival match through automatic WebSocket matchmaking', async () => {
+    await withServer(async (baseUrl) => {
+        const wsBaseUrl = baseUrl.replace(/^http/, 'ws');
+        const sockets = await Promise.all(
+            Array.from({ length: 4 }, () => openWebSocket(`${wsBaseUrl}/guangboo/ws`))
+        );
+
+        try {
+            sockets.forEach((socket, index) => {
+                socket.send(JSON.stringify({
+                    type: 'joinQueue',
+                    nickname: `Monster ${index + 1}`
+                }));
+            });
+
+            const starts = await Promise.all(
+                sockets.map(socket => waitForWsMessage(socket, message => message.type === 'matchStart'))
+            );
+            assert.equal(new Set(starts.map(message => message.matchId)).size, 1);
+            assert.equal(starts[0].players.length, 4);
+            assert.equal(starts[0].requiredPlayers, 4);
+
+            const state = await waitForWsMessage(sockets[0], message => message.type === 'state');
+            assert.equal(state.players.length, 4);
+            assert.equal(state.aliveCount, 4);
+            assert.equal(Array.isArray(state.projectiles), true);
+
+            sockets.slice(1).forEach(socket => socket.close());
+            const result = await waitForWsMessage(sockets[0], message => message.type === 'matchEnd');
+            assert.equal(result.winnerId, starts[0].playerId);
+            assert.equal(result.results[0].nickname, 'Monster 1');
+
+            const leaderboard = await requestJson(baseUrl, '/api/guangboo/leaderboard');
+            assert.equal(leaderboard.data.leaderboard[0].nickname, 'Monster 1');
+            assert.equal(leaderboard.data.leaderboard[0].wins, 1);
+        } finally {
+            sockets.forEach(socket => socket.close());
+        }
     });
 });
 

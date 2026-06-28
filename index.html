@@ -497,6 +497,39 @@
             box-shadow: 10px 10px 0 rgba(37, 99, 235, 0.12);
         }
 
+        .art-guangboo {
+            background:
+                radial-gradient(circle at 24% 26%, rgba(215, 242, 82, 0.72), transparent 22%),
+                radial-gradient(circle at 76% 38%, rgba(224, 82, 141, 0.46), transparent 20%),
+                linear-gradient(135deg, #1f3d2b, #eadf95);
+        }
+
+        .art-guangboo::before {
+            content: "";
+            position: absolute;
+            left: 36px;
+            top: 26px;
+            width: 66px;
+            height: 54px;
+            border-radius: 48% 52% 44% 56%;
+            background:
+                radial-gradient(circle at 62% 34%, #111827 0 6%, transparent 7%),
+                radial-gradient(circle at 38% 34%, #111827 0 6%, transparent 7%),
+                #6ee7b7;
+            box-shadow: 74px 16px 0 -9px #f9a8d4;
+        }
+
+        .art-guangboo::after {
+            content: "";
+            position: absolute;
+            right: 28px;
+            bottom: 20px;
+            width: 112px;
+            height: 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.34);
+        }
+
         .art-mario {
             background:
                 linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)),
@@ -696,6 +729,15 @@
                             <span class="file-chip">index copy.html</span>
                             <strong>Marble Builder Copy</strong>
                             <span>보관된 Marble Builder 복사본</span>
+                        </div>
+                    </a>
+
+                    <a class="app-card" href="guangboo/index.html">
+                        <div class="card-art art-guangboo" aria-hidden="true"></div>
+                        <div class="card-copy">
+                            <span class="file-chip">guangboo/index.html</span>
+                            <strong>Guangboo</strong>
+                            <span>괴물들이 겨루는 모바일 우선 생존 대전</span>
                         </div>
                     </a>
 
