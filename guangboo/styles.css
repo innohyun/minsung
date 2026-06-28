@@ -24,6 +24,8 @@ body {
 body {
     margin: 0;
     overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: pan-y;
     color: var(--ink);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background:
@@ -82,9 +84,7 @@ button {
     display: flex;
     flex-direction: column;
     gap: 22px;
-    justify-content: center;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
     padding: max(22px, env(safe-area-inset-top)) 18px max(22px, env(safe-area-inset-bottom));
 }
 

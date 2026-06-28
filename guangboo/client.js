@@ -66,6 +66,7 @@
         if (name !== 'match') {
             state.pendingShotAim = null;
             state.mouseAim.active = false;
+            exitGameFullscreen();
         }
     }
 
@@ -77,6 +78,11 @@
         } catch {
             // Some mobile browsers expose the API but reject option objects synchronously.
         }
+    }
+
+    function exitGameFullscreen() {
+        if (!document.fullscreenElement || typeof document.exitFullscreen !== 'function') return;
+        document.exitFullscreen().catch(() => {});
     }
 
     function wsUrl() {
@@ -604,6 +610,7 @@
 
         element.addEventListener('pointerdown', event => {
             event.preventDefault();
+            requestGameFullscreen();
             stick.active = true;
             element.setPointerCapture(event.pointerId);
             update(event);
@@ -679,6 +686,7 @@
     function setupPointerAim() {
         elements.canvas.addEventListener('pointerdown', event => {
             if (event.pointerType === 'touch') return;
+            requestGameFullscreen();
             updateMouseAim(event);
             state.mouseAim.active = true;
         });
@@ -708,7 +716,6 @@
 
     elements.joinForm.addEventListener('submit', event => {
         event.preventDefault();
-        requestGameFullscreen();
         state.joining = true;
         state.requestedMode = getSelectedMode();
         connect();
@@ -726,7 +733,6 @@
         });
     });
     elements.playAgain.addEventListener('click', () => {
-        requestGameFullscreen();
         setScreen('lobby');
         state.joining = true;
         state.requestedMode = getSelectedMode();

@@ -5,11 +5,21 @@ import { test } from 'node:test';
 const clientSource = readFileSync(new URL('../guangboo/client.js', import.meta.url), 'utf8');
 const stylesSource = readFileSync(new URL('../guangboo/styles.css', import.meta.url), 'utf8');
 
-test('guangboo client requests fullscreen when matchmaking starts', () => {
+test('guangboo client requests fullscreen from active match controls', () => {
     assert.match(clientSource, /function requestGameFullscreen\(\)/);
     assert.match(clientSource, /requestFullscreen\(\{ navigationUI: 'hide' \}\)/);
+    assert.match(clientSource, /element\.addEventListener\('pointerdown'[\s\S]*?requestGameFullscreen\(\)/);
+    assert.match(clientSource, /elements\.canvas\.addEventListener\('pointerdown'[\s\S]*?requestGameFullscreen\(\)/);
     assert.match(clientSource, /document\.addEventListener\('fullscreenchange', resizeCanvas\)/);
     assert.match(stylesSource, /html:fullscreen/);
+});
+
+test('guangboo lobby keeps document scrolling enabled', () => {
+    assert.match(stylesSource, /overflow-y: auto/);
+    assert.match(stylesSource, /touch-action: pan-y/);
+    assert.match(stylesSource, /\.lobby-screen \{[\s\S]*?justify-content: flex-start/);
+    assert.doesNotMatch(clientSource, /joinForm\.addEventListener\('submit'[\s\S]*?requestGameFullscreen\(\)/);
+    assert.doesNotMatch(clientSource, /playAgain\.addEventListener\('click'[\s\S]*?requestGameFullscreen\(\)/);
 });
 
 test('guangboo attack input fires once after aiming is released', () => {
