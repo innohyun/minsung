@@ -61,6 +61,7 @@
         elements.lobby.hidden = name !== 'lobby';
         elements.match.hidden = name !== 'match';
         elements.result.hidden = name !== 'result';
+        document.body.classList.toggle('is-playing', name === 'match');
     }
 
     function wsUrl() {
@@ -570,16 +571,20 @@
         }
 
         element.addEventListener('pointerdown', event => {
+            event.preventDefault();
             stick.active = true;
             element.setPointerCapture(event.pointerId);
             update(event);
         });
         element.addEventListener('pointermove', event => {
             if (!stick.active) return;
+            event.preventDefault();
             update(event);
         });
         element.addEventListener('pointerup', reset);
         element.addEventListener('pointercancel', reset);
+        element.addEventListener('contextmenu', event => event.preventDefault());
+        element.addEventListener('selectstart', event => event.preventDefault());
     }
 
     function currentInput() {
