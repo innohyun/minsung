@@ -588,6 +588,10 @@
             return Number.isFinite(value) && value > 0 ? value : 20;
         }
 
+        function getSlimeStrengthScale(source) {
+            return getConfiguredSlimeStrength(source) / getConfiguredSlimeStrength(ROAD_LIB.slime);
+        }
+
         function getConfiguredFloatLaunchSpeed(source) {
             const value = Number(source?.plugin?.floatLaunchSpeed ?? source?.floatLaunchSpeed);
             return Number.isFinite(value) && value > 0 ? Math.min(value, 7) : 7;
@@ -2813,8 +2817,10 @@
             const { support, normalX, normalY } = getEscalatorContactData(pair, marbleBody, slimeBody);
             const tangentX = -normalY;
             const tangentY = normalX;
-            const tangentSpeed = (marbleBody.velocity.x * tangentX) + (marbleBody.velocity.y * tangentY);
-            const launchSpeed = getConfiguredSlimeStrength(slimeBody);
+            const contactVelocity = marbleBody.plugin?.preStepVelocity || marbleBody.velocity;
+            const tangentSpeed = (contactVelocity.x * tangentX) + (contactVelocity.y * tangentY);
+            const incomingSpeed = Math.max(0, -((contactVelocity.x * normalX) + (contactVelocity.y * normalY)));
+            const launchSpeed = incomingSpeed * getSlimeStrengthScale(slimeBody);
             const radius = marbleBody.circleRadius || 15;
 
             if (marbleBody.isSleeping) {
@@ -4820,7 +4826,7 @@
         // 초기 시퀀스 디스플레이 렌더링
         renderSequenceDisplay();
 
-        // 무조건 엄청 튕기는 슬라임 로직 + 배치 구슬 깨우기
+        // 속도 기반 슬라임 로직 + 배치 구슬 깨우기
         Events.on(engine, 'collisionStart', (event) => {
             event.pairs.forEach(pair => {
                 const { bodyA, bodyB } = pair;
@@ -5142,6 +5148,7 @@
             getTunnelSensitiveBodies().forEach(body => {
                 body.plugin = body.plugin || {};
                 body.plugin.prevPosition = { x: body.position.x, y: body.position.y };
+                body.plugin.preStepVelocity = { x: body.velocity.x, y: body.velocity.y };
             });
         });
 
