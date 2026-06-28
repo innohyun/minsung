@@ -54,6 +54,7 @@
         rightStick: { active: false, x: 0, y: 0 },
         mouseAim: { active: false, x: 1, y: 0 },
         lastAim: { x: 1, y: 0 },
+        pendingShotAim: null,
         viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 }
     };
 
@@ -62,6 +63,20 @@
         elements.match.hidden = name !== 'match';
         elements.result.hidden = name !== 'result';
         document.body.classList.toggle('is-playing', name === 'match');
+        if (name !== 'match') {
+            state.pendingShotAim = null;
+            state.mouseAim.active = false;
+        }
+    }
+
+    function requestGameFullscreen() {
+        if (document.fullscreenElement || typeof document.documentElement.requestFullscreen !== 'function') return;
+        try {
+            const request = document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+            if (request?.catch) request.catch(() => {});
+        } catch {
+            // Some mobile browsers expose the API but reject option objects synchronously.
+        }
     }
 
     function wsUrl() {
@@ -352,6 +367,7 @@
         ctx.clearRect(0, 0, width, height);
         drawArenaBackdrop(width, height);
         drawMap();
+        drawLocalAimGuide();
         state.projectiles.forEach(drawProjectile);
         state.players.forEach(drawMonster);
     }
@@ -428,7 +444,6 @@
         ctx.rotate(angle);
 
         if (player.id === state.playerId) {
-            drawAimGuide(radius);
             ctx.strokeStyle = '#d7f252';
             ctx.lineWidth = 3;
             ctx.beginPath();
@@ -476,26 +491,35 @@
         drawNameplate(player, point, radius);
     }
 
-    function drawAimGuide(radius) {
-        const start = radius + 12;
-        const end = Math.max(78, radius * 5.4);
+    function drawLocalAimGuide() {
+        const me = state.players.find(player => player.id === state.playerId);
+        if (!me || !me.alive) return;
+
+        const aim = currentAim(me);
+        const start = worldToScreen(me.x + aim.x * 34, me.y + aim.y * 34);
+        const end = worldToScreen(me.x + aim.x * 230, me.y + aim.y * 230);
 
         ctx.save();
-        ctx.strokeStyle = 'rgba(215, 242, 82, 0.86)';
-        ctx.lineWidth = 3;
         ctx.lineCap = 'round';
-        ctx.setLineDash([12, 8]);
+        ctx.strokeStyle = 'rgba(5, 9, 6, 0.62)';
+        ctx.lineWidth = 10;
         ctx.beginPath();
-        ctx.moveTo(start, 0);
-        ctx.lineTo(end, 0);
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
         ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#d7f252';
-        ctx.shadowColor = '#d7f252';
-        ctx.shadowBlur = 12;
+
+        ctx.strokeStyle = 'rgba(215, 242, 82, 0.64)';
+        ctx.lineWidth = 5;
         ctx.beginPath();
-        ctx.arc(end + 8, 0, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(215, 242, 82, 0.82)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(end.x, end.y, 10, 0, Math.PI * 2);
+        ctx.stroke();
         ctx.restore();
     }
 
@@ -559,7 +583,7 @@
             stick.y = ny * (clamped / limit);
             thumb.style.transform = `translate(calc(-50% + ${nx * clamped}px), calc(-50% + ${ny * clamped}px))`;
             if (key === 'rightStick' && Math.hypot(stick.x, stick.y) > 0.12) {
-                state.lastAim = { x: stick.x, y: stick.y };
+                state.lastAim = normalizeAim(stick);
             }
         }
 
@@ -568,6 +592,14 @@
             stick.x = 0;
             stick.y = 0;
             thumb.style.transform = 'translate(-50%, -50%)';
+        }
+
+        function finish(event, shouldShoot) {
+            event.preventDefault();
+            if (key === 'rightStick' && shouldShoot && Math.hypot(stick.x, stick.y) > 0.2) {
+                queueShot(stick);
+            }
+            reset();
         }
 
         element.addEventListener('pointerdown', event => {
@@ -581,10 +613,34 @@
             event.preventDefault();
             update(event);
         });
-        element.addEventListener('pointerup', reset);
-        element.addEventListener('pointercancel', reset);
+        element.addEventListener('pointerup', event => finish(event, true));
+        element.addEventListener('pointercancel', event => finish(event, false));
         element.addEventListener('contextmenu', event => event.preventDefault());
         element.addEventListener('selectstart', event => event.preventDefault());
+    }
+
+    function normalizeAim(aim) {
+        const x = Number(aim?.x) || 0;
+        const y = Number(aim?.y) || 0;
+        const length = Math.hypot(x, y);
+        if (length < 0.001) return { x: 1, y: 0 };
+        return { x: x / length, y: y / length };
+    }
+
+    function currentAim(player) {
+        if (state.rightStick.active && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.12) {
+            return normalizeAim(state.rightStick);
+        }
+        if (state.mouseAim.active) return normalizeAim(state.mouseAim);
+        if (state.pendingShotAim) return normalizeAim(state.pendingShotAim);
+        if (state.lastAim) return normalizeAim(state.lastAim);
+        return normalizeAim({ x: player?.aimX ?? player?.aim?.x ?? 1, y: player?.aimY ?? player?.aim?.y ?? 0 });
+    }
+
+    function queueShot(aim) {
+        const normalized = normalizeAim(aim);
+        state.lastAim = normalized;
+        state.pendingShotAim = normalized;
     }
 
     function currentInput() {
@@ -596,12 +652,11 @@
             };
         }
 
-        let aim = state.lastAim;
-        let firing = state.rightStick.active && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.2;
-        if (firing) {
-            aim = { x: state.rightStick.x, y: state.rightStick.y };
-        } else if (state.mouseAim.active) {
-            aim = { x: state.mouseAim.x, y: state.mouseAim.y };
+        let aim = currentAim();
+        let firing = false;
+        if (state.pendingShotAim) {
+            aim = state.pendingShotAim;
+            state.pendingShotAim = null;
             firing = true;
         }
 
@@ -632,6 +687,9 @@
             updateMouseAim(event);
         });
         window.addEventListener('pointerup', () => {
+            if (state.mouseAim.active) {
+                queueShot(state.mouseAim);
+            }
             state.mouseAim.active = false;
         });
     }
@@ -650,6 +708,7 @@
 
     elements.joinForm.addEventListener('submit', event => {
         event.preventDefault();
+        requestGameFullscreen();
         state.joining = true;
         state.requestedMode = getSelectedMode();
         connect();
@@ -667,6 +726,7 @@
         });
     });
     elements.playAgain.addEventListener('click', () => {
+        requestGameFullscreen();
         setScreen('lobby');
         state.joining = true;
         state.requestedMode = getSelectedMode();
@@ -682,6 +742,7 @@
     window.addEventListener('keydown', event => keys.add(event.code));
     window.addEventListener('keyup', event => keys.delete(event.code));
     window.addEventListener('resize', resizeCanvas);
+    document.addEventListener('fullscreenchange', resizeCanvas);
 
     setupStick(elements.leftStick, 'leftStick');
     setupStick(elements.rightStick, 'rightStick');
