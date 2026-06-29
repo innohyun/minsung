@@ -128,10 +128,36 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile13/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile13/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile14/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile14/);
 });
 
+
+test('guangboo supports charged wall-breaking homing ultimate attacks', () => {
+    assert.match(htmlSource, /id="ultimateButton"/);
+    assert.match(stylesSource, /\.ultimate-button/);
+    assert.match(stylesSource, /\.ultimate-button\.is-ready/);
+    assert.match(clientSource, /ultimateButton: document\.getElementById\('ultimateButton'\)/);
+    assert.match(clientSource, /function fireUltimate\(\)/);
+    assert.match(clientSource, /state\.queuedUltimate = true/);
+    assert.match(clientSource, /ultimate\n\s*\};/);
+    assert.match(clientSource, /projectile\.kind === 'ultimate'/);
+    assert.match(runtimeSource, /const TILE_SIZE = 40/);
+    assert.match(runtimeSource, /const ULTIMATE_HITS_REQUIRED = 4/);
+    assert.match(runtimeSource, /const ULTIMATE_DAMAGE = 2000/);
+    assert.match(runtimeSource, /const ULTIMATE_SPEED = 150/);
+    assert.match(runtimeSource, /const ULTIMATE_RADIUS = 24/);
+    assert.match(runtimeSource, /function createMap\(\)/);
+    assert.match(runtimeSource, /walls,\n\s*obstacles: walls\.map\(wall => tileToRect\(wall\)\)/);
+    assert.match(runtimeSource, /function queueUltimateInput\(player, aim\)/);
+    assert.match(runtimeSource, /function spawnUltimateProjectile\(match, player, now\)/);
+    assert.match(runtimeSource, /kind: 'ultimate'/);
+    assert.match(runtimeSource, /function steerUltimateProjectile\(match, projectile\)/);
+    assert.match(runtimeSource, /destroyWallHitByProjectile\(match\.map, projectile\)/);
+    assert.match(runtimeSource, /function knockBackPlayer\(match, player, projectile\)/);
+    assert.match(runtimeSource, /owner\.ultimateHits = Math\.min\(ULTIMATE_HITS_REQUIRED, \(owner\.ultimateHits \|\| 0\) \+ 1\)/);
+    assert.match(runtimeSource, /if \(message\.ultimate\) queueUltimateInput\(player, aim\)/);
+});
 
 test('guangboo plays Web Audio projectile sounds on spawn, flight, and impact', () => {
     assert.match(clientSource, /audio: \{ context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 \}/);
@@ -221,7 +247,7 @@ test('guangboo auto-aims at the nearest opponent for tap-only attacks', () => {
 });
 
 test('guangboo server queues firing inputs so later movement packets cannot swallow shots', () => {
-    assert.match(runtimeSource, /if \(message\.firing && client\.match\?\.status === 'active'\)/);
+    assert.match(runtimeSource, /if \(\(message\.firing \|\| message\.ultimate\) && client\.match\?\.status === 'active'\)/);
     assert.match(runtimeSource, /queueShotInput\(player, aim, Date\.now\(\)\)/);
     assert.match(runtimeSource, /firing: false,/);
     assert.match(runtimeSource, /player\.queuedShotAims\.length && player\.ammo > 0/);

@@ -28,6 +28,7 @@
         kills: document.getElementById('killReadout'),
         connection: document.getElementById('connectionHud'),
         fullscreenExit: document.getElementById('fullscreenExitButton'),
+        ultimateButton: document.getElementById('ultimateButton'),
         leftStick: document.getElementById('leftStick'),
         rightStick: document.getElementById('rightStick'),
         resultTitle: document.getElementById('resultTitle'),
@@ -60,6 +61,7 @@
         mouseAim: { active: false, x: 1, y: 0 },
         lastAim: { x: 1, y: 0 },
         queuedShots: [],
+        queuedUltimate: false,
         projectileMemory: new Map(),
         audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 },
         lastTouchEndAt: 0,
@@ -77,6 +79,7 @@
         }
         if (name !== 'match') {
             state.queuedShots = [];
+            state.queuedUltimate = false;
             state.projectileMemory.clear();
             state.mouseAim.active = false;
             exitGameFullscreen();
@@ -318,6 +321,7 @@
 
         if (message.type === 'state') {
             state.players = message.players || [];
+            if (message.map) state.map = message.map;
             state.projectiles = rememberAndFilterProjectiles(message.projectiles || []);
             updateHud();
             return;
@@ -389,6 +393,17 @@
         elements.health.textContent = me ? Math.max(0, me.health) : 0;
         elements.kills.textContent = me ? me.kills : 0;
         elements.alive.textContent = state.players.filter(player => player.alive).length;
+        updateUltimateButton(me);
+    }
+
+    function updateUltimateButton(player = state.players.find(candidate => candidate.id === state.playerId)) {
+        if (!elements.ultimateButton) return;
+        const required = Number(player?.ultimateRequired) || 4;
+        const hits = Math.max(0, Math.min(required, Number(player?.ultimateHits) || 0));
+        const ready = Boolean(player?.ultimateReady);
+        elements.ultimateButton.disabled = !ready || !state.matchActive || player?.alive === false;
+        elements.ultimateButton.classList.toggle('is-ready', ready);
+        elements.ultimateButton.querySelector('.ultimate-count').textContent = ready ? 'READY' : `${hits}/${required}`;
     }
 
     function escapeHtml(value) {
@@ -480,18 +495,19 @@
         const bottomRight = worldToScreen(map.width, map.height);
         const w = bottomRight.x - topLeft.x;
         const h = bottomRight.y - topLeft.y;
+        const tileSize = Number(map.tileSize) || 40;
 
         ctx.save();
-        ctx.fillStyle = '#345339';
-        ctx.strokeStyle = 'rgba(215, 242, 82, 0.32)';
+        ctx.fillStyle = '#eef3df';
+        ctx.strokeStyle = 'rgba(45, 74, 58, 0.36)';
         ctx.lineWidth = 2;
         roundRect(topLeft.x, topLeft.y, w, h, 8);
         ctx.fill();
         ctx.stroke();
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.strokeStyle = 'rgba(33, 48, 63, 0.14)';
         ctx.lineWidth = 1;
-        for (let x = 80; x < map.width; x += 80) {
+        for (let x = tileSize; x < map.width; x += tileSize) {
             const a = worldToScreen(x, 0);
             const b = worldToScreen(x, map.height);
             ctx.beginPath();
@@ -499,7 +515,7 @@
             ctx.lineTo(b.x, b.y);
             ctx.stroke();
         }
-        for (let y = 80; y < map.height; y += 80) {
+        for (let y = tileSize; y < map.height; y += tileSize) {
             const a = worldToScreen(0, y);
             const b = worldToScreen(map.width, y);
             ctx.beginPath();
@@ -508,15 +524,21 @@
             ctx.stroke();
         }
 
-        (map.obstacles || []).forEach(rect => {
+        const walls = Array.isArray(map.walls) && map.walls.length
+            ? map.walls.map(wall => ({ x: wall.col * tileSize + tileSize / 2, y: wall.row * tileSize + tileSize / 2, w: tileSize, h: tileSize }))
+            : (map.obstacles || []);
+        walls.forEach(rect => {
             const center = worldToScreen(rect.x, rect.y);
             const rectW = rect.w * state.viewport.scale;
             const rectH = rect.h * state.viewport.scale;
             ctx.fillStyle = '#8a6b3d';
-            roundRect(center.x - rectW / 2, center.y - rectH / 2, rectW, rectH, 8);
+            roundRect(center.x - rectW / 2, center.y - rectH / 2, rectW, rectH, 3);
             ctx.fill();
-            ctx.fillStyle = 'rgba(247, 246, 239, 0.12)';
-            roundRect(center.x - rectW / 2 + 5, center.y - rectH / 2 + 5, rectW - 10, rectH - 10, 5);
+            ctx.strokeStyle = 'rgba(58, 40, 19, 0.42)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.fillStyle = 'rgba(247, 246, 239, 0.16)';
+            roundRect(center.x - rectW / 2 + 4, center.y - rectH / 2 + 4, rectW - 8, rectH - 8, 2);
             ctx.fill();
         });
         ctx.restore();
@@ -762,14 +784,22 @@
 
     function drawProjectile(projectile) {
         const point = worldToScreen(projectile.x, projectile.y);
-        const radius = 7 * state.viewport.scale;
+        const isUltimate = projectile.kind === 'ultimate';
+        const radius = (isUltimate ? Number(projectile.radius) || 24 : 7) * state.viewport.scale;
         ctx.save();
-        ctx.fillStyle = projectile.ownerId === state.playerId ? '#d7f252' : '#f29b4b';
+        ctx.fillStyle = isUltimate
+            ? (projectile.ownerId === state.playerId ? '#7dd3fc' : '#c084fc')
+            : (projectile.ownerId === state.playerId ? '#d7f252' : '#f29b4b');
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = 14;
+        ctx.shadowBlur = isUltimate ? 28 : 14;
         ctx.beginPath();
         ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
         ctx.fill();
+        if (isUltimate) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.78)';
+            ctx.lineWidth = Math.max(2, 3 * state.viewport.scale);
+            ctx.stroke();
+        }
         ctx.restore();
     }
 
@@ -1001,6 +1031,18 @@
         sendQueuedShotNow();
     }
 
+    function fireUltimate() {
+        const me = state.players.find(player => player.id === state.playerId);
+        if (!state.matchActive || !me?.ultimateReady) return false;
+        unlockAudio();
+        const aim = currentAim(me);
+        state.lastAim = aim;
+        state.queuedUltimate = true;
+        send(currentInput());
+        updateUltimateButton(me);
+        return true;
+    }
+
     function sendQueuedShotNow() {
         if (!state.matchActive || !state.queuedShots.length) return false;
         if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return false;
@@ -1018,9 +1060,15 @@
 
         let aim = currentAim();
         let firing = false;
+        let ultimate = false;
         if (state.queuedShots.length) {
             aim = state.queuedShots.shift();
             firing = true;
+        }
+        if (state.queuedUltimate) {
+            aim = state.lastAim || aim;
+            ultimate = true;
+            state.queuedUltimate = false;
         }
 
         return {
@@ -1028,7 +1076,8 @@
             seq: ++state.inputSeq,
             move,
             aim,
-            firing
+            firing,
+            ultimate
         };
     }
 
@@ -1101,6 +1150,10 @@
 
     elements.refreshBoard.addEventListener('click', loadLeaderboard);
     elements.fullscreenExit.addEventListener('click', exitGameFullscreen);
+    elements.ultimateButton?.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        fireUltimate();
+    });
     elements.modeInputs.forEach(input => {
         input.addEventListener('change', () => {
             state.requestedMode = null;

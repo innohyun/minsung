@@ -10,6 +10,14 @@ const MODES = {
 };
 const PROJECTILE_RANGE = 300;
 const PROJECTILE_SPEED = 570;
+const TILE_SIZE = 40;
+const ULTIMATE_HITS_REQUIRED = 4;
+const ULTIMATE_DAMAGE = 2000;
+const ULTIMATE_SPEED = 150;
+const ULTIMATE_RANGE = 820;
+const ULTIMATE_RADIUS = 24;
+const ULTIMATE_TURN_RATE = 0.08;
+const KNOCKBACK_DISTANCE = 90;
 const PLAYER_SPEED = 190;
 const PLAYER_MAX_HEALTH = 6000;
 const PROJECTILE_DAMAGE = 1200;
@@ -19,16 +27,29 @@ const REGEN_DELAY_MS = 3000;
 const REGEN_TICK_MS = 1000;
 const REGEN_PER_TICK = 500;
 const MAX_PENDING_SHOTS = 3;
-const MAP = {
-    width: 960,
-    height: 640,
-    obstacles: [
-        { x: 470, y: 178, w: 180, h: 38 },
-        { x: 490, y: 462, w: 180, h: 38 },
-        { x: 220, y: 320, w: 46, h: 170 },
-        { x: 740, y: 320, w: 46, h: 170 }
-    ]
-};
+const WALL_TILES = [
+    ...Array.from({ length: 5 }, (_, index) => ({ col: 10 + index, row: 4 })),
+    ...Array.from({ length: 5 }, (_, index) => ({ col: 10 + index, row: 11 })),
+    ...Array.from({ length: 4 }, (_, index) => ({ col: 5, row: 6 + index })),
+    ...Array.from({ length: 4 }, (_, index) => ({ col: 18, row: 6 + index })),
+    { col: 8, row: 7 },
+    { col: 15, row: 8 }
+];
+
+function createMap() {
+    const walls = WALL_TILES.map((wall, index) => ({ id: `w${index}`, ...wall }));
+    return {
+        width: 960,
+        height: 640,
+        tileSize: TILE_SIZE,
+        cols: 24,
+        rows: 16,
+        walls,
+        obstacles: walls.map(wall => tileToRect(wall))
+    };
+}
+
+const MAP = createMap();
 const SPAWNS = [
     { x: 312, y: 250 },
     { x: 648, y: 250 },
@@ -93,18 +114,30 @@ function clampUnitVector(vector) {
     return { x: x / length, y: y / length };
 }
 
+function tileToRect(tile) {
+    return {
+        id: tile.id,
+        col: tile.col,
+        row: tile.row,
+        x: tile.col * TILE_SIZE + TILE_SIZE / 2,
+        y: tile.row * TILE_SIZE + TILE_SIZE / 2,
+        w: TILE_SIZE,
+        h: TILE_SIZE
+    };
+}
+
 function rectContainsCircle(rect, x, y, radius) {
     const nearestX = Math.max(rect.x - rect.w / 2, Math.min(x, rect.x + rect.w / 2));
     const nearestY = Math.max(rect.y - rect.h / 2, Math.min(y, rect.y + rect.h / 2));
     return Math.hypot(x - nearestX, y - nearestY) < radius;
 }
 
-function resolvePlayerPosition(player) {
+function resolvePlayerPosition(player, map = MAP) {
     const radius = 22;
-    player.x = Math.max(radius, Math.min(MAP.width - radius, player.x));
-    player.y = Math.max(radius, Math.min(MAP.height - radius, player.y));
+    player.x = Math.max(radius, Math.min(map.width - radius, player.x));
+    player.y = Math.max(radius, Math.min(map.height - radius, player.y));
 
-    MAP.obstacles.forEach(rect => {
+    map.obstacles.forEach(rect => {
         if (!rectContainsCircle(rect, player.x, player.y, radius)) return;
         const dx = player.x - rect.x;
         const dy = player.y - rect.y;
@@ -118,11 +151,19 @@ function resolvePlayerPosition(player) {
     });
 }
 
-function isProjectileBlocked(projectile) {
-    if (projectile.x < 0 || projectile.x > MAP.width || projectile.y < 0 || projectile.y > MAP.height) {
+function isProjectileBlocked(projectile, map = MAP) {
+    if (projectile.x < 0 || projectile.x > map.width || projectile.y < 0 || projectile.y > map.height) {
         return true;
     }
-    return MAP.obstacles.some(rect => rectContainsCircle(rect, projectile.x, projectile.y, 8));
+    return map.obstacles.some(rect => rectContainsCircle(rect, projectile.x, projectile.y, projectile.radius || 8));
+}
+
+function destroyWallHitByProjectile(map, projectile) {
+    const hit = map.obstacles.find(rect => rectContainsCircle(rect, projectile.x, projectile.y, projectile.radius || ULTIMATE_RADIUS));
+    if (!hit) return false;
+    map.walls = map.walls.filter(wall => wall.id !== hit.id);
+    map.obstacles = map.obstacles.filter(rect => rect.id !== hit.id);
+    return true;
 }
 
 function sendJson(socket, payload) {
@@ -279,6 +320,9 @@ export function createGuangbooRealtime(server, store) {
                 maxHealth: PLAYER_MAX_HEALTH,
                 ammo: Math.max(0, Math.min(MAX_AMMO, Math.floor(player.ammo))),
                 maxAmmo: MAX_AMMO,
+                ultimateHits: Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0),
+                ultimateRequired: ULTIMATE_HITS_REQUIRED,
+                ultimateReady: Boolean(player.ultimateReady),
                 alive: player.alive,
                 kills: player.kills,
                 disconnected: player.disconnected
@@ -293,8 +337,11 @@ export function createGuangbooRealtime(server, store) {
                 targetX: Math.round(projectile.targetX ?? projectile.x),
                 targetY: Math.round(projectile.targetY ?? projectile.y),
                 traveled: Math.round(projectile.traveled ?? 0),
-                maxDistance: Math.round(projectile.maxDistance ?? PROJECTILE_RANGE)
+                maxDistance: Math.round(projectile.maxDistance ?? PROJECTILE_RANGE),
+                kind: projectile.kind || 'normal',
+                radius: Math.round(projectile.radius || 8)
             })),
+            map: match.map,
             aliveCount: [...match.players.values()].filter(player => player.alive).length
         };
     }
@@ -400,8 +447,8 @@ export function createGuangbooRealtime(server, store) {
         const aimLength = Math.hypot(aim.x, aim.y) || 1;
         const dx = aim.x / aimLength;
         const dy = aim.y / aimLength;
-        const spawnX = Math.max(8, Math.min(MAP.width - 8, player.x + dx * 30));
-        const spawnY = Math.max(8, Math.min(MAP.height - 8, player.y + dy * 30));
+        const spawnX = Math.max(8, Math.min(match.map.width - 8, player.x + dx * 30));
+        const spawnY = Math.max(8, Math.min(match.map.height - 8, player.y + dy * 30));
         const targetX = spawnX + dx * PROJECTILE_RANGE;
         const targetY = spawnY + dy * PROJECTILE_RANGE;
         player.aim = { x: dx, y: dy };
@@ -412,6 +459,7 @@ export function createGuangbooRealtime(server, store) {
         resetRegenTimer(player, now);
         match.projectiles.push({
             id: `${match.id}-p${match.nextProjectileId++}`,
+            kind: 'normal',
             ownerId: player.id,
             x: spawnX,
             y: spawnY,
@@ -422,10 +470,77 @@ export function createGuangbooRealtime(server, store) {
             vx: dx * PROJECTILE_SPEED,
             vy: dy * PROJECTILE_SPEED,
             damage: PROJECTILE_DAMAGE,
+            radius: 8,
             traveled: 0,
             maxDistance: PROJECTILE_RANGE,
             spawnedTick: match.tick
         });
+    }
+
+    function queueUltimateInput(player, aim) {
+        if (!player.ultimateReady) return false;
+        player.queuedUltimateAim = clampUnitVector(aim);
+        return true;
+    }
+
+    function spawnUltimateProjectile(match, player, now) {
+        if (!player.ultimateReady) return;
+        const aim = player.queuedUltimateAim || player.aim;
+        const aimLength = Math.hypot(aim.x, aim.y) || 1;
+        const dx = aim.x / aimLength;
+        const dy = aim.y / aimLength;
+        const spawnX = Math.max(ULTIMATE_RADIUS, Math.min(match.map.width - ULTIMATE_RADIUS, player.x + dx * 34));
+        const spawnY = Math.max(ULTIMATE_RADIUS, Math.min(match.map.height - ULTIMATE_RADIUS, player.y + dy * 34));
+        player.ultimateHits = 0;
+        player.ultimateReady = false;
+        player.queuedUltimateAim = null;
+        player.aim = { x: dx, y: dy };
+        player.facing = { x: dx, y: dy };
+        resetRegenTimer(player, now);
+        match.projectiles.push({
+            id: `${match.id}-u${match.nextProjectileId++}`,
+            kind: 'ultimate',
+            ownerId: player.id,
+            x: spawnX,
+            y: spawnY,
+            startX: spawnX,
+            startY: spawnY,
+            targetX: spawnX + dx * ULTIMATE_RANGE,
+            targetY: spawnY + dy * ULTIMATE_RANGE,
+            vx: dx * ULTIMATE_SPEED,
+            vy: dy * ULTIMATE_SPEED,
+            damage: ULTIMATE_DAMAGE,
+            radius: ULTIMATE_RADIUS,
+            traveled: 0,
+            maxDistance: ULTIMATE_RANGE,
+            spawnedTick: match.tick
+        });
+    }
+
+    function steerUltimateProjectile(match, projectile) {
+        if (projectile.kind !== 'ultimate') return;
+        const target = [...match.players.values()]
+            .filter(player => player.alive && player.id !== projectile.ownerId)
+            .sort((a, b) => Math.hypot(a.x - projectile.x, a.y - projectile.y) - Math.hypot(b.x - projectile.x, b.y - projectile.y))[0];
+        if (!target) return;
+        const tx = target.x - projectile.x;
+        const ty = target.y - projectile.y;
+        const tLen = Math.hypot(tx, ty) || 1;
+        const vLen = Math.hypot(projectile.vx, projectile.vy) || ULTIMATE_SPEED;
+        const current = { x: projectile.vx / vLen, y: projectile.vy / vLen };
+        const next = clampUnitVector({
+            x: current.x * (1 - ULTIMATE_TURN_RATE) + (tx / tLen) * ULTIMATE_TURN_RATE,
+            y: current.y * (1 - ULTIMATE_TURN_RATE) + (ty / tLen) * ULTIMATE_TURN_RATE
+        });
+        projectile.vx = next.x * ULTIMATE_SPEED;
+        projectile.vy = next.y * ULTIMATE_SPEED;
+    }
+
+    function knockBackPlayer(match, player, projectile) {
+        const vLen = Math.hypot(projectile.vx, projectile.vy) || 1;
+        player.x += (projectile.vx / vLen) * KNOCKBACK_DISTANCE;
+        player.y += (projectile.vy / vLen) * KNOCKBACK_DISTANCE;
+        resolvePlayerPosition(player, match.map);
     }
 
     function stepMatch(match) {
@@ -448,8 +563,11 @@ export function createGuangbooRealtime(server, store) {
             reloadAmmo(player, now);
             player.x += move.x * PLAYER_SPEED * dt;
             player.y += move.y * PLAYER_SPEED * dt;
-            resolvePlayerPosition(player);
+            resolvePlayerPosition(player, match.map);
 
+            if (player.queuedUltimateAim && player.ultimateReady) {
+                spawnUltimateProjectile(match, player, now);
+            }
             if (player.queuedShotAims.length && player.ammo > 0) {
                 spawnProjectile(match, player, now);
             }
@@ -462,6 +580,7 @@ export function createGuangbooRealtime(server, store) {
                 projectiles.push(projectile);
                 return;
             }
+            steerUltimateProjectile(match, projectile);
             const stepDistance = Math.hypot(projectile.vx * dt, projectile.vy * dt);
             const remaining = Math.max(0, projectile.maxDistance - projectile.traveled);
             const travelThisTick = Math.min(stepDistance, remaining);
@@ -469,17 +588,29 @@ export function createGuangbooRealtime(server, store) {
             projectile.x += (projectile.vx / velocityLength) * travelThisTick;
             projectile.y += (projectile.vy / velocityLength) * travelThisTick;
             projectile.traveled += travelThisTick;
-            if (projectile.traveled >= projectile.maxDistance || isProjectileBlocked(projectile)) return;
+            if (projectile.traveled >= projectile.maxDistance) return;
+            if (projectile.kind === 'ultimate') {
+                destroyWallHitByProjectile(match.map, projectile);
+            } else if (isProjectileBlocked(projectile, match.map)) {
+                return;
+            }
 
             const owner = match.players.get(projectile.ownerId);
             const hit = [...match.players.values()].find(player =>
                 player.alive &&
                 player.id !== projectile.ownerId &&
-                Math.hypot(player.x - projectile.x, player.y - projectile.y) <= 27
+                Math.hypot(player.x - projectile.x, player.y - projectile.y) <= 22 + (projectile.radius || 8)
             );
             if (hit) {
                 hit.health -= projectile.damage;
                 resetRegenTimer(hit, now);
+                if (projectile.kind === 'normal' && owner) {
+                    owner.ultimateHits = Math.min(ULTIMATE_HITS_REQUIRED, (owner.ultimateHits || 0) + 1);
+                    owner.ultimateReady = owner.ultimateHits >= ULTIMATE_HITS_REQUIRED;
+                }
+                if (projectile.kind === 'ultimate') {
+                    knockBackPlayer(match, hit, projectile);
+                }
                 if (hit.health <= 0) {
                     eliminatePlayer(match, hit, owner);
                 }
@@ -505,6 +636,7 @@ export function createGuangbooRealtime(server, store) {
             tick: 0,
             players: new Map(),
             projectiles: [],
+            map: createMap(),
             nextProjectileId: 1,
             timer: null
         };
@@ -535,11 +667,14 @@ export function createGuangbooRealtime(server, store) {
                 lastCombatAt: 0,
                 lastRegenAt: Date.now(),
                 queuedShotAims: [],
+                queuedUltimateAim: null,
+                ultimateHits: 0,
+                ultimateReady: false,
                 endedAtMs: null,
                 placement: 0
             };
             client.match = match;
-            client.input = { move: { x: 0, y: 0 }, aim: player.aim, firing: false };
+            client.input = { move: { x: 0, y: 0 }, aim: player.aim, firing: false, ultimate: false };
             match.players.set(player.id, player);
         });
 
@@ -550,7 +685,7 @@ export function createGuangbooRealtime(server, store) {
             mode: match.mode,
             modeLabel: mode.label,
             requiredPlayers: mode.size,
-            map: MAP,
+            map: match.map,
             players: [...match.players.values()].map(player => ({
                 id: player.id,
                 nickname: player.nickname,
@@ -565,7 +700,10 @@ export function createGuangbooRealtime(server, store) {
                 health: player.health,
                 maxHealth: PLAYER_MAX_HEALTH,
                 ammo: player.ammo,
-                maxAmmo: MAX_AMMO
+                maxAmmo: MAX_AMMO,
+                ultimateHits: player.ultimateHits,
+                ultimateRequired: ULTIMATE_HITS_REQUIRED,
+                ultimateReady: player.ultimateReady
             }))
         };
         match.players.forEach(player => sendJson(player.client.socket, { ...startPayload, playerId: player.id }));
@@ -593,7 +731,7 @@ export function createGuangbooRealtime(server, store) {
             bot: true,
             match: null,
             nextFireAt: Date.now() + 500,
-            input: { move: { x: 0, y: 0 }, aim: { x: -1, y: 0 }, firing: false }
+            input: { move: { x: 0, y: 0 }, aim: { x: -1, y: 0 }, firing: false, ultimate: false }
         };
     }
 
@@ -617,7 +755,7 @@ export function createGuangbooRealtime(server, store) {
                 )[0];
 
             if (!target) {
-                client.input = { move: { x: 0, y: 0 }, aim: player.aim, firing: false };
+                client.input = { move: { x: 0, y: 0 }, aim: player.aim, firing: false, ultimate: false };
                 return;
             }
 
@@ -685,10 +823,11 @@ export function createGuangbooRealtime(server, store) {
                 firing: false,
                 seq: Number(message.seq) || 0
             };
-            if (message.firing && client.match?.status === 'active') {
+            if ((message.firing || message.ultimate) && client.match?.status === 'active') {
                 const player = client.match.players.get(client.id);
                 if (player?.alive && !player.disconnected) {
-                    queueShotInput(player, aim, Date.now());
+                    if (message.firing) queueShotInput(player, aim, Date.now());
+                    if (message.ultimate) queueUltimateInput(player, aim);
                 }
             }
             return;
@@ -721,7 +860,7 @@ export function createGuangbooRealtime(server, store) {
             playerDbId: null,
             nickname: 'Guest',
             match: null,
-            input: { move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, firing: false }
+            input: { move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, firing: false, ultimate: false }
         };
         clients.set(client.id, client);
         sendJson(socket, {
