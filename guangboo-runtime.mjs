@@ -8,9 +8,15 @@ const MODES = {
     duel: { key: 'duel', label: '1:1 결투', size: 2 },
     survival: { key: 'survival', label: '4인 생존전', size: 4 }
 };
-const PROJECTILE_RANGE = 230;
+const PROJECTILE_RANGE = 300;
 const PROJECTILE_SPEED = 570;
-const FIRE_COOLDOWN_MS = 320;
+const PLAYER_SPEED = 190;
+const PLAYER_MAX_HEALTH = 6000;
+const PROJECTILE_DAMAGE = 1200;
+const MAX_AMMO = 3;
+const AMMO_RELOAD_MS = 1400;
+const REGEN_DELAY_MS = 3000;
+const REGEN_PER_SECOND = 500;
 const MAX_PENDING_SHOTS = 3;
 const MAP = {
     width: 960,
@@ -267,6 +273,9 @@ export function createGuangbooRealtime(server, store) {
                 aimX: Number(player.aim.x.toFixed(3)),
                 aimY: Number(player.aim.y.toFixed(3)),
                 health: Math.max(0, Math.round(player.health)),
+                maxHealth: PLAYER_MAX_HEALTH,
+                ammo: Math.max(0, Math.min(MAX_AMMO, Math.floor(player.ammo))),
+                maxAmmo: MAX_AMMO,
                 alive: player.alive,
                 kills: player.kills,
                 disconnected: player.disconnected
@@ -336,12 +345,27 @@ export function createGuangbooRealtime(server, store) {
         }
     }
 
-    function queueShotInput(player, aim) {
+    function reloadAmmo(player, now) {
+        if (player.ammo >= MAX_AMMO) {
+            player.lastAmmoReloadAt = now;
+            return;
+        }
+        const elapsed = now - player.lastAmmoReloadAt;
+        if (elapsed < AMMO_RELOAD_MS) return;
+        const reloadCount = Math.floor(elapsed / AMMO_RELOAD_MS);
+        player.ammo = Math.min(MAX_AMMO, player.ammo + reloadCount);
+        player.lastAmmoReloadAt += reloadCount * AMMO_RELOAD_MS;
+        if (player.ammo >= MAX_AMMO) player.lastAmmoReloadAt = now;
+    }
+
+    function queueShotInput(player, aim, now = Date.now()) {
+        reloadAmmo(player, now);
+        if (player.ammo <= player.queuedShotAims.length) return;
         const shotAim = clampUnitVector(aim);
         if (Math.hypot(shotAim.x, shotAim.y) <= 0.01) return;
         player.queuedShotAims.push(shotAim);
-        if (player.queuedShotAims.length > MAX_PENDING_SHOTS) {
-            player.queuedShotAims.splice(0, player.queuedShotAims.length - MAX_PENDING_SHOTS);
+        if (player.queuedShotAims.length > Math.min(MAX_PENDING_SHOTS, player.ammo)) {
+            player.queuedShotAims.splice(0, player.queuedShotAims.length - Math.min(MAX_PENDING_SHOTS, player.ammo));
         }
     }
 
@@ -355,7 +379,10 @@ export function createGuangbooRealtime(server, store) {
         const targetX = spawnX + dx * PROJECTILE_RANGE;
         const targetY = spawnY + dy * PROJECTILE_RANGE;
         player.aim = { x: dx, y: dy };
+        player.ammo = Math.max(0, player.ammo - 1);
+        player.lastAmmoReloadAt = now;
         player.lastShotAt = now;
+        player.lastCombatAt = now;
         match.projectiles.push({
             id: `${match.id}-p${match.nextProjectileId++}`,
             ownerId: player.id,
@@ -367,7 +394,7 @@ export function createGuangbooRealtime(server, store) {
             targetY,
             vx: dx * PROJECTILE_SPEED,
             vy: dy * PROJECTILE_SPEED,
-            damage: 28,
+            damage: PROJECTILE_DAMAGE,
             traveled: 0,
             maxDistance: PROJECTILE_RANGE,
             spawnedTick: match.tick
@@ -388,12 +415,16 @@ export function createGuangbooRealtime(server, store) {
             if (Math.hypot(aim.x, aim.y) > 0.18) {
                 player.aim = aim;
             }
-            player.x += move.x * 230 * dt;
-            player.y += move.y * 230 * dt;
+            reloadAmmo(player, now);
+            player.x += move.x * PLAYER_SPEED * dt;
+            player.y += move.y * PLAYER_SPEED * dt;
             resolvePlayerPosition(player);
 
-            if (player.queuedShotAims.length && now - player.lastShotAt >= FIRE_COOLDOWN_MS) {
+            if (player.queuedShotAims.length && player.ammo > 0) {
                 spawnProjectile(match, player, now);
+            }
+            if (player.health < PLAYER_MAX_HEALTH && now - player.lastCombatAt >= REGEN_DELAY_MS) {
+                player.health = Math.min(PLAYER_MAX_HEALTH, player.health + REGEN_PER_SECOND * dt);
             }
         });
 
@@ -420,6 +451,7 @@ export function createGuangbooRealtime(server, store) {
             );
             if (hit) {
                 hit.health -= projectile.damage;
+                hit.lastCombatAt = now;
                 if (hit.health <= 0) {
                     eliminatePlayer(match, hit, owner);
                 }
@@ -461,12 +493,17 @@ export function createGuangbooRealtime(server, store) {
                 x: spawn.x,
                 y: spawn.y,
                 aim: { x: index % 2 === 0 ? 1 : -1, y: 0 },
-                health: 100,
+                health: PLAYER_MAX_HEALTH,
+                ammo: MAX_AMMO,
+                maxAmmo: MAX_AMMO,
+                lastAmmoReloadAt: Date.now(),
+                maxHealth: PLAYER_MAX_HEALTH,
                 alive: true,
                 disconnected: false,
                 kills: 0,
                 deaths: 0,
                 lastShotAt: 0,
+                lastCombatAt: 0,
                 queuedShotAims: [],
                 endedAtMs: null,
                 placement: 0
@@ -490,7 +527,11 @@ export function createGuangbooRealtime(server, store) {
                 monster: player.monster,
                 bot: Boolean(player.client.bot),
                 x: player.x,
-                y: player.y
+                y: player.y,
+                health: player.health,
+                maxHealth: PLAYER_MAX_HEALTH,
+                ammo: player.ammo,
+                maxAmmo: MAX_AMMO
             }))
         };
         match.players.forEach(player => sendJson(player.client.socket, { ...startPayload, playerId: player.id }));
@@ -560,7 +601,7 @@ export function createGuangbooRealtime(server, store) {
             const firing = distance < 560 && now >= client.nextFireAt;
             if (firing) client.nextFireAt = now + 650 + Math.floor(Math.random() * 350);
             client.input = { move, aim, firing };
-            if (firing) queueShotInput(player, aim);
+            if (firing) queueShotInput(player, aim, now);
         });
     }
 
@@ -613,7 +654,7 @@ export function createGuangbooRealtime(server, store) {
             if (message.firing && client.match?.status === 'active') {
                 const player = client.match.players.get(client.id);
                 if (player?.alive && !player.disconnected) {
-                    queueShotInput(player, aim);
+                    queueShotInput(player, aim, Date.now());
                 }
             }
             return;

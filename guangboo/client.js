@@ -4,7 +4,8 @@
     const STORAGE_KEY = 'guangboo_nickname';
     const MODE_STORAGE_KEY = 'guangboo_match_mode';
     const BOT_STORAGE_KEY = 'guangboo_fill_bots';
-    const PROJECTILE_RANGE = 230;
+    const PROJECTILE_RANGE = 300;
+    const PLAYER_MAX_HEALTH = 6000;
     const keys = new Set();
 
     const elements = {
@@ -405,6 +406,7 @@
         drawLocalAimGuide();
         state.projectiles.forEach(drawProjectile);
         state.players.forEach(drawMonster);
+        drawAmmoHud();
     }
 
     function drawArenaBackdrop(width, height) {
@@ -536,22 +538,22 @@
 
         ctx.save();
         ctx.lineCap = 'round';
-        ctx.strokeStyle = 'rgba(5, 9, 6, 0.62)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.18)';
+        ctx.lineWidth = 18;
+        ctx.beginPath();
+        ctx.moveTo(start.x, start.y);
+        ctx.lineTo(end.x, end.y);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(215, 242, 82, 0.34)';
         ctx.lineWidth = 10;
         ctx.beginPath();
         ctx.moveTo(start.x, start.y);
         ctx.lineTo(end.x, end.y);
         ctx.stroke();
 
-        ctx.strokeStyle = 'rgba(215, 242, 82, 0.64)';
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x, end.y);
-        ctx.stroke();
-
-        ctx.strokeStyle = 'rgba(215, 242, 82, 0.82)';
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(215, 242, 82, 0.48)';
+        ctx.lineWidth = 4;
         ctx.beginPath();
         ctx.arc(end.x, end.y, 10, 0, Math.PI * 2);
         ctx.stroke();
@@ -574,13 +576,15 @@
     }
 
     function drawPlayerHealthBar(player, point, radius) {
-        const width = 58 * state.viewport.scale;
-        const height = Math.max(5, 7 * state.viewport.scale);
+        const width = 74 * state.viewport.scale;
+        const height = Math.max(13, 15 * state.viewport.scale);
         const x = point.x - width / 2;
-        const y = point.y - radius - 37 * state.viewport.scale;
-        const ratio = Math.max(0, Math.min(1, (Number(player.health) || 0) / 100));
+        const y = point.y - radius - 42 * state.viewport.scale;
+        const maxHealth = Number(player.maxHealth) || PLAYER_MAX_HEALTH;
+        const health = Math.max(0, Math.round(Number(player.health) || 0));
+        const ratio = Math.max(0, Math.min(1, health / maxHealth));
         ctx.save();
-        ctx.fillStyle = 'rgba(8, 13, 10, 0.78)';
+        ctx.fillStyle = 'rgba(8, 13, 10, 0.82)';
         roundRect(x, y, width, height, height / 2);
         ctx.fill();
         ctx.fillStyle = ratio <= 0.32 ? '#e05252' : '#d7f252';
@@ -590,6 +594,41 @@
         ctx.lineWidth = 1;
         roundRect(x + 0.5, y + 0.5, width - 1, height - 1, height / 2);
         ctx.stroke();
+        ctx.font = `${Math.max(9, 10 * state.viewport.scale)}px system-ui, sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
+        ctx.strokeText(String(health), point.x, y + height / 2);
+        ctx.fillStyle = '#fffdf8';
+        ctx.fillText(String(health), point.x, y + height / 2);
+        ctx.restore();
+    }
+
+    function drawAmmoHud() {
+        const me = state.players.find(player => player.id === state.playerId);
+        if (!me || !me.alive) return;
+        const maxAmmo = Number(me.maxAmmo) || 3;
+        const ammo = Math.max(0, Math.min(maxAmmo, Math.floor(Number(me.ammo) || 0)));
+        const size = 18;
+        const gap = 8;
+        const totalWidth = maxAmmo * size + (maxAmmo - 1) * gap;
+        const startX = state.viewport.width - totalWidth - Math.max(18, state.viewport.width * 0.04);
+        const y = state.viewport.height - Math.max(72, state.viewport.height * 0.12);
+        ctx.save();
+        for (let i = 0; i < maxAmmo; i += 1) {
+            const x = startX + i * (size + gap);
+            ctx.fillStyle = i < ammo ? 'rgba(215, 242, 82, 0.92)' : 'rgba(255, 255, 255, 0.18)';
+            ctx.strokeStyle = 'rgba(8, 13, 10, 0.72)';
+            ctx.lineWidth = 3;
+            roundRect(x, y, size, size * 1.9, 8);
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(255, 253, 248, 0.82)';
+        ctx.font = '700 11px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('AMMO', startX + totalWidth / 2, y - 8);
         ctx.restore();
     }
 

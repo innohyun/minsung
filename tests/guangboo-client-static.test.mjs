@@ -61,7 +61,7 @@ test('guangboo attack input fires once after aiming is released', () => {
 
 test('guangboo right-stick aim updates immediately from the touch direction', () => {
     assert.match(clientSource, /const pointerAim = aimFromPointer\(pointer\)/);
-    assert.match(clientSource, /const fallbackAim = isRightStick \? \(stick\.instantAim \|\| pointerAim \|\| state\.lastAim\)/);
+    assert.match(clientSource, /const fallbackAim = isRightStick \? \(pointerAim \|\| state\.lastAim\)/);
     assert.match(clientSource, /const nx = length > 3 \? dx \/ length : fallbackAim\.x/);
     assert.match(clientSource, /const ny = length > 3 \? dy \/ length : fallbackAim\.y/);
     assert.match(clientSource, /state\.lastAim = normalizeAim\(\{ x: nx, y: ny \}\)/);
@@ -72,13 +72,23 @@ test('guangboo aim guide is a visible semi-transparent local guide', () => {
     assert.match(clientSource, /function isAttackControlActive\(\)/);
     assert.match(clientSource, /!isAttackControlActive\(\)/);
     assert.match(clientSource, /drawLocalAimGuide\(\)/);
-    assert.match(clientSource, /rgba\(5, 9, 6, 0\.62\)/);
-    assert.match(clientSource, /rgba\(215, 242, 82, 0\.64\)/);
+    assert.match(clientSource, /rgba\(255, 255, 255, 0\.18\)/);
+    assert.match(clientSource, /rgba\(215, 242, 82, 0\.34\)/);
 });
 
 test('guangboo renders health over monsters', () => {
+    assert.match(clientSource, /const PLAYER_MAX_HEALTH = 6000/);
     assert.match(clientSource, /function drawPlayerHealthBar\(player, point, radius\)/);
     assert.match(clientSource, /drawPlayerHealthBar\(player, point, radius\)/);
+    assert.match(clientSource, /const maxHealth = Number\(player\.maxHealth\) \|\| PLAYER_MAX_HEALTH/);
+    assert.match(clientSource, /ctx\.fillText\(String\(health\), point\.x, y \+ height \/ 2\)/);
+});
+
+test('guangboo draws a brawl-style ammo hud', () => {
+    assert.match(clientSource, /function drawAmmoHud\(\)/);
+    assert.match(clientSource, /drawAmmoHud\(\)/);
+    assert.match(clientSource, /const maxAmmo = Number\(me\.maxAmmo\) \|\| 3/);
+    assert.match(clientSource, /ctx\.fillText\('AMMO'/);
 });
 
 test('guangboo suppresses mobile double-tap zoom during matches', () => {
@@ -90,19 +100,18 @@ test('guangboo suppresses mobile double-tap zoom during matches', () => {
 });
 
 test('guangboo projectiles are capped to the aim range on client and server snapshots', () => {
-    assert.match(clientSource, /const PROJECTILE_RANGE = 230/);
+    assert.match(clientSource, /const PROJECTILE_RANGE = 300/);
     assert.match(clientSource, /projectileMemory: new Map\(\)/);
     assert.match(clientSource, /function rememberAndFilterProjectiles\(projectiles\)/);
     assert.match(clientSource, /function isProjectileWithinRange\(projectile\)/);
     assert.match(clientSource, /rememberAndFilterProjectiles\(message\.projectiles \|\| \[\]\)/);
     assert.match(clientSource, /performance\.now\(\) - memory\.firstSeenAt < 1400/);
-    assert.match(runtimeSource, /const PROJECTILE_RANGE = 230/);
+    assert.match(runtimeSource, /const PROJECTILE_RANGE = 300/);
     assert.match(runtimeSource, /function spawnProjectile\(match, player, now\)/);
     assert.match(runtimeSource, /targetX = spawnX \+ dx \* PROJECTILE_RANGE/);
     assert.match(runtimeSource, /targetY = spawnY \+ dy \* PROJECTILE_RANGE/);
-    assert.match(runtimeSource, /const FIRE_COOLDOWN_MS = 320/);
     assert.match(runtimeSource, /const MAX_PENDING_SHOTS = 3/);
-    assert.match(runtimeSource, /function queueShotInput\(player, aim\)/);
+    assert.match(runtimeSource, /function queueShotInput\(player, aim, now = Date\.now\(\)\)/);
     assert.match(runtimeSource, /player\.queuedShotAims\.push\(shotAim\)/);
     assert.match(runtimeSource, /const aim = player\.queuedShotAims\.shift\(\) \|\| player\.aim/);
     assert.match(runtimeSource, /spawnedTick: match\.tick/);
@@ -113,10 +122,24 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile9/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile9/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile10/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile10/);
 });
 
+
+test('guangboo uses 6000 hp, 1200 damage, slower movement, ammo reload, and passive regen', () => {
+    assert.match(runtimeSource, /const PLAYER_SPEED = 190/);
+    assert.match(runtimeSource, /const PLAYER_MAX_HEALTH = 6000/);
+    assert.match(runtimeSource, /const PROJECTILE_DAMAGE = 1200/);
+    assert.match(runtimeSource, /const MAX_AMMO = 3/);
+    assert.match(runtimeSource, /const AMMO_RELOAD_MS = 1400/);
+    assert.match(runtimeSource, /const REGEN_DELAY_MS = 3000/);
+    assert.match(runtimeSource, /const REGEN_PER_SECOND = 500/);
+    assert.match(runtimeSource, /health: PLAYER_MAX_HEALTH/);
+    assert.match(runtimeSource, /ammo: MAX_AMMO/);
+    assert.match(runtimeSource, /player\.ammo = Math\.max\(0, player\.ammo - 1\)/);
+    assert.match(runtimeSource, /player\.health = Math\.min\(PLAYER_MAX_HEALTH, player\.health \+ REGEN_PER_SECOND \* dt\)/);
+});
 
 test('guangboo uses Brawl-style half-screen floating touch sticks', () => {
     assert.match(clientSource, /function shouldStartFromHalf\(event\)/);
@@ -162,8 +185,8 @@ test('guangboo auto-aims at the nearest opponent for tap-only attacks', () => {
 
 test('guangboo server queues firing inputs so later movement packets cannot swallow shots', () => {
     assert.match(runtimeSource, /if \(message\.firing && client\.match\?\.status === 'active'\)/);
-    assert.match(runtimeSource, /queueShotInput\(player, aim\)/);
+    assert.match(runtimeSource, /queueShotInput\(player, aim, Date\.now\(\)\)/);
     assert.match(runtimeSource, /firing: false,/);
-    assert.match(runtimeSource, /player\.queuedShotAims\.length && now - player\.lastShotAt >= FIRE_COOLDOWN_MS/);
+    assert.match(runtimeSource, /player\.queuedShotAims\.length && player\.ammo > 0/);
     assert.doesNotMatch(runtimeSource, /player\.queuedShotAim\b/);
 });
