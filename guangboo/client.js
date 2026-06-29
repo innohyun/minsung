@@ -468,9 +468,10 @@
     function drawMonster(player) {
         const point = worldToScreen(player.x, player.y);
         const radius = 22 * state.viewport.scale;
-        const aimX = player.aimX ?? player.aim?.x ?? 1;
-        const aimY = player.aimY ?? player.aim?.y ?? 0;
-        const angle = Math.atan2(aimY, aimX);
+        const facingX = player.facingX ?? player.facing?.x ?? player.aimX ?? player.aim?.x ?? 1;
+        const facingY = player.facingY ?? player.facing?.y ?? player.aimY ?? player.aim?.y ?? 0;
+        const facingLength = Math.hypot(facingX, facingY) || 1;
+        const angle = Math.atan2(facingY / facingLength, facingX / facingLength);
         const color = player.monster?.color || '#6ee7b7';
         const accent = player.monster?.accent || '#064e3b';
 

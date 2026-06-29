@@ -128,8 +128,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile11/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile11/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile12/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile12/);
 });
 
 
@@ -150,6 +150,17 @@ test('guangboo uses 6000 hp, 1200 damage, slower movement, ammo reload, and pass
     assert.match(runtimeSource, /health: PLAYER_MAX_HEALTH/);
     assert.match(runtimeSource, /ammo: MAX_AMMO/);
     assert.match(runtimeSource, /player\.ammo = Math\.max\(0, player\.ammo - 1\)/);
+});
+
+test('guangboo renders monster head from server facing instead of live aim while aiming', () => {
+    assert.match(clientSource, /const facingX = player\.facingX \?\? player\.facing\?\.x \?\? player\.aimX/);
+    assert.match(clientSource, /const facingY = player\.facingY \?\? player\.facing\?\.y \?\? player\.aimY/);
+    assert.match(clientSource, /const angle = Math\.atan2\(facingY \/ facingLength, facingX \/ facingLength\)/);
+    assert.match(runtimeSource, /facingX: Number\(\(player\.facing\?\.x \?\? player\.aim\.x\)\.toFixed\(3\)\)/);
+    assert.match(runtimeSource, /facingY: Number\(\(player\.facing\?\.y \?\? player\.aim\.y\)\.toFixed\(3\)\)/);
+    assert.match(runtimeSource, /facing: \{ x: index % 2 === 0 \? 1 : -1, y: 0 \}/);
+    assert.match(runtimeSource, /player\.facing = move/);
+    assert.match(runtimeSource, /player\.facing = \{ x: dx, y: dy \}/);
 });
 
 test('guangboo uses Brawl-style half-screen floating touch sticks', () => {

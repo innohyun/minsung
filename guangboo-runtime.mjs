@@ -273,6 +273,8 @@ export function createGuangbooRealtime(server, store) {
                 y: Math.round(player.y),
                 aimX: Number(player.aim.x.toFixed(3)),
                 aimY: Number(player.aim.y.toFixed(3)),
+                facingX: Number((player.facing?.x ?? player.aim.x).toFixed(3)),
+                facingY: Number((player.facing?.y ?? player.aim.y).toFixed(3)),
                 health: Math.max(0, Math.round(player.health)),
                 maxHealth: PLAYER_MAX_HEALTH,
                 ammo: Math.max(0, Math.min(MAX_AMMO, Math.floor(player.ammo))),
@@ -403,6 +405,7 @@ export function createGuangbooRealtime(server, store) {
         const targetX = spawnX + dx * PROJECTILE_RANGE;
         const targetY = spawnY + dy * PROJECTILE_RANGE;
         player.aim = { x: dx, y: dy };
+        player.facing = { x: dx, y: dy };
         player.ammo = Math.max(0, player.ammo - 1);
         player.lastAmmoReloadAt = now;
         player.lastShotAt = now;
@@ -438,6 +441,9 @@ export function createGuangbooRealtime(server, store) {
             const aim = clampUnitVector(input.aim);
             if (Math.hypot(aim.x, aim.y) > 0.18) {
                 player.aim = aim;
+            }
+            if (Math.hypot(move.x, move.y) > 0.18) {
+                player.facing = move;
             }
             reloadAmmo(player, now);
             player.x += move.x * PLAYER_SPEED * dt;
@@ -515,6 +521,7 @@ export function createGuangbooRealtime(server, store) {
                 x: spawn.x,
                 y: spawn.y,
                 aim: { x: index % 2 === 0 ? 1 : -1, y: 0 },
+                facing: { x: index % 2 === 0 ? 1 : -1, y: 0 },
                 health: PLAYER_MAX_HEALTH,
                 ammo: MAX_AMMO,
                 maxAmmo: MAX_AMMO,
@@ -551,6 +558,10 @@ export function createGuangbooRealtime(server, store) {
                 bot: Boolean(player.client.bot),
                 x: player.x,
                 y: player.y,
+                aimX: player.aim.x,
+                aimY: player.aim.y,
+                facingX: player.facing.x,
+                facingY: player.facing.y,
                 health: player.health,
                 maxHealth: PLAYER_MAX_HEALTH,
                 ammo: player.ammo,
