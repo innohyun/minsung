@@ -181,7 +181,8 @@ h1 {
     text-transform: uppercase;
 }
 
-.mode-picker {
+.mode-picker,
+.character-picker {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
@@ -190,7 +191,8 @@ h1 {
     padding: 0;
 }
 
-.mode-picker legend {
+.mode-picker legend,
+.character-picker legend {
     grid-column: 1 / -1;
     color: var(--muted);
     font-size: 11px;
@@ -198,7 +200,8 @@ h1 {
     text-transform: uppercase;
 }
 
-.mode-option {
+.mode-option,
+.character-option {
     display: flex;
     align-items: stretch;
     min-width: 0;
@@ -209,42 +212,54 @@ h1 {
     overflow: hidden;
 }
 
-.mode-option input {
+.mode-option input,
+.character-option input {
     position: absolute;
     opacity: 0;
     pointer-events: none;
 }
 
-.mode-option span {
+.mode-option span,
+.character-option span {
     display: grid;
     gap: 3px;
     width: 100%;
     padding: 11px 12px;
 }
 
-.mode-option strong {
+.mode-option strong,
+.character-option strong {
     color: var(--ink);
     font-size: 14px;
 }
 
-.mode-option small {
+.mode-option small,
+.character-option small {
     color: var(--muted);
     font-size: 11px;
     line-height: 1.25;
 }
 
-.mode-option:has(input:checked) {
+.mode-option:has(input:checked),
+.character-option:has(input:checked) {
     border-color: rgba(53, 166, 111, 0.7);
     background: rgba(215, 242, 82, 0.28);
     box-shadow: inset 0 0 0 2px rgba(53, 166, 111, 0.16);
 }
 
-.mode-option:has(input:focus-visible) {
+.character-option:has(input[value="slime"]:checked) {
+    border-color: rgba(42, 180, 80, 0.8);
+    background: rgba(111, 232, 92, 0.28);
+}
+
+.mode-option:has(input:focus-visible),
+.character-option:has(input:focus-visible) {
     outline: 3px solid rgba(53, 166, 111, 0.18);
     outline-offset: 2px;
 }
 
-.mode-picker:has(input:disabled) {
+.mode-picker:has(input:disabled),
+.character-picker:has(input:disabled) {
     opacity: 0.64;
 }
 

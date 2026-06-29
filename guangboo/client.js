@@ -3,6 +3,7 @@
     const SEND_MS = 33;
     const STORAGE_KEY = 'guangboo_nickname';
     const MODE_STORAGE_KEY = 'guangboo_match_mode';
+    const CHARACTER_STORAGE_KEY = 'guangboo_character';
     const BOT_STORAGE_KEY = 'guangboo_fill_bots';
     const PROJECTILE_RANGE = 300;
     const PLAYER_MAX_HEALTH = 6000;
@@ -16,6 +17,7 @@
         nickname: document.getElementById('nicknameInput'),
         botToggle: document.getElementById('botToggle'),
         modeInputs: [...document.querySelectorAll('input[name="matchMode"]')],
+        characterInputs: [...document.querySelectorAll('input[name="character"]')],
         joinButton: document.getElementById('joinButton'),
         status: document.getElementById('statusLine'),
         queueFill: document.getElementById('queueFill'),
@@ -54,6 +56,8 @@
         map: WORLD_FALLBACK,
         players: [],
         projectiles: [],
+        slimeTrails: [],
+        summons: [],
         lastResults: [],
         inputSeq: 0,
         leftStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, startX: 0, startY: 0, moved: false, shotQueued: false, instantAim: null },
@@ -81,6 +85,8 @@
             state.queuedShots = [];
             state.queuedUltimate = false;
             state.projectileMemory.clear();
+            state.slimeTrails = [];
+            state.summons = [];
             state.mouseAim.active = false;
             exitGameFullscreen();
         }
@@ -170,6 +176,10 @@
         return elements.modeInputs.find(input => input.checked)?.value || 'duel';
     }
 
+    function getSelectedCharacter() {
+        return elements.characterInputs.find(input => input.checked)?.value || 'monster';
+    }
+
     function getModeInfo(key = getSelectedMode()) {
         return state.modes.find(mode => mode.key === key) || state.modes[0];
     }
@@ -203,6 +213,7 @@
         elements.joinButton.disabled = isMatching;
         elements.joinButton.textContent = isMatching ? '매칭 중' : '자동 매칭';
         setModeInputsDisabled(isMatching);
+        elements.characterInputs.forEach(input => { input.disabled = isMatching; });
     }
 
     function connect() {
@@ -252,11 +263,13 @@
             return;
         }
         localStorage.setItem(STORAGE_KEY, nickname);
+        const character = getSelectedCharacter();
         localStorage.setItem(MODE_STORAGE_KEY, mode);
+        localStorage.setItem(CHARACTER_STORAGE_KEY, character);
         localStorage.setItem(BOT_STORAGE_KEY, elements.botToggle.checked ? '1' : '0');
         setMatchingUi(true);
         state.joining = true;
-        send({ type: 'joinQueue', nickname, mode, fillWithBots: elements.botToggle.checked });
+        send({ type: 'joinQueue', nickname, mode, character, fillWithBots: elements.botToggle.checked });
     }
 
     function handleServerMessage(message) {
@@ -313,6 +326,8 @@
                 state.lastAim = normalizeAim({ x: localPlayer.aimX ?? localPlayer.aim?.x ?? 1, y: localPlayer.aimY ?? localPlayer.aim?.y ?? 0 });
             }
             state.projectiles = [];
+            state.slimeTrails = message.slimeTrails || [];
+            state.summons = message.summons || [];
             elements.connection.textContent = message.modeLabel || '매치 진행';
             setScreen('match');
             resizeCanvas();
@@ -323,6 +338,8 @@
             state.players = message.players || [];
             if (message.map) state.map = message.map;
             state.projectiles = rememberAndFilterProjectiles(message.projectiles || []);
+            state.slimeTrails = message.slimeTrails || [];
+            state.summons = message.summons || [];
             updateHud();
             return;
         }
@@ -475,8 +492,10 @@
         ctx.clearRect(0, 0, width, height);
         drawArenaBackdrop(width, height);
         drawMap();
+        state.slimeTrails.forEach(drawSlimeTrail);
         drawLocalAimGuide();
         state.projectiles.forEach(drawProjectile);
+        state.summons.forEach(drawSummon);
         state.players.forEach(drawMonster);
     }
 
@@ -544,6 +563,46 @@
         ctx.restore();
     }
 
+    function drawSlimeTrail(trail) {
+        const point = worldToScreen(trail.x, trail.y);
+        const radius = (Number(trail.radius) || 34) * state.viewport.scale;
+        ctx.save();
+        ctx.globalAlpha = trail.ownerId === state.playerId ? 0.24 : 0.34;
+        ctx.fillStyle = trail.ownerId === state.playerId ? '#65d96d' : '#40b95d';
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(15, 92, 35, 0.28)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    function drawSummon(summon) {
+        const point = worldToScreen(summon.x, summon.y);
+        const radius = (Number(summon.radius) || 14) * state.viewport.scale;
+        ctx.save();
+        ctx.fillStyle = summon.ownerId === state.playerId ? '#9dff76' : '#4ade80';
+        ctx.shadowColor = '#53d769';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.ellipse(point.x, point.y, radius * 1.15, radius * 0.92, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#12351d';
+        ctx.beginPath();
+        ctx.arc(point.x + radius * 0.25, point.y - radius * 0.18, radius * 0.12, 0, Math.PI * 2);
+        ctx.arc(point.x + radius * 0.25, point.y + radius * 0.18, radius * 0.12, 0, Math.PI * 2);
+        ctx.fill();
+        const healthRatio = Math.max(0, Math.min(1, (Number(summon.health) || 0) / (Number(summon.maxHealth) || 500)));
+        ctx.fillStyle = 'rgba(8, 13, 10, 0.74)';
+        roundRect(point.x - radius, point.y - radius - 8, radius * 2, 4, 2);
+        ctx.fill();
+        ctx.fillStyle = '#d7f252';
+        roundRect(point.x - radius, point.y - radius - 8, radius * 2 * healthRatio, 4, 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
     function drawMonster(player) {
         const point = worldToScreen(player.x, player.y);
         const radius = 22 * state.viewport.scale;
@@ -551,8 +610,8 @@
         const facingY = player.facingY ?? player.facing?.y ?? player.aimY ?? player.aim?.y ?? 0;
         const facingLength = Math.hypot(facingX, facingY) || 1;
         const angle = Math.atan2(facingY / facingLength, facingX / facingLength);
-        const color = player.monster?.color || '#6ee7b7';
-        const accent = player.monster?.accent || '#064e3b';
+        const color = player.character === 'slime' ? '#7ee65b' : (player.monster?.color || '#6ee7b7');
+        const accent = player.character === 'slime' ? '#167a34' : (player.monster?.accent || '#064e3b');
 
         ctx.save();
         ctx.globalAlpha = player.alive ? 1 : 0.36;
@@ -569,8 +628,14 @@
 
         ctx.fillStyle = color;
         ctx.beginPath();
-        ctx.ellipse(0, 0, radius * 1.05, radius * 0.92, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, radius * 1.05, player.character === 'slime' ? radius * 0.78 : radius * 0.92, 0, 0, Math.PI * 2);
         ctx.fill();
+        if (player.character === 'slime') {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.26)';
+            ctx.beginPath();
+            ctx.ellipse(radius * 0.02, -radius * 0.18, radius * 0.54, radius * 0.22, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
 
         ctx.fillStyle = accent;
         ctx.beginPath();
@@ -785,11 +850,12 @@
     function drawProjectile(projectile) {
         const point = worldToScreen(projectile.x, projectile.y);
         const isUltimate = projectile.kind === 'ultimate';
-        const radius = (isUltimate ? Number(projectile.radius) || 24 : 7) * state.viewport.scale;
+        const isSlimeProjectile = projectile.kind === 'slime';
+        const radius = (isUltimate ? Number(projectile.radius) || 24 : (isSlimeProjectile ? Number(projectile.radius) || 11 : 7)) * state.viewport.scale;
         ctx.save();
         ctx.fillStyle = isUltimate
             ? (projectile.ownerId === state.playerId ? '#7dd3fc' : '#c084fc')
-            : (projectile.ownerId === state.playerId ? '#d7f252' : '#f29b4b');
+            : (isSlimeProjectile ? '#72e75f' : (projectile.ownerId === state.playerId ? '#d7f252' : '#f29b4b'));
         ctx.shadowColor = ctx.fillStyle;
         ctx.shadowBlur = isUltimate ? 28 : 14;
         ctx.beginPath();
@@ -1161,6 +1227,11 @@
             updateModeCopy();
         });
     });
+    elements.characterInputs.forEach(input => {
+        input.addEventListener('change', () => {
+            localStorage.setItem(CHARACTER_STORAGE_KEY, getSelectedCharacter());
+        });
+    });
     elements.botToggle.addEventListener('change', () => {
         localStorage.setItem(BOT_STORAGE_KEY, elements.botToggle.checked ? '1' : '0');
     });
@@ -1189,6 +1260,12 @@
 
     elements.nickname.value = localStorage.getItem(STORAGE_KEY) || '';
     elements.botToggle.checked = localStorage.getItem(BOT_STORAGE_KEY) === '1';
+    const savedCharacter = localStorage.getItem(CHARACTER_STORAGE_KEY);
+    if (savedCharacter && elements.characterInputs.some(input => input.value === savedCharacter)) {
+        elements.characterInputs.forEach(input => {
+            input.checked = input.value === savedCharacter;
+        });
+    }
     const savedMode = localStorage.getItem(MODE_STORAGE_KEY);
     if (savedMode && elements.modeInputs.some(input => input.value === savedMode)) {
         elements.modeInputs.forEach(input => {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Guangboo Monster Survival</title>
-    <link rel="stylesheet" href="styles.css?v=20260629-mobile14">
+    <link rel="stylesheet" href="styles.css?v=20260629-mobile15">
 </head>
 <body>
     <main id="app">
@@ -32,6 +32,23 @@
                             <span>
                                 <strong>4인 생존전</strong>
                                 <small>마지막 생존자 승리</small>
+                            </span>
+                        </label>
+                    </fieldset>
+                    <fieldset class="character-picker" aria-label="캐릭터 선택">
+                        <legend>캐릭터</legend>
+                        <label class="character-option">
+                            <input type="radio" name="character" value="monster" checked>
+                            <span>
+                                <strong>기본 몬스터</strong>
+                                <small>레이저 궁극기</small>
+                            </span>
+                        </label>
+                        <label class="character-option">
+                            <input type="radio" name="character" value="slime">
+                            <span>
+                                <strong>슬라임</strong>
+                                <small>장판 슬로우 · 애모 강탈</small>
                             </span>
                         </label>
                     </fieldset>
@@ -106,6 +123,6 @@
         </section>
     </main>
 
-    <script src="client.js?v=20260629-mobile14" defer></script>
+    <script src="client.js?v=20260629-mobile15" defer></script>
 </body>
 </html>

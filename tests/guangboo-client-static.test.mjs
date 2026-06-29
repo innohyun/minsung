@@ -128,8 +128,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile14/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile14/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile15/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile15/);
 });
 
 
@@ -157,6 +157,40 @@ test('guangboo supports charged wall-breaking homing ultimate attacks', () => {
     assert.match(runtimeSource, /function knockBackPlayer\(match, player, projectile\)/);
     assert.match(runtimeSource, /owner\.ultimateHits = Math\.min\(ULTIMATE_HITS_REQUIRED, \(owner\.ultimateHits \|\| 0\) \+ 1\)/);
     assert.match(runtimeSource, /if \(message\.ultimate\) queueUltimateInput\(player, aim\)/);
+});
+
+
+test('guangboo supports selectable slime character with trails, ammo steal, and baby slimes', () => {
+    assert.match(htmlSource, /class="character-picker"/);
+    assert.match(htmlSource, /name="character" value="slime"/);
+    assert.match(stylesSource, /\.character-option/);
+    assert.match(clientSource, /const CHARACTER_STORAGE_KEY = 'guangboo_character'/);
+    assert.match(clientSource, /characterInputs: \[\.\.\.document\.querySelectorAll\('input\[name="character"\]'\)\]/);
+    assert.match(clientSource, /function getSelectedCharacter\(\)/);
+    assert.match(clientSource, /send\(\{ type: 'joinQueue', nickname, mode, character, fillWithBots: elements\.botToggle\.checked \}\)/);
+    assert.match(clientSource, /state\.slimeTrails = message\.slimeTrails \|\| \[\]/);
+    assert.match(clientSource, /state\.summons = message\.summons \|\| \[\]/);
+    assert.match(clientSource, /function drawSlimeTrail\(trail\)/);
+    assert.match(clientSource, /function drawSummon\(summon\)/);
+    assert.match(clientSource, /player\.character === 'slime'/);
+    assert.match(clientSource, /projectile\.kind === 'slime'/);
+    assert.match(runtimeSource, /const SLIME_PROJECTILE_DAMAGE = 600/);
+    assert.match(runtimeSource, /const BABY_SLIME_DAMAGE = 200/);
+    assert.match(runtimeSource, /const BABY_SLIME_HEALTH = 500/);
+    assert.match(runtimeSource, /function normalizeCharacter\(value\)/);
+    assert.match(runtimeSource, /client\.character = normalizeCharacter\(message\.character\)/);
+    assert.match(runtimeSource, /character: player\.character/);
+    assert.match(runtimeSource, /slimeTrails: match\.slimeTrails\.map/);
+    assert.match(runtimeSource, /summons: match\.summons\.map/);
+    assert.match(runtimeSource, /function dropSlimeTrail\(match, player, now\)/);
+    assert.match(runtimeSource, /function isOnEnemySlimeTrail\(match, player, now\)/);
+    assert.match(runtimeSource, /function spawnBabySlimes\(match, player, count, now\)/);
+    assert.match(runtimeSource, /function stepSummons\(match, now, dt\)/);
+    assert.match(runtimeSource, /kind: slimeShot \? 'slime' : 'normal'/);
+    assert.match(runtimeSource, /damage: slimeShot \? SLIME_PROJECTILE_DAMAGE : PROJECTILE_DAMAGE/);
+    assert.match(runtimeSource, /hit\.ammo = Math\.max\(0, hit\.ammo - 1\)/);
+    assert.match(runtimeSource, /owner\.ammo = Math\.min\(MAX_AMMO, owner\.ammo \+ 1\)/);
+    assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
 });
 
 test('guangboo plays Web Audio projectile sounds on spawn, flight, and impact', () => {

@@ -21,6 +21,18 @@ const KNOCKBACK_DISTANCE = 90;
 const PLAYER_SPEED = 190;
 const PLAYER_MAX_HEALTH = 6000;
 const PROJECTILE_DAMAGE = 1200;
+const SLIME_PROJECTILE_DAMAGE = 600;
+const SLIME_PROJECTILE_RADIUS = 11;
+const SLIME_TRAIL_RADIUS = 34;
+const SLIME_TRAIL_MS = 4200;
+const SLIME_TRAIL_INTERVAL_MS = 230;
+const SLOW_FACTOR = 0.58;
+const SLOW_DURATION_MS = 1800;
+const BABY_SLIME_DAMAGE = 200;
+const BABY_SLIME_HEALTH = 500;
+const BABY_SLIME_SPEED = 115;
+const BABY_SLIME_RADIUS = 14;
+const BABY_SLIME_LIFETIME_MS = 9000;
 const MAX_AMMO = 3;
 const AMMO_RELOAD_MS = 1400;
 const REGEN_DELAY_MS = 3000;
@@ -62,6 +74,14 @@ const MONSTERS = [
     { key: 'grubvolt', name: 'Grubvolt', color: '#fde047', accent: '#713f12' },
     { key: 'nightgloop', name: 'Nightgloop', color: '#93c5fd', accent: '#1e3a8a' }
 ];
+const CHARACTER_DEFS = {
+    monster: { key: 'monster', label: '기본 몬스터' },
+    slime: { key: 'slime', label: '슬라임', monster: { key: 'slime', name: 'Slime', color: '#7ee65b', accent: '#167a34' } }
+};
+
+function normalizeCharacter(value) {
+    return value === 'slime' ? 'slime' : 'monster';
+}
 
 export const GUANGBOO_SCHEMA_SQL = `
     CREATE TABLE IF NOT EXISTS guangboo_players (
@@ -309,6 +329,7 @@ export function createGuangbooRealtime(server, store) {
                 id: player.id,
                 nickname: player.nickname,
                 monster: player.monster,
+                character: player.character,
                 bot: Boolean(player.client.bot),
                 x: Math.round(player.x),
                 y: Math.round(player.y),
@@ -323,6 +344,7 @@ export function createGuangbooRealtime(server, store) {
                 ultimateHits: Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0),
                 ultimateRequired: ULTIMATE_HITS_REQUIRED,
                 ultimateReady: Boolean(player.ultimateReady),
+                slowedUntil: player.slowedUntil || 0,
                 alive: player.alive,
                 kills: player.kills,
                 disconnected: player.disconnected
@@ -340,6 +362,13 @@ export function createGuangbooRealtime(server, store) {
                 maxDistance: Math.round(projectile.maxDistance ?? PROJECTILE_RANGE),
                 kind: projectile.kind || 'normal',
                 radius: Math.round(projectile.radius || 8)
+            })),
+            slimeTrails: match.slimeTrails.map(trail => ({
+                id: trail.id, ownerId: trail.ownerId, x: Math.round(trail.x), y: Math.round(trail.y), radius: trail.radius
+            })),
+            summons: match.summons.map(summon => ({
+                id: summon.id, ownerId: summon.ownerId, kind: summon.kind, x: Math.round(summon.x), y: Math.round(summon.y),
+                health: Math.max(0, Math.round(summon.health)), maxHealth: summon.maxHealth, radius: summon.radius
             })),
             map: match.map,
             aliveCount: [...match.players.values()].filter(player => player.alive).length
@@ -431,6 +460,80 @@ export function createGuangbooRealtime(server, store) {
         if (player.health >= PLAYER_MAX_HEALTH) player.lastRegenAt = now;
     }
 
+    function isSlime(player) {
+        return player?.character === 'slime';
+    }
+
+    function applySlow(player, now, duration = SLOW_DURATION_MS) {
+        player.slowedUntil = Math.max(player.slowedUntil || 0, now + duration);
+    }
+
+    function isOnEnemySlimeTrail(match, player, now) {
+        return match.slimeTrails.some(trail =>
+            trail.ownerId !== player.id &&
+            trail.expiresAt > now &&
+            Math.hypot(player.x - trail.x, player.y - trail.y) <= trail.radius + 20
+        );
+    }
+
+    function dropSlimeTrail(match, player, now) {
+        if (!isSlime(player) || now - (player.lastSlimeTrailAt || 0) < SLIME_TRAIL_INTERVAL_MS) return;
+        player.lastSlimeTrailAt = now;
+        match.slimeTrails.push({
+            id: `${match.id}-st${match.nextSlimeTrailId++}`,
+            ownerId: player.id,
+            x: player.x,
+            y: player.y,
+            radius: SLIME_TRAIL_RADIUS,
+            expiresAt: now + SLIME_TRAIL_MS
+        });
+    }
+
+    function spawnBabySlimes(match, player, count, now) {
+        const total = Math.max(1, Math.min(ULTIMATE_HITS_REQUIRED, count));
+        for (let index = 0; index < total; index += 1) {
+            const angle = (Math.PI * 2 * index) / total;
+            match.summons.push({
+                id: `${match.id}-bs${match.nextSummonId++}`,
+                kind: 'babySlime',
+                ownerId: player.id,
+                x: player.x + Math.cos(angle) * 28,
+                y: player.y + Math.sin(angle) * 28,
+                health: BABY_SLIME_HEALTH,
+                maxHealth: BABY_SLIME_HEALTH,
+                radius: BABY_SLIME_RADIUS,
+                expiresAt: now + BABY_SLIME_LIFETIME_MS
+            });
+        }
+    }
+
+    function stepSummons(match, now, dt) {
+        const survivors = [];
+        match.summons.forEach(summon => {
+            if (summon.health <= 0 || summon.expiresAt <= now) return;
+            const target = [...match.players.values()]
+                .filter(player => player.alive && player.id !== summon.ownerId)
+                .sort((a, b) => Math.hypot(a.x - summon.x, a.y - summon.y) - Math.hypot(b.x - summon.x, b.y - summon.y))[0];
+            if (target) {
+                const dx = target.x - summon.x;
+                const dy = target.y - summon.y;
+                const length = Math.hypot(dx, dy) || 1;
+                summon.x += (dx / length) * BABY_SLIME_SPEED * dt;
+                summon.y += (dy / length) * BABY_SLIME_SPEED * dt;
+                if (Math.hypot(target.x - summon.x, target.y - summon.y) <= 22 + summon.radius) {
+                    const owner = match.players.get(summon.ownerId);
+                    target.health -= BABY_SLIME_DAMAGE;
+                    applySlow(target, now);
+                    resetRegenTimer(target, now);
+                    if (target.health <= 0) eliminatePlayer(match, target, owner);
+                    return;
+                }
+            }
+            survivors.push(summon);
+        });
+        match.summons = survivors;
+    }
+
     function queueShotInput(player, aim, now = Date.now()) {
         reloadAmmo(player, now);
         if (player.ammo <= player.queuedShotAims.length) return;
@@ -457,9 +560,10 @@ export function createGuangbooRealtime(server, store) {
         player.lastAmmoReloadAt = now;
         player.lastShotAt = now;
         resetRegenTimer(player, now);
+        const slimeShot = isSlime(player);
         match.projectiles.push({
             id: `${match.id}-p${match.nextProjectileId++}`,
-            kind: 'normal',
+            kind: slimeShot ? 'slime' : 'normal',
             ownerId: player.id,
             x: spawnX,
             y: spawnY,
@@ -469,8 +573,8 @@ export function createGuangbooRealtime(server, store) {
             targetY,
             vx: dx * PROJECTILE_SPEED,
             vy: dy * PROJECTILE_SPEED,
-            damage: PROJECTILE_DAMAGE,
-            radius: 8,
+            damage: slimeShot ? SLIME_PROJECTILE_DAMAGE : PROJECTILE_DAMAGE,
+            radius: slimeShot ? SLIME_PROJECTILE_RADIUS : 8,
             traveled: 0,
             maxDistance: PROJECTILE_RANGE,
             spawnedTick: match.tick
@@ -485,6 +589,15 @@ export function createGuangbooRealtime(server, store) {
 
     function spawnUltimateProjectile(match, player, now) {
         if (!player.ultimateReady) return;
+        if (isSlime(player)) {
+            const spawnCount = Math.max(1, Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0));
+            spawnBabySlimes(match, player, spawnCount, now);
+            player.ultimateHits = 0;
+            player.ultimateReady = false;
+            player.queuedUltimateAim = null;
+            resetRegenTimer(player, now);
+            return;
+        }
         const aim = player.queuedUltimateAim || player.aim;
         const aimLength = Math.hypot(aim.x, aim.y) || 1;
         const dx = aim.x / aimLength;
@@ -548,6 +661,8 @@ export function createGuangbooRealtime(server, store) {
         const now = Date.now();
         const dt = TICK_MS / 1000;
         updateBotInputs(match, now);
+        match.slimeTrails = match.slimeTrails.filter(trail => trail.expiresAt > now);
+        stepSummons(match, now, dt);
 
         match.players.forEach(player => {
             if (!player.alive || player.disconnected) return;
@@ -561,8 +676,12 @@ export function createGuangbooRealtime(server, store) {
                 player.facing = move;
             }
             reloadAmmo(player, now);
-            player.x += move.x * PLAYER_SPEED * dt;
-            player.y += move.y * PLAYER_SPEED * dt;
+            const slowed = (player.slowedUntil || 0) > now || isOnEnemySlimeTrail(match, player, now);
+            const speed = PLAYER_SPEED * (slowed ? SLOW_FACTOR : 1);
+            player.x += move.x * speed * dt;
+            player.y += move.y * speed * dt;
+            if (slowed) applySlow(player, now, 250);
+            if (Math.hypot(move.x, move.y) > 0.18) dropSlimeTrail(match, player, now);
             resolvePlayerPosition(player, match.map);
 
             if (player.queuedUltimateAim && player.ultimateReady) {
@@ -596,6 +715,18 @@ export function createGuangbooRealtime(server, store) {
             }
 
             const owner = match.players.get(projectile.ownerId);
+            const summonHit = match.summons.find(summon =>
+                summon.ownerId !== projectile.ownerId &&
+                Math.hypot(summon.x - projectile.x, summon.y - projectile.y) <= summon.radius + (projectile.radius || 8)
+            );
+            if (summonHit) {
+                summonHit.health -= projectile.damage;
+                if (summonHit.health <= 0) {
+                    match.summons = match.summons.filter(summon => summon.id !== summonHit.id);
+                }
+                return;
+            }
+
             const hit = [...match.players.values()].find(player =>
                 player.alive &&
                 player.id !== projectile.ownerId &&
@@ -604,9 +735,16 @@ export function createGuangbooRealtime(server, store) {
             if (hit) {
                 hit.health -= projectile.damage;
                 resetRegenTimer(hit, now);
-                if (projectile.kind === 'normal' && owner) {
+                if ((projectile.kind === 'normal' || projectile.kind === 'slime') && owner) {
                     owner.ultimateHits = Math.min(ULTIMATE_HITS_REQUIRED, (owner.ultimateHits || 0) + 1);
                     owner.ultimateReady = owner.ultimateHits >= ULTIMATE_HITS_REQUIRED;
+                }
+                if (projectile.kind === 'slime' && owner) {
+                    if (hit.ammo > 0) {
+                        hit.ammo = Math.max(0, hit.ammo - 1);
+                        owner.ammo = Math.min(MAX_AMMO, owner.ammo + 1);
+                    }
+                    applySlow(hit, now);
                 }
                 if (projectile.kind === 'ultimate') {
                     knockBackPlayer(match, hit, projectile);
@@ -636,20 +774,26 @@ export function createGuangbooRealtime(server, store) {
             tick: 0,
             players: new Map(),
             projectiles: [],
+            slimeTrails: [],
+            summons: [],
             map: createMap(),
             nextProjectileId: 1,
+            nextSlimeTrailId: 1,
+            nextSummonId: 1,
             timer: null
         };
 
         players.forEach((client, index) => {
             const spawn = SPAWNS[index % SPAWNS.length];
-            const monster = MONSTERS[index % MONSTERS.length];
+            const character = normalizeCharacter(client.character);
+            const monster = character === 'slime' ? CHARACTER_DEFS.slime.monster : MONSTERS[index % MONSTERS.length];
             const player = {
                 id: client.id,
                 playerDbId: client.playerDbId,
                 client,
                 nickname: client.nickname,
                 monster,
+                character,
                 x: spawn.x,
                 y: spawn.y,
                 aim: { x: index % 2 === 0 ? 1 : -1, y: 0 },
@@ -666,6 +810,8 @@ export function createGuangbooRealtime(server, store) {
                 lastShotAt: 0,
                 lastCombatAt: 0,
                 lastRegenAt: Date.now(),
+                slowedUntil: 0,
+                lastSlimeTrailAt: 0,
                 queuedShotAims: [],
                 queuedUltimateAim: null,
                 ultimateHits: 0,
@@ -690,6 +836,7 @@ export function createGuangbooRealtime(server, store) {
                 id: player.id,
                 nickname: player.nickname,
                 monster: player.monster,
+                character: player.character,
                 bot: Boolean(player.client.bot),
                 x: player.x,
                 y: player.y,
@@ -703,7 +850,8 @@ export function createGuangbooRealtime(server, store) {
                 maxAmmo: MAX_AMMO,
                 ultimateHits: player.ultimateHits,
                 ultimateRequired: ULTIMATE_HITS_REQUIRED,
-                ultimateReady: player.ultimateReady
+                ultimateReady: player.ultimateReady,
+                slowedUntil: player.slowedUntil
             }))
         };
         match.players.forEach(player => sendJson(player.client.socket, { ...startPayload, playerId: player.id }));
@@ -728,6 +876,7 @@ export function createGuangbooRealtime(server, store) {
             playerDbId: player.id,
             nickname: player.nickname,
             mode: mode.key,
+            character: 'monster',
             bot: true,
             match: null,
             nextFireAt: Date.now() + 500,
@@ -791,6 +940,7 @@ export function createGuangbooRealtime(server, store) {
             client.playerDbId = player.id;
             client.nickname = player.nickname;
             client.mode = mode.key;
+            client.character = normalizeCharacter(message.character);
             removeFromQueue(client);
             if (!client.match) queueFor(mode.key).push(client);
             if (message.fillWithBots) {
@@ -821,6 +971,7 @@ export function createGuangbooRealtime(server, store) {
                 move: clampUnitVector(message.move),
                 aim,
                 firing: false,
+                ultimate: false,
                 seq: Number(message.seq) || 0
             };
             if ((message.firing || message.ultimate) && client.match?.status === 'active') {
