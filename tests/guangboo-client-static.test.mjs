@@ -156,6 +156,7 @@ test('guangboo supports charged wall-breaking homing ultimate attacks', () => {
     assert.match(runtimeSource, /destroyWallHitByProjectile\(match\.map, projectile\)/);
     assert.match(runtimeSource, /function knockBackPlayer\(match, player, projectile\)/);
     assert.match(runtimeSource, /owner\.ultimateHits = Math\.min\(ULTIMATE_HITS_REQUIRED, \(owner\.ultimateHits \|\| 0\) \+ 1\)/);
+    assert.match(runtimeSource, /syncUltimateReady\(owner\)/);
     assert.match(runtimeSource, /if \(message\.ultimate\) queueUltimateInput\(player, aim\)/);
 });
 
@@ -185,7 +186,16 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /function dropSlimeTrail\(match, player, now\)/);
     assert.match(runtimeSource, /function isOnEnemySlimeTrail\(match, player, now\)/);
     assert.match(runtimeSource, /function spawnBabySlimes\(match, player, count, now\)/);
+    assert.match(runtimeSource, /function isSummonBlocked\(map, x, y, radius = BABY_SLIME_RADIUS\)/);
+    assert.match(runtimeSource, /function moveSummonTowardTarget\(match, summon, target, dt\)/);
+    assert.match(runtimeSource, /filter\(option => !isSummonBlocked\(match\.map, option\.x, option\.y, summon\.radius\)\)/);
+    assert.match(runtimeSource, /moveSummonTowardTarget\(match, summon, target, dt\)/);
     assert.match(runtimeSource, /function stepSummons\(match, now, dt\)/);
+    assert.match(runtimeSource, /function ultimateRequiredFor\(player\)/);
+    assert.match(runtimeSource, /return isSlime\(player\) \? 1 : ULTIMATE_HITS_REQUIRED/);
+    assert.match(runtimeSource, /function hasUsableUltimate\(player\)/);
+    assert.match(runtimeSource, /return isSlime\(player\) \? hits > 0 : hits >= ULTIMATE_HITS_REQUIRED/);
+    assert.match(runtimeSource, /syncUltimateReady\(player\);\n\s*if \(!player\.ultimateReady\) return false/);
     assert.match(runtimeSource, /kind: slimeShot \? 'slime' : 'normal'/);
     assert.match(runtimeSource, /damage: slimeShot \? SLIME_PROJECTILE_DAMAGE : PROJECTILE_DAMAGE/);
     assert.match(runtimeSource, /hit\.ammo = Math\.max\(0, hit\.ammo - 1\)/);
