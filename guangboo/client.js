@@ -54,8 +54,8 @@
         projectiles: [],
         lastResults: [],
         inputSeq: 0,
-        leftStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, startX: 0, startY: 0, moved: false, instantAim: null },
-        rightStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, startX: 0, startY: 0, moved: false, instantAim: null },
+        leftStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, startX: 0, startY: 0, moved: false, shotQueued: false, instantAim: null },
+        rightStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, startX: 0, startY: 0, moved: false, shotQueued: false, instantAim: null },
         mouseAim: { active: false, x: 1, y: 0 },
         lastAim: { x: 1, y: 0 },
         queuedShots: [],
@@ -744,6 +744,7 @@
             stick.startX = 0;
             stick.startY = 0;
             stick.moved = false;
+            stick.shotQueued = false;
             stick.instantAim = null;
             element.classList.remove('is-floating-stick', floatingClass);
             element.style.left = '';
@@ -782,11 +783,17 @@
             return nearestOpponentAim() || localPlayerAim() || state.lastAim;
         }
 
+        function queueReleaseShotOnce() {
+            if (!isRightStick || stick.shotQueued) return;
+            stick.shotQueued = true;
+            queueShot(shotAimForRelease());
+        }
+
         function finish(event, shouldShoot) {
             if (!isPointerForThisStick(event)) return;
             event.preventDefault();
             if (isRightStick && shouldShoot) {
-                queueShot(shotAimForRelease());
+                queueReleaseShotOnce();
             }
             releasePointerCapture(event.pointerId);
             reset();
@@ -796,15 +803,11 @@
             finish(event, true);
         }
 
-        function finishWithoutShot(event) {
-            finish(event, false);
-        }
-
         function finishTouch(event) {
             if (window.PointerEvent || !stick.active) return;
             event.preventDefault();
             if (isRightStick) {
-                queueShot(shotAimForRelease());
+                queueReleaseShotOnce();
             }
             reset();
         }
@@ -832,7 +835,7 @@
         });
         window.addEventListener('pointerup', finishAndShoot, { capture: true });
         window.addEventListener('pointercancel', finishAndShoot, { capture: true });
-        elements.match.addEventListener('lostpointercapture', finishWithoutShot);
+        elements.match.addEventListener('lostpointercapture', finishAndShoot);
         elements.match.addEventListener('touchend', finishTouch, { passive: false });
         elements.match.addEventListener('touchcancel', finishTouch, { passive: false });
         element.addEventListener('contextmenu', event => event.preventDefault());

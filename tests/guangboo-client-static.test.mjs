@@ -51,7 +51,7 @@ test('guangboo attack input fires once after aiming is released', () => {
     assert.match(clientSource, /function queueShot\(aim\)/);
     assert.match(clientSource, /function finishAndShoot\(event\)/);
     assert.match(clientSource, /window\.addEventListener\('pointerup', finishAndShoot, \{ capture: true \}\)/);
-    assert.match(clientSource, /lostpointercapture/);
+    assert.match(clientSource, /lostpointercapture', finishAndShoot/);
     assert.match(clientSource, /window\.addEventListener\('pointercancel', finishAndShoot, \{ capture: true \}\)/);
     assert.match(clientSource, /touchend', finishTouch/);
     assert.match(clientSource, /touchcancel', finishTouch/);
@@ -113,8 +113,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile8/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile8/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile9/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile9/);
 });
 
 
@@ -137,6 +137,12 @@ test('guangboo flushes release shots immediately instead of waiting for the next
     assert.match(clientSource, /function sendQueuedShotNow\(\)/);
     assert.match(clientSource, /send\(currentInput\(\)\)/);
     assert.match(clientSource, /state\.queuedShots\.push\(normalized\);\n\s*sendQueuedShotNow\(\)/);
+    assert.match(clientSource, /shotQueued: false/);
+    assert.match(clientSource, /function queueReleaseShotOnce\(\)/);
+    assert.match(clientSource, /if \(!isRightStick \|\| stick\.shotQueued\) return;/);
+    assert.match(clientSource, /stick\.shotQueued = true;\n\s*queueShot\(shotAimForRelease\(\)\)/);
+    assert.match(clientSource, /elements\.match\.addEventListener\('lostpointercapture', finishAndShoot\)/);
+    assert.doesNotMatch(clientSource, /finishWithoutShot/);
 });
 
 test('guangboo auto-aims at the nearest opponent for tap-only attacks', () => {
