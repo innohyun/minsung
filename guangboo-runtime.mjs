@@ -16,7 +16,8 @@ const PROJECTILE_DAMAGE = 1200;
 const MAX_AMMO = 3;
 const AMMO_RELOAD_MS = 1400;
 const REGEN_DELAY_MS = 3000;
-const REGEN_PER_SECOND = 500;
+const REGEN_TICK_MS = 1000;
+const REGEN_PER_TICK = 500;
 const MAX_PENDING_SHOTS = 3;
 const MAP = {
     width: 960,
@@ -358,6 +359,29 @@ export function createGuangbooRealtime(server, store) {
         if (player.ammo >= MAX_AMMO) player.lastAmmoReloadAt = now;
     }
 
+    function resetRegenTimer(player, now) {
+        player.lastCombatAt = now;
+        player.lastRegenAt = now + REGEN_DELAY_MS;
+    }
+
+    function applyPassiveRegen(player, now) {
+        if (player.health >= PLAYER_MAX_HEALTH) {
+            player.lastRegenAt = now;
+            return;
+        }
+        const readyAt = player.lastCombatAt + REGEN_DELAY_MS;
+        if (now < readyAt) return;
+        if (!Number.isFinite(player.lastRegenAt) || player.lastRegenAt < readyAt) {
+            player.lastRegenAt = readyAt;
+        }
+        const elapsed = now - player.lastRegenAt;
+        if (elapsed < REGEN_TICK_MS) return;
+        const regenTicks = Math.floor(elapsed / REGEN_TICK_MS);
+        player.health = Math.min(PLAYER_MAX_HEALTH, player.health + regenTicks * REGEN_PER_TICK);
+        player.lastRegenAt += regenTicks * REGEN_TICK_MS;
+        if (player.health >= PLAYER_MAX_HEALTH) player.lastRegenAt = now;
+    }
+
     function queueShotInput(player, aim, now = Date.now()) {
         reloadAmmo(player, now);
         if (player.ammo <= player.queuedShotAims.length) return;
@@ -382,7 +406,7 @@ export function createGuangbooRealtime(server, store) {
         player.ammo = Math.max(0, player.ammo - 1);
         player.lastAmmoReloadAt = now;
         player.lastShotAt = now;
-        player.lastCombatAt = now;
+        resetRegenTimer(player, now);
         match.projectiles.push({
             id: `${match.id}-p${match.nextProjectileId++}`,
             ownerId: player.id,
@@ -423,9 +447,7 @@ export function createGuangbooRealtime(server, store) {
             if (player.queuedShotAims.length && player.ammo > 0) {
                 spawnProjectile(match, player, now);
             }
-            if (player.health < PLAYER_MAX_HEALTH && now - player.lastCombatAt >= REGEN_DELAY_MS) {
-                player.health = Math.min(PLAYER_MAX_HEALTH, player.health + REGEN_PER_SECOND * dt);
-            }
+            applyPassiveRegen(player, now);
         });
 
         const projectiles = [];
@@ -451,7 +473,7 @@ export function createGuangbooRealtime(server, store) {
             );
             if (hit) {
                 hit.health -= projectile.damage;
-                hit.lastCombatAt = now;
+                resetRegenTimer(hit, now);
                 if (hit.health <= 0) {
                     eliminatePlayer(match, hit, owner);
                 }
@@ -504,6 +526,7 @@ export function createGuangbooRealtime(server, store) {
                 deaths: 0,
                 lastShotAt: 0,
                 lastCombatAt: 0,
+                lastRegenAt: Date.now(),
                 queuedShotAims: [],
                 endedAtMs: null,
                 placement: 0

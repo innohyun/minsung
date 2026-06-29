@@ -140,11 +140,16 @@ test('guangboo uses 6000 hp, 1200 damage, slower movement, ammo reload, and pass
     assert.match(runtimeSource, /const MAX_AMMO = 3/);
     assert.match(runtimeSource, /const AMMO_RELOAD_MS = 1400/);
     assert.match(runtimeSource, /const REGEN_DELAY_MS = 3000/);
-    assert.match(runtimeSource, /const REGEN_PER_SECOND = 500/);
+    assert.match(runtimeSource, /const REGEN_TICK_MS = 1000/);
+    assert.match(runtimeSource, /const REGEN_PER_TICK = 500/);
+    assert.match(runtimeSource, /function resetRegenTimer\(player, now\)/);
+    assert.match(runtimeSource, /function applyPassiveRegen\(player, now\)/);
+    assert.match(runtimeSource, /const regenTicks = Math\.floor\(elapsed \/ REGEN_TICK_MS\)/);
+    assert.match(runtimeSource, /player\.health = Math\.min\(PLAYER_MAX_HEALTH, player\.health \+ regenTicks \* REGEN_PER_TICK\)/);
+    assert.doesNotMatch(runtimeSource, /REGEN_PER_SECOND \* dt/);
     assert.match(runtimeSource, /health: PLAYER_MAX_HEALTH/);
     assert.match(runtimeSource, /ammo: MAX_AMMO/);
     assert.match(runtimeSource, /player\.ammo = Math\.max\(0, player\.ammo - 1\)/);
-    assert.match(runtimeSource, /player\.health = Math\.min\(PLAYER_MAX_HEALTH, player\.health \+ REGEN_PER_SECOND \* dt\)/);
 });
 
 test('guangboo uses Brawl-style half-screen floating touch sticks', () => {
