@@ -53,8 +53,17 @@ test('guangboo attack input fires once after aiming is released', () => {
     assert.match(clientSource, /element\.addEventListener\('pointerup', finishAndShoot\)/);
     assert.match(clientSource, /lostpointercapture/);
     assert.match(clientSource, /pointercancel', finishAndShoot/);
+    assert.match(clientSource, /touchend', finishAndShoot/);
+    assert.match(clientSource, /touchcancel', finishAndShoot/);
     assert.match(clientSource, /let firing = false/);
     assert.match(clientSource, /state\.queuedShots\.shift\(\)/);
+});
+
+test('guangboo right-stick aim updates immediately from the touch direction', () => {
+    assert.match(clientSource, /const fallbackAim = key === 'rightStick' \? state\.lastAim/);
+    assert.match(clientSource, /const nx = length > 3 \? dx \/ length : fallbackAim\.x/);
+    assert.match(clientSource, /const ny = length > 3 \? dy \/ length : fallbackAim\.y/);
+    assert.match(clientSource, /state\.lastAim = normalizeAim\(stick\)/);
 });
 
 test('guangboo aim guide is a visible semi-transparent local guide', () => {
@@ -81,8 +90,11 @@ test('guangboo suppresses mobile double-tap zoom during matches', () => {
 
 test('guangboo projectiles are capped to the aim range on client and server snapshots', () => {
     assert.match(clientSource, /const PROJECTILE_RANGE = 230/);
+    assert.match(clientSource, /projectileMemory: new Map\(\)/);
+    assert.match(clientSource, /function rememberAndFilterProjectiles\(projectiles\)/);
     assert.match(clientSource, /function isProjectileWithinRange\(projectile\)/);
-    assert.match(clientSource, /filter\(isProjectileWithinRange\)/);
+    assert.match(clientSource, /rememberAndFilterProjectiles\(message\.projectiles \|\| \[\]\)/);
+    assert.match(clientSource, /performance\.now\(\) - memory\.firstSeenAt < 1400/);
     assert.match(runtimeSource, /const PROJECTILE_RANGE = 230/);
     assert.match(runtimeSource, /function spawnProjectile\(match, player, now\)/);
     assert.match(runtimeSource, /targetX = spawnX \+ dx \* PROJECTILE_RANGE/);
@@ -94,6 +106,6 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile2/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile2/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile3/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile3/);
 });

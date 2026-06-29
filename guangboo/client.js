@@ -59,6 +59,7 @@
         mouseAim: { active: false, x: 1, y: 0 },
         lastAim: { x: 1, y: 0 },
         queuedShots: [],
+        projectileMemory: new Map(),
         lastTouchEndAt: 0,
         gameFullscreen: false,
         viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 }
@@ -74,6 +75,7 @@
         }
         if (name !== 'match') {
             state.queuedShots = [];
+            state.projectileMemory.clear();
             state.mouseAim.active = false;
             exitGameFullscreen();
         }
@@ -245,6 +247,10 @@
             state.playerId = message.playerId;
             state.map = message.map || WORLD_FALLBACK;
             state.players = message.players || [];
+            const localPlayer = state.players.find(player => player.id === state.playerId);
+            if (localPlayer) {
+                state.lastAim = normalizeAim({ x: localPlayer.aimX ?? localPlayer.aim?.x ?? 1, y: localPlayer.aimY ?? localPlayer.aim?.y ?? 0 });
+            }
             state.projectiles = [];
             elements.connection.textContent = message.modeLabel || '매치 진행';
             setScreen('match');
@@ -254,7 +260,7 @@
 
         if (message.type === 'state') {
             state.players = message.players || [];
-            state.projectiles = (message.projectiles || []).filter(isProjectileWithinRange);
+            state.projectiles = rememberAndFilterProjectiles(message.projectiles || []);
             updateHud();
             return;
         }
@@ -571,6 +577,31 @@
         ctx.restore();
     }
 
+    function rememberAndFilterProjectiles(projectiles) {
+        const activeIds = new Set(projectiles.map(projectile => projectile.id));
+        for (const id of state.projectileMemory.keys()) {
+            if (!activeIds.has(id)) state.projectileMemory.delete(id);
+        }
+        return projectiles.filter(projectile => {
+            if (!projectile.id) return isProjectileWithinRange(projectile);
+            let memory = state.projectileMemory.get(projectile.id);
+            if (!memory) {
+                memory = {
+                    startX: Number.isFinite(projectile.startX) ? projectile.startX : projectile.x,
+                    startY: Number.isFinite(projectile.startY) ? projectile.startY : projectile.y,
+                    firstSeenAt: performance.now()
+                };
+                state.projectileMemory.set(projectile.id, memory);
+            }
+            projectile.startX = Number.isFinite(projectile.startX) ? projectile.startX : memory.startX;
+            projectile.startY = Number.isFinite(projectile.startY) ? projectile.startY : memory.startY;
+            projectile.maxDistance = Number.isFinite(projectile.maxDistance) ? projectile.maxDistance : PROJECTILE_RANGE;
+            const visible = isProjectileWithinRange(projectile) && performance.now() - memory.firstSeenAt < 1400;
+            if (!visible) state.projectileMemory.delete(projectile.id);
+            return visible;
+        });
+    }
+
     function isProjectileWithinRange(projectile) {
         const maxDistance = Number(projectile.maxDistance) || PROJECTILE_RANGE;
         if (Number.isFinite(projectile.traveled) && projectile.traveled > maxDistance) return false;
@@ -625,13 +656,14 @@
             const dx = pointer.clientX - cx;
             const dy = pointer.clientY - cy;
             const length = Math.hypot(dx, dy);
-            const clamped = Math.min(limit, length);
-            const nx = length > 0 ? dx / length : 0;
-            const ny = length > 0 ? dy / length : 0;
+            const fallbackAim = key === 'rightStick' ? state.lastAim : { x: 0, y: 0 };
+            const nx = length > 3 ? dx / length : fallbackAim.x;
+            const ny = length > 3 ? dy / length : fallbackAim.y;
+            const clamped = length > 3 ? Math.min(limit, length) : Math.min(limit, limit * 0.42);
             stick.x = nx * (clamped / limit);
             stick.y = ny * (clamped / limit);
             thumb.style.transform = `translate(calc(-50% + ${nx * clamped}px), calc(-50% + ${ny * clamped}px))`;
-            if (key === 'rightStick' && Math.hypot(stick.x, stick.y) > 0.12) {
+            if (key === 'rightStick') {
                 state.lastAim = normalizeAim(stick);
             }
         }
@@ -673,6 +705,8 @@
         element.addEventListener('pointerup', finishAndShoot);
         element.addEventListener('lostpointercapture', finishAndShoot);
         element.addEventListener('pointercancel', finishAndShoot);
+        element.addEventListener('touchend', finishAndShoot, { passive: false });
+        element.addEventListener('touchcancel', finishAndShoot, { passive: false });
         element.addEventListener('contextmenu', event => event.preventDefault());
         element.addEventListener('selectstart', event => event.preventDefault());
     }

@@ -20,7 +20,8 @@
 - The page disables mobile double-tap/pinch zoom during matches so rapid aiming and firing cannot unexpectedly enlarge the canvas.
 - The match HTML cache-busts changed CSS/JS assets so mobile browsers pick up control fixes quickly.
 - The match view uses a canvas arena with a left movement stick and a right aim/fire stick.
-- The right stick and pointer controls hold to aim and fire one queued shot reliably on release, including cancelled/lost pointer releases and low-distance releases that fall back to the last aim direction.
+- The right aim stick immediately uses the touch direction from the stick center, falls back to the last valid direction only for near-center touches, and keeps updating the aim guide while dragged.
+- The right stick and pointer controls hold to aim and fire one queued shot reliably on release, including cancelled/lost pointer/touch releases and low-distance releases that fall back to the last aim direction.
 - If a shot is released during the fire cooldown, the server keeps that queued aim and fires it as soon as the cooldown is ready instead of dropping the shot.
 - The local player's current aim direction is shown as a visible semi-transparent guide line only while the attack/aim control is active.
 - Each monster renders an in-world health bar above its nameplate so health is visible during play.
