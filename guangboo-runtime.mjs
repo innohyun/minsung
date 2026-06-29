@@ -10,6 +10,8 @@ const MODES = {
 };
 const PROJECTILE_RANGE = 230;
 const PROJECTILE_SPEED = 570;
+const FIRE_COOLDOWN_MS = 320;
+const MAX_PENDING_SHOTS = 3;
 const MAP = {
     width: 960,
     height: 640,
@@ -334,17 +336,25 @@ export function createGuangbooRealtime(server, store) {
         }
     }
 
+    function queueShotInput(player, aim) {
+        const shotAim = clampUnitVector(aim);
+        if (Math.hypot(shotAim.x, shotAim.y) <= 0.01) return;
+        player.queuedShotAims.push(shotAim);
+        if (player.queuedShotAims.length > MAX_PENDING_SHOTS) {
+            player.queuedShotAims.splice(0, player.queuedShotAims.length - MAX_PENDING_SHOTS);
+        }
+    }
+
     function spawnProjectile(match, player, now) {
-        const aim = player.queuedShotAim || player.aim;
+        const aim = player.queuedShotAims.shift() || player.aim;
         const aimLength = Math.hypot(aim.x, aim.y) || 1;
         const dx = aim.x / aimLength;
         const dy = aim.y / aimLength;
-        const spawnX = player.x + dx * 28;
-        const spawnY = player.y + dy * 28;
+        const spawnX = Math.max(8, Math.min(MAP.width - 8, player.x + dx * 30));
+        const spawnY = Math.max(8, Math.min(MAP.height - 8, player.y + dy * 30));
         const targetX = spawnX + dx * PROJECTILE_RANGE;
         const targetY = spawnY + dy * PROJECTILE_RANGE;
         player.aim = { x: dx, y: dy };
-        player.queuedShotAim = null;
         player.lastShotAt = now;
         match.projectiles.push({
             id: `${match.id}-p${match.nextProjectileId++}`,
@@ -359,7 +369,8 @@ export function createGuangbooRealtime(server, store) {
             vy: dy * PROJECTILE_SPEED,
             damage: 28,
             traveled: 0,
-            maxDistance: PROJECTILE_RANGE
+            maxDistance: PROJECTILE_RANGE,
+            spawnedTick: match.tick
         });
     }
 
@@ -381,16 +392,17 @@ export function createGuangbooRealtime(server, store) {
             player.y += move.y * 230 * dt;
             resolvePlayerPosition(player);
 
-            if (input.firing && Math.hypot(aim.x, aim.y) > 0.01) {
-                player.queuedShotAim = aim;
-            }
-            if (player.queuedShotAim && now - player.lastShotAt >= 360) {
+            if (player.queuedShotAims.length && now - player.lastShotAt >= FIRE_COOLDOWN_MS) {
                 spawnProjectile(match, player, now);
             }
         });
 
         const projectiles = [];
         match.projectiles.forEach(projectile => {
+            if (projectile.spawnedTick === match.tick) {
+                projectiles.push(projectile);
+                return;
+            }
             const stepDistance = Math.hypot(projectile.vx * dt, projectile.vy * dt);
             const remaining = Math.max(0, projectile.maxDistance - projectile.traveled);
             const travelThisTick = Math.min(stepDistance, remaining);
@@ -455,7 +467,7 @@ export function createGuangbooRealtime(server, store) {
                 kills: 0,
                 deaths: 0,
                 lastShotAt: 0,
-                queuedShotAim: null,
+                queuedShotAims: [],
                 endedAtMs: null,
                 placement: 0
             };
@@ -548,6 +560,7 @@ export function createGuangbooRealtime(server, store) {
             const firing = distance < 560 && now >= client.nextFireAt;
             if (firing) client.nextFireAt = now + 650 + Math.floor(Math.random() * 350);
             client.input = { move, aim, firing };
+            if (firing) queueShotInput(player, aim);
         });
     }
 
@@ -590,12 +603,19 @@ export function createGuangbooRealtime(server, store) {
         }
 
         if (message.type === 'input') {
+            const aim = clampUnitVector(message.aim);
             client.input = {
                 move: clampUnitVector(message.move),
-                aim: clampUnitVector(message.aim),
-                firing: Boolean(message.firing),
+                aim,
+                firing: false,
                 seq: Number(message.seq) || 0
             };
+            if (message.firing && client.match?.status === 'active') {
+                const player = client.match.players.get(client.id);
+                if (player?.alive && !player.disconnected) {
+                    queueShotInput(player, aim);
+                }
+            }
             return;
         }
 

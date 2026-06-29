@@ -100,15 +100,21 @@ test('guangboo projectiles are capped to the aim range on client and server snap
     assert.match(runtimeSource, /function spawnProjectile\(match, player, now\)/);
     assert.match(runtimeSource, /targetX = spawnX \+ dx \* PROJECTILE_RANGE/);
     assert.match(runtimeSource, /targetY = spawnY \+ dy \* PROJECTILE_RANGE/);
-    assert.match(runtimeSource, /player\.queuedShotAim/);
+    assert.match(runtimeSource, /const FIRE_COOLDOWN_MS = 320/);
+    assert.match(runtimeSource, /const MAX_PENDING_SHOTS = 3/);
+    assert.match(runtimeSource, /function queueShotInput\(player, aim\)/);
+    assert.match(runtimeSource, /player\.queuedShotAims\.push\(shotAim\)/);
+    assert.match(runtimeSource, /const aim = player\.queuedShotAims\.shift\(\) \|\| player\.aim/);
+    assert.match(runtimeSource, /spawnedTick: match\.tick/);
+    assert.match(runtimeSource, /projectile\.spawnedTick === match\.tick/);
     assert.match(runtimeSource, /travelThisTick = Math\.min\(stepDistance, remaining\)/);
     assert.match(runtimeSource, /projectile\.traveled >= projectile\.maxDistance/);
     assert.match(runtimeSource, /maxDistance: Math\.round\(projectile\.maxDistance \?\? PROJECTILE_RANGE\)/);
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile5/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile5/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile6/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile6/);
 });
 
 
@@ -129,4 +135,12 @@ test('guangboo flushes release shots immediately instead of waiting for the next
     assert.match(clientSource, /function sendQueuedShotNow\(\)/);
     assert.match(clientSource, /send\(currentInput\(\)\)/);
     assert.match(clientSource, /state\.queuedShots\.push\(normalized\);\n\s*sendQueuedShotNow\(\)/);
+});
+
+test('guangboo server queues firing inputs so later movement packets cannot swallow shots', () => {
+    assert.match(runtimeSource, /if \(message\.firing && client\.match\?\.status === 'active'\)/);
+    assert.match(runtimeSource, /queueShotInput\(player, aim\)/);
+    assert.match(runtimeSource, /firing: false,/);
+    assert.match(runtimeSource, /player\.queuedShotAims\.length && now - player\.lastShotAt >= FIRE_COOLDOWN_MS/);
+    assert.doesNotMatch(runtimeSource, /player\.queuedShotAim\b/);
 });
