@@ -49,8 +49,10 @@ test('guangboo lobby can request bot-filled solo tests', () => {
 test('guangboo attack input fires once after aiming is released', () => {
     assert.match(clientSource, /queuedShots/);
     assert.match(clientSource, /function queueShot\(aim\)/);
-    assert.match(clientSource, /element\.addEventListener\('pointerup', event => finish\(event, true\)\)/);
+    assert.match(clientSource, /function finishAndShoot\(event\)/);
+    assert.match(clientSource, /element\.addEventListener\('pointerup', finishAndShoot\)/);
     assert.match(clientSource, /lostpointercapture/);
+    assert.match(clientSource, /pointercancel', finishAndShoot/);
     assert.match(clientSource, /let firing = false/);
     assert.match(clientSource, /state\.queuedShots\.shift\(\)/);
 });
@@ -72,6 +74,7 @@ test('guangboo renders health over monsters', () => {
 test('guangboo suppresses mobile double-tap zoom during matches', () => {
     assert.match(clientSource, /function suppressMobileZoomGestures\(\)/);
     assert.match(clientSource, /gesturestart/);
+    assert.match(clientSource, /dblclick/);
     assert.match(clientSource, /touchend/);
     assert.match(clientSource, /passive: false/);
 });
@@ -81,8 +84,16 @@ test('guangboo projectiles are capped to the aim range on client and server snap
     assert.match(clientSource, /function isProjectileWithinRange\(projectile\)/);
     assert.match(clientSource, /filter\(isProjectileWithinRange\)/);
     assert.match(runtimeSource, /const PROJECTILE_RANGE = 230/);
-    assert.match(runtimeSource, /startX: spawnX/);
-    assert.match(runtimeSource, /startY: spawnY/);
+    assert.match(runtimeSource, /function spawnProjectile\(match, player, now\)/);
+    assert.match(runtimeSource, /targetX = spawnX \+ dx \* PROJECTILE_RANGE/);
+    assert.match(runtimeSource, /targetY = spawnY \+ dy \* PROJECTILE_RANGE/);
+    assert.match(runtimeSource, /player\.queuedShotAim/);
+    assert.match(runtimeSource, /travelThisTick = Math\.min\(stepDistance, remaining\)/);
     assert.match(runtimeSource, /projectile\.traveled >= projectile\.maxDistance/);
     assert.match(runtimeSource, /maxDistance: Math\.round\(projectile\.maxDistance \?\? PROJECTILE_RANGE\)/);
+});
+
+test('guangboo busts mobile browser caches for changed controls', () => {
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile2/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile2/);
 });

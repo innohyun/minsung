@@ -576,7 +576,12 @@
         if (Number.isFinite(projectile.traveled) && projectile.traveled > maxDistance) return false;
         if (Number.isFinite(projectile.startX) && Number.isFinite(projectile.startY)) {
             const distance = Math.hypot(projectile.x - projectile.startX, projectile.y - projectile.startY);
-            return distance <= maxDistance + 8;
+            if (distance > maxDistance + 8) return false;
+        }
+        if (Number.isFinite(projectile.targetX) && Number.isFinite(projectile.targetY)) {
+            const startDistance = Math.hypot(projectile.x - projectile.startX, projectile.y - projectile.startY);
+            const targetDistance = Math.hypot(projectile.targetX - projectile.startX, projectile.targetY - projectile.startY) || maxDistance;
+            return startDistance <= targetDistance + 8;
         }
         return true;
     }
@@ -648,10 +653,16 @@
             reset();
         }
 
+        function finishAndShoot(event) {
+            finish(event, true);
+        }
+
         element.addEventListener('pointerdown', event => {
             event.preventDefault();
             stick.active = true;
-            element.setPointerCapture(event.pointerId);
+            if (element.setPointerCapture) {
+                element.setPointerCapture(event.pointerId);
+            }
             update(event);
         });
         element.addEventListener('pointermove', event => {
@@ -659,9 +670,9 @@
             event.preventDefault();
             update(event);
         });
-        element.addEventListener('pointerup', event => finish(event, true));
-        element.addEventListener('lostpointercapture', event => finish(event, true));
-        element.addEventListener('pointercancel', event => finish(event, false));
+        element.addEventListener('pointerup', finishAndShoot);
+        element.addEventListener('lostpointercapture', finishAndShoot);
+        element.addEventListener('pointercancel', finishAndShoot);
         element.addEventListener('contextmenu', event => event.preventDefault());
         element.addEventListener('selectstart', event => event.preventDefault());
     }
@@ -750,6 +761,11 @@
         document.addEventListener('gesturestart', event => event.preventDefault());
         document.addEventListener('gesturechange', event => event.preventDefault());
         document.addEventListener('gestureend', event => event.preventDefault());
+        document.addEventListener('dblclick', event => {
+            if (document.body.classList.contains('is-playing')) {
+                event.preventDefault();
+            }
+        }, { passive: false });
         document.addEventListener('touchend', event => {
             if (!document.body.classList.contains('is-playing')) return;
             const now = Date.now();

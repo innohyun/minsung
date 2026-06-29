@@ -276,6 +276,8 @@ export function createGuangbooRealtime(server, store) {
                 y: Math.round(projectile.y),
                 startX: Math.round(projectile.startX ?? projectile.x),
                 startY: Math.round(projectile.startY ?? projectile.y),
+                targetX: Math.round(projectile.targetX ?? projectile.x),
+                targetY: Math.round(projectile.targetY ?? projectile.y),
                 traveled: Math.round(projectile.traveled ?? 0),
                 maxDistance: Math.round(projectile.maxDistance ?? PROJECTILE_RANGE)
             })),
@@ -332,6 +334,35 @@ export function createGuangbooRealtime(server, store) {
         }
     }
 
+    function spawnProjectile(match, player, now) {
+        const aim = player.queuedShotAim || player.aim;
+        const aimLength = Math.hypot(aim.x, aim.y) || 1;
+        const dx = aim.x / aimLength;
+        const dy = aim.y / aimLength;
+        const spawnX = player.x + dx * 28;
+        const spawnY = player.y + dy * 28;
+        const targetX = spawnX + dx * PROJECTILE_RANGE;
+        const targetY = spawnY + dy * PROJECTILE_RANGE;
+        player.aim = { x: dx, y: dy };
+        player.queuedShotAim = null;
+        player.lastShotAt = now;
+        match.projectiles.push({
+            id: `${match.id}-p${match.nextProjectileId++}`,
+            ownerId: player.id,
+            x: spawnX,
+            y: spawnY,
+            startX: spawnX,
+            startY: spawnY,
+            targetX,
+            targetY,
+            vx: dx * PROJECTILE_SPEED,
+            vy: dy * PROJECTILE_SPEED,
+            damage: 28,
+            traveled: 0,
+            maxDistance: PROJECTILE_RANGE
+        });
+    }
+
     function stepMatch(match) {
         match.tick += 1;
         const now = Date.now();
@@ -350,35 +381,23 @@ export function createGuangbooRealtime(server, store) {
             player.y += move.y * 230 * dt;
             resolvePlayerPosition(player);
 
-            if (input.firing && now - player.lastShotAt >= 360) {
-                player.lastShotAt = now;
-                const aimLength = Math.hypot(player.aim.x, player.aim.y) || 1;
-                const dx = player.aim.x / aimLength;
-                const dy = player.aim.y / aimLength;
-                const spawnX = player.x + dx * 28;
-                const spawnY = player.y + dy * 28;
-                match.projectiles.push({
-                    id: `${match.id}-p${match.nextProjectileId++}`,
-                    ownerId: player.id,
-                    x: spawnX,
-                    y: spawnY,
-                    startX: spawnX,
-                    startY: spawnY,
-                    vx: dx * PROJECTILE_SPEED,
-                    vy: dy * PROJECTILE_SPEED,
-                    damage: 28,
-                    traveled: 0,
-                    maxDistance: PROJECTILE_RANGE
-                });
+            if (input.firing && Math.hypot(aim.x, aim.y) > 0.01) {
+                player.queuedShotAim = aim;
+            }
+            if (player.queuedShotAim && now - player.lastShotAt >= 360) {
+                spawnProjectile(match, player, now);
             }
         });
 
         const projectiles = [];
         match.projectiles.forEach(projectile => {
             const stepDistance = Math.hypot(projectile.vx * dt, projectile.vy * dt);
-            projectile.x += projectile.vx * dt;
-            projectile.y += projectile.vy * dt;
-            projectile.traveled += stepDistance;
+            const remaining = Math.max(0, projectile.maxDistance - projectile.traveled);
+            const travelThisTick = Math.min(stepDistance, remaining);
+            const velocityLength = Math.hypot(projectile.vx, projectile.vy) || 1;
+            projectile.x += (projectile.vx / velocityLength) * travelThisTick;
+            projectile.y += (projectile.vy / velocityLength) * travelThisTick;
+            projectile.traveled += travelThisTick;
             if (projectile.traveled >= projectile.maxDistance || isProjectileBlocked(projectile)) return;
 
             const owner = match.players.get(projectile.ownerId);
@@ -436,6 +455,7 @@ export function createGuangbooRealtime(server, store) {
                 kills: 0,
                 deaths: 0,
                 lastShotAt: 0,
+                queuedShotAim: null,
                 endedAtMs: null,
                 placement: 0
             };
