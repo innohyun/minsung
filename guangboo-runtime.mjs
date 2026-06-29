@@ -273,7 +273,11 @@ export function createGuangbooRealtime(server, store) {
                 id: projectile.id,
                 ownerId: projectile.ownerId,
                 x: Math.round(projectile.x),
-                y: Math.round(projectile.y)
+                y: Math.round(projectile.y),
+                startX: Math.round(projectile.startX ?? projectile.x),
+                startY: Math.round(projectile.startY ?? projectile.y),
+                traveled: Math.round(projectile.traveled ?? 0),
+                maxDistance: Math.round(projectile.maxDistance ?? PROJECTILE_RANGE)
             })),
             aliveCount: [...match.players.values()].filter(player => player.alive).length
         };
@@ -351,11 +355,15 @@ export function createGuangbooRealtime(server, store) {
                 const aimLength = Math.hypot(player.aim.x, player.aim.y) || 1;
                 const dx = player.aim.x / aimLength;
                 const dy = player.aim.y / aimLength;
+                const spawnX = player.x + dx * 28;
+                const spawnY = player.y + dy * 28;
                 match.projectiles.push({
                     id: `${match.id}-p${match.nextProjectileId++}`,
                     ownerId: player.id,
-                    x: player.x + dx * 28,
-                    y: player.y + dy * 28,
+                    x: spawnX,
+                    y: spawnY,
+                    startX: spawnX,
+                    startY: spawnY,
                     vx: dx * PROJECTILE_SPEED,
                     vy: dy * PROJECTILE_SPEED,
                     damage: 28,

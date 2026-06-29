@@ -4,6 +4,7 @@
     const STORAGE_KEY = 'guangboo_nickname';
     const MODE_STORAGE_KEY = 'guangboo_match_mode';
     const BOT_STORAGE_KEY = 'guangboo_fill_bots';
+    const PROJECTILE_RANGE = 230;
     const keys = new Set();
 
     const elements = {
@@ -57,7 +58,8 @@
         rightStick: { active: false, x: 0, y: 0 },
         mouseAim: { active: false, x: 1, y: 0 },
         lastAim: { x: 1, y: 0 },
-        pendingShotAim: null,
+        queuedShots: [],
+        lastTouchEndAt: 0,
         gameFullscreen: false,
         viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 }
     };
@@ -71,7 +73,7 @@
             enterGameFullscreen();
         }
         if (name !== 'match') {
-            state.pendingShotAim = null;
+            state.queuedShots = [];
             state.mouseAim.active = false;
             exitGameFullscreen();
         }
@@ -252,7 +254,7 @@
 
         if (message.type === 'state') {
             state.players = message.players || [];
-            state.projectiles = message.projectiles || [];
+            state.projectiles = (message.projectiles || []).filter(isProjectileWithinRange);
             updateHud();
             return;
         }
@@ -508,7 +510,7 @@
 
         const aim = currentAim(me);
         const start = worldToScreen(me.x + aim.x * 34, me.y + aim.y * 34);
-        const end = worldToScreen(me.x + aim.x * 230, me.y + aim.y * 230);
+        const end = worldToScreen(me.x + aim.x * PROJECTILE_RANGE, me.y + aim.y * PROJECTILE_RANGE);
 
         ctx.save();
         ctx.lineCap = 'round';
@@ -567,6 +569,16 @@
         roundRect(x + 0.5, y + 0.5, width - 1, height - 1, height / 2);
         ctx.stroke();
         ctx.restore();
+    }
+
+    function isProjectileWithinRange(projectile) {
+        const maxDistance = Number(projectile.maxDistance) || PROJECTILE_RANGE;
+        if (Number.isFinite(projectile.traveled) && projectile.traveled > maxDistance) return false;
+        if (Number.isFinite(projectile.startX) && Number.isFinite(projectile.startY)) {
+            const distance = Math.hypot(projectile.x - projectile.startX, projectile.y - projectile.startY);
+            return distance <= maxDistance + 8;
+        }
+        return true;
     }
 
     function drawProjectile(projectile) {
@@ -628,8 +640,10 @@
 
         function finish(event, shouldShoot) {
             event.preventDefault();
-            if (key === 'rightStick' && shouldShoot && Math.hypot(stick.x, stick.y) > 0.2) {
-                queueShot(stick);
+            if (!stick.active) return;
+            if (key === 'rightStick' && shouldShoot) {
+                const aim = Math.hypot(stick.x, stick.y) > 0.08 ? stick : state.lastAim;
+                queueShot(aim);
             }
             reset();
         }
@@ -646,6 +660,7 @@
             update(event);
         });
         element.addEventListener('pointerup', event => finish(event, true));
+        element.addEventListener('lostpointercapture', event => finish(event, true));
         element.addEventListener('pointercancel', event => finish(event, false));
         element.addEventListener('contextmenu', event => event.preventDefault());
         element.addEventListener('selectstart', event => event.preventDefault());
@@ -660,25 +675,25 @@
     }
 
     function currentAim(player) {
-        if (state.rightStick.active && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.12) {
+        if (state.rightStick.active && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.08) {
             return normalizeAim(state.rightStick);
         }
         if (state.mouseAim.active) return normalizeAim(state.mouseAim);
-        if (state.pendingShotAim) return normalizeAim(state.pendingShotAim);
+        if (state.queuedShots.length) return normalizeAim(state.queuedShots[0]);
         if (state.lastAim) return normalizeAim(state.lastAim);
         return normalizeAim({ x: player?.aimX ?? player?.aim?.x ?? 1, y: player?.aimY ?? player?.aim?.y ?? 0 });
     }
 
     function isAttackControlActive() {
-        return (state.rightStick.active && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.12)
+        return (state.rightStick.active && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.08)
             || state.mouseAim.active
-            || Boolean(state.pendingShotAim);
+            || state.queuedShots.length > 0;
     }
 
     function queueShot(aim) {
         const normalized = normalizeAim(aim);
         state.lastAim = normalized;
-        state.pendingShotAim = normalized;
+        state.queuedShots.push(normalized);
     }
 
     function currentInput() {
@@ -692,9 +707,8 @@
 
         let aim = currentAim();
         let firing = false;
-        if (state.pendingShotAim) {
-            aim = state.pendingShotAim;
-            state.pendingShotAim = null;
+        if (state.queuedShots.length) {
+            aim = state.queuedShots.shift();
             firing = true;
         }
 
@@ -730,6 +744,20 @@
             }
             state.mouseAim.active = false;
         });
+    }
+
+    function suppressMobileZoomGestures() {
+        document.addEventListener('gesturestart', event => event.preventDefault());
+        document.addEventListener('gesturechange', event => event.preventDefault());
+        document.addEventListener('gestureend', event => event.preventDefault());
+        document.addEventListener('touchend', event => {
+            if (!document.body.classList.contains('is-playing')) return;
+            const now = Date.now();
+            if (now - state.lastTouchEndAt < 320) {
+                event.preventDefault();
+            }
+            state.lastTouchEndAt = now;
+        }, { passive: false });
     }
 
     function updateMouseAim(event) {
@@ -787,6 +815,7 @@
     setupStick(elements.leftStick, 'leftStick');
     setupStick(elements.rightStick, 'rightStick');
     setupPointerAim();
+    suppressMobileZoomGestures();
 
     elements.nickname.value = localStorage.getItem(STORAGE_KEY) || '';
     elements.botToggle.checked = localStorage.getItem(BOT_STORAGE_KEY) === '1';

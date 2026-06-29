@@ -17,8 +17,9 @@
 - The server starts a `duel` match when 2 queued players are available.
 - The server starts a `survival` match when 4 queued players are available.
 - Starting matchmaking keeps the lobby scrollable; active matches use an in-page fullscreen/focus state with a top-left `×` button to exit that state instead of invoking browser fullscreen.
+- The page disables mobile double-tap/pinch zoom during matches so rapid aiming and firing cannot unexpectedly enlarge the canvas.
 - The match view uses a canvas arena with a left movement stick and a right aim/fire stick.
-- The right stick and pointer controls hold to aim and fire one shot on release.
+- The right stick and pointer controls hold to aim and fire one queued shot reliably on release, including low-distance releases that fall back to the last aim direction.
 - The local player's current aim direction is shown as a visible semi-transparent guide line only while the attack/aim control is active.
 - Each monster renders an in-world health bar above its nameplate so health is visible during play.
 - Server projectiles expire when they travel the same distance as the aim guide instead of flying until their old time limit.
