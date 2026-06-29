@@ -387,6 +387,12 @@
         return normalizeAim({ x: nearest.x - me.x, y: nearest.y - me.y });
     }
 
+    function localPlayerAim() {
+        const me = state.players.find(player => player.id === state.playerId);
+        if (!me) return null;
+        return normalizeAim({ x: me.aimX ?? me.aim?.x ?? 1, y: me.aimY ?? me.aim?.y ?? 0 });
+    }
+
     function draw() {
         requestAnimationFrame(draw);
         if (elements.match.hidden && elements.result.hidden) return;
@@ -709,8 +715,14 @@
             if (Math.hypot(pointer.clientX - stick.startX, pointer.clientY - stick.startY) > 12) {
                 stick.moved = true;
             }
+            if (isRightStick && !stick.moved) {
+                stick.x = 0;
+                stick.y = 0;
+                thumb.style.transform = 'translate(-50%, -50%)';
+                return;
+            }
             const pointerAim = aimFromPointer(pointer);
-            const fallbackAim = isRightStick ? (stick.instantAim || pointerAim || state.lastAim) : { x: 0, y: 0 };
+            const fallbackAim = isRightStick ? (pointerAim || state.lastAim) : { x: 0, y: 0 };
             const nx = length > 3 ? dx / length : fallbackAim.x;
             const ny = length > 3 ? dy / length : fallbackAim.y;
             const clamped = length > 3 ? Math.min(limit, length) : Math.min(limit, limit * 0.42);
@@ -749,7 +761,7 @@
             stick.startX = event.clientX;
             stick.startY = event.clientY;
             stick.moved = false;
-            stick.instantAim = aimFromPointer(event);
+            stick.instantAim = isRightStick ? null : aimFromPointer(event);
             moveStickBase(event.clientX, event.clientY);
             if (elements.match.setPointerCapture) {
                 elements.match.setPointerCapture(event.pointerId);
@@ -765,9 +777,9 @@
 
         function shotAimForRelease() {
             if (!isRightStick) return null;
-            if (!stick.moved) return nearestOpponentAim() || stick.instantAim || state.lastAim;
+            if (!stick.moved) return nearestOpponentAim() || localPlayerAim() || state.lastAim;
             if (Math.hypot(stick.x, stick.y) > 0.08) return stick;
-            return nearestOpponentAim() || stick.instantAim || state.lastAim;
+            return nearestOpponentAim() || localPlayerAim() || state.lastAim;
         }
 
         function finish(event, shouldShoot) {

@@ -113,8 +113,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile7/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile7/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile8/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile8/);
 });
 
 
@@ -144,7 +144,12 @@ test('guangboo auto-aims at the nearest opponent for tap-only attacks', () => {
     assert.match(clientSource, /player\.id !== state\.playerId && player\.alive !== false/);
     assert.match(clientSource, /sort\(\(a, b\) => Math\.hypot\(a\.x - me\.x, a\.y - me\.y\) - Math\.hypot\(b\.x - me\.x, b\.y - me\.y\)\)/);
     assert.match(clientSource, /function shotAimForRelease\(\)/);
-    assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| stick\.instantAim \|\| state\.lastAim/);
+    assert.match(clientSource, /function localPlayerAim\(\)/);
+    assert.match(clientSource, /stick\.instantAim = isRightStick \? null : aimFromPointer\(event\)/);
+    assert.match(clientSource, /if \(isRightStick && !stick\.moved\) \{/);
+    assert.match(clientSource, /thumb\.style\.transform = 'translate\(-50%, -50%\)';\n\s*return;/);
+    assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| localPlayerAim\(\) \|\| state\.lastAim/);
+    assert.doesNotMatch(clientSource, /stick\.instantAim \|\| pointerAim/);
     assert.match(clientSource, /stick\.moved = false/);
     assert.match(clientSource, /Math\.hypot\(pointer\.clientX - stick\.startX, pointer\.clientY - stick\.startY\) > 12/);
 });
