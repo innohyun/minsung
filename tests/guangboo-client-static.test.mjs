@@ -84,11 +84,17 @@ test('guangboo renders health over monsters', () => {
     assert.match(clientSource, /ctx\.fillText\(String\(health\), point\.x, y \+ height \/ 2\)/);
 });
 
-test('guangboo draws a brawl-style ammo hud', () => {
-    assert.match(clientSource, /function drawAmmoHud\(\)/);
-    assert.match(clientSource, /drawAmmoHud\(\)/);
-    assert.match(clientSource, /const maxAmmo = Number\(me\.maxAmmo\) \|\| 3/);
-    assert.match(clientSource, /ctx\.fillText\('AMMO'/);
+test('guangboo draws brawl-style ammo under each player health bar', () => {
+    assert.match(clientSource, /function drawPlayerAmmoBar\(player, point, barY, barHeight, barWidth\)/);
+    assert.match(clientSource, /drawPlayerAmmoBar\(player, point, y, height, width\)/);
+    assert.match(clientSource, /const maxAmmo = Number\(player\.maxAmmo\) \|\| 3/);
+    assert.doesNotMatch(clientSource, /drawAmmoHud\(\);/);
+});
+
+test('guangboo orders player name, health bar, and ammo above the monster', () => {
+    assert.match(clientSource, /const nameY = point\.y - radius - 58 \* state\.viewport\.scale/);
+    assert.match(clientSource, /const y = point\.y - radius - 36 \* state\.viewport\.scale/);
+    assert.match(clientSource, /const y = barY \+ barHeight \+ Math\.max\(3, 4 \* state\.viewport\.scale\)/);
 });
 
 test('guangboo suppresses mobile double-tap zoom during matches', () => {
@@ -122,8 +128,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile10/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile10/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile11/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile11/);
 });
 
 

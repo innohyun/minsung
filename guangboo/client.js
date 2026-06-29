@@ -406,7 +406,6 @@
         drawLocalAimGuide();
         state.projectiles.forEach(drawProjectile);
         state.players.forEach(drawMonster);
-        drawAmmoHud();
     }
 
     function drawArenaBackdrop(width, height) {
@@ -567,19 +566,41 @@
         ctx.fillStyle = 'rgba(8, 13, 10, 0.72)';
         const text = player.nickname || 'Monster';
         const width = Math.min(120, ctx.measureText(text).width + 18);
-        roundRect(point.x - width / 2, point.y - radius - 24, width, 20, 8);
+        const nameY = point.y - radius - 58 * state.viewport.scale;
+        roundRect(point.x - width / 2, nameY - 13, width, 20, 8);
         ctx.fill();
         ctx.fillStyle = '#f8fff4';
-        ctx.fillText(text, point.x, point.y - radius - 10);
+        ctx.fillText(text, point.x, nameY + 1);
         ctx.restore();
         drawPlayerHealthBar(player, point, radius);
+    }
+
+    function drawPlayerAmmoBar(player, point, barY, barHeight, barWidth) {
+        const maxAmmo = Number(player.maxAmmo) || 3;
+        const ammo = Math.max(0, Math.min(maxAmmo, Math.floor(Number(player.ammo) || 0)));
+        const gap = Math.max(2, 3 * state.viewport.scale);
+        const cellW = (barWidth - gap * (maxAmmo - 1)) / maxAmmo;
+        const cellH = Math.max(5, 6 * state.viewport.scale);
+        const startX = point.x - barWidth / 2;
+        const y = barY + barHeight + Math.max(3, 4 * state.viewport.scale);
+        ctx.save();
+        for (let i = 0; i < maxAmmo; i += 1) {
+            const x = startX + i * (cellW + gap);
+            ctx.fillStyle = i < ammo ? 'rgba(215, 242, 82, 0.92)' : 'rgba(255, 255, 255, 0.18)';
+            ctx.strokeStyle = 'rgba(8, 13, 10, 0.72)';
+            ctx.lineWidth = 1;
+            roundRect(x, y, cellW, cellH, 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+        ctx.restore();
     }
 
     function drawPlayerHealthBar(player, point, radius) {
         const width = 74 * state.viewport.scale;
         const height = Math.max(13, 15 * state.viewport.scale);
         const x = point.x - width / 2;
-        const y = point.y - radius - 42 * state.viewport.scale;
+        const y = point.y - radius - 36 * state.viewport.scale;
         const maxHealth = Number(player.maxHealth) || PLAYER_MAX_HEALTH;
         const health = Math.max(0, Math.round(Number(player.health) || 0));
         const ratio = Math.max(0, Math.min(1, health / maxHealth));
@@ -603,6 +624,7 @@
         ctx.fillStyle = '#fffdf8';
         ctx.fillText(String(health), point.x, y + height / 2);
         ctx.restore();
+        drawPlayerAmmoBar(player, point, y, height, width);
     }
 
     function drawAmmoHud() {
