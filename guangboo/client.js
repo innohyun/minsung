@@ -738,6 +738,12 @@
             update(event);
         }
 
+        function releasePointerCapture(pointerId) {
+            if (elements.match.releasePointerCapture && elements.match.hasPointerCapture?.(pointerId)) {
+                elements.match.releasePointerCapture(pointerId);
+            }
+        }
+
         function finish(event, shouldShoot) {
             if (!isPointerForThisStick(event)) return;
             event.preventDefault();
@@ -745,6 +751,7 @@
                 const aim = Math.hypot(stick.x, stick.y) > 0.08 ? stick : (stick.instantAim || state.lastAim);
                 queueShot(aim);
             }
+            releasePointerCapture(event.pointerId);
             reset();
         }
 
@@ -752,8 +759,12 @@
             finish(event, true);
         }
 
+        function finishWithoutShot(event) {
+            finish(event, false);
+        }
+
         function finishTouch(event) {
-            if (!stick.active) return;
+            if (window.PointerEvent || !stick.active) return;
             event.preventDefault();
             if (isRightStick) {
                 const aim = Math.hypot(stick.x, stick.y) > 0.08 ? stick : (stick.instantAim || state.lastAim);
@@ -779,9 +790,9 @@
             event.preventDefault();
             update(event);
         });
-        elements.match.addEventListener('pointerup', finishAndShoot);
-        elements.match.addEventListener('lostpointercapture', finishAndShoot);
-        elements.match.addEventListener('pointercancel', finishAndShoot);
+        window.addEventListener('pointerup', finishAndShoot, { capture: true });
+        window.addEventListener('pointercancel', finishAndShoot, { capture: true });
+        elements.match.addEventListener('lostpointercapture', finishWithoutShot);
         elements.match.addEventListener('touchend', finishTouch, { passive: false });
         elements.match.addEventListener('touchcancel', finishTouch, { passive: false });
         element.addEventListener('contextmenu', event => event.preventDefault());

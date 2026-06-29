@@ -50,9 +50,9 @@ test('guangboo attack input fires once after aiming is released', () => {
     assert.match(clientSource, /queuedShots/);
     assert.match(clientSource, /function queueShot\(aim\)/);
     assert.match(clientSource, /function finishAndShoot\(event\)/);
-    assert.match(clientSource, /elements\.match\.addEventListener\('pointerup', finishAndShoot\)/);
+    assert.match(clientSource, /window\.addEventListener\('pointerup', finishAndShoot, \{ capture: true \}\)/);
     assert.match(clientSource, /lostpointercapture/);
-    assert.match(clientSource, /pointercancel', finishAndShoot/);
+    assert.match(clientSource, /window\.addEventListener\('pointercancel', finishAndShoot, \{ capture: true \}\)/);
     assert.match(clientSource, /touchend', finishTouch/);
     assert.match(clientSource, /touchcancel', finishTouch/);
     assert.match(clientSource, /let firing = false/);
@@ -107,8 +107,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile4/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile4/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile5/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile5/);
 });
 
 
@@ -120,6 +120,8 @@ test('guangboo uses Brawl-style half-screen floating touch sticks', () => {
     assert.match(clientSource, /function moveStickBase\(clientX, clientY\)/);
     assert.match(clientSource, /stick\.pointerId === event\.pointerId/);
     assert.match(clientSource, /elements\.match\.setPointerCapture\(event\.pointerId\)/);
+    assert.match(clientSource, /window\.addEventListener\('pointerup', finishAndShoot, \{ capture: true \}\)/);
+    assert.match(clientSource, /if \(window\.PointerEvent \|\| !stick\.active\) return;/);
     assert.match(stylesSource, /\.stick-zone\.is-floating-stick/);
 });
 
