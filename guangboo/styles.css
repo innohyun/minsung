@@ -406,6 +406,14 @@ button:active {
     -webkit-touch-callout: none;
 }
 
+body.is-playing.is-game-fullscreen .match-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    width: 100vw;
+    height: 100dvh;
+}
+
 #gameCanvas {
     display: block;
     width: 100vw;
@@ -455,6 +463,25 @@ html:fullscreen body.is-playing #gameCanvas {
     padding: 8px 10px;
     font-size: 12px;
     font-weight: 800;
+}
+
+.fullscreen-exit {
+    position: absolute;
+    top: max(14px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    z-index: 35;
+    width: 46px;
+    height: 46px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    border-radius: 999px;
+    color: #f8fff4;
+    background: rgba(10, 18, 12, 0.76);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
+    font-size: 32px;
+    font-weight: 900;
+    line-height: 1;
 }
 
 .stick-zone {

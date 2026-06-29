@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -168,8 +168,24 @@ test('sets up admin password and allows protected entries with a session cookie'
             redirect: 'manual'
         });
         assert.equal(marioResponse.status, 200);
-        assert.match(await marioResponse.text(), /Pixel Hill Runner/);
+        const marioHtml = await marioResponse.text();
+        assert.match(marioHtml, /Pixel Hill Runner/);
+        assert.match(marioHtml, /id="stageCount"/);
     });
+});
+
+test('mario exposes fullscreen exit, attack aiming, capped projectiles, and player health bar wiring', () => {
+    const html = readFileSync(new URL('../mario/index.html', import.meta.url), 'utf8');
+    const script = readFileSync(new URL('../mario/game.js', import.meta.url), 'utf8');
+
+    assert.match(html, /id="exitFullscreenButton"/);
+    assert.match(html, /data-control="attack"/);
+    assert.match(html, /id="fullscreenButton"/);
+    assert.match(script, /function exitFullscreen\(\)/);
+    assert.match(script, /if \(input\.attack && state\.mode === "playing"\) drawAimReticle\(\)/);
+    assert.match(script, /const ATTACK_RANGE = 280/);
+    assert.match(script, /projectile\.targetX/);
+    assert.match(script, /function drawPlayerHealthBar/);
 });
 
 test('serves guangboo publicly and returns local leaderboard data', async () => {

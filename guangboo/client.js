@@ -25,6 +25,7 @@
         alive: document.getElementById('aliveReadout'),
         kills: document.getElementById('killReadout'),
         connection: document.getElementById('connectionHud'),
+        fullscreenExit: document.getElementById('fullscreenExitButton'),
         leftStick: document.getElementById('leftStick'),
         rightStick: document.getElementById('rightStick'),
         resultTitle: document.getElementById('resultTitle'),
@@ -57,6 +58,7 @@
         mouseAim: { active: false, x: 1, y: 0 },
         lastAim: { x: 1, y: 0 },
         pendingShotAim: null,
+        gameFullscreen: false,
         viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 }
     };
 
@@ -65,6 +67,9 @@
         elements.match.hidden = name !== 'match';
         elements.result.hidden = name !== 'result';
         document.body.classList.toggle('is-playing', name === 'match');
+        if (name === 'match') {
+            enterGameFullscreen();
+        }
         if (name !== 'match') {
             state.pendingShotAim = null;
             state.mouseAim.active = false;
@@ -72,19 +77,16 @@
         }
     }
 
-    function requestGameFullscreen() {
-        if (document.fullscreenElement || typeof document.documentElement.requestFullscreen !== 'function') return;
-        try {
-            const request = document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-            if (request?.catch) request.catch(() => {});
-        } catch {
-            // Some mobile browsers expose the API but reject option objects synchronously.
-        }
+    function enterGameFullscreen() {
+        state.gameFullscreen = true;
+        document.body.classList.add('is-game-fullscreen');
+        resizeCanvas();
     }
 
     function exitGameFullscreen() {
-        if (!document.fullscreenElement || typeof document.exitFullscreen !== 'function') return;
-        document.exitFullscreen().catch(() => {});
+        state.gameFullscreen = false;
+        document.body.classList.remove('is-game-fullscreen');
+        resizeCanvas();
     }
 
     function wsUrl() {
@@ -502,7 +504,7 @@
 
     function drawLocalAimGuide() {
         const me = state.players.find(player => player.id === state.playerId);
-        if (!me || !me.alive) return;
+        if (!me || !me.alive || !isAttackControlActive()) return;
 
         const aim = currentAim(me);
         const start = worldToScreen(me.x + aim.x * 34, me.y + aim.y * 34);
@@ -543,6 +545,27 @@
         ctx.fill();
         ctx.fillStyle = '#f8fff4';
         ctx.fillText(text, point.x, point.y - radius - 10);
+        ctx.restore();
+        drawPlayerHealthBar(player, point, radius);
+    }
+
+    function drawPlayerHealthBar(player, point, radius) {
+        const width = 58 * state.viewport.scale;
+        const height = Math.max(5, 7 * state.viewport.scale);
+        const x = point.x - width / 2;
+        const y = point.y - radius - 37 * state.viewport.scale;
+        const ratio = Math.max(0, Math.min(1, (Number(player.health) || 0) / 100));
+        ctx.save();
+        ctx.fillStyle = 'rgba(8, 13, 10, 0.78)';
+        roundRect(x, y, width, height, height / 2);
+        ctx.fill();
+        ctx.fillStyle = ratio <= 0.32 ? '#e05252' : '#d7f252';
+        roundRect(x + 2, y + 2, Math.max(0, (width - 4) * ratio), Math.max(1, height - 4), height / 2);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
+        ctx.lineWidth = 1;
+        roundRect(x + 0.5, y + 0.5, width - 1, height - 1, height / 2);
+        ctx.stroke();
         ctx.restore();
     }
 
@@ -613,7 +636,6 @@
 
         element.addEventListener('pointerdown', event => {
             event.preventDefault();
-            requestGameFullscreen();
             stick.active = true;
             element.setPointerCapture(event.pointerId);
             update(event);
@@ -645,6 +667,12 @@
         if (state.pendingShotAim) return normalizeAim(state.pendingShotAim);
         if (state.lastAim) return normalizeAim(state.lastAim);
         return normalizeAim({ x: player?.aimX ?? player?.aim?.x ?? 1, y: player?.aimY ?? player?.aim?.y ?? 0 });
+    }
+
+    function isAttackControlActive() {
+        return (state.rightStick.active && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.12)
+            || state.mouseAim.active
+            || Boolean(state.pendingShotAim);
     }
 
     function queueShot(aim) {
@@ -689,7 +717,6 @@
     function setupPointerAim() {
         elements.canvas.addEventListener('pointerdown', event => {
             if (event.pointerType === 'touch') return;
-            requestGameFullscreen();
             updateMouseAim(event);
             state.mouseAim.active = true;
         });
@@ -728,6 +755,7 @@
     });
 
     elements.refreshBoard.addEventListener('click', loadLeaderboard);
+    elements.fullscreenExit.addEventListener('click', exitGameFullscreen);
     elements.modeInputs.forEach(input => {
         input.addEventListener('change', () => {
             state.requestedMode = null;

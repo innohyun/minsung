@@ -6,13 +6,15 @@ const clientSource = readFileSync(new URL('../guangboo/client.js', import.meta.u
 const stylesSource = readFileSync(new URL('../guangboo/styles.css', import.meta.url), 'utf8');
 const htmlSource = readFileSync(new URL('../guangboo/index.html', import.meta.url), 'utf8');
 
-test('guangboo client requests fullscreen from active match controls', () => {
-    assert.match(clientSource, /function requestGameFullscreen\(\)/);
-    assert.match(clientSource, /requestFullscreen\(\{ navigationUI: 'hide' \}\)/);
-    assert.match(clientSource, /element\.addEventListener\('pointerdown'[\s\S]*?requestGameFullscreen\(\)/);
-    assert.match(clientSource, /elements\.canvas\.addEventListener\('pointerdown'[\s\S]*?requestGameFullscreen\(\)/);
+test('guangboo uses an in-page fullscreen mode that exits with the top x button', () => {
+    assert.match(htmlSource, /id="fullscreenExitButton"/);
+    assert.match(clientSource, /function enterGameFullscreen\(\)/);
+    assert.match(clientSource, /function exitGameFullscreen\(\)/);
+    assert.match(clientSource, /elements\.fullscreenExit\.addEventListener\('click', exitGameFullscreen\)/);
+    assert.doesNotMatch(clientSource, /requestFullscreen\(/);
+    assert.doesNotMatch(clientSource, /document\.exitFullscreen\(/);
     assert.match(clientSource, /document\.addEventListener\('fullscreenchange', resizeCanvas\)/);
-    assert.match(stylesSource, /html:fullscreen/);
+    assert.match(stylesSource, /body\.is-playing\.is-game-fullscreen \.match-screen/);
 });
 
 test('guangboo lobby keeps document scrolling enabled outside matches', () => {
@@ -52,7 +54,14 @@ test('guangboo attack input fires once after aiming is released', () => {
 
 test('guangboo aim guide is a visible semi-transparent local guide', () => {
     assert.match(clientSource, /function drawLocalAimGuide\(\)/);
+    assert.match(clientSource, /function isAttackControlActive\(\)/);
+    assert.match(clientSource, /!isAttackControlActive\(\)/);
     assert.match(clientSource, /drawLocalAimGuide\(\)/);
     assert.match(clientSource, /rgba\(5, 9, 6, 0\.62\)/);
     assert.match(clientSource, /rgba\(215, 242, 82, 0\.64\)/);
+});
+
+test('guangboo renders health over monsters', () => {
+    assert.match(clientSource, /function drawPlayerHealthBar\(player, point, radius\)/);
+    assert.match(clientSource, /drawPlayerHealthBar\(player, point, radius\)/);
 });

@@ -16,10 +16,12 @@
 - `1:1 결투` copy must make clear that the match is `1명 vs 1명` with 2 total players, not 2 players per team.
 - The server starts a `duel` match when 2 queued players are available.
 - The server starts a `survival` match when 4 queued players are available.
-- Starting matchmaking keeps the lobby scrollable; active match controls request browser fullscreen when supported.
+- Starting matchmaking keeps the lobby scrollable; active matches use an in-page fullscreen/focus state with a top-left `×` button to exit that state instead of invoking browser fullscreen.
 - The match view uses a canvas arena with a left movement stick and a right aim/fire stick.
 - The right stick and pointer controls hold to aim and fire one shot on release.
-- The local player's current aim direction is shown as a visible semi-transparent guide line from the monster.
+- The local player's current aim direction is shown as a visible semi-transparent guide line only while the attack/aim control is active.
+- Each monster renders an in-world health bar above its nameplate so health is visible during play.
+- Server projectiles expire when they travel the same distance as the aim guide instead of flying until their old time limit.
 - The lobby and result screens remain vertically scrollable on mobile and must not use the match touch-lock state; outside matches, the page keeps normal document/body scrolling with iOS momentum scrolling so the lobby and ranking can be hand-scrolled on iPhone and iPad Safari.
 - While the match screen is active, touch selection, browser scrolling, and browser zoom gestures are suppressed so the two on-screen sticks can be used reliably.
 - The result view shows placement and kills, then allows another automatic match.

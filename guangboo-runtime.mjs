@@ -8,6 +8,8 @@ const MODES = {
     duel: { key: 'duel', label: '1:1 결투', size: 2 },
     survival: { key: 'survival', label: '4인 생존전', size: 4 }
 };
+const PROJECTILE_RANGE = 230;
+const PROJECTILE_SPEED = 570;
 const MAP = {
     width: 960,
     height: 640,
@@ -354,19 +356,22 @@ export function createGuangbooRealtime(server, store) {
                     ownerId: player.id,
                     x: player.x + dx * 28,
                     y: player.y + dy * 28,
-                    vx: dx * 570,
-                    vy: dy * 570,
+                    vx: dx * PROJECTILE_SPEED,
+                    vy: dy * PROJECTILE_SPEED,
                     damage: 28,
-                    expiresAt: now + 980
+                    traveled: 0,
+                    maxDistance: PROJECTILE_RANGE
                 });
             }
         });
 
         const projectiles = [];
         match.projectiles.forEach(projectile => {
+            const stepDistance = Math.hypot(projectile.vx * dt, projectile.vy * dt);
             projectile.x += projectile.vx * dt;
             projectile.y += projectile.vy * dt;
-            if (projectile.expiresAt <= now || isProjectileBlocked(projectile)) return;
+            projectile.traveled += stepDistance;
+            if (projectile.traveled >= projectile.maxDistance || isProjectileBlocked(projectile)) return;
 
             const owner = match.players.get(projectile.ownerId);
             const hit = [...match.players.values()].find(player =>
