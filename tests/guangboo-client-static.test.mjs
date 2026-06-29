@@ -128,10 +128,25 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile12/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile12/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile13/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile13/);
 });
 
+
+test('guangboo plays Web Audio projectile sounds on spawn, flight, and impact', () => {
+    assert.match(clientSource, /audio: \{ context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 \}/);
+    assert.match(clientSource, /function audioContext\(\)/);
+    assert.match(clientSource, /window\.AudioContext \|\| window\.webkitAudioContext/);
+    assert.match(clientSource, /function unlockAudio\(\)/);
+    assert.match(clientSource, /context\.resume\(\)\.catch\(\(\) => \{\}\)/);
+    assert.match(clientSource, /function playShotSound\(\)/);
+    assert.match(clientSource, /function playProjectileFlySound\(\)/);
+    assert.match(clientSource, /function playProjectileImpactSound\(\)/);
+    assert.match(clientSource, /playShotSound\(\);\n\s*playProjectileFlySound\(\);/);
+    assert.match(clientSource, /if \(!activeIds\.has\(id\)\) \{\n\s*playProjectileImpactSound\(\);/);
+    assert.match(clientSource, /if \(!visible\) \{\n\s*playProjectileImpactSound\(\);/);
+    assert.match(clientSource, /unlockAudio\(\);\n\s*event\.preventDefault\(\);/);
+});
 
 test('guangboo uses 6000 hp, 1200 damage, slower movement, ammo reload, and passive regen', () => {
     assert.match(runtimeSource, /const PLAYER_SPEED = 190/);

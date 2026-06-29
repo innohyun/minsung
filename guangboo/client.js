@@ -61,6 +61,7 @@
         lastAim: { x: 1, y: 0 },
         queuedShots: [],
         projectileMemory: new Map(),
+        audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 },
         lastTouchEndAt: 0,
         gameFullscreen: false,
         viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 }
@@ -104,6 +105,62 @@
         if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return false;
         state.ws.send(JSON.stringify(payload));
         return true;
+    }
+
+    function audioContext() {
+        if (!state.audio.context) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return null;
+            state.audio.context = new AudioCtx();
+        }
+        return state.audio.context;
+    }
+
+    function unlockAudio() {
+        const context = audioContext();
+        if (!context) return;
+        if (context.state === 'suspended') {
+            context.resume().catch(() => {});
+        }
+        state.audio.unlocked = true;
+    }
+
+    function playTone({ frequency = 440, endFrequency = frequency, duration = 0.12, volume = 0.04, type = 'sine', delay = 0 }) {
+        if (!state.audio.unlocked) return;
+        const context = audioContext();
+        if (!context) return;
+        const start = context.currentTime + delay;
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, start);
+        oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), start + duration);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + duration + 0.02);
+    }
+
+    function playShotSound() {
+        playTone({ frequency: 780, endFrequency: 420, duration: 0.11, volume: 0.055, type: 'square' });
+        playTone({ frequency: 1180, endFrequency: 720, duration: 0.07, volume: 0.025, type: 'sine', delay: 0.015 });
+    }
+
+    function playProjectileFlySound() {
+        const now = performance.now();
+        if (now - state.audio.lastFlyAt < 65) return;
+        state.audio.lastFlyAt = now;
+        playTone({ frequency: 260, endFrequency: 620, duration: 0.32, volume: 0.018, type: 'sawtooth' });
+    }
+
+    function playProjectileImpactSound() {
+        const now = performance.now();
+        if (now - state.audio.lastImpactAt < 45) return;
+        state.audio.lastImpactAt = now;
+        playTone({ frequency: 180, endFrequency: 70, duration: 0.12, volume: 0.06, type: 'triangle' });
+        playTone({ frequency: 90, endFrequency: 45, duration: 0.08, volume: 0.035, type: 'square', delay: 0.018 });
     }
 
     function getSelectedMode() {
@@ -658,7 +715,10 @@
     function rememberAndFilterProjectiles(projectiles) {
         const activeIds = new Set(projectiles.map(projectile => projectile.id));
         for (const id of state.projectileMemory.keys()) {
-            if (!activeIds.has(id)) state.projectileMemory.delete(id);
+            if (!activeIds.has(id)) {
+                playProjectileImpactSound();
+                state.projectileMemory.delete(id);
+            }
         }
         return projectiles.filter(projectile => {
             if (!projectile.id) return isProjectileWithinRange(projectile);
@@ -670,12 +730,17 @@
                     firstSeenAt: performance.now()
                 };
                 state.projectileMemory.set(projectile.id, memory);
+                playShotSound();
+                playProjectileFlySound();
             }
             projectile.startX = Number.isFinite(projectile.startX) ? projectile.startX : memory.startX;
             projectile.startY = Number.isFinite(projectile.startY) ? projectile.startY : memory.startY;
             projectile.maxDistance = Number.isFinite(projectile.maxDistance) ? projectile.maxDistance : PROJECTILE_RANGE;
             const visible = isProjectileWithinRange(projectile) && performance.now() - memory.firstSeenAt < 1400;
-            if (!visible) state.projectileMemory.delete(projectile.id);
+            if (!visible) {
+                playProjectileImpactSound();
+                state.projectileMemory.delete(projectile.id);
+            }
             return visible;
         });
     }
@@ -818,6 +883,7 @@
 
         function begin(event) {
             if (!state.matchActive || stick.active) return;
+            unlockAudio();
             event.preventDefault();
             stick.active = true;
             stick.pointerId = event.pointerId;
@@ -976,6 +1042,7 @@
     function setupPointerAim() {
         elements.canvas.addEventListener('pointerdown', event => {
             if (event.pointerType === 'touch') return;
+            unlockAudio();
             updateMouseAim(event);
             state.mouseAim.active = true;
         });
