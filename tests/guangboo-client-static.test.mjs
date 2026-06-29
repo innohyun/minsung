@@ -113,8 +113,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile6/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile6/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile7/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile7/);
 });
 
 
@@ -126,6 +126,8 @@ test('guangboo uses Brawl-style half-screen floating touch sticks', () => {
     assert.match(clientSource, /function moveStickBase\(clientX, clientY\)/);
     assert.match(clientSource, /stick\.pointerId === event\.pointerId/);
     assert.match(clientSource, /elements\.match\.setPointerCapture\(event\.pointerId\)/);
+    assert.match(clientSource, /element\.addEventListener\('pointerdown', event => \{/);
+    assert.match(clientSource, /event\.pointerType === 'touch' \|\| !state\.matchActive \|\| stick\.active/);
     assert.match(clientSource, /window\.addEventListener\('pointerup', finishAndShoot, \{ capture: true \}\)/);
     assert.match(clientSource, /if \(window\.PointerEvent \|\| !stick\.active\) return;/);
     assert.match(stylesSource, /\.stick-zone\.is-floating-stick/);
@@ -135,6 +137,16 @@ test('guangboo flushes release shots immediately instead of waiting for the next
     assert.match(clientSource, /function sendQueuedShotNow\(\)/);
     assert.match(clientSource, /send\(currentInput\(\)\)/);
     assert.match(clientSource, /state\.queuedShots\.push\(normalized\);\n\s*sendQueuedShotNow\(\)/);
+});
+
+test('guangboo auto-aims at the nearest opponent for tap-only attacks', () => {
+    assert.match(clientSource, /function nearestOpponentAim\(\)/);
+    assert.match(clientSource, /player\.id !== state\.playerId && player\.alive !== false/);
+    assert.match(clientSource, /sort\(\(a, b\) => Math\.hypot\(a\.x - me\.x, a\.y - me\.y\) - Math\.hypot\(b\.x - me\.x, b\.y - me\.y\)\)/);
+    assert.match(clientSource, /function shotAimForRelease\(\)/);
+    assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| stick\.instantAim \|\| state\.lastAim/);
+    assert.match(clientSource, /stick\.moved = false/);
+    assert.match(clientSource, /Math\.hypot\(pointer\.clientX - stick\.startX, pointer\.clientY - stick\.startY\) > 12/);
 });
 
 test('guangboo server queues firing inputs so later movement packets cannot swallow shots', () => {

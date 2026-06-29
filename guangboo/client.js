@@ -54,8 +54,8 @@
         projectiles: [],
         lastResults: [],
         inputSeq: 0,
-        leftStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, instantAim: null },
-        rightStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, instantAim: null },
+        leftStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, startX: 0, startY: 0, moved: false, instantAim: null },
+        rightStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, startX: 0, startY: 0, moved: false, instantAim: null },
         mouseAim: { active: false, x: 1, y: 0 },
         lastAim: { x: 1, y: 0 },
         queuedShots: [],
@@ -377,6 +377,16 @@
         };
     }
 
+    function nearestOpponentAim() {
+        const me = state.players.find(player => player.id === state.playerId && player.alive !== false);
+        if (!me) return null;
+        const nearest = state.players
+            .filter(player => player.id !== state.playerId && player.alive !== false)
+            .sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0];
+        if (!nearest) return null;
+        return normalizeAim({ x: nearest.x - me.x, y: nearest.y - me.y });
+    }
+
     function draw() {
         requestAnimationFrame(draw);
         if (elements.match.hidden && elements.result.hidden) return;
@@ -696,6 +706,9 @@
             const dx = pointer.clientX - cx;
             const dy = pointer.clientY - cy;
             const length = Math.hypot(dx, dy);
+            if (Math.hypot(pointer.clientX - stick.startX, pointer.clientY - stick.startY) > 12) {
+                stick.moved = true;
+            }
             const pointerAim = aimFromPointer(pointer);
             const fallbackAim = isRightStick ? (stick.instantAim || pointerAim || state.lastAim) : { x: 0, y: 0 };
             const nx = length > 3 ? dx / length : fallbackAim.x;
@@ -716,6 +729,9 @@
             stick.y = 0;
             stick.centerX = 0;
             stick.centerY = 0;
+            stick.startX = 0;
+            stick.startY = 0;
+            stick.moved = false;
             stick.instantAim = null;
             element.classList.remove('is-floating-stick', floatingClass);
             element.style.left = '';
@@ -730,6 +746,9 @@
             event.preventDefault();
             stick.active = true;
             stick.pointerId = event.pointerId;
+            stick.startX = event.clientX;
+            stick.startY = event.clientY;
+            stick.moved = false;
             stick.instantAim = aimFromPointer(event);
             moveStickBase(event.clientX, event.clientY);
             if (elements.match.setPointerCapture) {
@@ -744,12 +763,18 @@
             }
         }
 
+        function shotAimForRelease() {
+            if (!isRightStick) return null;
+            if (!stick.moved) return nearestOpponentAim() || stick.instantAim || state.lastAim;
+            if (Math.hypot(stick.x, stick.y) > 0.08) return stick;
+            return nearestOpponentAim() || stick.instantAim || state.lastAim;
+        }
+
         function finish(event, shouldShoot) {
             if (!isPointerForThisStick(event)) return;
             event.preventDefault();
             if (isRightStick && shouldShoot) {
-                const aim = Math.hypot(stick.x, stick.y) > 0.08 ? stick : (stick.instantAim || state.lastAim);
-                queueShot(aim);
+                queueShot(shotAimForRelease());
             }
             releasePointerCapture(event.pointerId);
             reset();
@@ -767,8 +792,7 @@
             if (window.PointerEvent || !stick.active) return;
             event.preventDefault();
             if (isRightStick) {
-                const aim = Math.hypot(stick.x, stick.y) > 0.08 ? stick : (stick.instantAim || state.lastAim);
-                queueShot(aim);
+                queueShot(shotAimForRelease());
             }
             reset();
         }
@@ -783,6 +807,10 @@
 
         elements.match.addEventListener('pointerdown', event => {
             if (!shouldStartFromHalf(event)) return;
+            begin(event);
+        });
+        element.addEventListener('pointerdown', event => {
+            if (event.pointerType === 'touch' || !state.matchActive || stick.active) return;
             begin(event);
         });
         elements.match.addEventListener('pointermove', event => {
