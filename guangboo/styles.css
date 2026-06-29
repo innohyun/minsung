@@ -509,6 +509,20 @@ html:fullscreen body.is-playing #gameCanvas {
     right: max(20px, env(safe-area-inset-right));
 }
 
+
+.stick-zone.is-floating-stick {
+    transform: translate(-50%, -50%);
+    opacity: 0.96;
+}
+
+.left-stick-floating {
+    border-color: rgba(215, 242, 82, 0.34);
+}
+
+.right-stick-floating {
+    border-color: rgba(224, 82, 141, 0.38);
+}
+
 .stick-thumb {
     position: absolute;
     left: 50%;

@@ -54,8 +54,8 @@
         projectiles: [],
         lastResults: [],
         inputSeq: 0,
-        leftStick: { active: false, x: 0, y: 0 },
-        rightStick: { active: false, x: 0, y: 0 },
+        leftStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, instantAim: null },
+        rightStick: { active: false, pointerId: null, x: 0, y: 0, centerX: 0, centerY: 0, instantAim: null },
         mouseAim: { active: false, x: 1, y: 0 },
         lastAim: { x: 1, y: 0 },
         queuedShots: [],
@@ -647,39 +647,102 @@
     function setupStick(element, key) {
         const thumb = element.querySelector('.stick-thumb');
         const stick = state[key];
+        const isRightStick = key === 'rightStick';
+        const baseClass = isRightStick ? 'right-stick' : 'left-stick';
+        const floatingClass = isRightStick ? 'right-stick-floating' : 'left-stick-floating';
+
+        function isPointerForThisStick(event) {
+            return stick.active && stick.pointerId === event.pointerId;
+        }
+
+        function clampCenter(clientX, clientY) {
+            const screen = elements.match.getBoundingClientRect();
+            const size = Math.min(element.offsetWidth || 120, element.offsetHeight || 120);
+            const half = size / 2;
+            const minX = screen.left + half + 8;
+            const maxX = screen.right - half - 8;
+            const minY = screen.top + half + 8;
+            const maxY = screen.bottom - half - 8;
+            return {
+                x: Math.max(minX, Math.min(maxX, clientX)),
+                y: Math.max(minY, Math.min(maxY, clientY))
+            };
+        }
+
+        function aimFromPointer(pointer) {
+            if (!isRightStick) return null;
+            const me = state.players.find(player => player.id === state.playerId);
+            if (!me) return state.lastAim;
+            const world = screenToWorld(pointer.clientX, pointer.clientY);
+            return normalizeAim({ x: world.x - me.x, y: world.y - me.y });
+        }
+
+        function moveStickBase(clientX, clientY) {
+            const center = clampCenter(clientX, clientY);
+            stick.centerX = center.x;
+            stick.centerY = center.y;
+            element.classList.add('is-floating-stick', floatingClass);
+            element.style.left = `${center.x}px`;
+            element.style.top = `${center.y}px`;
+            element.style.right = 'auto';
+            element.style.bottom = 'auto';
+        }
 
         function update(pointer) {
             const rect = element.getBoundingClientRect();
-            const cx = rect.left + rect.width / 2;
-            const cy = rect.top + rect.height / 2;
+            const cx = stick.centerX || rect.left + rect.width / 2;
+            const cy = stick.centerY || rect.top + rect.height / 2;
             const limit = rect.width * 0.34;
             const dx = pointer.clientX - cx;
             const dy = pointer.clientY - cy;
             const length = Math.hypot(dx, dy);
-            const fallbackAim = key === 'rightStick' ? state.lastAim : { x: 0, y: 0 };
+            const pointerAim = aimFromPointer(pointer);
+            const fallbackAim = isRightStick ? (stick.instantAim || pointerAim || state.lastAim) : { x: 0, y: 0 };
             const nx = length > 3 ? dx / length : fallbackAim.x;
             const ny = length > 3 ? dy / length : fallbackAim.y;
             const clamped = length > 3 ? Math.min(limit, length) : Math.min(limit, limit * 0.42);
             stick.x = nx * (clamped / limit);
             stick.y = ny * (clamped / limit);
             thumb.style.transform = `translate(calc(-50% + ${nx * clamped}px), calc(-50% + ${ny * clamped}px))`;
-            if (key === 'rightStick') {
-                state.lastAim = normalizeAim(stick);
+            if (isRightStick) {
+                state.lastAim = normalizeAim({ x: nx, y: ny });
             }
         }
 
         function reset() {
             stick.active = false;
+            stick.pointerId = null;
             stick.x = 0;
             stick.y = 0;
+            stick.centerX = 0;
+            stick.centerY = 0;
+            stick.instantAim = null;
+            element.classList.remove('is-floating-stick', floatingClass);
+            element.style.left = '';
+            element.style.top = '';
+            element.style.right = '';
+            element.style.bottom = '';
             thumb.style.transform = 'translate(-50%, -50%)';
         }
 
-        function finish(event, shouldShoot) {
+        function begin(event) {
+            if (!state.matchActive || stick.active) return;
             event.preventDefault();
-            if (!stick.active) return;
-            if (key === 'rightStick' && shouldShoot) {
-                const aim = Math.hypot(stick.x, stick.y) > 0.08 ? stick : state.lastAim;
+            stick.active = true;
+            stick.pointerId = event.pointerId;
+            stick.instantAim = aimFromPointer(event);
+            moveStickBase(event.clientX, event.clientY);
+            if (elements.match.setPointerCapture) {
+                elements.match.setPointerCapture(event.pointerId);
+            }
+            update(event);
+        }
+
+        function finish(event, shouldShoot) {
+            if (!isPointerForThisStick(event)) return;
+            event.preventDefault();
+            if (isRightStick && shouldShoot) {
+                const aim = Math.hypot(stick.x, stick.y) > 0.08 ? stick : (stick.instantAim || state.lastAim);
                 queueShot(aim);
             }
             reset();
@@ -689,24 +752,38 @@
             finish(event, true);
         }
 
-        element.addEventListener('pointerdown', event => {
-            event.preventDefault();
-            stick.active = true;
-            if (element.setPointerCapture) {
-                element.setPointerCapture(event.pointerId);
-            }
-            update(event);
-        });
-        element.addEventListener('pointermove', event => {
+        function finishTouch(event) {
             if (!stick.active) return;
             event.preventDefault();
+            if (isRightStick) {
+                const aim = Math.hypot(stick.x, stick.y) > 0.08 ? stick : (stick.instantAim || state.lastAim);
+                queueShot(aim);
+            }
+            reset();
+        }
+
+        function shouldStartFromHalf(event) {
+            if (!state.matchActive || event.pointerType !== 'touch') return false;
+            if (event.target.closest?.('button, input, label, fieldset, .hud')) return false;
+            const screen = elements.match.getBoundingClientRect();
+            const midpoint = screen.left + screen.width / 2;
+            return isRightStick ? event.clientX >= midpoint : event.clientX < midpoint;
+        }
+
+        elements.match.addEventListener('pointerdown', event => {
+            if (!shouldStartFromHalf(event)) return;
+            begin(event);
+        });
+        elements.match.addEventListener('pointermove', event => {
+            if (!isPointerForThisStick(event)) return;
+            event.preventDefault();
             update(event);
         });
-        element.addEventListener('pointerup', finishAndShoot);
-        element.addEventListener('lostpointercapture', finishAndShoot);
-        element.addEventListener('pointercancel', finishAndShoot);
-        element.addEventListener('touchend', finishAndShoot, { passive: false });
-        element.addEventListener('touchcancel', finishAndShoot, { passive: false });
+        elements.match.addEventListener('pointerup', finishAndShoot);
+        elements.match.addEventListener('lostpointercapture', finishAndShoot);
+        elements.match.addEventListener('pointercancel', finishAndShoot);
+        elements.match.addEventListener('touchend', finishTouch, { passive: false });
+        elements.match.addEventListener('touchcancel', finishTouch, { passive: false });
         element.addEventListener('contextmenu', event => event.preventDefault());
         element.addEventListener('selectstart', event => event.preventDefault());
     }
@@ -739,10 +816,17 @@
         const normalized = normalizeAim(aim);
         state.lastAim = normalized;
         state.queuedShots.push(normalized);
+        sendQueuedShotNow();
+    }
+
+    function sendQueuedShotNow() {
+        if (!state.matchActive || !state.queuedShots.length) return false;
+        if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return false;
+        return send(currentInput());
     }
 
     function currentInput() {
-        let move = { ...state.leftStick };
+        let move = { x: state.leftStick.x, y: state.leftStick.y };
         if (!state.leftStick.active) {
             move = {
                 x: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0),

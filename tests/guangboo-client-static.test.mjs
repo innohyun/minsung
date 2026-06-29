@@ -50,20 +50,21 @@ test('guangboo attack input fires once after aiming is released', () => {
     assert.match(clientSource, /queuedShots/);
     assert.match(clientSource, /function queueShot\(aim\)/);
     assert.match(clientSource, /function finishAndShoot\(event\)/);
-    assert.match(clientSource, /element\.addEventListener\('pointerup', finishAndShoot\)/);
+    assert.match(clientSource, /elements\.match\.addEventListener\('pointerup', finishAndShoot\)/);
     assert.match(clientSource, /lostpointercapture/);
     assert.match(clientSource, /pointercancel', finishAndShoot/);
-    assert.match(clientSource, /touchend', finishAndShoot/);
-    assert.match(clientSource, /touchcancel', finishAndShoot/);
+    assert.match(clientSource, /touchend', finishTouch/);
+    assert.match(clientSource, /touchcancel', finishTouch/);
     assert.match(clientSource, /let firing = false/);
     assert.match(clientSource, /state\.queuedShots\.shift\(\)/);
 });
 
 test('guangboo right-stick aim updates immediately from the touch direction', () => {
-    assert.match(clientSource, /const fallbackAim = key === 'rightStick' \? state\.lastAim/);
+    assert.match(clientSource, /const pointerAim = aimFromPointer\(pointer\)/);
+    assert.match(clientSource, /const fallbackAim = isRightStick \? \(stick\.instantAim \|\| pointerAim \|\| state\.lastAim\)/);
     assert.match(clientSource, /const nx = length > 3 \? dx \/ length : fallbackAim\.x/);
     assert.match(clientSource, /const ny = length > 3 \? dy \/ length : fallbackAim\.y/);
-    assert.match(clientSource, /state\.lastAim = normalizeAim\(stick\)/);
+    assert.match(clientSource, /state\.lastAim = normalizeAim\(\{ x: nx, y: ny \}\)/);
 });
 
 test('guangboo aim guide is a visible semi-transparent local guide', () => {
@@ -106,6 +107,24 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile3/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile3/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile4/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile4/);
+});
+
+
+test('guangboo uses Brawl-style half-screen floating touch sticks', () => {
+    assert.match(clientSource, /function shouldStartFromHalf\(event\)/);
+    assert.match(clientSource, /event\.pointerType !== 'touch'/);
+    assert.match(clientSource, /event\.clientX >= midpoint/);
+    assert.match(clientSource, /event\.clientX < midpoint/);
+    assert.match(clientSource, /function moveStickBase\(clientX, clientY\)/);
+    assert.match(clientSource, /stick\.pointerId === event\.pointerId/);
+    assert.match(clientSource, /elements\.match\.setPointerCapture\(event\.pointerId\)/);
+    assert.match(stylesSource, /\.stick-zone\.is-floating-stick/);
+});
+
+test('guangboo flushes release shots immediately instead of waiting for the next input tick', () => {
+    assert.match(clientSource, /function sendQueuedShotNow\(\)/);
+    assert.match(clientSource, /send\(currentInput\(\)\)/);
+    assert.match(clientSource, /state\.queuedShots\.push\(normalized\);\n\s*sendQueuedShotNow\(\)/);
 });
