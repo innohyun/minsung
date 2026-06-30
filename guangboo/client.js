@@ -84,7 +84,7 @@
         audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 },
         lastTouchEndAt: 0,
         gameFullscreen: false,
-        viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 },
+        viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0, cameraX: 0, cameraY: 0, visibleWorldWidth: 1, visibleWorldHeight: 1, following: false },
         customMaps: [],
         editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), tool: 'wall' }
     };
@@ -598,36 +598,70 @@
 
     function resizeCanvas() {
         const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        const width = Math.max(1, window.innerWidth || 1);
+        const height = Math.max(1, window.innerHeight || 1);
         elements.canvas.width = Math.floor(width * dpr);
         elements.canvas.height = Math.floor(height * dpr);
         elements.canvas.style.width = `${width}px`;
         elements.canvas.style.height = `${height}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        updateViewport();
+    }
 
+    function localCameraPlayer() {
+        return state.players.find(player => player.id === state.playerId && player.alive !== false)
+            || state.players.find(player => player.id === state.playerId)
+            || null;
+    }
+
+    function shouldFollowPlayer(map) {
+        if (!state.matchActive) return false;
+        if (!localCameraPlayer()) return false;
+        return map.width > WORLD_FALLBACK.width || map.height > WORLD_FALLBACK.height;
+    }
+
+    function updateViewport() {
+        const width = Math.max(1, state.viewport.width || window.innerWidth || 1);
+        const height = Math.max(1, state.viewport.height || window.innerHeight || 1);
         const map = state.map || WORLD_FALLBACK;
-        const scale = Math.min(width / map.width, height / map.height);
+        const followPlayer = shouldFollowPlayer(map);
+        const fitScale = Math.min(width / map.width, height / map.height);
+        const defaultArenaScale = Math.min(width / WORLD_FALLBACK.width, height / WORLD_FALLBACK.height);
+        const scale = Math.max(0.05, followPlayer ? defaultArenaScale : fitScale);
+        const visibleWorldWidth = width / scale;
+        const visibleWorldHeight = height / scale;
+        const player = localCameraPlayer();
+        const targetX = player ? player.x : map.width / 2;
+        const targetY = player ? player.y : map.height / 2;
+        const canScrollX = followPlayer && map.width > visibleWorldWidth;
+        const canScrollY = followPlayer && map.height > visibleWorldHeight;
+        const cameraX = canScrollX ? Math.max(0, Math.min(map.width - visibleWorldWidth, targetX - visibleWorldWidth / 2)) : 0;
+        const cameraY = canScrollY ? Math.max(0, Math.min(map.height - visibleWorldHeight, targetY - visibleWorldHeight / 2)) : 0;
         state.viewport = {
             width,
             height,
             scale,
-            offsetX: (width - map.width * scale) / 2,
-            offsetY: (height - map.height * scale) / 2
+            offsetX: canScrollX ? 0 : (width - map.width * scale) / 2,
+            offsetY: canScrollY ? 0 : (height - map.height * scale) / 2,
+            cameraX,
+            cameraY,
+            visibleWorldWidth,
+            visibleWorldHeight,
+            following: followPlayer
         };
     }
 
     function worldToScreen(x, y) {
         return {
-            x: state.viewport.offsetX + x * state.viewport.scale,
-            y: state.viewport.offsetY + y * state.viewport.scale
+            x: state.viewport.offsetX + (x - state.viewport.cameraX) * state.viewport.scale,
+            y: state.viewport.offsetY + (y - state.viewport.cameraY) * state.viewport.scale
         };
     }
 
     function screenToWorld(x, y) {
         return {
-            x: (x - state.viewport.offsetX) / state.viewport.scale,
-            y: (y - state.viewport.offsetY) / state.viewport.scale
+            x: (x - state.viewport.offsetX) / state.viewport.scale + state.viewport.cameraX,
+            y: (y - state.viewport.offsetY) / state.viewport.scale + state.viewport.cameraY
         };
     }
 
@@ -651,6 +685,7 @@
         requestAnimationFrame(draw);
         if (elements.match.hidden && elements.result.hidden) return;
 
+        updateViewport();
         const width = state.viewport.width;
         const height = state.viewport.height;
         ctx.clearRect(0, 0, width, height);
