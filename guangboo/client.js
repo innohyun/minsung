@@ -1117,7 +1117,10 @@
         const aim = currentAim(me);
         state.lastAim = aim;
         state.queuedUltimate = true;
-        send(currentInput());
+        const sent = send(currentInput());
+        if (!sent) return false;
+        me.ultimateReady = false;
+        me.ultimateHits = 0;
         updateUltimateButton(me);
         return true;
     }

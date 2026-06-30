@@ -518,16 +518,31 @@ export function createGuangbooRealtime(server, store) {
         });
     }
 
+    function babySlimeSpawnPoint(match, player, angle, index) {
+        const distances = [34, 52, 70, 88];
+        const angleOffsets = [0, Math.PI / 5, -Math.PI / 5, Math.PI / 2, -Math.PI / 2, Math.PI];
+        for (const distance of distances) {
+            for (const offset of angleOffsets) {
+                const spawnAngle = angle + offset + index * 0.17;
+                const x = Math.max(BABY_SLIME_RADIUS, Math.min(match.map.width - BABY_SLIME_RADIUS, player.x + Math.cos(spawnAngle) * distance));
+                const y = Math.max(BABY_SLIME_RADIUS, Math.min(match.map.height - BABY_SLIME_RADIUS, player.y + Math.sin(spawnAngle) * distance));
+                if (!isSummonBlocked(match.map, x, y, BABY_SLIME_RADIUS)) return { x, y };
+            }
+        }
+        return { x: player.x, y: player.y };
+    }
+
     function spawnBabySlimes(match, player, count, now) {
         const total = Math.max(1, Math.floor(count));
         for (let index = 0; index < total; index += 1) {
             const angle = (Math.PI * 2 * index) / total;
+            const spawn = babySlimeSpawnPoint(match, player, angle, index);
             match.summons.push({
                 id: `${match.id}-bs${match.nextSummonId++}`,
                 kind: 'babySlime',
                 ownerId: player.id,
-                x: Math.max(BABY_SLIME_RADIUS, Math.min(match.map.width - BABY_SLIME_RADIUS, player.x + Math.cos(angle) * 28)),
-                y: Math.max(BABY_SLIME_RADIUS, Math.min(match.map.height - BABY_SLIME_RADIUS, player.y + Math.sin(angle) * 28)),
+                x: spawn.x,
+                y: spawn.y,
                 health: BABY_SLIME_HEALTH,
                 maxHealth: BABY_SLIME_HEALTH,
                 radius: BABY_SLIME_RADIUS,
@@ -1096,7 +1111,9 @@ export function createGuangbooRealtime(server, store) {
                 const player = client.match.players.get(client.id);
                 if (player?.alive && !player.disconnected) {
                     if (message.firing) queueShotInput(player, aim, Date.now());
-                    if (message.ultimate) queueUltimateInput(player, aim);
+                    if (message.ultimate && queueUltimateInput(player, aim)) {
+                        spawnUltimateProjectile(client.match, player, Date.now());
+                    }
                 }
             }
             return;

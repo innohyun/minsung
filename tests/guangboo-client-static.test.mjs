@@ -190,6 +190,8 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(clientSource, /const ready = isSlime \? rawHits >= 1 : Boolean\(player\?\.ultimateReady\)/);
     assert.match(clientSource, /const slimeReady = me\?\.character === 'slime' && Math\.max\(0, Number\(me\?\.ultimateHits\) \|\| 0\) >= 1/);
     assert.match(clientSource, /const ready = slimeReady \|\| Boolean\(me\?\.ultimateReady\)/);
+    assert.match(clientSource, /const sent = send\(currentInput\(\)\)/);
+    assert.match(clientSource, /me\.ultimateReady = false;\n\s*me\.ultimateHits = 0/);
     assert.match(clientSource, /projectile\.kind === 'slime'/);
     assert.match(runtimeSource, /const SLIME_PROJECTILE_DAMAGE = 600/);
     assert.match(runtimeSource, /const BABY_SLIME_DAMAGE = 200/);
@@ -202,6 +204,8 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /function dropSlimeTrail\(match, player, now\)/);
     assert.match(runtimeSource, /function isOnEnemySlimeTrail\(match, player, now\)/);
     assert.match(runtimeSource, /function spawnBabySlimes\(match, player, count, now\)/);
+    assert.match(runtimeSource, /function babySlimeSpawnPoint\(match, player, angle, index\)/);
+    assert.match(runtimeSource, /if \(!isSummonBlocked\(match\.map, x, y, BABY_SLIME_RADIUS\)\) return \{ x, y \}/);
     assert.match(runtimeSource, /function isSummonBlocked\(map, x, y, radius = BABY_SLIME_RADIUS\)/);
     assert.match(runtimeSource, /function summonGridPath\(match, summon, target\)/);
     assert.match(runtimeSource, /const wallKeys = new Set\(\(map\.walls \|\| \[\]\)\.map/);
@@ -227,7 +231,8 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /const spawnCount = slimeSummonCountForUltimate\(player\)/);
     assert.match(runtimeSource, /if \(spawnCount < SLIME_ULTIMATE_MIN_HITS_REQUIRED\) return/);
     assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
-    assert.match(htmlSource, /client\.js\?v=20260630-slime1hit-use/);
+    assert.match(runtimeSource, /if \(message\.ultimate && queueUltimateInput\(player, aim\)\) \{\n\s*spawnUltimateProjectile\(client\.match, player, Date\.now\(\)\);\n\s*\}/);
+    assert.match(htmlSource, /client\.js\?v=20260630-slime-summon-now/);
 });
 
 test('guangboo plays Web Audio projectile sounds on spawn, flight, and impact', () => {
