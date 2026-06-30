@@ -89,6 +89,10 @@ export function getSlimeUltimateSummonCount(slimeHits) {
     );
 }
 
+export function isSlimeUltimateReady(slimeHits) {
+    return getSlimeUltimateSummonCount(slimeHits) >= SLIME_ULTIMATE_MIN_HITS_REQUIRED;
+}
+
 function normalizeCharacter(value) {
     return value === 'slime' ? 'slime' : 'monster';
 }
@@ -493,7 +497,7 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function hasSlimeUltimateCharge(player) {
-        return slimeHitsForUltimate(player) >= SLIME_ULTIMATE_MIN_HITS_REQUIRED;
+        return isSlimeUltimateReady(slimeHitsForUltimate(player));
     }
 
     function hasUsableUltimate(player) {
@@ -510,7 +514,7 @@ export function createGuangbooRealtime(server, store) {
             player.slimeHits = getSlimeUltimateSummonCount((player.slimeHits || 0) + 1);
             player.slimeSummonCharge = player.slimeHits;
             player.ultimateHits = player.slimeHits;
-            player.ultimateReady = player.slimeHits >= SLIME_ULTIMATE_MIN_HITS_REQUIRED;
+            player.ultimateReady = isSlimeUltimateReady(player.slimeHits);
             return;
         }
         player.ultimateHits = Math.min(ULTIMATE_HITS_REQUIRED, (player.ultimateHits || 0) + 1);
@@ -566,7 +570,8 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function spawnBabySlimes(match, player, count, now) {
-        const total = Math.max(1, Math.floor(count));
+        const total = getSlimeUltimateSummonCount(count);
+        if (total < SLIME_ULTIMATE_MIN_HITS_REQUIRED) return;
         for (let index = 0; index < total; index += 1) {
             const angle = (Math.PI * 2 * index) / total;
             const spawn = babySlimeSpawnPoint(match, player, angle, index);

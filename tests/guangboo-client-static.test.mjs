@@ -229,7 +229,8 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /player\.slimeHits = getSlimeUltimateSummonCount\(\(player\.slimeHits \|\| 0\) \+ 1\)/);
     assert.match(runtimeSource, /player\.slimeSummonCharge = player\.slimeHits/);
     assert.match(runtimeSource, /player\.ultimateHits = player\.slimeHits/);
-    assert.match(runtimeSource, /player\.ultimateReady = player\.slimeHits >= SLIME_ULTIMATE_MIN_HITS_REQUIRED/);
+    assert.match(runtimeSource, /export function isSlimeUltimateReady\(slimeHits\)/);
+    assert.match(runtimeSource, /player\.ultimateReady = isSlimeUltimateReady\(player\.slimeHits\)/);
     assert.match(runtimeSource, /function hasUsableUltimate\(player\)/);
     assert.match(runtimeSource, /return isSlime\(player\) \? hasSlimeUltimateCharge\(player\) : hits >= ULTIMATE_HITS_REQUIRED/);
     assert.match(runtimeSource, /ultimateHits: isSlime\(player\) \? slimeHitsForUltimate\(player\) : Math.min\(ULTIMATE_HITS_REQUIRED/);
