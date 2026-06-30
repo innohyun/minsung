@@ -35,6 +35,7 @@ const BABY_SLIME_DAMAGE = 200;
 const BABY_SLIME_HEALTH = 500;
 const BABY_SLIME_SPEED = 115;
 const BABY_SLIME_RADIUS = 14;
+const BABY_SLIME_WALL_MARGIN = 4;
 const BABY_SLIME_LIFETIME_MS = 9000;
 const MAX_AMMO = 3;
 const AMMO_RELOAD_MS = 1400;
@@ -197,6 +198,17 @@ function isSummonBlocked(map, x, y, radius = BABY_SLIME_RADIUS) {
         return true;
     }
     return map.obstacles.some(rect => rectContainsCircle(rect, x, y, radius));
+}
+
+export function isBabySlimeCellPassable(map, cell, radius = BABY_SLIME_RADIUS) {
+    const tileSize = map.tileSize || TILE_SIZE;
+    const cols = map.cols || Math.ceil(map.width / tileSize);
+    const rows = map.rows || Math.ceil(map.height / tileSize);
+    if (!cell || cell.col < 0 || cell.col >= cols || cell.row < 0 || cell.row >= rows) return false;
+    if ((map.walls || []).some(wall => wall.col === cell.col && wall.row === cell.row)) return false;
+    const x = cell.col * tileSize + tileSize / 2;
+    const y = cell.row * tileSize + tileSize / 2;
+    return !isSummonBlocked(map, x, y, radius + BABY_SLIME_WALL_MARGIN);
 }
 
 function destroyWallHitByProjectile(map, projectile) {
@@ -563,7 +575,7 @@ export function createGuangbooRealtime(server, store) {
                 const spawnAngle = angle + offset + index * 0.17;
                 const x = Math.max(BABY_SLIME_RADIUS, Math.min(match.map.width - BABY_SLIME_RADIUS, player.x + Math.cos(spawnAngle) * distance));
                 const y = Math.max(BABY_SLIME_RADIUS, Math.min(match.map.height - BABY_SLIME_RADIUS, player.y + Math.sin(spawnAngle) * distance));
-                if (!isSummonBlocked(match.map, x, y, BABY_SLIME_RADIUS)) return { x, y };
+                if (!isSummonBlocked(match.map, x, y, BABY_SLIME_RADIUS + BABY_SLIME_WALL_MARGIN)) return { x, y };
             }
         }
         return { x: player.x, y: player.y };
@@ -594,7 +606,6 @@ export function createGuangbooRealtime(server, store) {
         const tileSize = map.tileSize || TILE_SIZE;
         const cols = map.cols || Math.ceil(map.width / tileSize);
         const rows = map.rows || Math.ceil(map.height / tileSize);
-        const wallKeys = new Set((map.walls || []).map(wall => `${wall.col},${wall.row}`));
         const toCell = point => ({
             col: Math.max(0, Math.min(cols - 1, Math.floor(point.x / tileSize))),
             row: Math.max(0, Math.min(rows - 1, Math.floor(point.y / tileSize)))
@@ -602,7 +613,7 @@ export function createGuangbooRealtime(server, store) {
         const start = toCell(summon);
         const goal = toCell(target);
         const keyOf = cell => `${cell.col},${cell.row}`;
-        const passable = cell => cell.col >= 0 && cell.col < cols && cell.row >= 0 && cell.row < rows && !wallKeys.has(keyOf(cell));
+        const passable = cell => isBabySlimeCellPassable(map, cell, summon.radius || BABY_SLIME_RADIUS);
         if (!passable(start) || !passable(goal)) return null;
 
         const open = [{ ...start, g: 0, f: Math.abs(goal.col - start.col) + Math.abs(goal.row - start.row) }];
@@ -652,11 +663,20 @@ export function createGuangbooRealtime(server, store) {
         const dy = waypoint.y - summon.y;
         const length = Math.hypot(dx, dy) || 1;
         const distance = Math.min(BABY_SLIME_SPEED * dt, length);
-        const nextX = summon.x + (dx / length) * distance;
-        const nextY = summon.y + (dy / length) * distance;
-        if (isSummonBlocked(match.map, nextX, nextY, summon.radius)) return;
-        summon.x = nextX;
-        summon.y = nextY;
+        const stepX = (dx / length) * distance;
+        const stepY = (dy / length) * distance;
+        const radius = summon.radius || BABY_SLIME_RADIUS;
+        const candidates = [
+            { x: summon.x + stepX, y: summon.y + stepY },
+            { x: summon.x + stepX, y: summon.y },
+            { x: summon.x, y: summon.y + stepY },
+            { x: summon.x - stepY * 0.72, y: summon.y + stepX * 0.72 },
+            { x: summon.x + stepY * 0.72, y: summon.y - stepX * 0.72 }
+        ].sort((a, b) => Math.hypot(a.x - waypoint.x, a.y - waypoint.y) - Math.hypot(b.x - waypoint.x, b.y - waypoint.y));
+        const next = candidates.find(candidate => !isSummonBlocked(match.map, candidate.x, candidate.y, radius));
+        if (!next) return;
+        summon.x = next.x;
+        summon.y = next.y;
     }
 
     function stepSummons(match, now, dt) {

@@ -7,6 +7,7 @@ import WebSocket from 'ws';
 import { createMinsungServer } from '../server.mjs';
 import {
     getSlimeUltimateSummonCount,
+    isBabySlimeCellPassable,
     isSlimeUltimateReady
 } from '../guangboo-runtime.mjs';
 
@@ -115,6 +116,24 @@ test('slime ultimate is ready from the first successful hit only', () => {
     assert.equal(isSlimeUltimateReady(3), true);
     assert.equal(isSlimeUltimateReady(4), true);
     assert.equal(isSlimeUltimateReady(5), true);
+});
+
+test('baby slime pathing rejects wall cells but keeps adjacent route cells usable', () => {
+    const tileSize = 40;
+    const map = {
+        width: 240,
+        height: 200,
+        tileSize,
+        cols: 6,
+        rows: 5,
+        walls: [{ id: 'w0', col: 3, row: 2 }],
+        obstacles: [{ id: 'w0', x: 3 * tileSize + tileSize / 2, y: 2 * tileSize + tileSize / 2, w: tileSize, h: tileSize }]
+    };
+
+    assert.equal(isBabySlimeCellPassable(map, { col: 3, row: 2 }), false);
+    assert.equal(isBabySlimeCellPassable(map, { col: 2, row: 2 }), true);
+    assert.equal(isBabySlimeCellPassable(map, { col: 3, row: 1 }), true);
+    assert.equal(isBabySlimeCellPassable(map, { col: -1, row: 2 }), false);
 });
 
 test('slime can cast ultimate after one real hit and immediately spawns one baby slime', async () => {
