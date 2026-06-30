@@ -14,6 +14,7 @@ const TILE_SIZE = 40;
 const ULTIMATE_HITS_REQUIRED = 4;
 const MAX_SLIME_ULTIMATE_HITS = 12;
 const ULTIMATE_DAMAGE = 2000;
+const ULTIMATE_PROJECTILE_HEALTH = 3000;
 const ULTIMATE_SPEED = 150;
 const ULTIMATE_RANGE = 820;
 const ULTIMATE_RADIUS = 24;
@@ -718,6 +719,7 @@ export function createGuangbooRealtime(server, store) {
             radius: ULTIMATE_RADIUS,
             traveled: 0,
             maxDistance: ULTIMATE_RANGE,
+            health: ULTIMATE_PROJECTILE_HEALTH,
             spawnedTick: match.tick
         });
     }
@@ -746,6 +748,20 @@ export function createGuangbooRealtime(server, store) {
         player.x += (projectile.vx / vLen) * KNOCKBACK_DISTANCE;
         player.y += (projectile.vy / vLen) * KNOCKBACK_DISTANCE;
         resolvePlayerPosition(player, match.map);
+    }
+
+    function collideWithEnemyUltimateProjectile(match, projectile) {
+        if (projectile.kind === 'ultimate') return false;
+        const hitUltimate = match.projectiles.find(candidate =>
+            candidate.kind === 'ultimate' &&
+            !candidate.destroyed &&
+            candidate.ownerId !== projectile.ownerId &&
+            Math.hypot(candidate.x - projectile.x, candidate.y - projectile.y) <= (candidate.radius || ULTIMATE_RADIUS) + (projectile.radius || 8)
+        );
+        if (!hitUltimate) return false;
+        hitUltimate.health = (hitUltimate.health ?? ULTIMATE_PROJECTILE_HEALTH) - (projectile.damage || 0);
+        if (hitUltimate.health <= 0) hitUltimate.destroyed = true;
+        return true;
     }
 
     function stepMatch(match) {
@@ -787,6 +803,7 @@ export function createGuangbooRealtime(server, store) {
 
         const projectiles = [];
         match.projectiles.forEach(projectile => {
+            if (projectile.destroyed) return;
             if (projectile.spawnedTick === match.tick) {
                 projectiles.push(projectile);
                 return;
@@ -805,6 +822,8 @@ export function createGuangbooRealtime(server, store) {
             } else if (isProjectileBlocked(projectile, match.map)) {
                 return;
             }
+
+            if (collideWithEnemyUltimateProjectile(match, projectile)) return;
 
             const owner = match.players.get(projectile.ownerId);
             const summonHit = match.summons.find(summon =>
@@ -850,7 +869,7 @@ export function createGuangbooRealtime(server, store) {
             }
             projectiles.push(projectile);
         });
-        match.projectiles = projectiles;
+        match.projectiles = projectiles.filter(projectile => !projectile.destroyed);
 
         if (match.status === 'active') {
             broadcastMatch(match, snapshotMatch(match));

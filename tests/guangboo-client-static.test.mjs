@@ -151,6 +151,7 @@ test('guangboo supports charged wall-breaking homing ultimate attacks', () => {
     assert.match(runtimeSource, /const ULTIMATE_DAMAGE = 2000/);
     assert.match(runtimeSource, /const ULTIMATE_SPEED = 150/);
     assert.match(runtimeSource, /const ULTIMATE_RADIUS = 24/);
+    assert.match(runtimeSource, /const ULTIMATE_PROJECTILE_HEALTH = 3000/);
     assert.match(runtimeSource, /function createMap\(\)/);
     assert.match(runtimeSource, /walls,\n\s*obstacles: walls\.map\(wall => tileToRect\(wall\)\)/);
     assert.match(runtimeSource, /function queueUltimateInput\(player, aim\)/);
@@ -159,7 +160,14 @@ test('guangboo supports charged wall-breaking homing ultimate attacks', () => {
     assert.match(runtimeSource, /function steerUltimateProjectile\(match, projectile\)/);
     assert.match(runtimeSource, /destroyWallHitByProjectile\(match\.map, projectile\)/);
     assert.match(runtimeSource, /function knockBackPlayer\(match, player, projectile\)/);
-    assert.match(runtimeSource, /owner\.ultimateHits = Math\.min\(ULTIMATE_HITS_REQUIRED, \(owner\.ultimateHits \|\| 0\) \+ 1\)/);
+    assert.match(runtimeSource, /function collideWithEnemyUltimateProjectile\(match, projectile\)/);
+    assert.match(runtimeSource, /candidate\.kind === 'ultimate'/);
+    assert.match(runtimeSource, /candidate\.ownerId !== projectile\.ownerId/);
+    assert.match(runtimeSource, /hitUltimate\.health = \(hitUltimate\.health \?\? ULTIMATE_PROJECTILE_HEALTH\) - \(projectile\.damage \|\| 0\)/);
+    assert.match(runtimeSource, /if \(hitUltimate\.health <= 0\) hitUltimate\.destroyed = true/);
+    assert.match(runtimeSource, /match\.projectiles = projectiles\.filter\(projectile => !projectile\.destroyed\)/);
+    assert.match(runtimeSource, /owner\.ultimateHits = isSlime\(owner\)/);
+    assert.match(runtimeSource, /: Math\.min\(ULTIMATE_HITS_REQUIRED, \(owner\.ultimateHits \|\| 0\) \+ 1\)/);
     assert.match(runtimeSource, /syncUltimateReady\(owner\)/);
     assert.match(runtimeSource, /if \(message\.ultimate\) queueUltimateInput\(player, aim\)/);
 });
