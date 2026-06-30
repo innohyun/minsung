@@ -82,6 +82,13 @@ const CHARACTER_DEFS = {
     slime: { key: 'slime', label: '슬라임', monster: { key: 'slime', name: 'Slime', color: '#7ee65b', accent: '#167a34' } }
 };
 
+export function getSlimeUltimateSummonCount(hitCount) {
+    return Math.min(
+        SLIME_ULTIMATE_MAX_SUMMONS,
+        Math.max(0, Math.floor(Number(hitCount) || 0))
+    );
+}
+
 function normalizeCharacter(value) {
     return value === 'slime' ? 'slime' : 'monster';
 }
@@ -482,15 +489,16 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function slimeSummonCountForUltimate(player) {
-        return Math.min(
-            SLIME_ULTIMATE_MAX_SUMMONS,
-            Math.max(0, Math.floor(player?.slimeSummonCharge ?? player?.ultimateHits ?? 0))
-        );
+        return getSlimeUltimateSummonCount(player?.slimeSummonCharge ?? player?.ultimateHits ?? 0);
+    }
+
+    function hasSlimeUltimateCharge(player) {
+        return slimeSummonCountForUltimate(player) >= SLIME_ULTIMATE_MIN_HITS_REQUIRED;
     }
 
     function hasUsableUltimate(player) {
         const hits = player?.ultimateHits || 0;
-        return isSlime(player) ? slimeSummonCountForUltimate(player) >= SLIME_ULTIMATE_MIN_HITS_REQUIRED : hits >= ULTIMATE_HITS_REQUIRED;
+        return isSlime(player) ? hasSlimeUltimateCharge(player) : hits >= ULTIMATE_HITS_REQUIRED;
     }
 
     function syncUltimateReady(player) {
@@ -715,24 +723,35 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function queueUltimateInput(player, aim) {
+        if (isSlime(player)) {
+            if (!hasSlimeUltimateCharge(player)) return false;
+            player.queuedUltimateAim = clampUnitVector(aim);
+            player.ultimateReady = true;
+            return true;
+        }
         syncUltimateReady(player);
         if (!player.ultimateReady) return false;
         player.queuedUltimateAim = clampUnitVector(aim);
         return true;
     }
 
+    function castSlimeUltimate(match, player, now) {
+        const spawnCount = slimeSummonCountForUltimate(player);
+        if (spawnCount < SLIME_ULTIMATE_MIN_HITS_REQUIRED) return false;
+        spawnBabySlimes(match, player, spawnCount, now);
+        consumeSlimeSummonCharge(player);
+        player.queuedUltimateAim = null;
+        resetRegenTimer(player, now);
+        return true;
+    }
+
     function spawnUltimateProjectile(match, player, now) {
-        syncUltimateReady(player);
-        if (!player.ultimateReady) return;
         if (isSlime(player)) {
-            const spawnCount = slimeSummonCountForUltimate(player);
-            if (spawnCount < SLIME_ULTIMATE_MIN_HITS_REQUIRED) return;
-            spawnBabySlimes(match, player, spawnCount, now);
-            consumeSlimeSummonCharge(player);
-            player.queuedUltimateAim = null;
-            resetRegenTimer(player, now);
+            castSlimeUltimate(match, player, now);
             return;
         }
+        syncUltimateReady(player);
+        if (!player.ultimateReady) return;
         const aim = player.queuedUltimateAim || player.aim;
         const aimLength = Math.hypot(aim.x, aim.y) || 1;
         const dx = aim.x / aimLength;
