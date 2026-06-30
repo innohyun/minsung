@@ -6,17 +6,61 @@
     const CHARACTER_KEY = 'guangboo_v2_character';
     const BOT_KEY = 'guangboo_v2_bots';
     const MAP_KEY = 'guangboo_v2_map';
+    const EDITOR_TILE_SIZE = 40;
+    const DEFAULT_OFFICIAL_MAP_ID = 'official:crossroads';
+    const OFFICIAL_MAPS = [
+        { id: 'official:crossroads', name: '초원 교차로', summary: '가운데 벽을 활용해 견제하는 기본 정식 맵', description: '가운데에 짧은 벽들이 있어 숨고 빠지면서 싸우기 좋습니다. 처음 플레이하기 쉬운 균형형 맵입니다.', cols: 24, rows: 16, walls: [{ col: 10, row: 6 }, { col: 11, row: 6 }, { col: 12, row: 6 }, { col: 13, row: 6 }, { col: 10, row: 9 }, { col: 11, row: 9 }, { col: 12, row: 9 }, { col: 13, row: 9 }, { col: 6, row: 8 }, { col: 17, row: 8 }], spawns: [{ col: 4, row: 4 }, { col: 19, row: 11 }, { col: 4, row: 11 }, { col: 19, row: 4 }] },
+        { id: 'official:maze', name: '돌담 미로', summary: '벽이 많아서 숨고 돌아가는 전투 맵', description: '긴 벽과 골목이 많아 직선 공격을 피하기 좋습니다. 아기슬라임도 길을 돌아가며 추격합니다.', cols: 24, rows: 16, walls: [{ col: 5, row: 3 }, { col: 5, row: 4 }, { col: 5, row: 5 }, { col: 5, row: 10 }, { col: 5, row: 11 }, { col: 5, row: 12 }, { col: 11, row: 5 }, { col: 12, row: 5 }, { col: 13, row: 5 }, { col: 10, row: 10 }, { col: 11, row: 10 }, { col: 12, row: 10 }, { col: 18, row: 3 }, { col: 18, row: 4 }, { col: 18, row: 11 }, { col: 18, row: 12 }], spawns: [{ col: 2, row: 2 }, { col: 21, row: 13 }, { col: 2, row: 13 }, { col: 21, row: 2 }] },
+        { id: 'official:ring', name: '강철 링', summary: '가운데 링을 두고 도는 근접 난전 맵', description: '중앙을 둥글게 감싼 벽 때문에 빙글 돌며 싸우는 상황이 많이 나옵니다. 빈틈을 찾아 공격하세요.', cols: 24, rows: 16, walls: [{ col: 9, row: 5 }, { col: 10, row: 5 }, { col: 13, row: 5 }, { col: 14, row: 5 }, { col: 8, row: 6 }, { col: 15, row: 6 }, { col: 8, row: 9 }, { col: 15, row: 9 }, { col: 9, row: 10 }, { col: 10, row: 10 }, { col: 13, row: 10 }, { col: 14, row: 10 }], spawns: [{ col: 3, row: 7 }, { col: 20, row: 7 }, { col: 11, row: 2 }, { col: 12, row: 13 }] },
+        { id: 'official:wide', name: '넓은 대평원', summary: '시야가 넓고 투사체 피하기가 중요한 맵', description: '벽이 적고 넓어서 이동과 조준 실력이 중요합니다. 멀리서 공격을 피하며 싸우기 좋습니다.', cols: 30, rows: 20, walls: [{ col: 8, row: 5 }, { col: 9, row: 5 }, { col: 20, row: 14 }, { col: 21, row: 14 }, { col: 14, row: 9 }, { col: 15, row: 9 }, { col: 14, row: 10 }, { col: 15, row: 10 }], spawns: [{ col: 3, row: 3 }, { col: 26, row: 16 }, { col: 3, row: 16 }, { col: 26, row: 3 }] }
+    ];
+    const CHARACTER_CARDS = [
+        { key: 'monster', name: '기본 몬스터', summary: '강한 기본 공격과 레이저 궁극기', color: '#6ee7b7', accent: '#064e3b' },
+        { key: 'slime', name: '슬라임', summary: '맞힌 횟수만큼 아기슬라임 소환', color: '#7ee65b', accent: '#167a34' }
+    ];
     const PLAYER_MAX_HEALTH = 6000;
 
     const elements = {
         lobby: document.getElementById('lobbyScreen'),
         game: document.getElementById('gameScreen'),
         result: document.getElementById('resultScreen'),
+        mapSelect: document.getElementById('mapSelectScreen'),
+        characterSelect: document.getElementById('characterSelectScreen'),
+        editor: document.getElementById('mapEditorScreen'),
         joinForm: document.getElementById('joinForm'),
         nickname: document.getElementById('nicknameInput'),
         joinButton: document.getElementById('joinButton'),
         botToggle: document.getElementById('botToggle'),
         customMapSelect: document.getElementById('customMapSelect'),
+        selectedMapCard: document.getElementById('selectedMapCard'),
+        selectedMapMini: document.getElementById('selectedMapMini'),
+        selectedMapName: document.getElementById('selectedMapName'),
+        selectedMapSummary: document.getElementById('selectedMapSummary'),
+        mapInfoButton: document.getElementById('mapInfoButton'),
+        mapInfoModal: document.getElementById('mapInfoModal'),
+        mapInfoMini: document.getElementById('mapInfoMini'),
+        mapInfoTitle: document.getElementById('mapInfoTitle'),
+        mapInfoDescription: document.getElementById('mapInfoDescription'),
+        closeMapInfo: document.getElementById('closeMapInfoButton'),
+        openMapSelect: document.getElementById('openMapSelectButton'),
+        closeMapSelect: document.getElementById('closeMapSelectButton'),
+        officialMapGrid: document.getElementById('officialMapGrid'),
+        customMapList: document.getElementById('customMapList'),
+        mapSelectEditor: document.getElementById('mapSelectEditorButton'),
+        openCharacterSelect: document.getElementById('openCharacterSelectButton'),
+        closeCharacterSelect: document.getElementById('closeCharacterSelectButton'),
+        characterGrid: document.getElementById('characterGrid'),
+        lobbyCharacterPreview: document.getElementById('lobbyCharacterPreview'),
+        selectedCharacterName: document.getElementById('selectedCharacterName'),
+        closeMapEditor: document.getElementById('closeMapEditorButton'),
+        mapEditorCanvas: document.getElementById('mapEditorCanvas'),
+        mapName: document.getElementById('mapNameInput'),
+        mapCols: document.getElementById('mapColsInput'),
+        mapRows: document.getElementById('mapRowsInput'),
+        newMap: document.getElementById('newMapButton'),
+        saveMap: document.getElementById('saveMapButton'),
+        mapEditorStatus: document.getElementById('mapEditorStatus'),
+        mapTools: [...document.querySelectorAll('.map-tool')],
         status: document.getElementById('statusLine'),
         pixiHost: document.getElementById('pixiHost'),
         health: document.getElementById('healthReadout'),
@@ -51,8 +95,7 @@
         slimeTrails: [],
         summons: [],
         modes: [
-            { key: 'duel', label: '1:1 결투', size: 2 },
-            { key: 'survival', label: '4인 생존전', size: 4 }
+            { key: 'survival', label: '정식 맵 전투', size: 4 }
         ],
         inputSeq: 0,
         queuedShots: [],
@@ -61,6 +104,9 @@
         mouseAim: { active: false, x: 1, y: 0 },
         leftStick: stickState(),
         rightStick: stickState(),
+        customMaps: [],
+        selectedMapId: DEFAULT_OFFICIAL_MAP_ID,
+        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), spawns: new Set(), tool: 'wall' },
         render: {
             app: null,
             ready: false,
@@ -90,6 +136,9 @@
 
     function setScreen(name) {
         elements.lobby.hidden = name !== 'lobby';
+        elements.mapSelect.hidden = name !== 'mapSelect';
+        elements.characterSelect.hidden = name !== 'characterSelect';
+        elements.editor.hidden = name !== 'editor';
         elements.game.hidden = name !== 'game';
         elements.result.hidden = name !== 'result';
         document.body.classList.toggle('is-playing', name === 'game');
@@ -104,7 +153,7 @@
     }
 
     function selectedMode() {
-        return elements.modeInputs.find(input => input.checked)?.value || 'duel';
+        return 'survival';
     }
 
     function selectedCharacter() {
@@ -165,16 +214,17 @@
         const nickname = (elements.nickname.value || 'Monster').trim();
         const mode = selectedMode();
         const character = selectedCharacter();
+        const mapId = selectedMapId();
         localStorage.setItem(STORAGE_KEY, nickname);
         localStorage.setItem(MODE_KEY, mode);
         localStorage.setItem(CHARACTER_KEY, character);
         localStorage.setItem(BOT_KEY, elements.botToggle.checked ? '1' : '0');
-        localStorage.setItem(MAP_KEY, elements.customMapSelect.value || '');
+        localStorage.setItem(MAP_KEY, mapId);
         elements.joinButton.disabled = true;
         elements.joinButton.textContent = '매칭 중';
         elements.status.textContent = 'v2 매칭 요청 중';
         state.joining = true;
-        send({ type: 'joinQueue', nickname, mode, character, customMapId: elements.customMapSelect.value || null, fillWithBots: elements.botToggle.checked });
+        send({ type: 'joinQueue', nickname, mode, character, customMapId: isOfficialMapId(mapId) ? null : mapId, officialMapId: isOfficialMapId(mapId) ? mapId : null, fillWithBots: elements.botToggle.checked });
     }
 
     function handleServerMessage(message) {
@@ -555,6 +605,224 @@
         state.lastAim = aim;
     }
 
+    function isOfficialMapId(id) {
+        return String(id || '').startsWith('official:');
+    }
+
+    function selectedMapId() {
+        return state.selectedMapId || localStorage.getItem(MAP_KEY) || DEFAULT_OFFICIAL_MAP_ID;
+    }
+
+    function mapMeta(id = selectedMapId()) {
+        if (isOfficialMapId(id)) {
+            return OFFICIAL_MAPS.find(map => map.id === id) || OFFICIAL_MAPS[0];
+        }
+        const custom = state.customMaps.find(map => map.id === id);
+        if (custom) {
+            const cols = Math.max(8, Math.round(custom.width / (custom.tileSize || EDITOR_TILE_SIZE)));
+            const rows = Math.max(8, Math.round(custom.height / (custom.tileSize || EDITOR_TILE_SIZE)));
+            const data = custom.map || custom.data || {};
+            return { id: custom.id, name: custom.name, summary: '내가 만든 사용자 맵', description: `${custom.creator || '플레이어'}가 만든 ${cols}x${rows} 사용자 맵입니다.`, cols, rows, walls: data.walls || [], spawns: data.spawnPoints || [] };
+        }
+        return OFFICIAL_MAPS[0];
+    }
+
+    function selectMap(id) {
+        state.selectedMapId = id || DEFAULT_OFFICIAL_MAP_ID;
+        localStorage.setItem(MAP_KEY, state.selectedMapId);
+        elements.customMapSelect.value = state.selectedMapId;
+        renderSelectedMapCard();
+        renderOfficialMapGrid();
+        renderCustomMapList();
+        setScreen('lobby');
+    }
+
+    function drawMiniMap(canvas, map) {
+        if (!canvas || !map) return;
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#12351f';
+        ctx.fillRect(0, 0, width, height);
+        const cols = Math.max(1, map.cols || 24);
+        const rows = Math.max(1, map.rows || 16);
+        const scale = Math.min(width / cols, height / rows);
+        const offsetX = (width - cols * scale) / 2;
+        const offsetY = (height - rows * scale) / 2;
+        ctx.fillStyle = '#1f7a3a';
+        ctx.fillRect(offsetX, offsetY, cols * scale, rows * scale);
+        ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+        ctx.lineWidth = 1;
+        for (let col = 0; col <= cols; col += 1) {
+            ctx.beginPath(); ctx.moveTo(offsetX + col * scale, offsetY); ctx.lineTo(offsetX + col * scale, offsetY + rows * scale); ctx.stroke();
+        }
+        for (let row = 0; row <= rows; row += 1) {
+            ctx.beginPath(); ctx.moveTo(offsetX, offsetY + row * scale); ctx.lineTo(offsetX + cols * scale, offsetY + row * scale); ctx.stroke();
+        }
+        ctx.fillStyle = '#8b5e34';
+        (map.walls || []).forEach(wall => ctx.fillRect(offsetX + wall.col * scale, offsetY + wall.row * scale, scale, scale));
+        ctx.fillStyle = '#f8fb7b';
+        (map.spawns || []).forEach(spawn => {
+            ctx.beginPath();
+            ctx.arc(offsetX + (Number(spawn.col) + 0.5) * scale, offsetY + (Number(spawn.row) + 0.5) * scale, Math.max(3, scale * 0.25), 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    function renderSelectedMapCard() {
+        const map = mapMeta();
+        elements.selectedMapName.textContent = map.name;
+        elements.selectedMapSummary.textContent = map.summary || map.description || '정식 맵';
+        drawMiniMap(elements.selectedMapMini, map);
+    }
+
+    function renderOfficialMapGrid() {
+        elements.officialMapGrid.innerHTML = '';
+        OFFICIAL_MAPS.forEach(map => {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = `map-card ${selectedMapId() === map.id ? 'is-selected' : ''}`;
+            const canvas = document.createElement('canvas');
+            canvas.width = 220;
+            canvas.height = 140;
+            card.appendChild(canvas);
+            const info = document.createElement('button');
+            info.type = 'button';
+            info.className = 'ghost-button map-info-chip';
+            info.textContent = 'i';
+            info.addEventListener('click', event => { event.stopPropagation(); openMapInfo(map.id); });
+            card.appendChild(info);
+            const title = document.createElement('h3'); title.textContent = map.name; card.appendChild(title);
+            const summary = document.createElement('p'); summary.textContent = map.summary; card.appendChild(summary);
+            card.addEventListener('click', () => selectMap(map.id));
+            elements.officialMapGrid.appendChild(card);
+            drawMiniMap(canvas, map);
+        });
+    }
+
+    function renderCustomMapList() {
+        elements.customMapList.innerHTML = '';
+        if (!state.customMaps.length) return;
+        const heading = document.createElement('p');
+        heading.className = 'eyebrow';
+        heading.textContent = 'Custom maps';
+        elements.customMapList.appendChild(heading);
+        state.customMaps.forEach(map => {
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = `custom-map-card ${selectedMapId() === map.id ? 'is-selected' : ''}`;
+            card.innerHTML = `<strong>${escapeHtml(map.name)}</strong><p>${Math.round(map.width / map.tileSize)}x${Math.round(map.height / map.tileSize)} · ${escapeHtml(map.creator || '플레이어')}</p>`;
+            card.addEventListener('click', () => selectMap(map.id));
+            elements.customMapList.appendChild(card);
+        });
+    }
+
+    function openMapSelect() {
+        renderOfficialMapGrid();
+        renderCustomMapList();
+        setScreen('mapSelect');
+    }
+    function closeMapSelect() { setScreen('lobby'); }
+
+    function openMapInfo(id = selectedMapId()) {
+        const map = mapMeta(id);
+        elements.mapInfoTitle.textContent = map.name;
+        elements.mapInfoDescription.textContent = `${map.summary || '정식 맵'} · ${map.description || ''}`;
+        drawMiniMap(elements.mapInfoMini, map);
+        elements.mapInfoModal.hidden = false;
+    }
+    function closeMapInfo() { elements.mapInfoModal.hidden = true; }
+
+    function renderLobbyCharacter() {
+        const character = selectedCharacter();
+        const card = CHARACTER_CARDS.find(item => item.key === character) || CHARACTER_CARDS[0];
+        elements.selectedCharacterName.textContent = card.name;
+        elements.lobbyCharacterPreview.classList.toggle('is-slime', character === 'slime');
+    }
+
+    function renderCharacterSelectScreen() {
+        elements.characterGrid.innerHTML = '';
+        CHARACTER_CARDS.forEach(card => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = `character-choice-card ${selectedCharacter() === card.key ? 'is-selected' : ''}`;
+            button.innerHTML = `<div class="character-avatar" style="background: radial-gradient(circle at 35% 24%, #fff, ${card.color} 38%, ${card.accent} 92%)"></div><h3>${card.name}</h3><p>${card.summary}</p>`;
+            button.addEventListener('click', () => {
+                elements.characterInputs.forEach(input => { input.checked = input.value === card.key; });
+                localStorage.setItem(CHARACTER_KEY, card.key);
+                renderLobbyCharacter();
+                renderCharacterSelectScreen();
+                setScreen('lobby');
+            });
+            elements.characterGrid.appendChild(button);
+        });
+    }
+    function openCharacterSelect() { renderCharacterSelectScreen(); setScreen('characterSelect'); }
+    function closeCharacterSelect() { setScreen('lobby'); }
+
+    function openMapEditor() {
+        drawEditor();
+        setScreen('editor');
+    }
+    function closeMapEditor() { setScreen('lobby'); }
+
+    function applyEditorSize() {
+        state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
+        state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
+        state.editor.walls.clear();
+        state.editor.spawns.clear();
+        drawEditor();
+    }
+
+    function drawEditor() {
+        const canvas = elements.mapEditorCanvas;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const { cols, rows } = state.editor;
+        canvas.width = cols * EDITOR_TILE_SIZE;
+        canvas.height = rows * EDITOR_TILE_SIZE;
+        ctx.fillStyle = '#13361f'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
+        for (let col = 0; col <= cols; col += 1) { ctx.beginPath(); ctx.moveTo(col * EDITOR_TILE_SIZE, 0); ctx.lineTo(col * EDITOR_TILE_SIZE, canvas.height); ctx.stroke(); }
+        for (let row = 0; row <= rows; row += 1) { ctx.beginPath(); ctx.moveTo(0, row * EDITOR_TILE_SIZE); ctx.lineTo(canvas.width, row * EDITOR_TILE_SIZE); ctx.stroke(); }
+        ctx.fillStyle = '#8b5e34';
+        state.editor.walls.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.fillRect(col * EDITOR_TILE_SIZE, row * EDITOR_TILE_SIZE, EDITOR_TILE_SIZE, EDITOR_TILE_SIZE); });
+        ctx.fillStyle = '#f8fb7b';
+        state.editor.spawns.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.beginPath(); ctx.arc((col + 0.5) * EDITOR_TILE_SIZE, (row + 0.5) * EDITOR_TILE_SIZE, 10, 0, Math.PI * 2); ctx.fill(); });
+    }
+
+    function editCellFromEvent(event) {
+        const rect = elements.mapEditorCanvas.getBoundingClientRect();
+        const scaleX = elements.mapEditorCanvas.width / rect.width;
+        const scaleY = elements.mapEditorCanvas.height / rect.height;
+        const col = Math.floor((event.clientX - rect.left) * scaleX / EDITOR_TILE_SIZE);
+        const row = Math.floor((event.clientY - rect.top) * scaleY / EDITOR_TILE_SIZE);
+        if (col < 0 || row < 0 || col >= state.editor.cols || row >= state.editor.rows) return;
+        const key = `${col},${row}`;
+        if (state.editor.tool === 'erase') { state.editor.walls.delete(key); state.editor.spawns.delete(key); }
+        else if (state.editor.tool === 'spawn') { state.editor.walls.delete(key); state.editor.spawns.add(key); }
+        else { state.editor.spawns.delete(key); state.editor.walls.add(key); }
+        drawEditor();
+    }
+
+    async function saveCustomMap() {
+        const name = (elements.mapName.value || 'v2 사용자 맵').trim();
+        const walls = [...state.editor.walls].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; });
+        const spawnPoints = [...state.editor.spawns].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; });
+        elements.mapEditorStatus.textContent = '저장 중...';
+        const response = await fetch('/api/guangboo/maps', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, creator: elements.nickname.value || 'v2 플레이어', map: { cols: state.editor.cols, rows: state.editor.rows, tileSize: EDITOR_TILE_SIZE, walls, spawnPoints } })
+        });
+        const data = await response.json();
+        if (!data.ok) throw new Error(data.error || 'save_failed');
+        elements.mapEditorStatus.textContent = '저장 완료';
+        await loadCustomMaps();
+        selectMap(data.map.id);
+    }
+
     function renderResults(winnerId, results) {
         const didWin = winnerId && winnerId === state.playerId;
         elements.resultTitle.textContent = didWin ? '승리' : '생존 종료';
@@ -572,17 +840,26 @@
         try {
             const response = await fetch('/api/guangboo/maps', { cache: 'no-store' });
             const data = await response.json();
-            const selected = localStorage.getItem(MAP_KEY) || '';
-            elements.customMapSelect.innerHTML = '<option value="">기본 맵</option>';
-            (data.maps || []).forEach(map => {
+            state.customMaps = data.maps || [];
+            const saved = localStorage.getItem(MAP_KEY) || DEFAULT_OFFICIAL_MAP_ID;
+            state.selectedMapId = saved;
+            elements.customMapSelect.innerHTML = OFFICIAL_MAPS.map(map => `<option value="${map.id}">${map.name}</option>`).join('');
+            state.customMaps.forEach(map => {
                 const option = document.createElement('option');
                 option.value = map.id;
                 option.textContent = `${map.name} (${Math.round(map.width / map.tileSize)}x${Math.round(map.height / map.tileSize)})`;
                 elements.customMapSelect.appendChild(option);
             });
-            if ([...elements.customMapSelect.options].some(option => option.value === selected)) elements.customMapSelect.value = selected;
+            if (![...elements.customMapSelect.options].some(option => option.value === state.selectedMapId)) state.selectedMapId = DEFAULT_OFFICIAL_MAP_ID;
+            elements.customMapSelect.value = state.selectedMapId;
+            renderSelectedMapCard();
+            renderOfficialMapGrid();
+            renderCustomMapList();
         } catch {
-            elements.customMapSelect.innerHTML = '<option value="">기본 맵</option>';
+            state.customMaps = [];
+            state.selectedMapId = DEFAULT_OFFICIAL_MAP_ID;
+            elements.customMapSelect.innerHTML = '<option value="official:crossroads">초원 교차로</option>';
+            renderSelectedMapCard();
         }
     }
     function escapeHtml(value) {
@@ -602,6 +879,29 @@
         if (state.ws?.readyState === WebSocket.OPEN && state.serverReady) joinQueue();
     });
     elements.backLobby.addEventListener('click', () => setScreen('lobby'));
+    elements.selectedMapCard.addEventListener('click', openMapSelect);
+    elements.selectedMapCard.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openMapSelect(); } });
+    elements.openMapSelect.addEventListener('click', openMapSelect);
+    elements.closeMapSelect.addEventListener('click', closeMapSelect);
+    elements.mapInfoButton.addEventListener('click', event => { event.stopPropagation(); openMapInfo(); });
+    elements.closeMapInfo.addEventListener('click', closeMapInfo);
+    elements.mapInfoModal.addEventListener('click', event => { if (event.target === elements.mapInfoModal) closeMapInfo(); });
+    elements.openCharacterSelect.addEventListener('click', openCharacterSelect);
+    elements.closeCharacterSelect.addEventListener('click', closeCharacterSelect);
+    elements.mapSelectEditor.addEventListener('click', openMapEditor);
+    elements.closeMapEditor.addEventListener('click', closeMapEditor);
+    elements.newMap.addEventListener('click', applyEditorSize);
+    elements.saveMap.addEventListener('click', () => saveCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
+    elements.mapTools.forEach(button => {
+        button.addEventListener('click', () => {
+            state.editor.tool = button.dataset.tool || 'wall';
+            elements.mapTools.forEach(candidate => candidate.classList.toggle('is-selected', candidate === button));
+            elements.mapEditorStatus.textContent = state.editor.tool === 'spawn' ? '플레이어 생성 지점을 배치하세요.' : state.editor.tool === 'erase' ? '지울 칸을 선택하세요.' : '벽을 배치하세요.';
+        });
+    });
+    elements.mapEditorCanvas.addEventListener('pointerdown', event => { event.preventDefault(); elements.mapEditorCanvas.setPointerCapture?.(event.pointerId); editCellFromEvent(event); });
+    elements.mapEditorCanvas.addEventListener('pointermove', event => { if (!elements.mapEditorCanvas.hasPointerCapture?.(event.pointerId)) return; event.preventDefault(); editCellFromEvent(event); });
+    elements.characterInputs.forEach(input => input.addEventListener('change', () => { localStorage.setItem(CHARACTER_KEY, selectedCharacter()); renderLobbyCharacter(); renderCharacterSelectScreen(); }));
     elements.ultimateButton.addEventListener('pointerdown', event => { event.preventDefault(); fireUltimate(); });
     elements.pixiHost.addEventListener('pointermove', event => { if (event.pointerType !== 'mouse' || !state.matchActive) return; updateMouseAim(event); });
     elements.pixiHost.addEventListener('pointerdown', event => { if (event.pointerType !== 'mouse' || !state.matchActive) return; updateMouseAim(event); });
@@ -621,6 +921,9 @@
     if (savedMode) elements.modeInputs.forEach(input => { input.checked = input.value === savedMode; });
     const savedCharacter = localStorage.getItem(CHARACTER_KEY);
     if (savedCharacter) elements.characterInputs.forEach(input => { input.checked = input.value === savedCharacter; });
+    renderLobbyCharacter();
+    renderCharacterSelectScreen();
+    renderSelectedMapCard();
     loadCustomMaps();
     setupStick('leftStick', elements.leftStick);
     setupStick('rightStick', elements.rightStick);

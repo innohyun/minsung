@@ -4,68 +4,124 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Guangboo v2 · PixiJS</title>
-    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260630-pixi-v2">
+    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260630-v2-lobby-map-character">
 </head>
 <body>
     <main id="app">
         <section class="screen lobby-screen" id="lobbyScreen">
-            <div class="brand-card">
+            <div class="brand-card lobby-brand">
                 <p class="eyebrow">PixiJS v2 prototype</p>
                 <h1>Guangboo v2</h1>
-                <p class="tagline">기존 서버는 그대로 쓰고, 화면 렌더링만 WebGL 기반으로 바꾼 테스트 버전입니다.</p>
+                <p class="tagline">엔진은 v2 PixiJS 그대로 쓰고, 로비/맵/캐릭터 선택 기능을 넣은 버전입니다.</p>
             </div>
 
-            <form class="join-panel" id="joinForm">
-                <label>
-                    닉네임
+            <section class="selected-character-card" aria-label="선택한 캐릭터">
+                <button class="character-bundle-button" id="openCharacterSelectButton" type="button">
+                    <span class="bundle-icons" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <strong>캐릭터</strong>
+                    <small>묶음에서 선택</small>
+                </button>
+                <div class="lobby-character-preview" id="lobbyCharacterPreview" aria-hidden="true"></div>
+                <p class="selected-character-name" id="selectedCharacterName">기본 몬스터</p>
+            </section>
+
+            <form class="join-panel lobby-play-panel" id="joinForm">
+                <label for="nicknameInput">닉네임</label>
+                <div class="join-row">
                     <input id="nicknameInput" maxlength="18" autocomplete="nickname" placeholder="Monster" required>
-                </label>
+                    <button id="joinButton" type="submit">플레이</button>
+                </div>
 
-                <fieldset>
-                    <legend>모드</legend>
-                    <label class="radio-card">
-                        <input type="radio" name="matchMode" value="duel" checked>
-                        <span><strong>1:1 결투</strong><small>가볍게 테스트</small></span>
-                    </label>
-                    <label class="radio-card">
-                        <input type="radio" name="matchMode" value="survival">
-                        <span><strong>4인 생존전</strong><small>기존 서버 규칙 사용</small></span>
-                    </label>
-                </fieldset>
-
-                <fieldset>
+                <fieldset class="character-picker sr-only" aria-label="캐릭터 선택">
                     <legend>캐릭터</legend>
-                    <label class="radio-card">
-                        <input type="radio" name="character" value="monster" checked>
-                        <span><strong>기본 몬스터</strong><small>레이저 궁극기</small></span>
-                    </label>
-                    <label class="radio-card">
-                        <input type="radio" name="character" value="slime">
-                        <span><strong>슬라임</strong><small>장판 · 소환수</small></span>
-                    </label>
+                    <label class="radio-card"><input type="radio" name="character" value="monster" checked><span><strong>기본 몬스터</strong><small>레이저 궁극기</small></span></label>
+                    <label class="radio-card"><input type="radio" name="character" value="slime"><span><strong>슬라임</strong><small>장판 · 소환수</small></span></label>
                 </fieldset>
 
-                <label>
-                    플레이 맵
-                    <select id="customMapSelect">
-                        <option value="">기본 맵</option>
-                    </select>
-                </label>
+                <label>선택 맵</label>
+                <article class="selected-map-card" id="selectedMapCard" role="button" tabindex="0" aria-label="맵 선택 페이지 열기">
+                    <canvas id="selectedMapMini" width="220" height="140" aria-hidden="true"></canvas>
+                    <div class="selected-map-copy">
+                        <p class="eyebrow">Official map</p>
+                        <h2 id="selectedMapName">초원 교차로</h2>
+                        <p id="selectedMapSummary">가운데 벽을 활용해 견제하는 기본 정식 맵</p>
+                    </div>
+                </article>
+                <div class="map-card-actions">
+                    <button class="ghost-button circle-info" id="mapInfoButton" type="button" aria-label="맵 정보">i</button>
+                    <button class="ghost-button" id="openMapSelectButton" type="button">맵 바꾸기</button>
+                </div>
+                <select id="customMapSelect" hidden><option value="official:crossroads">초원 교차로</option></select>
 
                 <label class="bot-toggle">
                     <input id="botToggle" type="checkbox" checked>
                     <span>부족한 인원은 봇으로 채우기</span>
                 </label>
-
-                <button id="joinButton" type="submit">v2로 매칭 시작</button>
                 <p class="status-line" id="statusLine">대기 중</p>
             </form>
 
             <aside class="help-panel">
                 <h2>조작</h2>
                 <p>PC: WASD/방향키 이동, 마우스 클릭 발사, Space 궁극기</p>
-                <p>패드/폰: 왼쪽 조이스틱 이동, 오른쪽 조이스틱 조준 후 손 떼면 발사, 궁 버튼 사용</p>
+                <p>패드/폰: 왼쪽 조이스틱 이동, 오른쪽 조이스틱 조준 후 손 떼면 발사</p>
             </aside>
+        </section>
+
+        <section class="screen map-select-screen" id="mapSelectScreen" hidden aria-labelledby="mapSelectTitle">
+            <div class="selection-panel">
+                <div class="panel-head">
+                    <div><p class="eyebrow">Map select</p><h2 id="mapSelectTitle">맵 선택</h2></div>
+                    <button class="ghost-button" id="closeMapSelectButton" type="button">로비</button>
+                </div>
+                <div class="map-grid" id="officialMapGrid"></div>
+                <div class="custom-map-list" id="customMapList"></div>
+                <button id="mapSelectEditorButton" type="button">맵 만들기</button>
+            </div>
+        </section>
+
+        <section class="screen character-select-screen" id="characterSelectScreen" hidden aria-labelledby="characterSelectTitle">
+            <div class="selection-panel">
+                <div class="panel-head">
+                    <div><p class="eyebrow">Character select</p><h2 id="characterSelectTitle">캐릭터 선택</h2></div>
+                    <button class="ghost-button" id="closeCharacterSelectButton" type="button">로비</button>
+                </div>
+                <div class="character-grid" id="characterGrid"></div>
+            </div>
+        </section>
+
+        <div class="map-info-modal" id="mapInfoModal" hidden role="dialog" aria-modal="true" aria-labelledby="mapInfoTitle">
+            <div class="map-info-card">
+                <button class="ghost-button map-info-close" id="closeMapInfoButton" type="button">×</button>
+                <canvas id="mapInfoMini" width="320" height="210" aria-hidden="true"></canvas>
+                <div>
+                    <p class="eyebrow">Map info</p>
+                    <h2 id="mapInfoTitle">맵 정보</h2>
+                    <p id="mapInfoDescription"></p>
+                </div>
+            </div>
+        </div>
+
+        <section class="screen map-editor-screen" id="mapEditorScreen" hidden aria-labelledby="mapEditorTitle">
+            <div class="map-editor-panel">
+                <div class="panel-head">
+                    <div><p class="eyebrow">Custom map</p><h2 id="mapEditorTitle">맵 제작</h2></div>
+                    <button class="ghost-button" id="closeMapEditorButton" type="button">로비</button>
+                </div>
+                <div class="map-editor-controls">
+                    <label>맵 이름 <input id="mapNameInput" maxlength="30" placeholder="내가 만든 맵"></label>
+                    <label>가로 칸 <input id="mapColsInput" type="number" min="8" max="100" value="24"></label>
+                    <label>세로 칸 <input id="mapRowsInput" type="number" min="8" max="100" value="16"></label>
+                    <button id="newMapButton" type="button">크기 적용</button>
+                    <button id="saveMapButton" type="button">저장/올리기</button>
+                </div>
+                <canvas id="mapEditorCanvas" width="960" height="640"></canvas>
+                <div class="map-toolbox" role="toolbar" aria-label="맵 배치 요소">
+                    <button class="map-tool is-selected" data-tool="wall" type="button">벽</button>
+                    <button class="map-tool" data-tool="spawn" type="button">플레이어 생성 지점</button>
+                    <button class="map-tool" data-tool="erase" type="button">지우개</button>
+                </div>
+                <p class="map-editor-status" id="mapEditorStatus">크기를 정하고 하단 도구로 벽을 배치하세요.</p>
+            </div>
         </section>
 
         <section class="screen game-screen" id="gameScreen" hidden>
@@ -95,6 +151,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
-    <script src="/guangboo-v2/client.js?v=20260630-pixi-v2" defer></script>
+    <script src="/guangboo-v2/client.js?v=20260630-v2-lobby-map-character" defer></script>
 </body>
 </html>
