@@ -132,8 +132,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts browser caches for changed guangboo assets', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260630-map-editor-ai/);
-    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-ai/);
+    assert.match(htmlSource, /styles\.css\?v=20260630-map-editor-button-fix/);
+    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-button-fix/);
 });
 
 
@@ -249,7 +249,7 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
     assert.match(runtimeSource, /if \(isSlime\(player\)\) \{\n\s*castSlimeUltimate\(match, player, now\);\n\s*return;\n\s*\}/);
     assert.match(runtimeSource, /if \(message\.ultimate && queueUltimateInput\(player, aim\)\) \{\n\s*spawnUltimateProjectile\(client\.match, player, Date\.now\(\)\);\n\s*\}/);
-    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-ai/);
+    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-button-fix/);
 });
 
 
@@ -263,6 +263,13 @@ test('guangboo supports lobby custom map creation, saving, listing, and selectio
     assert.match(htmlSource, /data-tool="erase"/);
     assert.match(clientSource, /const CUSTOM_MAP_STORAGE_KEY = 'guangboo_custom_map_id'/);
     assert.match(clientSource, /function loadCustomMaps\(\)/);
+    assert.match(clientSource, /function openMapEditor\(\)/);
+    assert.match(clientSource, /elements\.openMapEditor\.addEventListener\('click', openMapEditor\)/);
+    assert.match(clientSource, /elements\.closeMapEditor\.addEventListener\('click', closeMapEditor\)/);
+    assert.match(clientSource, /elements\.newMap\.addEventListener\('click', applyEditorSize\)/);
+    assert.match(clientSource, /elements\.saveMap\.addEventListener\('click', saveCustomMap\)/);
+    assert.match(clientSource, /elements\.mapEditorCanvas\.addEventListener\('pointerdown'/);
+    assert.match(clientSource, /elements\.mapTools\.forEach\(button =>/);
     assert.match(clientSource, /fetch\('\/api\/guangboo\/maps', \{ cache: 'no-store' \}\)/);
     assert.match(clientSource, /function saveCustomMap\(\)/);
     assert.match(clientSource, /method: 'POST'/);

@@ -460,6 +460,18 @@
         drawMapEditor();
     }
 
+    function openMapEditor() {
+        state.joining = false;
+        setMatchingUi(false);
+        setScreen('editor');
+        applyEditorSize();
+    }
+
+    function closeMapEditor() {
+        setScreen('lobby');
+        loadCustomMaps();
+    }
+
     function editCellFromEvent(event) {
         const canvas = elements.mapEditorCanvas;
         const rect = canvas.getBoundingClientRect();
@@ -1379,6 +1391,29 @@
     });
 
     elements.refreshBoard.addEventListener('click', loadLeaderboard);
+    elements.openMapEditor.addEventListener('click', openMapEditor);
+    elements.closeMapEditor.addEventListener('click', closeMapEditor);
+    elements.newMap.addEventListener('click', applyEditorSize);
+    elements.saveMap.addEventListener('click', saveCustomMap);
+    elements.customMapSelect.addEventListener('change', () => {
+        localStorage.setItem(CUSTOM_MAP_STORAGE_KEY, elements.customMapSelect.value || '');
+    });
+    elements.mapTools.forEach(button => {
+        button.addEventListener('click', () => {
+            state.editor.tool = button.dataset.tool || 'wall';
+            elements.mapTools.forEach(candidate => candidate.classList.toggle('is-selected', candidate === button));
+        });
+    });
+    elements.mapEditorCanvas.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
+        editCellFromEvent(event);
+    });
+    elements.mapEditorCanvas.addEventListener('pointermove', event => {
+        if (!elements.mapEditorCanvas.hasPointerCapture?.(event.pointerId)) return;
+        event.preventDefault();
+        editCellFromEvent(event);
+    });
     elements.fullscreenExit.addEventListener('click', exitGameFullscreen);
     elements.ultimateButton?.addEventListener('pointerdown', event => {
         event.preventDefault();
