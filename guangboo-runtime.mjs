@@ -12,7 +12,6 @@ const PROJECTILE_RANGE = 300;
 const PROJECTILE_SPEED = 570;
 const TILE_SIZE = 40;
 const ULTIMATE_HITS_REQUIRED = 4;
-const MAX_SLIME_ULTIMATE_HITS = 12;
 const ULTIMATE_DAMAGE = 2000;
 const ULTIMATE_PROJECTILE_HEALTH = 3000;
 const ULTIMATE_SPEED = 150;
@@ -352,7 +351,7 @@ export function createGuangbooRealtime(server, store) {
                     maxHealth: PLAYER_MAX_HEALTH,
                     ammo: Math.max(0, Math.min(MAX_AMMO, Math.floor(player.ammo))),
                     maxAmmo: MAX_AMMO,
-                    ultimateHits: isSlime(player) ? Math.min(MAX_SLIME_ULTIMATE_HITS, player.ultimateHits || 0) : Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0),
+                    ultimateHits: isSlime(player) ? (player.ultimateHits || 0) : Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0),
                     ultimateRequired: ultimateRequiredFor(player),
                     ultimateReady: Boolean(player.ultimateReady),
                     slowedUntil: player.slowedUntil || 0,
@@ -515,7 +514,7 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function spawnBabySlimes(match, player, count, now) {
-        const total = Math.max(1, Math.min(MAX_SLIME_ULTIMATE_HITS, count));
+        const total = Math.max(1, Math.floor(count));
         for (let index = 0; index < total; index += 1) {
             const angle = (Math.PI * 2 * index) / total;
             match.summons.push({
@@ -683,7 +682,7 @@ export function createGuangbooRealtime(server, store) {
         syncUltimateReady(player);
         if (!player.ultimateReady) return;
         if (isSlime(player)) {
-            const spawnCount = Math.max(1, Math.min(MAX_SLIME_ULTIMATE_HITS, player.ultimateHits || 0));
+            const spawnCount = Math.max(1, Math.floor(player.ultimateHits || 0));
             spawnBabySlimes(match, player, spawnCount, now);
             player.ultimateHits = 0;
             player.ultimateReady = false;
@@ -848,7 +847,7 @@ export function createGuangbooRealtime(server, store) {
                 resetRegenTimer(hit, now);
                 if ((projectile.kind === 'normal' || projectile.kind === 'slime') && owner) {
                     owner.ultimateHits = isSlime(owner)
-                        ? Math.min(MAX_SLIME_ULTIMATE_HITS, (owner.ultimateHits || 0) + 1)
+                        ? (owner.ultimateHits || 0) + 1
                         : Math.min(ULTIMATE_HITS_REQUIRED, (owner.ultimateHits || 0) + 1);
                     syncUltimateReady(owner);
                 }
