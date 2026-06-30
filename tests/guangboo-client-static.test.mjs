@@ -187,9 +187,10 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(clientSource, /function drawSummon\(summon\)/);
     assert.match(clientSource, /player\.character === 'slime'/);
     assert.match(clientSource, /const isSlime = player\?\.character === 'slime'/);
-    assert.match(clientSource, /const ready = isSlime \? rawHits >= 1 : Boolean\(player\?\.ultimateReady\)/);
-    assert.match(clientSource, /const slimeReady = me\?\.character === 'slime' && Math\.max\(0, Number\(me\?\.ultimateHits\) \|\| 0\) >= 1/);
-    assert.match(clientSource, /const ready = slimeReady \|\| Boolean\(me\?\.ultimateReady\)/);
+    assert.match(clientSource, /const hits = isSlime \? Math\.min\(4, rawHits\) : Math\.min\(required, rawHits\)/);
+    assert.match(clientSource, /const ready = Boolean\(player\?\.ultimateReady\)/);
+    assert.match(clientSource, /const ready = Boolean\(me\?\.ultimateReady\)/);
+    assert.doesNotMatch(clientSource, /const slimeReady =/);
     assert.match(clientSource, /const sent = send\(currentInput\(\)\)/);
     assert.match(clientSource, /me\.ultimateReady = false;\n\s*me\.ultimateHits = 0/);
     assert.match(clientSource, /projectile\.kind === 'slime'/);
@@ -215,17 +216,18 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /moveSummonTowardTarget\(match, summon, target, dt\)/);
     assert.match(runtimeSource, /function stepSummons\(match, now, dt\)/);
     assert.match(runtimeSource, /function ultimateRequiredFor\(player\)/);
-    assert.doesNotMatch(runtimeSource, /MAX_SLIME_ULTIMATE_HITS/);
     assert.match(runtimeSource, /const SLIME_ULTIMATE_MIN_HITS_REQUIRED = 1/);
+    assert.match(runtimeSource, /const SLIME_ULTIMATE_MAX_SUMMONS = 4/);
     assert.match(runtimeSource, /return isSlime\(player\) \? SLIME_ULTIMATE_MIN_HITS_REQUIRED : ULTIMATE_HITS_REQUIRED/);
     assert.match(runtimeSource, /function slimeSummonCountForUltimate\(player\)/);
+    assert.match(runtimeSource, /Math\.min\(\n\s*SLIME_ULTIMATE_MAX_SUMMONS,/);
     assert.match(runtimeSource, /player\?\.slimeSummonCharge \?\? player\?\.ultimateHits \?\? 0/);
     assert.match(runtimeSource, /function consumeSlimeSummonCharge\(player\)/);
-    assert.match(runtimeSource, /player\.slimeSummonCharge = \(player\.slimeSummonCharge \|\| 0\) \+ 1/);
-    assert.match(runtimeSource, /player\.ultimateHits = player\.slimeSummonCharge/);
+    assert.match(runtimeSource, /player\.slimeSummonCharge = Math\.min\(SLIME_ULTIMATE_MAX_SUMMONS, \(player\.slimeSummonCharge \|\| 0\) \+ 1\)/);
+    assert.match(runtimeSource, /player\.ultimateHits = slimeSummonCountForUltimate\(player\)/);
     assert.match(runtimeSource, /function hasUsableUltimate\(player\)/);
     assert.match(runtimeSource, /return isSlime\(player\) \? slimeSummonCountForUltimate\(player\) >= SLIME_ULTIMATE_MIN_HITS_REQUIRED : hits >= ULTIMATE_HITS_REQUIRED/);
-    assert.match(runtimeSource, /ultimateHits: isSlime\(player\) \? \(player\.ultimateHits \|\| 0\) : Math.min\(ULTIMATE_HITS_REQUIRED/);
+    assert.match(runtimeSource, /ultimateHits: isSlime\(player\) \? slimeSummonCountForUltimate\(player\) : Math.min\(ULTIMATE_HITS_REQUIRED/);
     assert.doesNotMatch(runtimeSource, /owner\.ultimateHits = isSlime\(owner\)/);
     assert.match(runtimeSource, /syncUltimateReady\(player\);\n\s*if \(!player\.ultimateReady\) return false/);
     assert.match(runtimeSource, /kind: slimeShot \? 'slime' : 'normal'/);
@@ -236,7 +238,7 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /if \(spawnCount < SLIME_ULTIMATE_MIN_HITS_REQUIRED\) return/);
     assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
     assert.match(runtimeSource, /if \(message\.ultimate && queueUltimateInput\(player, aim\)\) \{\n\s*spawnUltimateProjectile\(client\.match, player, Date\.now\(\)\);\n\s*\}/);
-    assert.match(htmlSource, /client\.js\?v=20260630-slime-charge/);
+    assert.match(htmlSource, /client\.js\?v=20260630-slime-ultimate-cap/);
 });
 
 test('guangboo plays Web Audio projectile sounds on spawn, flight, and impact', () => {

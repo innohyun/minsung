@@ -13,6 +13,7 @@ const PROJECTILE_SPEED = 570;
 const TILE_SIZE = 40;
 const ULTIMATE_HITS_REQUIRED = 4;
 const SLIME_ULTIMATE_MIN_HITS_REQUIRED = 1;
+const SLIME_ULTIMATE_MAX_SUMMONS = 4;
 const ULTIMATE_DAMAGE = 2000;
 const ULTIMATE_PROJECTILE_HEALTH = 3000;
 const ULTIMATE_SPEED = 150;
@@ -352,7 +353,7 @@ export function createGuangbooRealtime(server, store) {
                     maxHealth: PLAYER_MAX_HEALTH,
                     ammo: Math.max(0, Math.min(MAX_AMMO, Math.floor(player.ammo))),
                     maxAmmo: MAX_AMMO,
-                    ultimateHits: isSlime(player) ? (player.ultimateHits || 0) : Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0),
+                    ultimateHits: isSlime(player) ? slimeSummonCountForUltimate(player) : Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0),
                     ultimateRequired: ultimateRequiredFor(player),
                     ultimateReady: Boolean(player.ultimateReady),
                     slowedUntil: player.slowedUntil || 0,
@@ -481,7 +482,10 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function slimeSummonCountForUltimate(player) {
-        return Math.max(0, Math.floor(player?.slimeSummonCharge ?? player?.ultimateHits ?? 0));
+        return Math.min(
+            SLIME_ULTIMATE_MAX_SUMMONS,
+            Math.max(0, Math.floor(player?.slimeSummonCharge ?? player?.ultimateHits ?? 0))
+        );
     }
 
     function hasUsableUltimate(player) {
@@ -495,8 +499,8 @@ export function createGuangbooRealtime(server, store) {
 
     function addUltimateHitCharge(player) {
         if (isSlime(player)) {
-            player.slimeSummonCharge = (player.slimeSummonCharge || 0) + 1;
-            player.ultimateHits = player.slimeSummonCharge;
+            player.slimeSummonCharge = Math.min(SLIME_ULTIMATE_MAX_SUMMONS, (player.slimeSummonCharge || 0) + 1);
+            player.ultimateHits = slimeSummonCountForUltimate(player);
             syncUltimateReady(player);
             return;
         }

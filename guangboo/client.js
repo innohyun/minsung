@@ -418,8 +418,8 @@
         const required = Number(player?.ultimateRequired) || 4;
         const rawHits = Math.max(0, Number(player?.ultimateHits) || 0);
         const isSlime = player?.character === 'slime';
-        const hits = isSlime ? rawHits : Math.min(required, rawHits);
-        const ready = isSlime ? rawHits >= 1 : Boolean(player?.ultimateReady);
+        const hits = isSlime ? Math.min(4, rawHits) : Math.min(required, rawHits);
+        const ready = Boolean(player?.ultimateReady);
         elements.ultimateButton.disabled = !ready || !state.matchActive || player?.alive === false;
         elements.ultimateButton.classList.toggle('is-ready', ready);
         elements.ultimateButton.querySelector('.ultimate-count').textContent = player?.character === 'slime'
@@ -1110,8 +1110,7 @@
 
     function fireUltimate() {
         const me = state.players.find(player => player.id === state.playerId);
-        const slimeReady = me?.character === 'slime' && Math.max(0, Number(me?.ultimateHits) || 0) >= 1;
-        const ready = slimeReady || Boolean(me?.ultimateReady);
+        const ready = Boolean(me?.ultimateReady);
         if (!state.matchActive || !ready) return false;
         unlockAudio();
         const aim = currentAim(me);
