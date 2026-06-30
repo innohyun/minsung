@@ -91,10 +91,12 @@ test('guangboo draws brawl-style ammo under each player health bar', () => {
     assert.doesNotMatch(clientSource, /drawAmmoHud\(\);/);
 });
 
-test('guangboo orders player name, health bar, and ammo above the monster', () => {
-    assert.match(clientSource, /const nameY = point\.y - radius - 58 \* state\.viewport\.scale/);
-    assert.match(clientSource, /const y = point\.y - radius - 36 \* state\.viewport\.scale/);
-    assert.match(clientSource, /const y = barY \+ barHeight \+ Math\.max\(3, 4 \* state\.viewport\.scale\)/);
+test('guangboo keeps name, health, and ammo proportions stable on phones', () => {
+    assert.match(clientSource, /function playerHudScale\(\)/);
+    assert.match(clientSource, /Math\.max\(0\.92, Math\.min\(1\.08, state\.viewport\.scale\)\)/);
+    assert.match(clientSource, /const nameY = point\.y - radius - 58 \* hudScale/);
+    assert.match(clientSource, /const y = point\.y - radius - 36 \* hudScale/);
+    assert.match(clientSource, /const y = barY \+ barHeight \+ 4 \* hudScale/);
 });
 
 test('guangboo suppresses mobile double-tap zoom during matches', () => {
@@ -128,8 +130,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile16/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile16/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile17/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile17/);
 });
 
 
@@ -301,12 +303,4 @@ test('guangboo server queues firing inputs so later movement packets cannot swal
     assert.match(runtimeSource, /firing: false,/);
     assert.match(runtimeSource, /player\.queuedShotAims\.length && player\.ammo > 0/);
     assert.doesNotMatch(runtimeSource, /player\.queuedShotAim\b/);
-});
-
-
-test('guangboo fits gameplay to the tablet-proven map aspect on every device', () => {
-    assert.match(clientSource, /const mapRatio = map\.width \/ map\.height/);
-    assert.match(clientSource, /const width = Math\.min\(screenWidth, screenHeight \* mapRatio\)/);
-    assert.match(clientSource, /elements\.canvas\.style\.left = `\$\{\(screenWidth - width\) \/ 2\}px`/);
-    assert.match(stylesSource, /#gameCanvas \{[\s\S]*?position: absolute/);
 });

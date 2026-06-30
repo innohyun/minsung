@@ -437,27 +437,22 @@
 
     function resizeCanvas() {
         const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-        const map = state.map || WORLD_FALLBACK;
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-        const mapRatio = map.width / map.height;
-        const width = Math.min(screenWidth, screenHeight * mapRatio);
-        const height = width / mapRatio;
+        const width = window.innerWidth;
+        const height = window.innerHeight;
         elements.canvas.width = Math.floor(width * dpr);
         elements.canvas.height = Math.floor(height * dpr);
         elements.canvas.style.width = `${width}px`;
         elements.canvas.style.height = `${height}px`;
-        elements.canvas.style.left = `${(screenWidth - width) / 2}px`;
-        elements.canvas.style.top = `${(screenHeight - height) / 2}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        const scale = width / map.width;
+        const map = state.map || WORLD_FALLBACK;
+        const scale = Math.min(width / map.width, height / map.height);
         state.viewport = {
             width,
             height,
             scale,
-            offsetX: 0,
-            offsetY: 0
+            offsetX: (width - map.width * scale) / 2,
+            offsetY: (height - map.height * scale) / 2
         };
     }
 
@@ -712,30 +707,37 @@
         ctx.restore();
     }
 
+    function playerHudScale() {
+        return Math.max(0.92, Math.min(1.08, state.viewport.scale));
+    }
+
     function drawNameplate(player, point, radius) {
+        const hudScale = playerHudScale();
         ctx.save();
-        ctx.font = '700 12px system-ui, sans-serif';
+        ctx.font = `700 ${Math.round(12 * hudScale)}px system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(8, 13, 10, 0.72)';
         const text = player.nickname || 'Monster';
-        const width = Math.min(120, ctx.measureText(text).width + 18);
-        const nameY = point.y - radius - 58 * state.viewport.scale;
-        roundRect(point.x - width / 2, nameY - 13, width, 20, 8);
+        const width = Math.min(124 * hudScale, ctx.measureText(text).width + 18 * hudScale);
+        const height = 20 * hudScale;
+        const nameY = point.y - radius - 58 * hudScale;
+        roundRect(point.x - width / 2, nameY - height / 2 - 3 * hudScale, width, height, 8 * hudScale);
         ctx.fill();
         ctx.fillStyle = '#f8fff4';
-        ctx.fillText(text, point.x, nameY + 1);
+        ctx.fillText(text, point.x, nameY + 1 * hudScale);
         ctx.restore();
         drawPlayerHealthBar(player, point, radius);
     }
 
     function drawPlayerAmmoBar(player, point, barY, barHeight, barWidth) {
+        const hudScale = playerHudScale();
         const maxAmmo = Number(player.maxAmmo) || 3;
         const ammo = Math.max(0, Math.min(maxAmmo, Math.floor(Number(player.ammo) || 0)));
-        const gap = Math.max(2, 3 * state.viewport.scale);
+        const gap = 3 * hudScale;
         const cellW = (barWidth - gap * (maxAmmo - 1)) / maxAmmo;
-        const cellH = Math.max(5, 6 * state.viewport.scale);
+        const cellH = 6 * hudScale;
         const startX = point.x - barWidth / 2;
-        const y = barY + barHeight + Math.max(3, 4 * state.viewport.scale);
+        const y = barY + barHeight + 4 * hudScale;
         ctx.save();
         for (let i = 0; i < maxAmmo; i += 1) {
             const x = startX + i * (cellW + gap);
@@ -750,10 +752,11 @@
     }
 
     function drawPlayerHealthBar(player, point, radius) {
-        const width = 74 * state.viewport.scale;
-        const height = Math.max(13, 15 * state.viewport.scale);
+        const hudScale = playerHudScale();
+        const width = 74 * hudScale;
+        const height = 15 * hudScale;
         const x = point.x - width / 2;
-        const y = point.y - radius - 36 * state.viewport.scale;
+        const y = point.y - radius - 36 * hudScale;
         const maxHealth = Number(player.maxHealth) || PLAYER_MAX_HEALTH;
         const health = Math.max(0, Math.round(Number(player.health) || 0));
         const ratio = Math.max(0, Math.min(1, health / maxHealth));
@@ -768,7 +771,7 @@
         ctx.lineWidth = 1;
         roundRect(x + 0.5, y + 0.5, width - 1, height - 1, height / 2);
         ctx.stroke();
-        ctx.font = `${Math.max(9, 10 * state.viewport.scale)}px system-ui, sans-serif`;
+        ctx.font = `${Math.round(10 * hudScale)}px system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.lineWidth = 3;
