@@ -128,8 +128,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile15/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile15/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile16/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile16/);
 });
 
 
@@ -187,11 +187,15 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /function isOnEnemySlimeTrail\(match, player, now\)/);
     assert.match(runtimeSource, /function spawnBabySlimes\(match, player, count, now\)/);
     assert.match(runtimeSource, /function isSummonBlocked\(map, x, y, radius = BABY_SLIME_RADIUS\)/);
+    assert.match(runtimeSource, /function summonGridPath\(match, summon, target\)/);
+    assert.match(runtimeSource, /const wallKeys = new Set\(\(map\.walls \|\| \[\]\)\.map/);
+    assert.match(runtimeSource, /const directions = \[\n\s*\{ col: 1, row: 0 \}/);
     assert.match(runtimeSource, /function moveSummonTowardTarget\(match, summon, target, dt\)/);
-    assert.match(runtimeSource, /filter\(option => !isSummonBlocked\(match\.map, option\.x, option\.y, summon\.radius\)\)/);
+    assert.match(runtimeSource, /if \(isSummonBlocked\(match\.map, nextX, nextY, summon\.radius\)\) return/);
     assert.match(runtimeSource, /moveSummonTowardTarget\(match, summon, target, dt\)/);
     assert.match(runtimeSource, /function stepSummons\(match, now, dt\)/);
     assert.match(runtimeSource, /function ultimateRequiredFor\(player\)/);
+    assert.match(runtimeSource, /const MAX_SLIME_ULTIMATE_HITS = 12/);
     assert.match(runtimeSource, /return isSlime\(player\) \? 1 : ULTIMATE_HITS_REQUIRED/);
     assert.match(runtimeSource, /function hasUsableUltimate\(player\)/);
     assert.match(runtimeSource, /return isSlime\(player\) \? hits > 0 : hits >= ULTIMATE_HITS_REQUIRED/);
@@ -200,6 +204,7 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /damage: slimeShot \? SLIME_PROJECTILE_DAMAGE : PROJECTILE_DAMAGE/);
     assert.match(runtimeSource, /hit\.ammo = Math\.max\(0, hit\.ammo - 1\)/);
     assert.match(runtimeSource, /owner\.ammo = Math\.min\(MAX_AMMO, owner\.ammo \+ 1\)/);
+    assert.match(runtimeSource, /MAX_SLIME_ULTIMATE_HITS/);
     assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
 });
 
@@ -296,4 +301,12 @@ test('guangboo server queues firing inputs so later movement packets cannot swal
     assert.match(runtimeSource, /firing: false,/);
     assert.match(runtimeSource, /player\.queuedShotAims\.length && player\.ammo > 0/);
     assert.doesNotMatch(runtimeSource, /player\.queuedShotAim\b/);
+});
+
+
+test('guangboo fits gameplay to the tablet-proven map aspect on every device', () => {
+    assert.match(clientSource, /const mapRatio = map\.width \/ map\.height/);
+    assert.match(clientSource, /const width = Math\.min\(screenWidth, screenHeight \* mapRatio\)/);
+    assert.match(clientSource, /elements\.canvas\.style\.left = `\$\{\(screenWidth - width\) \/ 2\}px`/);
+    assert.match(stylesSource, /#gameCanvas \{[\s\S]*?position: absolute/);
 });

@@ -431,6 +431,7 @@ body.is-playing.is-game-fullscreen .match-screen {
 }
 
 #gameCanvas {
+    position: absolute;
     display: block;
     width: 100vw;
     height: 100dvh;

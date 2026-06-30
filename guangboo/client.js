@@ -416,11 +416,14 @@
     function updateUltimateButton(player = state.players.find(candidate => candidate.id === state.playerId)) {
         if (!elements.ultimateButton) return;
         const required = Number(player?.ultimateRequired) || 4;
-        const hits = Math.max(0, Math.min(required, Number(player?.ultimateHits) || 0));
+        const rawHits = Math.max(0, Number(player?.ultimateHits) || 0);
+        const hits = player?.character === 'slime' ? rawHits : Math.min(required, rawHits);
         const ready = Boolean(player?.ultimateReady);
         elements.ultimateButton.disabled = !ready || !state.matchActive || player?.alive === false;
         elements.ultimateButton.classList.toggle('is-ready', ready);
-        elements.ultimateButton.querySelector('.ultimate-count').textContent = ready ? 'READY' : `${hits}/${required}`;
+        elements.ultimateButton.querySelector('.ultimate-count').textContent = player?.character === 'slime'
+            ? `${hits}마리`
+            : (ready ? 'READY' : `${hits}/${required}`);
     }
 
     function escapeHtml(value) {
@@ -434,22 +437,27 @@
 
     function resizeCanvas() {
         const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        const map = state.map || WORLD_FALLBACK;
+        const screenWidth = window.innerWidth;
+        const screenHeight = window.innerHeight;
+        const mapRatio = map.width / map.height;
+        const width = Math.min(screenWidth, screenHeight * mapRatio);
+        const height = width / mapRatio;
         elements.canvas.width = Math.floor(width * dpr);
         elements.canvas.height = Math.floor(height * dpr);
         elements.canvas.style.width = `${width}px`;
         elements.canvas.style.height = `${height}px`;
+        elements.canvas.style.left = `${(screenWidth - width) / 2}px`;
+        elements.canvas.style.top = `${(screenHeight - height) / 2}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-        const map = state.map || WORLD_FALLBACK;
-        const scale = Math.min(width / map.width, height / map.height);
+        const scale = width / map.width;
         state.viewport = {
             width,
             height,
             scale,
-            offsetX: (width - map.width * scale) / 2,
-            offsetY: (height - map.height * scale) / 2
+            offsetX: 0,
+            offsetY: 0
         };
     }
 

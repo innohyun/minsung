@@ -12,6 +12,7 @@ const PROJECTILE_RANGE = 300;
 const PROJECTILE_SPEED = 570;
 const TILE_SIZE = 40;
 const ULTIMATE_HITS_REQUIRED = 4;
+const MAX_SLIME_ULTIMATE_HITS = 12;
 const ULTIMATE_DAMAGE = 2000;
 const ULTIMATE_SPEED = 150;
 const ULTIMATE_RANGE = 820;
@@ -350,7 +351,7 @@ export function createGuangbooRealtime(server, store) {
                     maxHealth: PLAYER_MAX_HEALTH,
                     ammo: Math.max(0, Math.min(MAX_AMMO, Math.floor(player.ammo))),
                     maxAmmo: MAX_AMMO,
-                    ultimateHits: Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0),
+                    ultimateHits: isSlime(player) ? Math.min(MAX_SLIME_ULTIMATE_HITS, player.ultimateHits || 0) : Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0),
                     ultimateRequired: ultimateRequiredFor(player),
                     ultimateReady: Boolean(player.ultimateReady),
                     slowedUntil: player.slowedUntil || 0,
@@ -513,15 +514,15 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function spawnBabySlimes(match, player, count, now) {
-        const total = Math.max(1, Math.min(ULTIMATE_HITS_REQUIRED, count));
+        const total = Math.max(1, Math.min(MAX_SLIME_ULTIMATE_HITS, count));
         for (let index = 0; index < total; index += 1) {
             const angle = (Math.PI * 2 * index) / total;
             match.summons.push({
                 id: `${match.id}-bs${match.nextSummonId++}`,
                 kind: 'babySlime',
                 ownerId: player.id,
-                x: player.x + Math.cos(angle) * 28,
-                y: player.y + Math.sin(angle) * 28,
+                x: Math.max(BABY_SLIME_RADIUS, Math.min(match.map.width - BABY_SLIME_RADIUS, player.x + Math.cos(angle) * 28)),
+                y: Math.max(BABY_SLIME_RADIUS, Math.min(match.map.height - BABY_SLIME_RADIUS, player.y + Math.sin(angle) * 28)),
                 health: BABY_SLIME_HEALTH,
                 maxHealth: BABY_SLIME_HEALTH,
                 radius: BABY_SLIME_RADIUS,
@@ -530,34 +531,74 @@ export function createGuangbooRealtime(server, store) {
         }
     }
 
-    function moveSummonTowardTarget(match, summon, target, dt) {
-        const dx = target.x - summon.x;
-        const dy = target.y - summon.y;
-        const length = Math.hypot(dx, dy) || 1;
-        const direct = { x: dx / length, y: dy / length };
-        const distance = BABY_SLIME_SPEED * dt;
-        const candidates = [
-            direct,
-            { x: direct.x * 0.65 - direct.y * 0.76, y: direct.x * 0.76 + direct.y * 0.65 },
-            { x: direct.x * 0.65 + direct.y * 0.76, y: -direct.x * 0.76 + direct.y * 0.65 },
-            { x: -direct.y, y: direct.x },
-            { x: direct.y, y: -direct.x },
-            { x: direct.x * 0.25 - direct.y * 0.97, y: direct.x * 0.97 + direct.y * 0.25 },
-            { x: direct.x * 0.25 + direct.y * 0.97, y: -direct.x * 0.97 + direct.y * 0.25 }
+    function summonGridPath(match, summon, target) {
+        const map = match.map;
+        const tileSize = map.tileSize || TILE_SIZE;
+        const cols = map.cols || Math.ceil(map.width / tileSize);
+        const rows = map.rows || Math.ceil(map.height / tileSize);
+        const wallKeys = new Set((map.walls || []).map(wall => `${wall.col},${wall.row}`));
+        const toCell = point => ({
+            col: Math.max(0, Math.min(cols - 1, Math.floor(point.x / tileSize))),
+            row: Math.max(0, Math.min(rows - 1, Math.floor(point.y / tileSize)))
+        });
+        const start = toCell(summon);
+        const goal = toCell(target);
+        const keyOf = cell => `${cell.col},${cell.row}`;
+        const passable = cell => cell.col >= 0 && cell.col < cols && cell.row >= 0 && cell.row < rows && !wallKeys.has(keyOf(cell));
+        if (!passable(start) || !passable(goal)) return null;
+
+        const open = [{ ...start, g: 0, f: Math.abs(goal.col - start.col) + Math.abs(goal.row - start.row) }];
+        const cameFrom = new Map();
+        const bestCost = new Map([[keyOf(start), 0]]);
+        const directions = [
+            { col: 1, row: 0 }, { col: -1, row: 0 }, { col: 0, row: 1 }, { col: 0, row: -1 }
         ];
-        const options = candidates
-            .map(vector => {
-                const vLength = Math.hypot(vector.x, vector.y) || 1;
-                const x = summon.x + (vector.x / vLength) * distance;
-                const y = summon.y + (vector.y / vLength) * distance;
-                return { x, y, score: Math.hypot(target.x - x, target.y - y) };
-            })
-            .filter(option => !isSummonBlocked(match.map, option.x, option.y, summon.radius))
-            .sort((a, b) => a.score - b.score);
-        const best = options[0];
-        if (!best) return;
-        summon.x = best.x;
-        summon.y = best.y;
+
+        while (open.length) {
+            open.sort((a, b) => a.f - b.f);
+            const current = open.shift();
+            const currentKey = keyOf(current);
+            if (current.col === goal.col && current.row === goal.row) {
+                const path = [current];
+                let cursor = currentKey;
+                while (cameFrom.has(cursor)) {
+                    const previous = cameFrom.get(cursor);
+                    path.unshift(previous.cell);
+                    cursor = previous.key;
+                }
+                return path;
+            }
+            directions.forEach(direction => {
+                const next = { col: current.col + direction.col, row: current.row + direction.row };
+                if (!passable(next)) return;
+                const nextKey = keyOf(next);
+                const nextCost = (bestCost.get(currentKey) || 0) + 1;
+                if (nextCost >= (bestCost.get(nextKey) ?? Infinity)) return;
+                bestCost.set(nextKey, nextCost);
+                cameFrom.set(nextKey, { key: currentKey, cell: current });
+                const heuristic = Math.abs(goal.col - next.col) + Math.abs(goal.row - next.row);
+                open.push({ ...next, g: nextCost, f: nextCost + heuristic });
+            });
+        }
+        return null;
+    }
+
+    function moveSummonTowardTarget(match, summon, target, dt) {
+        const path = summonGridPath(match, summon, target);
+        const tileSize = match.map.tileSize || TILE_SIZE;
+        const nextCell = path?.[1] || path?.[0];
+        const waypoint = nextCell
+            ? { x: nextCell.col * tileSize + tileSize / 2, y: nextCell.row * tileSize + tileSize / 2 }
+            : target;
+        const dx = waypoint.x - summon.x;
+        const dy = waypoint.y - summon.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const distance = Math.min(BABY_SLIME_SPEED * dt, length);
+        const nextX = summon.x + (dx / length) * distance;
+        const nextY = summon.y + (dy / length) * distance;
+        if (isSummonBlocked(match.map, nextX, nextY, summon.radius)) return;
+        summon.x = nextX;
+        summon.y = nextY;
     }
 
     function stepSummons(match, now, dt) {
@@ -641,7 +682,7 @@ export function createGuangbooRealtime(server, store) {
         syncUltimateReady(player);
         if (!player.ultimateReady) return;
         if (isSlime(player)) {
-            const spawnCount = Math.max(1, Math.min(ULTIMATE_HITS_REQUIRED, player.ultimateHits || 0));
+            const spawnCount = Math.max(1, Math.min(MAX_SLIME_ULTIMATE_HITS, player.ultimateHits || 0));
             spawnBabySlimes(match, player, spawnCount, now);
             player.ultimateHits = 0;
             player.ultimateReady = false;
@@ -787,7 +828,9 @@ export function createGuangbooRealtime(server, store) {
                 hit.health -= projectile.damage;
                 resetRegenTimer(hit, now);
                 if ((projectile.kind === 'normal' || projectile.kind === 'slime') && owner) {
-                    owner.ultimateHits = Math.min(ULTIMATE_HITS_REQUIRED, (owner.ultimateHits || 0) + 1);
+                    owner.ultimateHits = isSlime(owner)
+                        ? Math.min(MAX_SLIME_ULTIMATE_HITS, (owner.ultimateHits || 0) + 1)
+                        : Math.min(ULTIMATE_HITS_REQUIRED, (owner.ultimateHits || 0) + 1);
                     syncUltimateReady(owner);
                 }
                 if (projectile.kind === 'slime' && owner) {
