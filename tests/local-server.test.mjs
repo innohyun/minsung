@@ -246,44 +246,47 @@ test('starts a guangboo survival match through automatic WebSocket matchmaking',
     });
 });
 
-test('starts a guangboo official-map match with selected map data', async () => {
-    await withServer(async baseUrl => {
+test('starts a guangboo 1:1 duel match with two players', async () => {
+    await withServer(async (baseUrl) => {
         const wsBaseUrl = baseUrl.replace(/^http/, 'ws');
-        const sockets = [];
-        const hellos = [];
-        const starts = [];
+        const opened = await Promise.all(
+            Array.from({ length: 2 }, () => openWebSocketAndWaitFor(
+                `${wsBaseUrl}/guangboo/ws`,
+                message => message.type === 'hello'
+            ))
+        );
+        const sockets = opened.map(entry => entry.socket);
+
         try {
-            for (let index = 0; index < 4; index += 1) {
-                const { socket, message } = await openWebSocketAndWaitFor(
-                    `${wsBaseUrl}/guangboo/ws`,
-                    msg => msg.type === 'hello'
-                );
-                sockets.push(socket);
-                hellos.push(message);
-                socket.on('message', data => {
-                    const parsed = JSON.parse(data.toString('utf8'));
-                    if (parsed.type === 'matchStart') starts.push(parsed);
-                });
-            }
+            const hellos = opened.map(entry => entry.message);
             assert.deepEqual(
-                hellos[0].modes.find(mode => mode.key === 'survival'),
-                { key: 'survival', label: '정식 맵 전투', size: 4 }
+                hellos[0].modes.find(mode => mode.key === 'duel'),
+                { key: 'duel', label: '1:1 결투', size: 2 }
             );
-            assert.equal(hellos[0].modes.some(mode => mode.key === 'duel'), false);
+
             sockets.forEach((socket, index) => {
                 socket.send(JSON.stringify({
                     type: 'joinQueue',
-                    nickname: `MapPlayer${index}`,
-                    mode: 'survival',
-                    officialMapId: 'official:ring'
+                    nickname: `Duel Monster ${index + 1}`,
+                    mode: 'duel'
                 }));
             });
-            const firstStart = await waitForWsMessage(sockets[0], message => message.type === 'matchStart');
-            starts.push(firstStart);
-            assert.equal(starts[0].mode, 'survival');
-            assert.equal(starts[0].map.id, 'official:ring');
-            assert.equal(starts[0].map.name, '강철 링');
-            assert.ok(starts[0].map.spawnPoints.length >= 4);
+
+            const starts = await Promise.all(
+                sockets.map(socket => waitForWsMessage(socket, message => message.type === 'matchStart'))
+            );
+            assert.equal(new Set(starts.map(message => message.matchId)).size, 1);
+            assert.equal(starts[0].mode, 'duel');
+            assert.equal(starts[0].players.length, 2);
+            assert.equal(starts[0].requiredPlayers, 2);
+
+            const state = await waitForWsMessage(sockets[0], message => message.type === 'state');
+            assert.equal(state.players.length, 2);
+            assert.equal(state.aliveCount, 2);
+
+            sockets[1].close();
+            const result = await waitForWsMessage(sockets[0], message => message.type === 'matchEnd');
+            assert.equal(result.winnerId, starts[0].playerId);
         } finally {
             sockets.forEach(socket => socket.close());
         }

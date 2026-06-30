@@ -3,9 +3,10 @@ import { WebSocketServer } from 'ws';
 
 const TICK_MS = 50;
 const WS_PATH = '/guangboo/ws';
-const DEFAULT_MODE = 'survival';
+const DEFAULT_MODE = 'duel';
 const MODES = {
-    survival: { key: 'survival', label: '정식 맵 전투', size: 4 }
+    duel: { key: 'duel', label: '1:1 결투', size: 2 },
+    survival: { key: 'survival', label: '4인 생존전', size: 4 }
 };
 const PROJECTILE_RANGE = 300;
 const PROJECTILE_SPEED = 570;
@@ -20,7 +21,7 @@ const ULTIMATE_RANGE = 820;
 const ULTIMATE_RADIUS = 24;
 const ULTIMATE_TURN_RATE = 0.08;
 const KNOCKBACK_DISTANCE = 90;
-const PLAYER_SPEED = 155;
+const PLAYER_SPEED = 190;
 const PLAYER_MAX_HEALTH = 6000;
 const PROJECTILE_DAMAGE = 1200;
 const SLIME_PROJECTILE_DAMAGE = 600;
@@ -54,44 +55,17 @@ const WALL_TILES = [
     { col: 15, row: 8 }
 ];
 
-const OFFICIAL_MAPS = {
-    'official:crossroads': { id: 'official:crossroads', name: '초원 교차로', cols: 24, rows: 16, walls: [{ col: 10, row: 6 }, { col: 11, row: 6 }, { col: 12, row: 6 }, { col: 13, row: 6 }, { col: 10, row: 9 }, { col: 11, row: 9 }, { col: 12, row: 9 }, { col: 13, row: 9 }, { col: 6, row: 8 }, { col: 17, row: 8 }], spawnPoints: [{ col: 4, row: 4 }, { col: 19, row: 11 }, { col: 4, row: 11 }, { col: 19, row: 4 }] },
-    'official:maze': { id: 'official:maze', name: '돌담 미로', cols: 24, rows: 16, walls: [{ col: 5, row: 3 }, { col: 5, row: 4 }, { col: 5, row: 5 }, { col: 5, row: 10 }, { col: 5, row: 11 }, { col: 5, row: 12 }, { col: 11, row: 5 }, { col: 12, row: 5 }, { col: 13, row: 5 }, { col: 10, row: 10 }, { col: 11, row: 10 }, { col: 12, row: 10 }, { col: 18, row: 3 }, { col: 18, row: 4 }, { col: 18, row: 11 }, { col: 18, row: 12 }], spawnPoints: [{ col: 2, row: 2 }, { col: 21, row: 13 }, { col: 2, row: 13 }, { col: 21, row: 2 }] },
-    'official:ring': { id: 'official:ring', name: '강철 링', cols: 24, rows: 16, walls: [{ col: 9, row: 5 }, { col: 10, row: 5 }, { col: 13, row: 5 }, { col: 14, row: 5 }, { col: 8, row: 6 }, { col: 15, row: 6 }, { col: 8, row: 9 }, { col: 15, row: 9 }, { col: 9, row: 10 }, { col: 10, row: 10 }, { col: 13, row: 10 }, { col: 14, row: 10 }], spawnPoints: [{ col: 3, row: 7 }, { col: 20, row: 7 }, { col: 11, row: 2 }, { col: 12, row: 13 }] },
-    'official:wide': { id: 'official:wide', name: '넓은 대평원', cols: 30, rows: 20, walls: [{ col: 8, row: 5 }, { col: 9, row: 5 }, { col: 20, row: 14 }, { col: 21, row: 14 }, { col: 14, row: 9 }, { col: 15, row: 9 }, { col: 14, row: 10 }, { col: 15, row: 10 }], spawnPoints: [{ col: 3, row: 3 }, { col: 26, row: 16 }, { col: 3, row: 16 }, { col: 26, row: 3 }] }
-};
-
-function createMap(definition = null) {
-    const source = definition || { cols: 24, rows: 16, walls: WALL_TILES, spawnPoints: [
-        { x: 312, y: 250 },
-        { x: 648, y: 250 },
-        { x: 312, y: 390 },
-        { x: 648, y: 390 }
-    ] };
-    const tileSize = TILE_SIZE;
-    const cols = Math.max(8, Math.floor(Number(source.cols) || 24));
-    const rows = Math.max(8, Math.floor(Number(source.rows) || 16));
-    const walls = (source.walls || WALL_TILES).map((wall, index) => ({ id: `w${index}`, col: wall.col, row: wall.row }));
-    const spawnPoints = (source.spawnPoints || []).map(spawn => {
-        if (Number.isFinite(spawn.x) && Number.isFinite(spawn.y)) return { x: spawn.x, y: spawn.y };
-        return { x: (Number(spawn.col) + 0.5) * tileSize, y: (Number(spawn.row) + 0.5) * tileSize };
-    }).filter(spawn => Number.isFinite(spawn.x) && Number.isFinite(spawn.y));
+function createMap() {
+    const walls = WALL_TILES.map((wall, index) => ({ id: `w${index}`, ...wall }));
     return {
-        id: source.id || '',
-        name: source.name || '기본 맵',
-        width: cols * tileSize,
-        height: rows * tileSize,
-        tileSize,
-        cols,
-        rows,
+        width: 960,
+        height: 640,
+        tileSize: TILE_SIZE,
+        cols: 24,
+        rows: 16,
         walls,
-        spawnPoints,
         obstacles: walls.map(wall => tileToRect(wall))
     };
-}
-
-function getOfficialMap(id) {
-    return OFFICIAL_MAPS[id] ? createMap(OFFICIAL_MAPS[id]) : null;
 }
 
 const MAP = createMap();
@@ -209,8 +183,6 @@ function normalizeCustomMapData(value) {
     const rows = Math.max(8, Math.min(100, Math.floor(Number(input.rows) || Math.ceil((Number(input.height) || 640) / tileSize))));
     const occupied = new Set();
     const walls = [];
-    const spawnOccupied = new Set();
-    const spawnPoints = [];
     for (const wall of Array.isArray(input.walls) ? input.walls : []) {
         const col = Math.floor(Number(wall?.col));
         const row = Math.floor(Number(wall?.row));
@@ -220,15 +192,6 @@ function normalizeCustomMapData(value) {
         occupied.add(key);
         walls.push({ id: `w${walls.length}`, col, row });
     }
-    for (const spawn of Array.isArray(input.spawnPoints) ? input.spawnPoints : []) {
-        const col = Math.floor(Number(spawn?.col));
-        const row = Math.floor(Number(spawn?.row));
-        if (!Number.isFinite(col) || !Number.isFinite(row) || col < 0 || row < 0 || col >= cols || row >= rows) continue;
-        const key = `${col},${row}`;
-        if (spawnOccupied.has(key)) continue;
-        spawnOccupied.add(key);
-        spawnPoints.push({ col, row, x: (col + 0.5) * tileSize, y: (row + 0.5) * tileSize });
-    }
     const map = {
         id: String(input.id || ''),
         name: String(input.name || '사용자 맵').trim().slice(0, 30) || '사용자 맵',
@@ -237,8 +200,7 @@ function normalizeCustomMapData(value) {
         tileSize,
         cols,
         rows,
-        walls,
-        spawnPoints
+        walls
     };
     map.obstacles = walls.map(wall => tileToRect(wall, tileSize));
     return map;
@@ -1118,10 +1080,6 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function spawnPointForMap(map, index) {
-        if (Array.isArray(map.spawnPoints) && map.spawnPoints.length) {
-            const spawn = map.spawnPoints[index % map.spawnPoints.length];
-            return { x: Math.max(22, Math.min(map.width - 22, spawn.x)), y: Math.max(22, Math.min(map.height - 22, spawn.y)) };
-        }
         if (map.width === 960 && map.height === 640 && map.cols === 24 && map.rows === 16) {
             return SPAWNS[index % SPAWNS.length];
         }
@@ -1140,7 +1098,7 @@ export function createGuangbooRealtime(server, store) {
         };
     }
 
-    function startMatch(players, mode, customMap = null, officialMapId = null) {
+    function startMatch(players, mode, customMap = null) {
         const id = `gb_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
         const match = {
             id,
@@ -1153,7 +1111,7 @@ export function createGuangbooRealtime(server, store) {
             projectiles: [],
             slimeTrails: [],
             summons: [],
-            map: customMap ? normalizeCustomMapData(customMap) : (getOfficialMap(officialMapId) || createMap()),
+            map: customMap ? normalizeCustomMapData(customMap) : createMap(),
             nextProjectileId: 1,
             nextSlimeTrailId: 1,
             nextSummonId: 1,
@@ -1243,8 +1201,7 @@ export function createGuangbooRealtime(server, store) {
         while (queue.length >= mode.size) {
             const group = queue.splice(0, mode.size);
             const customMap = store.getCustomMap(group.find(client => client.customMapId)?.customMapId);
-            const officialMapId = group.find(client => client.officialMapId)?.officialMapId;
-            startMatch(group, mode, customMap, officialMapId);
+            startMatch(group, mode, customMap);
             broadcastQueue(mode.key);
         }
     }
@@ -1332,7 +1289,6 @@ export function createGuangbooRealtime(server, store) {
             client.mode = mode.key;
             client.character = normalizeCharacter(message.character);
             client.customMapId = typeof message.customMapId === 'string' && message.customMapId ? message.customMapId : null;
-            client.officialMapId = typeof message.officialMapId === 'string' && OFFICIAL_MAPS[message.officialMapId] ? message.officialMapId : null;
             removeFromQueue(client);
             if (!client.match) queueFor(mode.key).push(client);
             if (message.fillWithBots) {

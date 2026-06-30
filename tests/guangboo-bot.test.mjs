@@ -88,7 +88,7 @@ function waitForWsMessage(socket, predicate, timeoutMs = 3000) {
     });
 }
 
-test('fills a guangboo official-map match with bots for solo testing', async () => {
+test('fills a guangboo duel with one bot for solo testing', async () => {
     await withServer(async baseUrl => {
         const wsBaseUrl = baseUrl.replace(/^http/, 'ws');
         const { socket } = await openWebSocketAndWaitFor(
@@ -99,17 +99,23 @@ test('fills a guangboo official-map match with bots for solo testing', async () 
         try {
             socket.send(JSON.stringify({
                 type: 'joinQueue',
-                nickname: 'OfficialMapSolo',
-                mode: 'survival',
-                officialMapId: 'official:maze',
+                nickname: 'Solo Tester',
+                mode: 'duel',
                 fillWithBots: true
             }));
+
             const start = await waitForWsMessage(socket, message => message.type === 'matchStart');
-            assert.equal(start.mode, 'survival');
-            assert.equal(start.map.id, 'official:maze');
-            assert.equal(start.map.name, '돌담 미로');
-            assert.equal(start.players.length, 4);
-            assert.equal(start.players.filter(player => player.bot).length, 3);
+            assert.equal(start.mode, 'duel');
+            assert.equal(start.requiredPlayers, 2);
+            assert.equal(start.players.length, 2);
+            assert.equal(start.players.filter(player => player.bot).length, 1);
+
+            const state = await waitForWsMessage(socket, message =>
+                message.type === 'state' &&
+                message.players.some(player => player.bot) &&
+                message.projectiles.some(projectile => projectile.ownerId !== start.playerId)
+            );
+            assert.equal(state.players.length, 2);
         } finally {
             socket.close();
         }
