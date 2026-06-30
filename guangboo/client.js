@@ -707,44 +707,43 @@
         ctx.restore();
     }
 
-    function playerHudScale() {
-        return Math.max(0.92, Math.min(1.08, state.viewport.scale));
+    function playerHudUnit(radius) {
+        return radius / 22;
     }
 
     function drawNameplate(player, point, radius) {
-        const hudScale = playerHudScale();
         ctx.save();
-        ctx.font = `700 ${Math.round(12 * hudScale)}px system-ui, sans-serif`;
+        ctx.font = `700 ${Math.round(radius * 0.545)}px system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.fillStyle = 'rgba(8, 13, 10, 0.72)';
         const text = player.nickname || 'Monster';
-        const width = Math.min(124 * hudScale, ctx.measureText(text).width + 18 * hudScale);
-        const height = 20 * hudScale;
-        const nameY = point.y - radius - 58 * hudScale;
-        roundRect(point.x - width / 2, nameY - height / 2 - 3 * hudScale, width, height, 8 * hudScale);
+        const width = Math.min(radius * 5.64, ctx.measureText(text).width + radius * 0.82);
+        const height = radius * 0.91;
+        const nameY = point.y - radius * 3.64;
+        roundRect(point.x - width / 2, nameY - height / 2 - radius * 0.14, width, height, radius * 0.36);
         ctx.fill();
         ctx.fillStyle = '#f8fff4';
-        ctx.fillText(text, point.x, nameY + 1 * hudScale);
+        ctx.fillText(text, point.x, nameY + radius * 0.045);
         ctx.restore();
         drawPlayerHealthBar(player, point, radius);
     }
 
-    function drawPlayerAmmoBar(player, point, barY, barHeight, barWidth) {
-        const hudScale = playerHudScale();
+    function drawPlayerAmmoBar(player, point, radius, barY, barHeight, barWidth) {
+        const hudUnit = playerHudUnit(radius);
         const maxAmmo = Number(player.maxAmmo) || 3;
         const ammo = Math.max(0, Math.min(maxAmmo, Math.floor(Number(player.ammo) || 0)));
-        const gap = 3 * hudScale;
+        const gap = 3 * hudUnit;
         const cellW = (barWidth - gap * (maxAmmo - 1)) / maxAmmo;
-        const cellH = 6 * hudScale;
+        const cellH = 6 * hudUnit;
         const startX = point.x - barWidth / 2;
-        const y = barY + barHeight + 4 * hudScale;
+        const y = barY + barHeight + 4 * hudUnit;
         ctx.save();
         for (let i = 0; i < maxAmmo; i += 1) {
             const x = startX + i * (cellW + gap);
             ctx.fillStyle = i < ammo ? 'rgba(215, 242, 82, 0.92)' : 'rgba(255, 255, 255, 0.18)';
             ctx.strokeStyle = 'rgba(8, 13, 10, 0.72)';
-            ctx.lineWidth = 1;
-            roundRect(x, y, cellW, cellH, 2);
+            ctx.lineWidth = Math.max(1, radius * 0.045);
+            roundRect(x, y, cellW, cellH, radius * 0.09);
             ctx.fill();
             ctx.stroke();
         }
@@ -752,11 +751,11 @@
     }
 
     function drawPlayerHealthBar(player, point, radius) {
-        const hudScale = playerHudScale();
-        const width = 74 * hudScale;
-        const height = 15 * hudScale;
+        const width = radius * 3.36;
+        const height = radius * 0.68;
+        const inset = radius * 0.09;
         const x = point.x - width / 2;
-        const y = point.y - radius - 36 * hudScale;
+        const y = point.y - radius * 2.64;
         const maxHealth = Number(player.maxHealth) || PLAYER_MAX_HEALTH;
         const health = Math.max(0, Math.round(Number(player.health) || 0));
         const ratio = Math.max(0, Math.min(1, health / maxHealth));
@@ -765,22 +764,22 @@
         roundRect(x, y, width, height, height / 2);
         ctx.fill();
         ctx.fillStyle = ratio <= 0.32 ? '#e05252' : '#d7f252';
-        roundRect(x + 2, y + 2, Math.max(0, (width - 4) * ratio), Math.max(1, height - 4), height / 2);
+        roundRect(x + inset, y + inset, Math.max(0, (width - inset * 2) * ratio), Math.max(1, height - inset * 2), height / 2);
         ctx.fill();
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
-        ctx.lineWidth = 1;
-        roundRect(x + 0.5, y + 0.5, width - 1, height - 1, height / 2);
+        ctx.lineWidth = Math.max(1, radius * 0.045);
+        roundRect(x + ctx.lineWidth / 2, y + ctx.lineWidth / 2, width - ctx.lineWidth, height - ctx.lineWidth, height / 2);
         ctx.stroke();
-        ctx.font = `${Math.round(10 * hudScale)}px system-ui, sans-serif`;
+        ctx.font = `${Math.round(radius * 0.455)}px system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = Math.max(1, radius * 0.14);
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.72)';
         ctx.strokeText(String(health), point.x, y + height / 2);
         ctx.fillStyle = '#fffdf8';
         ctx.fillText(String(health), point.x, y + height / 2);
         ctx.restore();
-        drawPlayerAmmoBar(player, point, y, height, width);
+        drawPlayerAmmoBar(player, point, radius, y, height, width);
     }
 
     function drawAmmoHud() {

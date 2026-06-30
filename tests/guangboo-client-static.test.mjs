@@ -85,18 +85,20 @@ test('guangboo renders health over monsters', () => {
 });
 
 test('guangboo draws brawl-style ammo under each player health bar', () => {
-    assert.match(clientSource, /function drawPlayerAmmoBar\(player, point, barY, barHeight, barWidth\)/);
-    assert.match(clientSource, /drawPlayerAmmoBar\(player, point, y, height, width\)/);
+    assert.match(clientSource, /function drawPlayerAmmoBar\(player, point, radius, barY, barHeight, barWidth\)/);
+    assert.match(clientSource, /drawPlayerAmmoBar\(player, point, radius, y, height, width\)/);
     assert.match(clientSource, /const maxAmmo = Number\(player\.maxAmmo\) \|\| 3/);
     assert.doesNotMatch(clientSource, /drawAmmoHud\(\);/);
 });
 
-test('guangboo keeps name, health, and ammo proportions stable on phones', () => {
-    assert.match(clientSource, /function playerHudScale\(\)/);
-    assert.match(clientSource, /Math\.max\(0\.92, Math\.min\(1\.08, state\.viewport\.scale\)\)/);
-    assert.match(clientSource, /const nameY = point\.y - radius - 58 \* hudScale/);
-    assert.match(clientSource, /const y = point\.y - radius - 36 \* hudScale/);
-    assert.match(clientSource, /const y = barY \+ barHeight \+ 4 \* hudScale/);
+test('guangboo keeps name, health, and ammo proportional to character radius on phones', () => {
+    assert.match(clientSource, /function playerHudUnit\(radius\)/);
+    assert.match(clientSource, /return radius \/ 22/);
+    assert.match(clientSource, /const nameY = point\.y - radius \* 3\.64/);
+    assert.match(clientSource, /const width = radius \* 3\.36/);
+    assert.match(clientSource, /const height = radius \* 0\.68/);
+    assert.match(clientSource, /const y = point\.y - radius \* 2\.64/);
+    assert.match(clientSource, /drawPlayerAmmoBar\(player, point, radius, y, height, width\)/);
 });
 
 test('guangboo suppresses mobile double-tap zoom during matches', () => {
@@ -130,8 +132,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile17/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile17/);
+    assert.match(htmlSource, /styles\.css\?v=20260629-mobile18/);
+    assert.match(htmlSource, /client\.js\?v=20260629-mobile18/);
 });
 
 
