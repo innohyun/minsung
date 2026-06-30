@@ -37,6 +37,9 @@ const BABY_SLIME_SPEED = 115;
 const BABY_SLIME_RADIUS = 14;
 const BABY_SLIME_WALL_MARGIN = 4;
 const BABY_SLIME_LIFETIME_MS = 9000;
+const BABY_SLIME_ATTACK_RANGE = 28;
+const BOT_RETREAT_HEALTH_RATIO = 0.4;
+const BOT_RETREAT_RECOVER_RATIO = 0.62;
 const MAX_AMMO = 3;
 const AMMO_RELOAD_MS = 1400;
 const REGEN_DELAY_MS = 3000;
@@ -130,6 +133,18 @@ export const GUANGBOO_SCHEMA_SQL = `
         survived_ms INTEGER NOT NULL,
         PRIMARY KEY (match_id, player_id)
     );
+
+    CREATE TABLE IF NOT EXISTS guangboo_custom_maps (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        creator TEXT NOT NULL,
+        width INTEGER NOT NULL,
+        height INTEGER NOT NULL,
+        tile_size INTEGER NOT NULL,
+        data_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    );
 `;
 
 function nowIso() {
@@ -149,16 +164,46 @@ function clampUnitVector(vector) {
     return { x: x / length, y: y / length };
 }
 
-function tileToRect(tile) {
+function tileToRect(tile, tileSize = TILE_SIZE) {
     return {
         id: tile.id,
         col: tile.col,
         row: tile.row,
-        x: tile.col * TILE_SIZE + TILE_SIZE / 2,
-        y: tile.row * TILE_SIZE + TILE_SIZE / 2,
-        w: TILE_SIZE,
-        h: TILE_SIZE
+        x: tile.col * tileSize + tileSize / 2,
+        y: tile.row * tileSize + tileSize / 2,
+        w: tileSize,
+        h: tileSize
     };
+}
+
+function normalizeCustomMapData(value) {
+    const input = value && typeof value === 'object' ? value : {};
+    const tileSize = Math.max(24, Math.min(64, Math.floor(Number(input.tileSize) || TILE_SIZE)));
+    const cols = Math.max(8, Math.min(100, Math.floor(Number(input.cols) || Math.ceil((Number(input.width) || 960) / tileSize))));
+    const rows = Math.max(8, Math.min(100, Math.floor(Number(input.rows) || Math.ceil((Number(input.height) || 640) / tileSize))));
+    const occupied = new Set();
+    const walls = [];
+    for (const wall of Array.isArray(input.walls) ? input.walls : []) {
+        const col = Math.floor(Number(wall?.col));
+        const row = Math.floor(Number(wall?.row));
+        if (!Number.isFinite(col) || !Number.isFinite(row) || col < 0 || row < 0 || col >= cols || row >= rows) continue;
+        const key = `${col},${row}`;
+        if (occupied.has(key)) continue;
+        occupied.add(key);
+        walls.push({ id: `w${walls.length}`, col, row });
+    }
+    const map = {
+        id: String(input.id || ''),
+        name: String(input.name || '사용자 맵').trim().slice(0, 30) || '사용자 맵',
+        width: cols * tileSize,
+        height: rows * tileSize,
+        tileSize,
+        cols,
+        rows,
+        walls
+    };
+    map.obstacles = walls.map(wall => tileToRect(wall, tileSize));
+    return map;
 }
 
 function rectContainsCircle(rect, x, y, radius) {
@@ -259,6 +304,17 @@ export function createGuangbooStore(db) {
             updated_at = ?
         WHERE id = ?
     `);
+    const insertCustomMap = db.prepare(`
+        INSERT INTO guangboo_custom_maps (id, name, creator, width, height, tile_size, data_json, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const listCustomMapsStmt = db.prepare(`
+        SELECT id, name, creator, width, height, tile_size AS tileSize, created_at AS createdAt, updated_at AS updatedAt
+        FROM guangboo_custom_maps
+        ORDER BY updated_at DESC
+        LIMIT 50
+    `);
+    const getCustomMapStmt = db.prepare('SELECT * FROM guangboo_custom_maps WHERE id = ?');
     const leaderboard = db.prepare(`
         SELECT nickname, matches, wins, kills, deaths, play_time_ms
         FROM guangboo_players
@@ -317,7 +373,55 @@ export function createGuangbooStore(db) {
         }));
     }
 
-    return { ensurePlayer, recordMatch, getLeaderboard };
+    function publicMapRow(row) {
+        return row ? {
+            id: row.id,
+            name: row.name,
+            creator: row.creator,
+            width: row.width,
+            height: row.height,
+            tileSize: row.tileSize || row.tile_size,
+            createdAt: row.createdAt || row.created_at,
+            updatedAt: row.updatedAt || row.updated_at
+        } : null;
+    }
+
+    function saveCustomMap({ name, creator, map }) {
+        const normalized = normalizeCustomMapData({ ...map, name });
+        const id = `gbm_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
+        normalized.id = id;
+        normalized.name = String(name || normalized.name).trim().slice(0, 30) || normalized.name;
+        const timestamp = nowIso();
+        const normalizedCreator = normalizeNickname(creator || 'Map Maker');
+        insertCustomMap.run(
+            id,
+            normalized.name,
+            normalizedCreator,
+            normalized.width,
+            normalized.height,
+            normalized.tileSize,
+            JSON.stringify(normalized),
+            timestamp,
+            timestamp
+        );
+        return publicMapRow({ id, name: normalized.name, creator: normalizedCreator, width: normalized.width, height: normalized.height, tileSize: normalized.tileSize, createdAt: timestamp, updatedAt: timestamp });
+    }
+
+    function listCustomMaps() {
+        return listCustomMapsStmt.all().map(publicMapRow);
+    }
+
+    function getCustomMap(id) {
+        const row = getCustomMapStmt.get(String(id || ''));
+        if (!row) return null;
+        try {
+            return normalizeCustomMapData({ ...JSON.parse(row.data_json), id: row.id, name: row.name });
+        } catch {
+            return null;
+        }
+    }
+
+    return { ensurePlayer, recordMatch, getLeaderboard, listCustomMaps, saveCustomMap, getCustomMap };
 }
 
 export function createGuangbooRealtime(server, store) {
@@ -686,14 +790,28 @@ export function createGuangbooRealtime(server, store) {
             const target = [...match.players.values()]
                 .filter(player => player.alive && player.id !== summon.ownerId)
                 .sort((a, b) => Math.hypot(a.x - summon.x, a.y - summon.y) - Math.hypot(b.x - summon.x, b.y - summon.y))[0];
-            if (target) {
-                moveSummonTowardTarget(match, summon, target, dt);
-                if (Math.hypot(target.x - summon.x, target.y - summon.y) <= 22 + summon.radius) {
+            const enemyUltimate = match.projectiles
+                .filter(projectile => projectile.kind === 'ultimate' && projectile.ownerId !== summon.ownerId && !projectile.destroyed)
+                .sort((a, b) => Math.hypot(a.x - summon.x, a.y - summon.y) - Math.hypot(b.x - summon.x, b.y - summon.y))[0];
+            const targetEntity = enemyUltimate && (!target || Math.hypot(enemyUltimate.x - summon.x, enemyUltimate.y - summon.y) < Math.hypot(target.x - summon.x, target.y - summon.y))
+                ? enemyUltimate
+                : target;
+            if (targetEntity) {
+                moveSummonTowardTarget(match, summon, targetEntity, dt);
+                const hitRange = targetEntity.kind === 'ultimate'
+                    ? (targetEntity.radius || ULTIMATE_RADIUS) + summon.radius + BABY_SLIME_ATTACK_RANGE
+                    : 22 + summon.radius;
+                if (Math.hypot(targetEntity.x - summon.x, targetEntity.y - summon.y) <= hitRange) {
                     const owner = match.players.get(summon.ownerId);
-                    target.health -= BABY_SLIME_DAMAGE;
-                    applySlow(target, now);
-                    resetRegenTimer(target, now);
-                    if (target.health <= 0) eliminatePlayer(match, target, owner);
+                    if (targetEntity.kind === 'ultimate') {
+                        targetEntity.health = (targetEntity.health ?? ULTIMATE_PROJECTILE_HEALTH) - BABY_SLIME_DAMAGE;
+                        if (targetEntity.health <= 0) targetEntity.destroyed = true;
+                    } else {
+                        targetEntity.health -= BABY_SLIME_DAMAGE;
+                        applySlow(targetEntity, now);
+                        resetRegenTimer(targetEntity, now);
+                        if (targetEntity.health <= 0) eliminatePlayer(match, targetEntity, owner);
+                    }
                     return;
                 }
             }
@@ -961,7 +1079,26 @@ export function createGuangbooRealtime(server, store) {
         }
     }
 
-    function startMatch(players, mode) {
+    function spawnPointForMap(map, index) {
+        if (map.width === 960 && map.height === 640 && map.cols === 24 && map.rows === 16) {
+            return SPAWNS[index % SPAWNS.length];
+        }
+        const margin = 72;
+        const candidates = [
+            { x: margin, y: map.height / 2 },
+            { x: map.width - margin, y: map.height / 2 },
+            { x: map.width / 2, y: margin },
+            { x: map.width / 2, y: map.height - margin },
+            { x: map.width / 2, y: map.height / 2 }
+        ];
+        const base = candidates[index % candidates.length] || SPAWNS[index % SPAWNS.length];
+        return {
+            x: Math.max(22, Math.min(map.width - 22, base.x)),
+            y: Math.max(22, Math.min(map.height - 22, base.y))
+        };
+    }
+
+    function startMatch(players, mode, customMap = null) {
         const id = `gb_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
         const match = {
             id,
@@ -974,7 +1111,7 @@ export function createGuangbooRealtime(server, store) {
             projectiles: [],
             slimeTrails: [],
             summons: [],
-            map: createMap(),
+            map: customMap ? normalizeCustomMapData(customMap) : createMap(),
             nextProjectileId: 1,
             nextSlimeTrailId: 1,
             nextSummonId: 1,
@@ -982,7 +1119,7 @@ export function createGuangbooRealtime(server, store) {
         };
 
         players.forEach((client, index) => {
-            const spawn = SPAWNS[index % SPAWNS.length];
+            const spawn = spawnPointForMap(match.map, index);
             const character = normalizeCharacter(client.character);
             const monster = character === 'slime' ? CHARACTER_DEFS.slime.monster : MONSTERS[index % MONSTERS.length];
             const player = {
@@ -1062,7 +1199,9 @@ export function createGuangbooRealtime(server, store) {
         const mode = getMode(modeKey);
         const queue = queueFor(mode.key);
         while (queue.length >= mode.size) {
-            startMatch(queue.splice(0, mode.size), mode);
+            const group = queue.splice(0, mode.size);
+            const customMap = store.getCustomMap(group.find(client => client.customMapId)?.customMapId);
+            startMatch(group, mode, customMap);
             broadcastQueue(mode.key);
         }
     }
@@ -1080,6 +1219,7 @@ export function createGuangbooRealtime(server, store) {
             bot: true,
             match: null,
             nextFireAt: Date.now() + 500,
+            nextUltimateAt: Date.now() + 1200,
             input: { move: { x: 0, y: 0 }, aim: { x: -1, y: 0 }, firing: false, ultimate: false }
         };
     }
@@ -1112,17 +1252,24 @@ export function createGuangbooRealtime(server, store) {
             const dy = target.y - player.y;
             const distance = Math.hypot(dx, dy) || 1;
             const aim = { x: dx / distance, y: dy / distance };
+            const healthRatio = player.health / PLAYER_MAX_HEALTH;
+            player.botRetreating = healthRatio <= BOT_RETREAT_HEALTH_RATIO || (player.botRetreating && healthRatio < BOT_RETREAT_RECOVER_RATIO);
             let move = { x: 0, y: 0 };
-            if (distance > 260) {
+            if (player.botRetreating) {
+                move = { x: -aim.x, y: -aim.y };
+            } else if (distance > 260) {
                 move = aim;
             } else if (distance < 150) {
                 move = { x: -aim.x, y: -aim.y };
             }
 
-            const firing = distance < 560 && now >= client.nextFireAt;
+            const firing = !player.botRetreating && distance < 560 && now >= client.nextFireAt;
             if (firing) client.nextFireAt = now + 650 + Math.floor(Math.random() * 350);
-            client.input = { move, aim, firing };
+            const ultimate = !player.botRetreating && distance < 620 && hasUsableUltimate(player) && now >= (client.nextUltimateAt || 0);
+            if (ultimate) client.nextUltimateAt = now + 1200 + Math.floor(Math.random() * 500);
+            client.input = { move, aim, firing, ultimate };
             if (firing) queueShotInput(player, aim, now);
+            if (ultimate && queueUltimateInput(player, aim)) spawnUltimateProjectile(match, player, now);
         });
     }
 
@@ -1141,6 +1288,7 @@ export function createGuangbooRealtime(server, store) {
             client.nickname = player.nickname;
             client.mode = mode.key;
             client.character = normalizeCharacter(message.character);
+            client.customMapId = typeof message.customMapId === 'string' && message.customMapId ? message.customMapId : null;
             removeFromQueue(client);
             if (!client.match) queueFor(mode.key).push(client);
             if (message.fillWithBots) {

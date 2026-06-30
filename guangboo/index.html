@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Guangboo Monster Survival</title>
-    <link rel="stylesheet" href="styles.css?v=20260630-slime-charge">
+    <link rel="stylesheet" href="styles.css?v=20260630-map-editor-ai">
 </head>
 <body>
     <main id="app">
@@ -56,6 +56,13 @@
                         <input id="nicknameInput" name="nickname" maxlength="18" autocomplete="nickname" placeholder="Monster" required>
                         <button id="joinButton" type="submit">자동 매칭</button>
                     </div>
+                    <label for="customMapSelect">플레이 맵</label>
+                    <div class="map-select-row">
+                        <select id="customMapSelect" name="customMap">
+                            <option value="">기본 맵</option>
+                        </select>
+                        <button class="ghost-button" id="openMapEditorButton" type="button">맵 제작</button>
+                    </div>
                     <label class="bot-toggle">
                         <input id="botToggle" type="checkbox">
                         <span>봇으로 혼자 테스트</span>
@@ -74,6 +81,31 @@
                     </div>
                     <ol class="leaderboard-list" id="leaderboardList"></ol>
                 </aside>
+            </div>
+        </section>
+
+        <section class="screen map-editor-screen" id="mapEditorScreen" hidden aria-labelledby="mapEditorTitle">
+            <div class="map-editor-panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="eyebrow">Custom map</p>
+                        <h2 id="mapEditorTitle">맵 제작</h2>
+                    </div>
+                    <button class="ghost-button" id="closeMapEditorButton" type="button">로비</button>
+                </div>
+                <div class="map-editor-controls">
+                    <label>맵 이름 <input id="mapNameInput" maxlength="30" placeholder="내가 만든 맵"></label>
+                    <label>가로 칸 <input id="mapColsInput" type="number" min="8" max="100" value="24"></label>
+                    <label>세로 칸 <input id="mapRowsInput" type="number" min="8" max="100" value="16"></label>
+                    <button id="newMapButton" type="button">크기 적용</button>
+                    <button id="saveMapButton" type="button">저장/올리기</button>
+                </div>
+                <canvas id="mapEditorCanvas" width="960" height="640"></canvas>
+                <div class="map-toolbox" role="toolbar" aria-label="맵 배치 요소">
+                    <button class="map-tool is-selected" data-tool="wall" type="button">벽</button>
+                    <button class="map-tool" data-tool="erase" type="button">지우개</button>
+                </div>
+                <p class="map-editor-status" id="mapEditorStatus">크기를 정하고 하단 도구로 벽을 배치하세요.</p>
             </div>
         </section>
 
@@ -123,6 +155,6 @@
         </section>
     </main>
 
-    <script src="/guangboo/client.js?v=20260630-slime-hits-simple" defer></script>
+    <script src="/guangboo/client.js?v=20260630-map-editor-ai" defer></script>
 </body>
 </html>

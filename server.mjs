@@ -12,7 +12,7 @@ const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_PORT = 4173;
 const COOKIE_NAME = 'minsung_admin_session';
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const MAX_JSON_BYTES = 16 * 1024;
+const MAX_JSON_BYTES = 512 * 1024;
 const ALLOWED_BRIDGE_ORIGINS = new Set([
     'https://minsung.classaimate.com'
 ]);
@@ -375,6 +375,19 @@ export function createMinsungServer(options = {}) {
             if (url.pathname === '/api/guangboo/leaderboard') {
                 if (req.method !== 'GET') return writeMethodNotAllowed(res);
                 return sendJson(res, 200, { ok: true, leaderboard: guangbooStore.getLeaderboard() });
+            }
+
+            if (url.pathname === '/api/guangboo/maps') {
+                if (req.method === 'GET') {
+                    return sendJson(res, 200, { ok: true, maps: guangbooStore.listCustomMaps() });
+                }
+                if (req.method === 'POST') {
+                    if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
+                    const body = await readJsonBody(req);
+                    const map = guangbooStore.saveCustomMap({ name: body.name, creator: body.creator, map: body.map });
+                    return sendJson(res, 200, { ok: true, map });
+                }
+                return writeMethodNotAllowed(res);
             }
 
             if (url.pathname.startsWith('/api/')) {

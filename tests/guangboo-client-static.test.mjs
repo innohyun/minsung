@@ -132,8 +132,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts browser caches for changed guangboo assets', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260630-slime-charge/);
-    assert.match(htmlSource, /client\.js\?v=20260630-slime-hits-simple/);
+    assert.match(htmlSource, /styles\.css\?v=20260630-map-editor-ai/);
+    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-ai/);
 });
 
 
@@ -180,7 +180,7 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(clientSource, /const CHARACTER_STORAGE_KEY = 'guangboo_character'/);
     assert.match(clientSource, /characterInputs: \[\.\.\.document\.querySelectorAll\('input\[name="character"\]'\)\]/);
     assert.match(clientSource, /function getSelectedCharacter\(\)/);
-    assert.match(clientSource, /send\(\{ type: 'joinQueue', nickname, mode, character, fillWithBots: elements\.botToggle\.checked \}\)/);
+    assert.match(clientSource, /send\(\{ type: 'joinQueue', nickname, mode, character, customMapId: elements\.customMapSelect\.value \|\| null, fillWithBots: elements\.botToggle\.checked \}\)/);
     assert.match(clientSource, /state\.slimeTrails = message\.slimeTrails \|\| \[\]/);
     assert.match(clientSource, /state\.summons = message\.summons \|\| \[\]/);
     assert.match(clientSource, /function drawSlimeTrail\(trail\)/);
@@ -249,7 +249,44 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
     assert.match(runtimeSource, /if \(isSlime\(player\)\) \{\n\s*castSlimeUltimate\(match, player, now\);\n\s*return;\n\s*\}/);
     assert.match(runtimeSource, /if \(message\.ultimate && queueUltimateInput\(player, aim\)\) \{\n\s*spawnUltimateProjectile\(client\.match, player, Date\.now\(\)\);\n\s*\}/);
-    assert.match(htmlSource, /client\.js\?v=20260630-slime-hits-simple/);
+    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-ai/);
+});
+
+
+test('guangboo supports lobby custom map creation, saving, listing, and selection', () => {
+    assert.match(htmlSource, /id="openMapEditorButton"/);
+    assert.match(htmlSource, /id="mapEditorScreen"/);
+    assert.match(htmlSource, /id="mapColsInput"[^>]*max="100"/);
+    assert.match(htmlSource, /id="mapRowsInput"[^>]*max="100"/);
+    assert.match(htmlSource, /id="mapEditorCanvas"/);
+    assert.match(htmlSource, /data-tool="wall"/);
+    assert.match(htmlSource, /data-tool="erase"/);
+    assert.match(clientSource, /const CUSTOM_MAP_STORAGE_KEY = 'guangboo_custom_map_id'/);
+    assert.match(clientSource, /function loadCustomMaps\(\)/);
+    assert.match(clientSource, /fetch\('\/api\/guangboo\/maps', \{ cache: 'no-store' \}\)/);
+    assert.match(clientSource, /function saveCustomMap\(\)/);
+    assert.match(clientSource, /method: 'POST'/);
+    assert.match(clientSource, /customMapId: elements\.customMapSelect\.value \|\| null/);
+    assert.match(runtimeSource, /CREATE TABLE IF NOT EXISTS guangboo_custom_maps/);
+    assert.match(runtimeSource, /function normalizeCustomMapData\(value\)/);
+    assert.match(runtimeSource, /saveCustomMap/);
+    assert.match(runtimeSource, /getCustomMap/);
+    assert.match(runtimeSource, /customMap \? normalizeCustomMapData\(customMap\) : createMap\(\)/);
+    assert.match(stylesSource, /\.map-toolbox/);
+});
+
+test('guangboo bots can use ultimates and retreat below forty percent health', () => {
+    assert.match(runtimeSource, /const BOT_RETREAT_HEALTH_RATIO = 0\.4/);
+    assert.match(runtimeSource, /player\.botRetreating = healthRatio <= BOT_RETREAT_HEALTH_RATIO/);
+    assert.match(runtimeSource, /const ultimate = !player\.botRetreating && distance < 620 && hasUsableUltimate\(player\)/);
+    assert.match(runtimeSource, /if \(ultimate && queueUltimateInput\(player, aim\)\) spawnUltimateProjectile\(match, player, now\)/);
+});
+
+test('baby slimes can attack enemy ultimate projectiles', () => {
+    assert.match(runtimeSource, /const BABY_SLIME_ATTACK_RANGE = 28/);
+    assert.match(runtimeSource, /projectile\.kind === 'ultimate' && projectile\.ownerId !== summon\.ownerId/);
+    assert.match(runtimeSource, /targetEntity\.health = \(targetEntity\.health \?\? ULTIMATE_PROJECTILE_HEALTH\) - BABY_SLIME_DAMAGE/);
+    assert.match(runtimeSource, /if \(targetEntity\.health <= 0\) targetEntity\.destroyed = true/);
 });
 
 test('guangboo plays Web Audio projectile sounds on spawn, flight, and impact', () => {

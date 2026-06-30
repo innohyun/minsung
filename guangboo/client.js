@@ -5,6 +5,8 @@
     const MODE_STORAGE_KEY = 'guangboo_match_mode';
     const CHARACTER_STORAGE_KEY = 'guangboo_character';
     const BOT_STORAGE_KEY = 'guangboo_fill_bots';
+    const CUSTOM_MAP_STORAGE_KEY = 'guangboo_custom_map_id';
+    const EDITOR_TILE_SIZE = 40;
     const PROJECTILE_RANGE = 300;
     const PLAYER_MAX_HEALTH = 6000;
     const keys = new Set();
@@ -12,10 +14,22 @@
     const elements = {
         lobby: document.getElementById('lobbyScreen'),
         match: document.getElementById('matchScreen'),
+        editor: document.getElementById('mapEditorScreen'),
         result: document.getElementById('resultScreen'),
         joinForm: document.getElementById('joinForm'),
         nickname: document.getElementById('nicknameInput'),
         botToggle: document.getElementById('botToggle'),
+        customMapSelect: document.getElementById('customMapSelect'),
+        openMapEditor: document.getElementById('openMapEditorButton'),
+        closeMapEditor: document.getElementById('closeMapEditorButton'),
+        mapEditorCanvas: document.getElementById('mapEditorCanvas'),
+        mapName: document.getElementById('mapNameInput'),
+        mapCols: document.getElementById('mapColsInput'),
+        mapRows: document.getElementById('mapRowsInput'),
+        newMap: document.getElementById('newMapButton'),
+        saveMap: document.getElementById('saveMapButton'),
+        mapEditorStatus: document.getElementById('mapEditorStatus'),
+        mapTools: [...document.querySelectorAll('.map-tool')],
         modeInputs: [...document.querySelectorAll('input[name="matchMode"]')],
         characterInputs: [...document.querySelectorAll('input[name="character"]')],
         joinButton: document.getElementById('joinButton'),
@@ -70,11 +84,14 @@
         audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 },
         lastTouchEndAt: 0,
         gameFullscreen: false,
-        viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 }
+        viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 },
+        customMaps: [],
+        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), tool: 'wall' }
     };
 
     function setScreen(name) {
         elements.lobby.hidden = name !== 'lobby';
+        elements.editor.hidden = name !== 'editor';
         elements.match.hidden = name !== 'match';
         elements.result.hidden = name !== 'result';
         document.body.classList.toggle('is-playing', name === 'match');
@@ -267,9 +284,10 @@
         localStorage.setItem(MODE_STORAGE_KEY, mode);
         localStorage.setItem(CHARACTER_STORAGE_KEY, character);
         localStorage.setItem(BOT_STORAGE_KEY, elements.botToggle.checked ? '1' : '0');
+        localStorage.setItem(CUSTOM_MAP_STORAGE_KEY, elements.customMapSelect.value || '');
         setMatchingUi(true);
         state.joining = true;
-        send({ type: 'joinQueue', nickname, mode, character, fillWithBots: elements.botToggle.checked });
+        send({ type: 'joinQueue', nickname, mode, character, customMapId: elements.customMapSelect.value || null, fillWithBots: elements.botToggle.checked });
     }
 
     function handleServerMessage(message) {
@@ -354,6 +372,136 @@
 
         if (message.type === 'error') {
             elements.status.textContent = message.message || message.code || '오류';
+        }
+    }
+
+    async function loadCustomMaps() {
+        try {
+            const response = await fetch('/api/guangboo/maps', { cache: 'no-store' });
+            const data = await response.json();
+            state.customMaps = data.maps || [];
+            renderCustomMapOptions();
+        } catch {
+            state.customMaps = [];
+            renderCustomMapOptions();
+        }
+    }
+
+    function renderCustomMapOptions() {
+        const selected = localStorage.getItem(CUSTOM_MAP_STORAGE_KEY) || elements.customMapSelect.value || '';
+        elements.customMapSelect.innerHTML = '<option value="">기본 맵</option>';
+        state.customMaps.forEach(map => {
+            const option = document.createElement('option');
+            option.value = map.id;
+            option.textContent = `${map.name} (${Math.round(map.width / map.tileSize)}x${Math.round(map.height / map.tileSize)})`;
+            elements.customMapSelect.appendChild(option);
+        });
+        if ([...elements.customMapSelect.options].some(option => option.value === selected)) {
+            elements.customMapSelect.value = selected;
+        }
+    }
+
+    function editorMapData() {
+        const walls = [...state.editor.walls].map(key => {
+            const [col, row] = key.split(',').map(Number);
+            return { col, row };
+        });
+        return {
+            name: (elements.mapName.value || '내 맵').trim(),
+            tileSize: state.editor.tileSize,
+            cols: state.editor.cols,
+            rows: state.editor.rows,
+            width: state.editor.cols * state.editor.tileSize,
+            height: state.editor.rows * state.editor.tileSize,
+            walls
+        };
+    }
+
+    function drawMapEditor() {
+        const canvas = elements.mapEditorCanvas;
+        if (!canvas) return;
+        const context = canvas.getContext('2d');
+        const cols = state.editor.cols;
+        const rows = state.editor.rows;
+        const tile = Math.max(4, Math.min(canvas.width / cols, canvas.height / rows));
+        const offsetX = (canvas.width - cols * tile) / 2;
+        const offsetY = (canvas.height - rows * tile) / 2;
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.fillStyle = '#eef3df';
+        context.fillRect(offsetX, offsetY, cols * tile, rows * tile);
+        context.strokeStyle = 'rgba(33, 48, 63, 0.18)';
+        context.lineWidth = 1;
+        for (let col = 0; col <= cols; col += 1) {
+            context.beginPath();
+            context.moveTo(offsetX + col * tile, offsetY);
+            context.lineTo(offsetX + col * tile, offsetY + rows * tile);
+            context.stroke();
+        }
+        for (let row = 0; row <= rows; row += 1) {
+            context.beginPath();
+            context.moveTo(offsetX, offsetY + row * tile);
+            context.lineTo(offsetX + cols * tile, offsetY + row * tile);
+            context.stroke();
+        }
+        context.fillStyle = '#8a6b3d';
+        state.editor.walls.forEach(key => {
+            const [col, row] = key.split(',').map(Number);
+            context.fillRect(offsetX + col * tile + 1, offsetY + row * tile + 1, Math.max(1, tile - 2), Math.max(1, tile - 2));
+        });
+    }
+
+    function applyEditorSize() {
+        state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
+        state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
+        state.editor.walls.clear();
+        elements.mapCols.value = state.editor.cols;
+        elements.mapRows.value = state.editor.rows;
+        elements.mapEditorStatus.textContent = `${state.editor.cols} x ${state.editor.rows} 맵을 제작 중입니다.`;
+        drawMapEditor();
+    }
+
+    function editCellFromEvent(event) {
+        const canvas = elements.mapEditorCanvas;
+        const rect = canvas.getBoundingClientRect();
+        const cols = state.editor.cols;
+        const rows = state.editor.rows;
+        const tile = Math.max(4, Math.min(canvas.width / cols, canvas.height / rows));
+        const offsetX = (canvas.width - cols * tile) / 2;
+        const offsetY = (canvas.height - rows * tile) / 2;
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = (event.clientX - rect.left) * scaleX - offsetX;
+        const y = (event.clientY - rect.top) * scaleY - offsetY;
+        const col = Math.floor(x / tile);
+        const row = Math.floor(y / tile);
+        if (col < 0 || row < 0 || col >= cols || row >= rows) return;
+        const key = `${col},${row}`;
+        if (state.editor.tool === 'erase') state.editor.walls.delete(key);
+        else state.editor.walls.add(key);
+        drawMapEditor();
+    }
+
+    async function saveCustomMap() {
+        const map = editorMapData();
+        if (!map.name) {
+            elements.mapEditorStatus.textContent = '맵 이름을 입력하세요.';
+            return;
+        }
+        elements.mapEditorStatus.textContent = '저장 중...';
+        try {
+            const response = await fetch('/api/guangboo/maps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: map.name, creator: elements.nickname.value || 'Map Maker', map })
+            });
+            const data = await response.json();
+            if (!data.ok) throw new Error(data.error || 'save_failed');
+            elements.mapEditorStatus.textContent = '저장 완료. 로비에서 선택할 수 있습니다.';
+            await loadCustomMaps();
+            elements.customMapSelect.value = data.map.id;
+            localStorage.setItem(CUSTOM_MAP_STORAGE_KEY, data.map.id);
+        } catch {
+            elements.mapEditorStatus.textContent = '저장 실패. 서버 연결을 확인하세요.';
         }
     }
 
@@ -1250,6 +1398,7 @@
     });
     elements.botToggle.addEventListener('change', () => {
         localStorage.setItem(BOT_STORAGE_KEY, elements.botToggle.checked ? '1' : '0');
+        localStorage.setItem(CUSTOM_MAP_STORAGE_KEY, elements.customMapSelect.value || '');
     });
     elements.playAgain.addEventListener('click', () => {
         setScreen('lobby');
@@ -1290,6 +1439,7 @@
     }
     updateModeCopy();
     loadLeaderboard();
+    loadCustomMaps();
     resizeCanvas();
     draw();
     sendInputLoop();

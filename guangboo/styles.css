@@ -66,7 +66,8 @@ html:fullscreen body.is-playing .match-screen {
 }
 
 button,
-input {
+input,
+select {
     font: inherit;
 }
 
@@ -675,5 +676,101 @@ html:fullscreen body.is-playing #gameCanvas {
 
     .top-hud {
         padding: 6px;
+    }
+}
+
+
+.map-select-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+}
+
+.map-select-row select {
+    min-width: 0;
+    height: 44px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 12px;
+    color: var(--ink);
+    background: #fffdf8;
+    font-weight: 800;
+}
+
+.map-editor-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding: max(22px, env(safe-area-inset-top)) 14px max(22px, env(safe-area-inset-bottom));
+}
+
+.map-editor-panel {
+    display: grid;
+    gap: 12px;
+    width: min(980px, 100%);
+    margin: 0 auto;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    background: var(--surface);
+    box-shadow: 0 18px 50px rgba(26, 36, 30, 0.12);
+}
+
+.map-editor-controls {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(88px, 120px)) auto auto;
+    gap: 8px;
+    align-items: end;
+}
+
+.map-editor-controls label {
+    display: grid;
+    gap: 4px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+#mapEditorCanvas {
+    width: 100%;
+    max-height: 66vh;
+    border: 1px solid rgba(23, 32, 24, 0.18);
+    border-radius: 8px;
+    background: #172018;
+    touch-action: none;
+}
+
+.map-toolbox {
+    position: sticky;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    padding: 8px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: rgba(255, 253, 248, 0.88);
+    backdrop-filter: blur(12px);
+}
+
+.map-tool.is-selected {
+    color: #f8fff4;
+    background: var(--moss);
+}
+
+.map-editor-status {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+@media (max-width: 720px) {
+    .map-editor-controls {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .map-editor-controls label:first-child {
+        grid-column: 1 / -1;
     }
 }
