@@ -166,10 +166,10 @@ test('guangboo supports charged wall-breaking homing ultimate attacks', () => {
     assert.match(runtimeSource, /hitUltimate\.health = \(hitUltimate\.health \?\? ULTIMATE_PROJECTILE_HEALTH\) - \(projectile\.damage \|\| 0\)/);
     assert.match(runtimeSource, /if \(hitUltimate\.health <= 0\) hitUltimate\.destroyed = true/);
     assert.match(runtimeSource, /match\.projectiles = projectiles\.filter\(projectile => !projectile\.destroyed\)/);
-    assert.match(runtimeSource, /owner\.ultimateHits = isSlime\(owner\)/);
-    assert.match(runtimeSource, /: Math\.min\(ULTIMATE_HITS_REQUIRED, \(owner\.ultimateHits \|\| 0\) \+ 1\)/);
-    assert.match(runtimeSource, /syncUltimateReady\(owner\)/);
-    assert.match(runtimeSource, /if \(message\.ultimate\) queueUltimateInput\(player, aim\)/);
+    assert.match(runtimeSource, /function addUltimateHitCharge\(player\)/);
+    assert.match(runtimeSource, /player\.ultimateHits = Math\.min\(ULTIMATE_HITS_REQUIRED, \(player\.ultimateHits \|\| 0\) \+ 1\)/);
+    assert.match(runtimeSource, /addUltimateHitCharge\(owner\)/);
+    assert.match(runtimeSource, /if \(message\.ultimate && queueUltimateInput\(player, aim\)\)/);
 });
 
 
@@ -219,10 +219,14 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /const SLIME_ULTIMATE_MIN_HITS_REQUIRED = 1/);
     assert.match(runtimeSource, /return isSlime\(player\) \? SLIME_ULTIMATE_MIN_HITS_REQUIRED : ULTIMATE_HITS_REQUIRED/);
     assert.match(runtimeSource, /function slimeSummonCountForUltimate\(player\)/);
+    assert.match(runtimeSource, /player\?\.slimeSummonCharge \?\? player\?\.ultimateHits \?\? 0/);
+    assert.match(runtimeSource, /function consumeSlimeSummonCharge\(player\)/);
+    assert.match(runtimeSource, /player\.slimeSummonCharge = \(player\.slimeSummonCharge \|\| 0\) \+ 1/);
+    assert.match(runtimeSource, /player\.ultimateHits = player\.slimeSummonCharge/);
     assert.match(runtimeSource, /function hasUsableUltimate\(player\)/);
     assert.match(runtimeSource, /return isSlime\(player\) \? slimeSummonCountForUltimate\(player\) >= SLIME_ULTIMATE_MIN_HITS_REQUIRED : hits >= ULTIMATE_HITS_REQUIRED/);
     assert.match(runtimeSource, /ultimateHits: isSlime\(player\) \? \(player\.ultimateHits \|\| 0\) : Math.min\(ULTIMATE_HITS_REQUIRED/);
-    assert.match(runtimeSource, /\? \(owner\.ultimateHits \|\| 0\) \+ 1/);
+    assert.doesNotMatch(runtimeSource, /owner\.ultimateHits = isSlime\(owner\)/);
     assert.match(runtimeSource, /syncUltimateReady\(player\);\n\s*if \(!player\.ultimateReady\) return false/);
     assert.match(runtimeSource, /kind: slimeShot \? 'slime' : 'normal'/);
     assert.match(runtimeSource, /damage: slimeShot \? SLIME_PROJECTILE_DAMAGE : PROJECTILE_DAMAGE/);
@@ -232,7 +236,7 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /if \(spawnCount < SLIME_ULTIMATE_MIN_HITS_REQUIRED\) return/);
     assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
     assert.match(runtimeSource, /if \(message\.ultimate && queueUltimateInput\(player, aim\)\) \{\n\s*spawnUltimateProjectile\(client\.match, player, Date\.now\(\)\);\n\s*\}/);
-    assert.match(htmlSource, /client\.js\?v=20260630-slime-summon-now/);
+    assert.match(htmlSource, /client\.js\?v=20260630-slime-charge/);
 });
 
 test('guangboo plays Web Audio projectile sounds on spawn, flight, and impact', () => {

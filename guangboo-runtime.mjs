@@ -481,7 +481,7 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function slimeSummonCountForUltimate(player) {
-        return Math.max(0, Math.floor(player?.ultimateHits || 0));
+        return Math.max(0, Math.floor(player?.slimeSummonCharge ?? player?.ultimateHits ?? 0));
     }
 
     function hasUsableUltimate(player) {
@@ -491,6 +491,25 @@ export function createGuangbooRealtime(server, store) {
 
     function syncUltimateReady(player) {
         player.ultimateReady = hasUsableUltimate(player);
+    }
+
+    function addUltimateHitCharge(player) {
+        if (isSlime(player)) {
+            player.slimeSummonCharge = (player.slimeSummonCharge || 0) + 1;
+            player.ultimateHits = player.slimeSummonCharge;
+            syncUltimateReady(player);
+            return;
+        }
+        player.ultimateHits = Math.min(ULTIMATE_HITS_REQUIRED, (player.ultimateHits || 0) + 1);
+        syncUltimateReady(player);
+    }
+
+    function consumeSlimeSummonCharge(player) {
+        const spawnCount = slimeSummonCountForUltimate(player);
+        player.slimeSummonCharge = 0;
+        player.ultimateHits = 0;
+        player.ultimateReady = false;
+        return spawnCount;
     }
 
     function applySlow(player, now, duration = SLOW_DURATION_MS) {
@@ -705,8 +724,7 @@ export function createGuangbooRealtime(server, store) {
             const spawnCount = slimeSummonCountForUltimate(player);
             if (spawnCount < SLIME_ULTIMATE_MIN_HITS_REQUIRED) return;
             spawnBabySlimes(match, player, spawnCount, now);
-            player.ultimateHits = 0;
-            player.ultimateReady = false;
+            consumeSlimeSummonCharge(player);
             player.queuedUltimateAim = null;
             resetRegenTimer(player, now);
             return;
@@ -867,10 +885,7 @@ export function createGuangbooRealtime(server, store) {
                 hit.health -= projectile.damage;
                 resetRegenTimer(hit, now);
                 if ((projectile.kind === 'normal' || projectile.kind === 'slime') && owner) {
-                    owner.ultimateHits = isSlime(owner)
-                        ? (owner.ultimateHits || 0) + 1
-                        : Math.min(ULTIMATE_HITS_REQUIRED, (owner.ultimateHits || 0) + 1);
-                    syncUltimateReady(owner);
+                    addUltimateHitCharge(owner);
                 }
                 if (projectile.kind === 'slime' && owner) {
                     if (hit.ammo > 0) {
@@ -948,6 +963,7 @@ export function createGuangbooRealtime(server, store) {
                 queuedShotAims: [],
                 queuedUltimateAim: null,
                 ultimateHits: 0,
+                slimeSummonCharge: 0,
                 ultimateReady: false,
                 endedAtMs: null,
                 placement: 0
