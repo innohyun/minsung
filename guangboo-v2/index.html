@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Guangboo v2 · PixiJS</title>
+    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260630-pixi-v2">
+</head>
+<body>
+    <main id="app">
+        <section class="screen lobby-screen" id="lobbyScreen">
+            <div class="brand-card">
+                <p class="eyebrow">PixiJS v2 prototype</p>
+                <h1>Guangboo v2</h1>
+                <p class="tagline">기존 서버는 그대로 쓰고, 화면 렌더링만 WebGL 기반으로 바꾼 테스트 버전입니다.</p>
+            </div>
+
+            <form class="join-panel" id="joinForm">
+                <label>
+                    닉네임
+                    <input id="nicknameInput" maxlength="18" autocomplete="nickname" placeholder="Monster" required>
+                </label>
+
+                <fieldset>
+                    <legend>모드</legend>
+                    <label class="radio-card">
+                        <input type="radio" name="matchMode" value="duel" checked>
+                        <span><strong>1:1 결투</strong><small>가볍게 테스트</small></span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="matchMode" value="survival">
+                        <span><strong>4인 생존전</strong><small>기존 서버 규칙 사용</small></span>
+                    </label>
+                </fieldset>
+
+                <fieldset>
+                    <legend>캐릭터</legend>
+                    <label class="radio-card">
+                        <input type="radio" name="character" value="monster" checked>
+                        <span><strong>기본 몬스터</strong><small>레이저 궁극기</small></span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="character" value="slime">
+                        <span><strong>슬라임</strong><small>장판 · 소환수</small></span>
+                    </label>
+                </fieldset>
+
+                <label>
+                    플레이 맵
+                    <select id="customMapSelect">
+                        <option value="">기본 맵</option>
+                    </select>
+                </label>
+
+                <label class="bot-toggle">
+                    <input id="botToggle" type="checkbox" checked>
+                    <span>부족한 인원은 봇으로 채우기</span>
+                </label>
+
+                <button id="joinButton" type="submit">v2로 매칭 시작</button>
+                <p class="status-line" id="statusLine">대기 중</p>
+            </form>
+
+            <aside class="help-panel">
+                <h2>조작</h2>
+                <p>PC: WASD/방향키 이동, 마우스 클릭 발사, Space 궁극기</p>
+                <p>패드/폰: 왼쪽 조이스틱 이동, 오른쪽 조이스틱 조준 후 손 떼면 발사, 궁 버튼 사용</p>
+            </aside>
+        </section>
+
+        <section class="screen game-screen" id="gameScreen" hidden>
+            <div id="pixiHost" class="pixi-host"></div>
+            <div class="hud top-hud">
+                <div><span>체력</span><strong id="healthReadout">0</strong></div>
+                <div><span>생존</span><strong id="aliveReadout">0</strong></div>
+                <div><span>킬</span><strong id="killReadout">0</strong></div>
+            </div>
+            <div class="connection-hud" id="connectionHud">연결 중</div>
+            <div class="stick-zone left-stick" id="leftStick"><div class="stick-thumb"></div></div>
+            <div class="stick-zone right-stick" id="rightStick"><div class="stick-thumb"></div></div>
+            <button class="ultimate-button" id="ultimateButton" type="button" disabled><span>궁</span><small id="ultimateReadout">0/4</small></button>
+        </section>
+
+        <section class="screen result-screen" id="resultScreen" hidden>
+            <div class="result-panel">
+                <p class="eyebrow">Match complete</p>
+                <h2 id="resultTitle">결과</h2>
+                <ol id="resultList" class="result-list"></ol>
+                <div class="result-actions">
+                    <button id="playAgainButton" type="button">다시 하기</button>
+                    <button id="backLobbyButton" type="button">로비</button>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
+    <script src="/guangboo-v2/client.js?v=20260630-pixi-v2" defer></script>
+</body>
+</html>
