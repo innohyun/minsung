@@ -84,7 +84,7 @@
         audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 },
         lastTouchEndAt: 0,
         gameFullscreen: false,
-        viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0, cameraX: 0, cameraY: 0, visibleWorldWidth: 1, visibleWorldHeight: 1 },
+        viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 },
         customMaps: [],
         editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), tool: 'wall' }
     };
@@ -605,56 +605,29 @@
         elements.canvas.style.width = `${width}px`;
         elements.canvas.style.height = `${height}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        updateViewportCamera();
-    }
 
-    function viewportScaleForMap(map, width, height) {
-        const baseVisibleWorld = WORLD_FALLBACK;
-        const followScale = Math.min(width / baseVisibleWorld.width, height / baseVisibleWorld.height);
-        const fitScale = Math.min(width / map.width, height / map.height);
-        const mapIsLargerThanBaseView = map.width > baseVisibleWorld.width || map.height > baseVisibleWorld.height;
-        return mapIsLargerThanBaseView ? followScale : fitScale;
-    }
-
-    function updateViewportCamera() {
-        const width = state.viewport.width || window.innerWidth || 1;
-        const height = state.viewport.height || window.innerHeight || 1;
         const map = state.map || WORLD_FALLBACK;
-        const scale = viewportScaleForMap(map, width, height);
-        const visibleWorldWidth = width / scale;
-        const visibleWorldHeight = height / scale;
-        const me = state.players.find(player => player.id === state.playerId && player.alive !== false)
-            || state.players.find(player => player.id === state.playerId);
-        const targetX = me ? me.x : map.width / 2;
-        const targetY = me ? me.y : map.height / 2;
-        const canScrollX = map.width > visibleWorldWidth;
-        const canScrollY = map.height > visibleWorldHeight;
-        const cameraX = canScrollX ? Math.max(0, Math.min(map.width - visibleWorldWidth, targetX - visibleWorldWidth / 2)) : 0;
-        const cameraY = canScrollY ? Math.max(0, Math.min(map.height - visibleWorldHeight, targetY - visibleWorldHeight / 2)) : 0;
+        const scale = Math.min(width / map.width, height / map.height);
         state.viewport = {
             width,
             height,
             scale,
-            offsetX: canScrollX ? 0 : (width - map.width * scale) / 2,
-            offsetY: canScrollY ? 0 : (height - map.height * scale) / 2,
-            cameraX,
-            cameraY,
-            visibleWorldWidth,
-            visibleWorldHeight
+            offsetX: (width - map.width * scale) / 2,
+            offsetY: (height - map.height * scale) / 2
         };
     }
 
     function worldToScreen(x, y) {
         return {
-            x: state.viewport.offsetX + (x - state.viewport.cameraX) * state.viewport.scale,
-            y: state.viewport.offsetY + (y - state.viewport.cameraY) * state.viewport.scale
+            x: state.viewport.offsetX + x * state.viewport.scale,
+            y: state.viewport.offsetY + y * state.viewport.scale
         };
     }
 
     function screenToWorld(x, y) {
         return {
-            x: (x - state.viewport.offsetX) / state.viewport.scale + state.viewport.cameraX,
-            y: (y - state.viewport.offsetY) / state.viewport.scale + state.viewport.cameraY
+            x: (x - state.viewport.offsetX) / state.viewport.scale,
+            y: (y - state.viewport.offsetY) / state.viewport.scale
         };
     }
 
@@ -680,7 +653,6 @@
 
         const width = state.viewport.width;
         const height = state.viewport.height;
-        updateViewportCamera();
         ctx.clearRect(0, 0, width, height);
         drawArenaBackdrop(width, height);
         drawMap();
