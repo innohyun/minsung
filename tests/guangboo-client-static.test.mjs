@@ -132,8 +132,8 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts browser caches for changed guangboo assets', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260630-map-editor-button-fix/);
-    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-button-fix/);
+    assert.match(htmlSource, /styles\.css\?v=20260630-follow-camera/);
+    assert.match(htmlSource, /client\.js\?v=20260630-follow-camera/);
 });
 
 
@@ -249,9 +249,24 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
     assert.match(runtimeSource, /if \(isSlime\(player\)\) \{\n\s*castSlimeUltimate\(match, player, now\);\n\s*return;\n\s*\}/);
     assert.match(runtimeSource, /if \(message\.ultimate && queueUltimateInput\(player, aim\)\) \{\n\s*spawnUltimateProjectile\(client\.match, player, Date\.now\(\)\);\n\s*\}/);
-    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-button-fix/);
+    assert.match(htmlSource, /client\.js\?v=20260630-follow-camera/);
 });
 
+
+test('guangboo large maps use a Brawl-style camera that follows the local player', () => {
+    assert.match(clientSource, /function viewportScaleForMap\(map, width, height\)/);
+    assert.match(clientSource, /const followScale = Math\.min\(width \/ baseVisibleWorld\.width, height \/ baseVisibleWorld\.height\)/);
+    assert.match(clientSource, /const mapIsLargerThanBaseView = map\.width > baseVisibleWorld\.width \|\| map\.height > baseVisibleWorld\.height/);
+    assert.match(clientSource, /return mapIsLargerThanBaseView \? followScale : fitScale/);
+    assert.match(clientSource, /function updateViewportCamera\(\)/);
+    assert.match(clientSource, /targetX - visibleWorldWidth \/ 2/);
+    assert.match(clientSource, /targetY - visibleWorldHeight \/ 2/);
+    assert.match(clientSource, /Math\.min\(map\.width - visibleWorldWidth/);
+    assert.match(clientSource, /Math\.min\(map\.height - visibleWorldHeight/);
+    assert.match(clientSource, /updateViewportCamera\(\);\n\s*ctx\.clearRect/);
+    assert.match(clientSource, /x: state\.viewport\.offsetX \+ \(x - state\.viewport\.cameraX\) \* state\.viewport\.scale/);
+    assert.match(clientSource, /x: \(x - state\.viewport\.offsetX\) \/ state\.viewport\.scale \+ state\.viewport\.cameraX/);
+});
 
 test('guangboo supports lobby custom map creation, saving, listing, and selection', () => {
     assert.match(htmlSource, /id="openMapEditorButton"/);
