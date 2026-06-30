@@ -84,7 +84,7 @@
         audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 },
         lastTouchEndAt: 0,
         gameFullscreen: false,
-        viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0 },
+        viewport: { width: 1, height: 1, scale: 1, offsetX: 0, offsetY: 0, cameraActive: false },
         customMaps: [],
         editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), tool: 'wall' }
     };
@@ -596,25 +596,100 @@
             .replaceAll("'", '&#039;');
     }
 
+    function layoutViewportSize() {
+        const canvasRect = elements.canvas.getBoundingClientRect?.();
+        const matchRect = elements.match.getBoundingClientRect?.();
+        const visualViewport = window.visualViewport;
+        const width = Math.max(
+            1,
+            Math.round(canvasRect?.width || matchRect?.width || visualViewport?.width || window.innerWidth || WORLD_FALLBACK.width)
+        );
+        const height = Math.max(
+            1,
+            Math.round(canvasRect?.height || matchRect?.height || visualViewport?.height || window.innerHeight || WORLD_FALLBACK.height)
+        );
+        return { width, height };
+    }
+
     function resizeCanvas() {
         const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        const { width, height } = layoutViewportSize();
         elements.canvas.width = Math.floor(width * dpr);
         elements.canvas.height = Math.floor(height * dpr);
         elements.canvas.style.width = `${width}px`;
         elements.canvas.style.height = `${height}px`;
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        updateViewportCamera();
+    }
 
+    function validNumber(value) {
+        return Number.isFinite(Number(value));
+    }
+
+    function clamp(value, min, max) {
+        if (max < min) return min;
+        return Math.max(min, Math.min(max, value));
+    }
+
+    function localPlayerForCamera(mapWidth = Infinity, mapHeight = Infinity) {
+        const player = state.players.find(candidate => candidate.id === state.playerId);
+        if (!player || player.alive === false || !validNumber(player.x) || !validNumber(player.y)) return null;
+        if (player.x < 0 || player.x > mapWidth || player.y < 0 || player.y > mapHeight) return null;
+        return player;
+    }
+
+    function isLargeMap(map) {
+        return map.width > WORLD_FALLBACK.width || map.height > WORLD_FALLBACK.height;
+    }
+
+    function centeredOrClampedOffset(rawOffset, screenSize, worldSize, scale) {
+        const scaledWorld = worldSize * scale;
+        if (scaledWorld <= screenSize) return (screenSize - scaledWorld) / 2;
+        return clamp(rawOffset, screenSize - scaledWorld, 0);
+    }
+
+    function keepWorldPointVisible(offset, point, screenSize, worldSize, scale) {
+        const margin = Math.min(80, Math.max(24, screenSize * 0.08));
+        let nextOffset = offset;
+        const screenPoint = point * scale + nextOffset;
+        if (screenPoint < margin) nextOffset += margin - screenPoint;
+        if (screenPoint > screenSize - margin) nextOffset -= screenPoint - (screenSize - margin);
+        return centeredOrClampedOffset(nextOffset, screenSize, worldSize, scale);
+    }
+
+    function mapIntersectsViewport(offsetX, offsetY, width, height, mapWidth, mapHeight, scale) {
+        return offsetX < width && offsetY < height && offsetX + mapWidth * scale > 0 && offsetY + mapHeight * scale > 0;
+    }
+
+    function updateViewportCamera() {
         const map = state.map || WORLD_FALLBACK;
-        const scale = Math.min(width / map.width, height / map.height);
-        state.viewport = {
-            width,
-            height,
-            scale,
-            offsetX: (width - map.width * scale) / 2,
-            offsetY: (height - map.height * scale) / 2
-        };
+        const { width, height } = layoutViewportSize();
+        const mapWidth = validNumber(map.width) && Number(map.width) > 0 ? Number(map.width) : WORLD_FALLBACK.width;
+        const mapHeight = validNumber(map.height) && Number(map.height) > 0 ? Number(map.height) : WORLD_FALLBACK.height;
+        const fitScale = Math.min(width / mapWidth, height / mapHeight);
+        const followScale = Math.min(width / WORLD_FALLBACK.width, height / WORLD_FALLBACK.height);
+        const player = localPlayerForCamera(mapWidth, mapHeight);
+        const cameraActive = state.matchActive && isLargeMap({ width: mapWidth, height: mapHeight }) && Boolean(player);
+        const scale = cameraActive ? followScale : fitScale;
+        let offsetX = cameraActive
+            ? centeredOrClampedOffset(width / 2 - player.x * scale, width, mapWidth, scale)
+            : (width - mapWidth * scale) / 2;
+        let offsetY = cameraActive
+            ? centeredOrClampedOffset(height / 2 - player.y * scale, height, mapHeight, scale)
+            : (height - mapHeight * scale) / 2;
+
+        if (cameraActive) {
+            offsetX = keepWorldPointVisible(offsetX, player.x, width, mapWidth, scale);
+            offsetY = keepWorldPointVisible(offsetY, player.y, height, mapHeight, scale);
+            if (!mapIntersectsViewport(offsetX, offsetY, width, height, mapWidth, mapHeight, scale)) {
+                offsetX = (width - mapWidth * fitScale) / 2;
+                offsetY = (height - mapHeight * fitScale) / 2;
+                state.viewport = { width, height, scale: fitScale, offsetX, offsetY, cameraActive: false };
+                return;
+            }
+        }
+
+        state.viewport = { width, height, scale, offsetX, offsetY, cameraActive };
     }
 
     function worldToScreen(x, y) {
@@ -625,6 +700,7 @@
     }
 
     function screenToWorld(x, y) {
+        updateViewportCamera();
         return {
             x: (x - state.viewport.offsetX) / state.viewport.scale,
             y: (y - state.viewport.offsetY) / state.viewport.scale
@@ -651,6 +727,7 @@
         requestAnimationFrame(draw);
         if (elements.match.hidden && elements.result.hidden) return;
 
+        updateViewportCamera();
         const width = state.viewport.width;
         const height = state.viewport.height;
         ctx.clearRect(0, 0, width, height);
@@ -684,9 +761,18 @@
         ctx.fillStyle = '#eef3df';
         ctx.strokeStyle = 'rgba(45, 74, 58, 0.36)';
         ctx.lineWidth = 2;
-        roundRect(topLeft.x, topLeft.y, w, h, 8);
-        ctx.fill();
-        ctx.stroke();
+        if (state.viewport.cameraActive) {
+            const visibleX = Math.max(0, topLeft.x);
+            const visibleY = Math.max(0, topLeft.y);
+            const visibleRight = Math.min(state.viewport.width, bottomRight.x);
+            const visibleBottom = Math.min(state.viewport.height, bottomRight.y);
+            ctx.fillRect(visibleX, visibleY, Math.max(0, visibleRight - visibleX), Math.max(0, visibleBottom - visibleY));
+            ctx.strokeRect(visibleX, visibleY, Math.max(0, visibleRight - visibleX), Math.max(0, visibleBottom - visibleY));
+        } else {
+            roundRect(topLeft.x, topLeft.y, w, h, 8);
+            ctx.fill();
+            ctx.stroke();
+        }
 
         ctx.strokeStyle = 'rgba(33, 48, 63, 0.14)';
         ctx.lineWidth = 1;

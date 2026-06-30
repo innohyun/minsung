@@ -132,8 +132,29 @@ test('guangboo projectiles are capped to the aim range on client and server snap
 });
 
 test('guangboo busts browser caches for changed guangboo assets', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260630-map-editor-button-fix/);
-    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-button-fix/);
+    assert.match(htmlSource, /styles\.css\?v=20260630-large-map-camera-visible-fix/);
+    assert.match(htmlSource, /client\.js\?v=20260630-large-map-camera-visible-fix/);
+});
+
+
+test('guangboo only enables follow camera for valid large-map matches', () => {
+    assert.match(clientSource, /cameraActive: false/);
+    assert.match(clientSource, /function updateViewportCamera\(\)/);
+    assert.match(clientSource, /function localPlayerForCamera\(mapWidth = Infinity, mapHeight = Infinity\)/);
+    assert.match(clientSource, /function isLargeMap\(map\)/);
+    assert.match(clientSource, /function layoutViewportSize\(\)/);
+    assert.match(clientSource, /getBoundingClientRect/);
+    assert.match(clientSource, /function keepWorldPointVisible\(offset, point, screenSize, worldSize, scale\)/);
+    assert.match(clientSource, /function mapIntersectsViewport\(offsetX, offsetY, width, height, mapWidth, mapHeight, scale\)/);
+    assert.match(clientSource, /state\.matchActive && isLargeMap\(\{ width: mapWidth, height: mapHeight \}\) && Boolean\(player\)/);
+    assert.match(clientSource, /const followScale = Math\.min\(width \/ WORLD_FALLBACK\.width, height \/ WORLD_FALLBACK\.height\)/);
+    assert.match(clientSource, /const scale = cameraActive \? followScale : fitScale/);
+    assert.match(clientSource, /centeredOrClampedOffset\(width \/ 2 - player\.x \* scale, width, mapWidth, scale\)/);
+    assert.match(clientSource, /offsetX = keepWorldPointVisible\(offsetX, player\.x, width, mapWidth, scale\)/);
+    assert.match(clientSource, /!mapIntersectsViewport\(offsetX, offsetY, width, height, mapWidth, mapHeight, scale\)/);
+    assert.match(clientSource, /ctx\.fillRect\(visibleX, visibleY, Math\.max\(0, visibleRight - visibleX\), Math\.max\(0, visibleBottom - visibleY\)\)/);
+    assert.match(clientSource, /updateViewportCamera\(\);\n\s*const width = state\.viewport\.width/);
+    assert.match(clientSource, /updateViewportCamera\(\);\n\s*return \{/);
 });
 
 
@@ -249,7 +270,7 @@ test('guangboo supports selectable slime character with trails, ammo steal, and 
     assert.match(runtimeSource, /spawnBabySlimes\(match, player, spawnCount, now\)/);
     assert.match(runtimeSource, /if \(isSlime\(player\)\) \{\n\s*castSlimeUltimate\(match, player, now\);\n\s*return;\n\s*\}/);
     assert.match(runtimeSource, /if \(message\.ultimate && queueUltimateInput\(player, aim\)\) \{\n\s*spawnUltimateProjectile\(client\.match, player, Date\.now\(\)\);\n\s*\}/);
-    assert.match(htmlSource, /client\.js\?v=20260630-map-editor-button-fix/);
+    assert.match(htmlSource, /client\.js\?v=20260630-large-map-camera-visible-fix/);
 });
 
 
