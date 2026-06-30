@@ -63,6 +63,7 @@
         mapTools: [...document.querySelectorAll('.map-tool')],
         status: document.getElementById('statusLine'),
         pixiHost: document.getElementById('pixiHost'),
+        fullscreenExit: document.getElementById('fullscreenExitButton'),
         health: document.getElementById('healthReadout'),
         alive: document.getElementById('aliveReadout'),
         kills: document.getElementById('killReadout'),
@@ -71,6 +72,10 @@
         rightStick: document.getElementById('rightStick'),
         ultimateButton: document.getElementById('ultimateButton'),
         ultimateReadout: document.getElementById('ultimateReadout'),
+        queueFill: document.getElementById('queueFill'),
+        queueCopy: document.getElementById('queueCopy'),
+        leaderboard: document.getElementById('leaderboardList'),
+        refreshBoard: document.getElementById('refreshBoardButton'),
         resultTitle: document.getElementById('resultTitle'),
         resultList: document.getElementById('resultList'),
         playAgain: document.getElementById('playAgainButton'),
@@ -222,7 +227,9 @@
         localStorage.setItem(MAP_KEY, mapId);
         elements.joinButton.disabled = true;
         elements.joinButton.textContent = '매칭 중';
-        elements.status.textContent = 'v2 매칭 요청 중';
+        elements.status.textContent = '매칭 요청 중';
+        if (elements.queueCopy) elements.queueCopy.textContent = `정식 맵 전투: 선택한 맵 ${mapMeta(mapId).name}`;
+        if (elements.queueFill) elements.queueFill.style.width = '35%';
         state.joining = true;
         send({ type: 'joinQueue', nickname, mode, character, customMapId: isOfficialMapId(mapId) ? null : mapId, officialMapId: isOfficialMapId(mapId) ? mapId : null, fillWithBots: elements.botToggle.checked });
     }
@@ -242,6 +249,8 @@
         }
         if (message.type === 'queue') {
             elements.status.textContent = `${message.modeLabel || message.mode}: ${message.playersWaiting}/${message.requiredPlayers} 대기 중`;
+            if (elements.queueCopy) elements.queueCopy.textContent = `${message.modeLabel || message.mode}: ${message.playersWaiting}/${message.requiredPlayers} 대기 중 (총 ${message.requiredPlayers || 4}명)`;
+            if (elements.queueFill) elements.queueFill.style.width = `${Math.max(8, Math.min(100, ((message.playersWaiting || 0) / (message.requiredPlayers || 4)) * 100))}%`;
             return;
         }
         if (message.type === 'matchStart') {
@@ -255,8 +264,8 @@
             state.slimeTrails = [];
             state.summons = [];
             elements.joinButton.disabled = false;
-            elements.joinButton.textContent = 'v2로 매칭 시작';
-            elements.connection.textContent = message.modeLabel || '매치 진행';
+            elements.joinButton.textContent = '플레이';
+            elements.connection.textContent = message.modeLabel || '정식 맵 전투';
             setScreen('game');
             ensurePixi();
             updateHud();
@@ -682,7 +691,7 @@
         OFFICIAL_MAPS.forEach(map => {
             const card = document.createElement('button');
             card.type = 'button';
-            card.className = `map-card ${selectedMapId() === map.id ? 'is-selected' : ''}`;
+            card.className = `map-choice-card ${selectedMapId() === map.id ? 'is-selected' : ''}`;
             const canvas = document.createElement('canvas');
             canvas.width = 220;
             canvas.height = 140;
@@ -711,7 +720,7 @@
         state.customMaps.forEach(map => {
             const card = document.createElement('button');
             card.type = 'button';
-            card.className = `custom-map-card ${selectedMapId() === map.id ? 'is-selected' : ''}`;
+            card.className = `map-choice-card custom-map-card ${selectedMapId() === map.id ? 'is-selected' : ''}`;
             card.innerHTML = `<strong>${escapeHtml(map.name)}</strong><p>${Math.round(map.width / map.tileSize)}x${Math.round(map.height / map.tileSize)} · ${escapeHtml(map.creator || '플레이어')}</p>`;
             card.addEventListener('click', () => selectMap(map.id));
             elements.customMapList.appendChild(card);
@@ -747,7 +756,7 @@
             const button = document.createElement('button');
             button.type = 'button';
             button.className = `character-choice-card ${selectedCharacter() === card.key ? 'is-selected' : ''}`;
-            button.innerHTML = `<div class="character-avatar" style="background: radial-gradient(circle at 35% 24%, #fff, ${card.color} 38%, ${card.accent} 92%)"></div><h3>${card.name}</h3><p>${card.summary}</p>`;
+            button.innerHTML = `<div class="character-choice-avatar character-avatar" style="background: radial-gradient(circle at 35% 24%, #fff, ${card.color} 38%, ${card.accent} 92%)"></div><h3>${card.name}</h3><p>${card.summary}</p>`;
             button.addEventListener('click', () => {
                 elements.characterInputs.forEach(input => { input.checked = input.value === card.key; });
                 localStorage.setItem(CHARACTER_KEY, card.key);
@@ -823,6 +832,34 @@
         selectMap(data.map.id);
     }
 
+
+    async function loadLeaderboard() {
+        if (!elements.leaderboard) return;
+        try {
+            const response = await fetch('/api/guangboo/leaderboard', { cache: 'no-store' });
+            const data = await response.json();
+            renderLeaderboard(data.leaderboard || []);
+        } catch {
+            renderLeaderboard([]);
+        }
+    }
+
+    function renderLeaderboard(rows) {
+        if (!elements.leaderboard) return;
+        elements.leaderboard.innerHTML = '';
+        if (!rows.length) {
+            const item = document.createElement('li');
+            item.innerHTML = '<span>1</span><strong>기록 없음</strong><span class="stat-pill">0승</span>';
+            elements.leaderboard.appendChild(item);
+            return;
+        }
+        rows.forEach((row, index) => {
+            const item = document.createElement('li');
+            item.innerHTML = `<span>${index + 1}</span><strong>${escapeHtml(row.nickname)}</strong><span class="stat-pill">${row.wins}승 ${row.kills}킬</span>`;
+            elements.leaderboard.appendChild(item);
+        });
+    }
+
     function renderResults(winnerId, results) {
         const didWin = winnerId && winnerId === state.playerId;
         elements.resultTitle.textContent = didWin ? '승리' : '생존 종료';
@@ -833,7 +870,8 @@
             elements.resultList.appendChild(li);
         });
         elements.joinButton.disabled = false;
-        elements.joinButton.textContent = 'v2로 매칭 시작';
+        elements.joinButton.textContent = '플레이';
+        loadLeaderboard();
         setScreen('result');
     }
     async function loadCustomMaps() {
@@ -879,6 +917,14 @@
         if (state.ws?.readyState === WebSocket.OPEN && state.serverReady) joinQueue();
     });
     elements.backLobby.addEventListener('click', () => setScreen('lobby'));
+    elements.fullscreenExit?.addEventListener('click', () => {
+        state.matchActive = false;
+        try { state.ws?.close(); } catch {}
+        elements.joinButton.disabled = false;
+        elements.joinButton.textContent = '플레이';
+        setScreen('lobby');
+    });
+    elements.refreshBoard?.addEventListener('click', loadLeaderboard);
     elements.selectedMapCard.addEventListener('click', openMapSelect);
     elements.selectedMapCard.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openMapSelect(); } });
     elements.openMapSelect.addEventListener('click', openMapSelect);
@@ -925,6 +971,7 @@
     renderCharacterSelectScreen();
     renderSelectedMapCard();
     loadCustomMaps();
+    loadLeaderboard();
     setupStick('leftStick', elements.leftStick);
     setupStick('rightStick', elements.rightStick);
     sendInputLoop();
