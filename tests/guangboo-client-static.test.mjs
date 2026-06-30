@@ -131,9 +131,9 @@ test('guangboo projectiles are capped to the aim range on client and server snap
     assert.match(runtimeSource, /maxDistance: Math\.round\(projectile\.maxDistance \?\? PROJECTILE_RANGE\)/);
 });
 
-test('guangboo busts mobile browser caches for changed controls', () => {
-    assert.match(htmlSource, /styles\.css\?v=20260629-mobile18/);
-    assert.match(htmlSource, /client\.js\?v=20260629-mobile18/);
+test('guangboo busts browser caches for changed guangboo assets', () => {
+    assert.match(htmlSource, /styles\.css\?v=20260630-slime-charge/);
+    assert.match(htmlSource, /client\.js\?v=20260630-slime-hits-simple/);
 });
 
 
