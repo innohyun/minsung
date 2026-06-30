@@ -12,6 +12,7 @@ const PROJECTILE_RANGE = 300;
 const PROJECTILE_SPEED = 570;
 const TILE_SIZE = 40;
 const ULTIMATE_HITS_REQUIRED = 4;
+const SLIME_ULTIMATE_MIN_HITS_REQUIRED = 1;
 const ULTIMATE_DAMAGE = 2000;
 const ULTIMATE_PROJECTILE_HEALTH = 3000;
 const ULTIMATE_SPEED = 150;
@@ -476,12 +477,16 @@ export function createGuangbooRealtime(server, store) {
     }
 
     function ultimateRequiredFor(player) {
-        return isSlime(player) ? 1 : ULTIMATE_HITS_REQUIRED;
+        return isSlime(player) ? SLIME_ULTIMATE_MIN_HITS_REQUIRED : ULTIMATE_HITS_REQUIRED;
+    }
+
+    function slimeSummonCountForUltimate(player) {
+        return Math.max(0, Math.floor(player?.ultimateHits || 0));
     }
 
     function hasUsableUltimate(player) {
         const hits = player?.ultimateHits || 0;
-        return isSlime(player) ? hits > 0 : hits >= ULTIMATE_HITS_REQUIRED;
+        return isSlime(player) ? slimeSummonCountForUltimate(player) >= SLIME_ULTIMATE_MIN_HITS_REQUIRED : hits >= ULTIMATE_HITS_REQUIRED;
     }
 
     function syncUltimateReady(player) {
@@ -682,7 +687,8 @@ export function createGuangbooRealtime(server, store) {
         syncUltimateReady(player);
         if (!player.ultimateReady) return;
         if (isSlime(player)) {
-            const spawnCount = Math.max(1, Math.floor(player.ultimateHits || 0));
+            const spawnCount = slimeSummonCountForUltimate(player);
+            if (spawnCount < SLIME_ULTIMATE_MIN_HITS_REQUIRED) return;
             spawnBabySlimes(match, player, spawnCount, now);
             player.ultimateHits = 0;
             player.ultimateReady = false;
