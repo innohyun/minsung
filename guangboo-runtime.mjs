@@ -214,6 +214,8 @@ function normalizeCustomMapData(value) {
     const walls = [];
     const spawnOccupied = new Set();
     const spawnPoints = [];
+    const bushOccupied = new Set();
+    const bushes = [];
     for (const wall of Array.isArray(input.walls) ? input.walls : []) {
         const col = Math.floor(Number(wall?.col));
         const row = Math.floor(Number(wall?.row));
@@ -222,6 +224,15 @@ function normalizeCustomMapData(value) {
         if (occupied.has(key)) continue;
         occupied.add(key);
         walls.push({ id: `w${walls.length}`, col, row });
+    }
+    for (const bush of Array.isArray(input.bushes) ? input.bushes : []) {
+        const col = Math.floor(Number(bush?.col));
+        const row = Math.floor(Number(bush?.row));
+        if (!Number.isFinite(col) || !Number.isFinite(row) || col < 0 || row < 0 || col >= cols || row >= rows) continue;
+        const key = `${col},${row}`;
+        if (occupied.has(key) || bushOccupied.has(key)) continue;
+        bushOccupied.add(key);
+        bushes.push({ id: `b${bushes.length}`, col, row });
     }
     for (const spawn of Array.isArray(input.spawnPoints) ? input.spawnPoints : []) {
         const col = Math.floor(Number(spawn?.col));
@@ -241,6 +252,7 @@ function normalizeCustomMapData(value) {
         cols,
         rows,
         walls,
+        bushes,
         spawnPoints
     };
     map.obstacles = walls.map(wall => tileToRect(wall, tileSize));
@@ -303,6 +315,24 @@ function destroyWallHitByProjectile(map, projectile) {
     map.walls = map.walls.filter(wall => wall.id !== hit.id);
     map.obstacles = map.obstacles.filter(rect => rect.id !== hit.id);
     return hit;
+}
+
+function bushContainsPoint(map, x, y) {
+    const tileSize = map.tileSize || TILE_SIZE;
+    return (map.bushes || []).some(bush =>
+        x >= bush.col * tileSize && x <= (bush.col + 1) * tileSize &&
+        y >= bush.row * tileSize && y <= (bush.row + 1) * tileSize
+    );
+}
+
+function revealPlayer(player, now = Date.now(), duration = 1000) {
+    player.revealedUntil = Math.max(player.revealedUntil || 0, now + duration);
+}
+
+function isPlayerHiddenFrom(match, player, viewerId, now = Date.now()) {
+    if (!player.alive || player.id === viewerId) return false;
+    if ((player.revealedUntil || 0) > now) return false;
+    return bushContainsPoint(match.map, player.x, player.y);
 }
 
 function sendJson(socket, payload) {
@@ -559,11 +589,12 @@ export function createGuangbooRealtime(server, store) {
         });
     }
 
-    function snapshotMatch(match) {
+    function snapshotMatch(match, viewerId = null, effects = null) {
+        const now = Date.now();
         return {
             type: 'state',
             tick: match.tick,
-            players: [...match.players.values()].map(player => {
+            players: [...match.players.values()].filter(player => !isPlayerHiddenFrom(match, player, viewerId, now)).map(player => {
                 syncUltimateReady(player);
                 return {
                     id: player.id,
@@ -587,7 +618,8 @@ export function createGuangbooRealtime(server, store) {
                     slowedUntil: player.slowedUntil || 0,
                     alive: player.alive,
                     kills: player.kills,
-                    disconnected: player.disconnected
+                    disconnected: player.disconnected,
+                    revealedUntil: player.revealedUntil || 0
                 };
             }),
             projectiles: match.projectiles.map(projectile => ({
@@ -614,14 +646,17 @@ export function createGuangbooRealtime(server, store) {
                 health: Math.max(0, Math.round(summon.health)), maxHealth: summon.maxHealth, radius: summon.radius,
                 facingX: Number((summon.facing?.x ?? 1).toFixed(3)), facingY: Number((summon.facing?.y ?? 0).toFixed(3))
             })),
-            effects: match.effects.splice(0, match.effects.length),
+            effects: effects ?? match.effects.splice(0, match.effects.length),
             map: match.map,
             aliveCount: [...match.players.values()].filter(player => player.alive).length
         };
     }
 
     function broadcastMatch(match, payload) {
-        match.players.forEach(player => sendJson(player.client.socket, payload));
+        match.players.forEach(player => {
+            const nextPayload = typeof payload === 'function' ? payload(player.id) : payload;
+            sendJson(player.client.socket, nextPayload);
+        });
     }
 
     function finishMatch(match) {
@@ -915,11 +950,13 @@ export function createGuangbooRealtime(server, store) {
                     : 22 + summon.radius;
                 if (Math.hypot(targetEntity.x - summon.x, targetEntity.y - summon.y) <= hitRange) {
                     const owner = match.players.get(summon.ownerId);
+                    if (owner) revealPlayer(owner, now);
                     if (targetEntity.kind === 'ultimate') {
                         targetEntity.health = (targetEntity.health ?? ULTIMATE_PROJECTILE_HEALTH) - BABY_SLIME_DAMAGE;
                         if (targetEntity.health <= 0) targetEntity.destroyed = true;
                     } else {
                         targetEntity.health -= BABY_SLIME_DAMAGE;
+                        revealPlayer(targetEntity, now);
                         applySlow(targetEntity, now);
                         resetRegenTimer(targetEntity, now);
                         if (targetEntity.health <= 0) eliminatePlayer(match, targetEntity, owner);
@@ -957,6 +994,7 @@ export function createGuangbooRealtime(server, store) {
         player.ammo = Math.max(0, player.ammo - 1);
         player.lastAmmoReloadAt = now;
         player.lastShotAt = now;
+        revealPlayer(player, now);
         resetRegenTimer(player, now);
         const slimeShot = isSlime(player);
         match.projectiles.push({
@@ -998,6 +1036,7 @@ export function createGuangbooRealtime(server, store) {
         spawnBabySlimes(match, player, spawnCount, now);
         consumeSlimeSummonCharge(player);
         player.queuedUltimateAim = null;
+        revealPlayer(player, now);
         resetRegenTimer(player, now);
         return true;
     }
@@ -1020,6 +1059,7 @@ export function createGuangbooRealtime(server, store) {
         player.queuedUltimateAim = null;
         player.aim = { x: dx, y: dy };
         player.facing = { x: dx, y: dy };
+        revealPlayer(player, now);
         resetRegenTimer(player, now);
         match.projectiles.push({
             id: `${match.id}-u${match.nextProjectileId++}`,
@@ -1170,6 +1210,7 @@ export function createGuangbooRealtime(server, store) {
             );
             if (hit) {
                 hit.health -= projectile.damage;
+                revealPlayer(hit, now);
                 resetRegenTimer(hit, now);
                 if ((projectile.kind === 'normal' || projectile.kind === 'slime') && owner) {
                     addUltimateHitCharge(owner);
@@ -1194,7 +1235,8 @@ export function createGuangbooRealtime(server, store) {
         match.projectiles = projectiles.filter(projectile => !projectile.destroyed);
 
         if (match.status === 'active') {
-            broadcastMatch(match, snapshotMatch(match));
+            const effects = match.effects.splice(0, match.effects.length);
+            broadcastMatch(match, viewerId => snapshotMatch(match, viewerId, effects));
         }
     }
 
@@ -1270,6 +1312,7 @@ export function createGuangbooRealtime(server, store) {
                 lastCombatAt: 0,
                 lastRegenAt: Date.now(),
                 slowedUntil: 0,
+                revealedUntil: 0,
                 lastSlimeTrailAt: 0,
                 queuedShotAims: [],
                 queuedUltimateAim: null,

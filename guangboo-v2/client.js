@@ -68,10 +68,10 @@
         mapMode: document.getElementById('mapModeInput'),
         mapCols: document.getElementById('mapColsInput'),
         mapRows: document.getElementById('mapRowsInput'),
+        applyMapSize: document.getElementById('applyMapSizeButton'),
         mapSummary: document.getElementById('mapSummaryInput'),
         publishMap: document.getElementById('publishMapButton'),
         mapEditorCanvasWrap: document.getElementById('mapEditorCanvasWrap'),
-        newMap: document.getElementById('newMapButton'),
         saveMap: document.getElementById('saveMapButton'),
         mapEditorStatus: document.getElementById('mapEditorStatus'),
         mapTools: [...document.querySelectorAll('.map-tool')],
@@ -129,7 +129,7 @@
         effects: [],
         effectMemory: new Set(),
         selectedMapId: DEFAULT_OFFICIAL_MAP_ID,
-        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), spawns: new Set(), enemySpawns: new Set(), tool: 'wall', editingId: null, editPassword: null, zoom: 1, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1, pinching: false, pinchBlockUntil: 0, dragPointerId: null, draggedCell: '', statusToken: null },
+        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), bushes: new Set(), spawns: new Set(), enemySpawns: new Set(), tool: 'wall', editingId: null, editPassword: null, zoom: 1, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1, pinching: false, pinchBlockUntil: 0, dragPointerId: null, draggedCell: '', statusToken: null },
         render: {
             app: null,
             ready: false,
@@ -444,8 +444,9 @@
         const width = Math.max(tileSize, Number(map.width) || BASE_WORLD.width);
         const height = Math.max(tileSize, Number(map.height) || BASE_WORLD.height);
         const walls = Array.isArray(map.walls) ? map.walls : [];
+        const bushes = Array.isArray(map.bushes) ? map.bushes : [];
         const obstacles = Array.isArray(map.obstacles) ? map.obstacles : walls.map(wall => ({ id: wall.id || `${wall.col},${wall.row}`, col: wall.col, row: wall.row, x: wall.col * tileSize + tileSize / 2, y: wall.row * tileSize + tileSize / 2, w: tileSize, h: tileSize }));
-        return { ...map, width, height, tileSize, walls, obstacles };
+        return { ...map, width, height, tileSize, walls, bushes, obstacles };
     }
 
     async function ensurePixi() {
@@ -541,7 +542,7 @@
     }
 
     function mapSignature(map = state.map) {
-        return `${map.width}:${map.height}:${map.tileSize}:${(map.walls || []).map(w => `${w.col},${w.row}`).join('|')}`;
+        return `${map.width}:${map.height}:${map.tileSize}:${(map.walls || []).map(w => `${w.col},${w.row}`).join('|')}:${(map.bushes || []).map(b => `${b.col},${b.row}`).join('|')}`;
     }
 
     function drawStaticMapIfNeeded() {
@@ -558,6 +559,13 @@
         walls.forEach(rect => {
             g.roundRect(rect.x - rect.w / 2, rect.y - rect.h / 2, rect.w, rect.h, 4).fill(0x8a6b3d).stroke({ width: 1, color: 0x3a2813, alpha: 0.42 });
             g.roundRect(rect.x - rect.w / 2 + 5, rect.y - rect.h / 2 + 5, Math.max(1, rect.w - 10), Math.max(1, rect.h - 10), 3).fill({ color: 0xffffff, alpha: 0.12 });
+        });
+        (map.bushes || []).forEach(bush => {
+            const x = bush.col * map.tileSize;
+            const y = bush.row * map.tileSize;
+            g.roundRect(x + 3, y + 3, map.tileSize - 6, map.tileSize - 6, 10).fill({ color: 0x1f8f3a, alpha: 0.72 });
+            g.circle(x + map.tileSize * 0.34, y + map.tileSize * 0.42, map.tileSize * 0.2).fill({ color: 0x2fbf5b, alpha: 0.76 });
+            g.circle(x + map.tileSize * 0.62, y + map.tileSize * 0.58, map.tileSize * 0.22).fill({ color: 0x146c2c, alpha: 0.68 });
         });
     }
 
@@ -1043,7 +1051,7 @@
             const cols = Math.max(8, Math.round(custom.width / (custom.tileSize || EDITOR_TILE_SIZE)));
             const rows = Math.max(8, Math.round(custom.height / (custom.tileSize || EDITOR_TILE_SIZE)));
             const data = custom.map || custom.data || {};
-            return { id: custom.id, name: custom.name, summary: custom.summary || data.summary || '정식 맵', description: custom.summary || data.summary || `${cols}x${rows} 정식 맵입니다.`, cols, rows, walls: data.walls || custom.walls || [], spawns: data.spawnPoints || custom.spawnPoints || [], mode: custom.mode || data.mode || 'survival' };
+            return { id: custom.id, name: custom.name, summary: custom.summary || data.summary || '정식 맵', description: custom.summary || data.summary || `${cols}x${rows} 정식 맵입니다.`, cols, rows, walls: data.walls || custom.walls || [], bushes: data.bushes || custom.bushes || [], spawns: data.spawnPoints || custom.spawnPoints || [], mode: custom.mode || data.mode || 'survival' };
         }
         return OFFICIAL_MAPS[0];
     }
@@ -1083,6 +1091,8 @@
         }
         ctx.fillStyle = '#8b5e34';
         (map.walls || []).forEach(wall => ctx.fillRect(offsetX + wall.col * scale, offsetY + wall.row * scale, scale, scale));
+        ctx.fillStyle = '#168a36';
+        (map.bushes || []).forEach(bush => ctx.fillRect(offsetX + bush.col * scale, offsetY + bush.row * scale, scale, scale));
         (map.spawns || []).forEach(spawn => {
             ctx.fillStyle = spawn.team === 'enemy' ? '#ef4444' : '#f8fb7b';
             ctx.beginPath();
@@ -1252,6 +1262,7 @@
         state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
         state.editor.walls = new Set((source?.walls || []).map(wall => `${wall.col},${wall.row}`));
+        state.editor.bushes = new Set((source?.bushes || []).map(bush => `${bush.col},${bush.row}`));
         const sourceSpawns = source?.spawns || [];
         state.editor.spawns = new Set(sourceSpawns.filter(spawn => spawn.team !== 'enemy').map(spawn => `${spawn.col},${spawn.row}`));
         state.editor.enemySpawns = new Set(sourceSpawns.filter(spawn => spawn.team === 'enemy').map(spawn => `${spawn.col},${spawn.row}`));
@@ -1265,9 +1276,10 @@
     function applyEditorSize() {
         state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
-        state.editor.walls.clear();
-        state.editor.spawns.clear();
-        state.editor.enemySpawns.clear();
+        state.editor.walls = new Set([...state.editor.walls].filter(key => { const [col, row] = key.split(',').map(Number); return col < state.editor.cols && row < state.editor.rows; }));
+        state.editor.bushes = new Set([...state.editor.bushes].filter(key => { const [col, row] = key.split(',').map(Number); return col < state.editor.cols && row < state.editor.rows; }));
+        state.editor.spawns = new Set([...state.editor.spawns].filter(key => { const [col, row] = key.split(',').map(Number); return col < state.editor.cols && row < state.editor.rows; }));
+        state.editor.enemySpawns = new Set([...state.editor.enemySpawns].filter(key => { const [col, row] = key.split(',').map(Number); return col < state.editor.cols && row < state.editor.rows; }));
         elements.mapEditorStatus.textContent = `${elements.mapMode.value === 'duel' ? '1:1' : '4인 생존전'} 맵 제작: 벽과 플레이어 생성 지점을 배치하세요. 두 손가락으로 확대/축소합니다.`;
         drawEditor();
     }
@@ -1297,6 +1309,8 @@
         for (let row = 0; row <= rows; row += 1) { ctx.beginPath(); ctx.moveTo(0, row * EDITOR_TILE_SIZE); ctx.lineTo(canvas.width, row * EDITOR_TILE_SIZE); ctx.stroke(); }
         ctx.fillStyle = '#8b5e34';
         state.editor.walls.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.fillRect(col * EDITOR_TILE_SIZE, row * EDITOR_TILE_SIZE, EDITOR_TILE_SIZE, EDITOR_TILE_SIZE); });
+        ctx.fillStyle = '#168a36';
+        state.editor.bushes.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.fillRect(col * EDITOR_TILE_SIZE + 3, row * EDITOR_TILE_SIZE + 3, EDITOR_TILE_SIZE - 6, EDITOR_TILE_SIZE - 6); });
         ctx.fillStyle = '#f8fb7b';
         state.editor.spawns.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.beginPath(); ctx.arc((col + 0.5) * EDITOR_TILE_SIZE, (row + 0.5) * EDITOR_TILE_SIZE, 10, 0, Math.PI * 2); ctx.fill(); });
         ctx.fillStyle = '#ef4444';
@@ -1348,6 +1362,7 @@
             state.editor.walls.delete(key);
             state.editor.spawns.delete(key);
             state.editor.enemySpawns.delete(key);
+            state.editor.bushes.delete(key);
         } else if (state.editor.tool === 'spawn' || state.editor.tool === 'enemySpawn') {
             const set = state.editor.tool === 'enemySpawn' ? state.editor.enemySpawns : state.editor.spawns;
             const limit = editorSpawnLimit(state.editor.tool);
@@ -1356,12 +1371,19 @@
                 return;
             }
             state.editor.walls.delete(key);
+            state.editor.bushes.delete(key);
             state.editor.spawns.delete(key);
             state.editor.enemySpawns.delete(key);
             set.add(key);
+        } else if (state.editor.tool === 'bush') {
+            state.editor.walls.delete(key);
+            state.editor.spawns.delete(key);
+            state.editor.enemySpawns.delete(key);
+            state.editor.bushes.add(key);
         } else {
             state.editor.spawns.delete(key);
             state.editor.enemySpawns.delete(key);
+            state.editor.bushes.delete(key);
             state.editor.walls.add(key);
         }
         drawEditor();
@@ -1369,10 +1391,11 @@
 
     function editorMapPayload() {
         const walls = [...state.editor.walls].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; });
+        const bushes = [...state.editor.bushes].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; });
         const ownSpawns = [...state.editor.spawns].map(key => { const [col, row] = key.split(',').map(Number); return { col, row, team: 'own' }; });
         const enemySpawns = [...state.editor.enemySpawns].map(key => { const [col, row] = key.split(',').map(Number); return { col, row, team: 'enemy' }; });
         const spawnPoints = selectedEditorMode() === 'duel' ? [...ownSpawns, ...enemySpawns] : ownSpawns;
-        return { cols: state.editor.cols, rows: state.editor.rows, tileSize: EDITOR_TILE_SIZE, walls, spawnPoints, mode: selectedEditorMode(), summary: (elements.mapSummary.value || '').trim() };
+        return { cols: state.editor.cols, rows: state.editor.rows, tileSize: EDITOR_TILE_SIZE, walls, bushes, spawnPoints, mode: selectedEditorMode(), summary: (elements.mapSummary.value || '').trim() };
     }
 
     async function saveCustomMap() {
@@ -1535,14 +1558,14 @@
     });
     elements.backMapEditor.addEventListener('click', () => setScreen('editor'));
     elements.closeMapEditor.addEventListener('click', closeMapEditor);
-    elements.newMap?.addEventListener('click', applyEditorSize);
+    elements.applyMapSize?.addEventListener('click', applyEditorSize);
     elements.saveMap.addEventListener('click', () => saveCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
     elements.publishMap.addEventListener('click', () => publishCustomMap().catch(error => { elements.mapSavedInfoStatus.textContent = `저장 실패: ${error.message}`; }));
     elements.mapTools.forEach(button => {
         button.addEventListener('click', () => {
             state.editor.tool = button.dataset.tool || 'wall';
             elements.mapTools.forEach(candidate => candidate.classList.toggle('is-selected', candidate === button));
-            elements.mapEditorStatus.textContent = state.editor.tool === 'enemySpawn' ? '상대 플레이어 지점을 배치하세요.' : state.editor.tool === 'spawn' ? '내 플레이어 지점을 배치하세요.' : state.editor.tool === 'erase' ? '지울 칸을 선택하세요.' : '벽을 배치하세요.';
+            elements.mapEditorStatus.textContent = state.editor.tool === 'enemySpawn' ? '상대 플레이어 지점을 배치하세요.' : state.editor.tool === 'spawn' ? '내 플레이어 지점을 배치하세요.' : state.editor.tool === 'bush' ? '부쉬를 배치하세요.' : state.editor.tool === 'erase' ? '지울 칸을 선택하세요.' : '벽을 배치하세요.';
         });
     });
     function updateEditorPinch() {
@@ -1563,25 +1586,24 @@
         return !state.editor.pinching && state.editor.pointers.size < 2 && Date.now() >= (state.editor.pinchBlockUntil || 0);
     }
     elements.mapEditorCanvas.addEventListener('pointerdown', event => {
-        event.preventDefault();
-        elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
-        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY, startedAt: Date.now(), pointerType: event.pointerType });
+        if (event.pointerType !== 'touch') event.preventDefault();
+        if (event.pointerType !== 'touch') elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
+        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY, startX: event.clientX, startY: event.clientY, startedAt: Date.now(), pointerType: event.pointerType, moved: false });
         if (state.editor.pointers.size >= 2) { state.editor.dragPointerId = null; updateEditorPinch(); return; }
         state.editor.dragPointerId = event.pointerId;
         state.editor.draggedCell = '';
         if (event.pointerType !== 'touch' && canPlaceEditorElement()) editCellFromEvent(event);
     });
     elements.mapEditorCanvas.addEventListener('pointermove', event => {
-        if (!elements.mapEditorCanvas.hasPointerCapture?.(event.pointerId)) return;
-        event.preventDefault();
         const previousPoint = state.editor.pointers.get(event.pointerId);
-        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY, startedAt: previousPoint?.startedAt || Date.now(), pointerType: event.pointerType });
-        if (state.editor.pointers.size >= 2) { state.editor.dragPointerId = null; updateEditorPinch(); return; }
-        if (event.pointerType === 'touch' && Date.now() - (previousPoint?.startedAt || Date.now()) < 140) return;
-        if (canPlaceEditorElement()) editCellFromEvent(event);
+        if (!previousPoint) return;
+        const moved = previousPoint.moved || Math.hypot(event.clientX - previousPoint.startX, event.clientY - previousPoint.startY) > 8;
+        state.editor.pointers.set(event.pointerId, { ...previousPoint, clientX: event.clientX, clientY: event.clientY, moved });
+        if (state.editor.pointers.size >= 2) { event.preventDefault(); state.editor.dragPointerId = null; updateEditorPinch(); return; }
     });
     const endEditorPointer = event => {
-        if (canPlaceEditorElement() && state.editor.dragPointerId === event.pointerId && event.pointerType === 'touch' && !state.editor.draggedCell) editCellFromEvent(event);
+        const point = state.editor.pointers.get(event.pointerId);
+        if (canPlaceEditorElement() && state.editor.dragPointerId === event.pointerId && event.pointerType === 'touch' && point && !point.moved) editCellFromEvent(event);
         state.editor.pointers.delete(event.pointerId);
         if (state.editor.dragPointerId === event.pointerId) state.editor.dragPointerId = null;
         state.editor.draggedCell = '';
