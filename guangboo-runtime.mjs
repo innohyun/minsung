@@ -21,6 +21,7 @@ const ULTIMATE_RANGE = 820;
 const ULTIMATE_RADIUS = 24;
 const ULTIMATE_TURN_RATE = 0.08;
 const KNOCKBACK_DISTANCE = 90;
+const KNOCKBACK_DURATION_MS = 700;
 const PLAYER_SPEED = 155;
 const PLAYER_MAX_HEALTH = 6000;
 const PROJECTILE_DAMAGE = 1200;
@@ -335,6 +336,15 @@ function destroyWallsTouchedByUltimate(map, projectile, previousX, previousY) {
         }
     }
     return hits;
+}
+
+function distanceFromPointToSegment(px, py, ax, ay, bx, by) {
+    const dx = bx - ax;
+    const dy = by - ay;
+    const lengthSq = dx * dx + dy * dy;
+    if (lengthSq <= 0.0001) return Math.hypot(px - bx, py - by);
+    const ratio = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lengthSq));
+    return Math.hypot(px - (ax + dx * ratio), py - (ay + dy * ratio));
 }
 
 function bushContainsPoint(map, x, y) {
@@ -1124,11 +1134,37 @@ export function createGuangbooRealtime(server, store) {
         projectile.vy = next.y * ULTIMATE_SPEED;
     }
 
-    function knockBackPlayer(match, player, projectile) {
+    function startUltimateKnockback(player, projectile, now) {
         const vLen = Math.hypot(projectile.vx, projectile.vy) || 1;
-        player.x += (projectile.vx / vLen) * KNOCKBACK_DISTANCE;
-        player.y += (projectile.vy / vLen) * KNOCKBACK_DISTANCE;
+        player.knockback = {
+            x: projectile.vx / vLen,
+            y: projectile.vy / vLen,
+            until: now + KNOCKBACK_DURATION_MS,
+            durationMs: KNOCKBACK_DURATION_MS,
+            initialSpeed: (KNOCKBACK_DISTANCE * 2) / (KNOCKBACK_DURATION_MS / 1000)
+        };
+    }
+
+    function stepPlayerKnockback(match, player, now, dt) {
+        const knockback = player.knockback;
+        if (!knockback || knockback.until <= now) {
+            player.knockback = null;
+            return false;
+        }
+        const remainingRatio = Math.max(0, Math.min(1, (knockback.until - now) / knockback.durationMs));
+        const speed = knockback.initialSpeed * remainingRatio;
+        player.x += knockback.x * speed * dt;
+        player.y += knockback.y * speed * dt;
         resolvePlayerPosition(player, match.map);
+        return true;
+    }
+
+    function projectileTouchesPlayer(projectile, player, previousX, previousY) {
+        const hitRadius = 22 + (projectile.radius || 8);
+        if (projectile.kind !== 'ultimate') {
+            return Math.hypot(player.x - projectile.x, player.y - projectile.y) <= hitRadius;
+        }
+        return distanceFromPointToSegment(player.x, player.y, previousX, previousY, projectile.x, projectile.y) <= hitRadius;
     }
 
     function collideWithEnemyUltimateProjectile(match, projectile) {
@@ -1156,21 +1192,24 @@ export function createGuangbooRealtime(server, store) {
         match.players.forEach(player => {
             if (!player.alive || player.disconnected) return;
             const input = player.client.input;
-            const move = clampUnitVector(input.move);
             const aim = clampUnitVector(input.aim);
             if (Math.hypot(aim.x, aim.y) > 0.18) {
                 player.aim = aim;
             }
+            reloadAmmo(player, now);
+            const knockbackActive = stepPlayerKnockback(match, player, now, dt);
+            const move = knockbackActive ? { x: 0, y: 0 } : clampUnitVector(input.move);
             if (Math.hypot(move.x, move.y) > 0.18) {
                 player.facing = move;
             }
-            reloadAmmo(player, now);
             const slowed = (player.slowedUntil || 0) > now || isOnEnemySlimeTrail(match, player, now);
             const speed = PLAYER_SPEED * (slowed ? SLOW_FACTOR : 1);
-            player.x += move.x * speed * dt;
-            player.y += move.y * speed * dt;
+            if (!knockbackActive) {
+                player.x += move.x * speed * dt;
+                player.y += move.y * speed * dt;
+            }
             if (slowed) applySlow(player, now, 250);
-            if (Math.hypot(move.x, move.y) > 0.18) dropSlimeTrail(match, player, now);
+            if (!knockbackActive && Math.hypot(move.x, move.y) > 0.18) dropSlimeTrail(match, player, now);
             resolvePlayerPosition(player, match.map);
 
             if (player.queuedUltimateAim && player.ultimateReady) {
@@ -1233,7 +1272,7 @@ export function createGuangbooRealtime(server, store) {
                 player.alive &&
                 player.id !== projectile.ownerId &&
                 !projectileHitTargets.has(`player:${player.id}`) &&
-                Math.hypot(player.x - projectile.x, player.y - projectile.y) <= 22 + (projectile.radius || 8)
+                projectileTouchesPlayer(projectile, player, previousX, previousY)
             );
             if (hit) {
                 projectileHitTargets.add(`player:${hit.id}`);
@@ -1251,12 +1290,13 @@ export function createGuangbooRealtime(server, store) {
                     applySlow(hit, now);
                 }
                 if (projectile.kind === 'ultimate') {
-                    knockBackPlayer(match, hit, projectile);
+                    startUltimateKnockback(hit, projectile, now);
                 }
                 if (hit.health <= 0) {
                     eliminatePlayer(match, hit, owner);
                 }
-                if (projectile.kind !== 'ultimate') return;
+                if (projectile.kind === 'ultimate') return;
+                return;
             }
             projectiles.push(projectile);
         });
@@ -1340,6 +1380,7 @@ export function createGuangbooRealtime(server, store) {
                 lastCombatAt: 0,
                 lastRegenAt: Date.now(),
                 slowedUntil: 0,
+                knockback: null,
                 revealedUntil: 0,
                 lastSlimeTrailAt: 0,
                 queuedShotAims: [],

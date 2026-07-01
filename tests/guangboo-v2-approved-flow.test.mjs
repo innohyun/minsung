@@ -32,7 +32,7 @@ test('v2 custom maps render like selectable map cards with fixed official-style 
 
 test('v2 edit and delete require the map edit password', () => {
     assert.match(clientSource, /function requireMapPassword/);
-    assert.match(clientSource, /1234567890/);
+    assert.match(clientSource, /1183/);
     assert.match(clientSource, /requestEditMap/);
     assert.match(clientSource, /맵을 수정하려면 비밀번호를 입력하세요/);
     assert.match(clientSource, /맵을 삭제하려면 비밀번호를 입력하세요/);
@@ -40,13 +40,19 @@ test('v2 edit and delete require the map edit password', () => {
     assert.match(serverSource, /if \(!isGuangbooMapEditPassword\(body\.password\)\) return sendJson\(res, 401/);
 });
 
-test('v2 ultimate and summon healthbars are non-rotating HUD graphics and ultimates survive wall breaks', () => {
+test('v2 ultimate and summon healthbars are non-rotating HUD graphics and ultimates follow approved collision rules', () => {
     assert.match(clientSource, /function drawWorldHealthBar/);
     assert.match(clientSource, /node\.addChild\(body, hud\.hud\)/);
     assert.match(clientSource, /entry\.body\.rotation = Math\.atan2/);
     assert.match(clientSource, /drawWorldHealthBar\(entry\.healthBar, entry\.healthText, health/);
     assert.match(clientSource, /drawWorldHealthBar\(entry\.healthBar, entry\.healthText, Number\(projectile\.health\)/);
-    assert.match(runtimeSource, /destroyWallHitByProjectile\(match\.map, projectile\);[\s\S]*?projectiles\.push\(projectile\);\n\s*return;/);
+    assert.match(runtimeSource, /destroyWallsTouchedByUltimate\(match\.map, projectile, previousX, previousY\)/);
+    assert.match(runtimeSource, /function distanceFromPointToSegment/);
+    assert.match(runtimeSource, /const KNOCKBACK_DURATION_MS = 700/);
+    assert.match(runtimeSource, /function stepPlayerKnockback/);
+    assert.match(runtimeSource, /const move = knockbackActive \? \{ x: 0, y: 0 \} : clampUnitVector\(input\.move\)/);
+    assert.match(runtimeSource, /projectileTouchesPlayer\(projectile, player, previousX, previousY\)/);
+    assert.match(runtimeSource, /if \(projectile\.kind === 'ultimate'\) return;\n\s*return;/);
 });
 
 test('v2 left stick sends fixed-speed movement regardless of stick distance', () => {
@@ -63,11 +69,11 @@ test('v2 blocks page zoom except editor canvas pinch and prevents placement duri
     assert.match(clientSource, /dblclick/);
     assert.match(clientSource, /function canPlaceEditorElement/);
     assert.match(clientSource, /pinchBlockUntil/);
-    assert.match(clientSource, /if \(state\.editor\.pointers\.size >= 2\) \{ updateEditorPinch\(\); return; \}/);
+    assert.match(clientSource, /if \(state\.editor\.pointers\.size >= 2\) \{ state\.editor\.dragPointerId = null; updateEditorPinch\(\); return; \}/);
 });
 
 test('v2 right stick does not auto-lock aim while dragging', () => {
     assert.doesNotMatch(clientSource, /if \(isRight\) state\.lastAim = nearestOpponentAim/);
     assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| state\.lastAim/);
-    assert.match(htmlSource, /20260701-v2-zoom-aim-wall/);
+    assert.match(htmlSource, /20260701-v2-ultimate-hp-only/);
 });

@@ -126,7 +126,7 @@ test('guangboo projectiles are capped to the aim range on client and server snap
     assert.match(runtimeSource, /const aim = player\.queuedShotAims\.shift\(\) \|\| player\.aim/);
     assert.match(runtimeSource, /spawnedTick: match\.tick/);
     assert.match(runtimeSource, /projectile\.spawnedTick === match\.tick/);
-    assert.match(runtimeSource, /travelThisTick = Math\.min\(stepDistance, remaining\)/);
+    assert.match(runtimeSource, /const travelThisTick = isUltimateProjectile \? stepDistance : Math\.min\(stepDistance, remaining\)/);
     assert.match(runtimeSource, /projectile\.traveled >= projectile\.maxDistance/);
     assert.match(runtimeSource, /maxDistance: Math\.round\(projectile\.maxDistance \?\? PROJECTILE_RANGE\)/);
 });
@@ -179,8 +179,9 @@ test('guangboo supports charged wall-breaking homing ultimate attacks', () => {
     assert.match(runtimeSource, /function spawnUltimateProjectile\(match, player, now\)/);
     assert.match(runtimeSource, /kind: 'ultimate'/);
     assert.match(runtimeSource, /function steerUltimateProjectile\(match, projectile\)/);
-    assert.match(runtimeSource, /destroyWallHitByProjectile\(match\.map, projectile\)/);
-    assert.match(runtimeSource, /function knockBackPlayer\(match, player, projectile\)/);
+    assert.match(runtimeSource, /destroyWallsTouchedByUltimate\(match\.map, projectile, previousX, previousY\)/);
+    assert.match(runtimeSource, /function startUltimateKnockback\(player, projectile, now\)/);
+    assert.match(runtimeSource, /const KNOCKBACK_DURATION_MS = 700/);
     assert.match(runtimeSource, /function collideWithEnemyUltimateProjectile\(match, projectile\)/);
     assert.match(runtimeSource, /candidate\.kind === 'ultimate'/);
     assert.match(runtimeSource, /candidate\.ownerId !== projectile\.ownerId/);
