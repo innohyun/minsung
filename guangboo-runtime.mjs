@@ -1139,6 +1139,7 @@ export function createGuangbooRealtime(server, store) {
                 const wallHit = destroyWallHitByProjectile(match.map, projectile);
                 if (wallHit) {
                     match.effects.push({ id: `${match.id}-wall-${projectile.id}-${match.tick}`, kind: 'wallBreak', x: Math.round(wallHit.x), y: Math.round(wallHit.y) });
+                    return;
                 }
             } else if (isProjectileBlocked(projectile, match.map)) {
                 return;

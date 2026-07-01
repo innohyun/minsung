@@ -27,10 +27,7 @@
         result: document.getElementById('resultScreen'),
         mapSelect: document.getElementById('mapSelectScreen'),
         characterSelect: document.getElementById('characterSelectScreen'),
-        mapModeScreen: document.getElementById('mapModeScreen'),
-        mapNameScreen: document.getElementById('mapNameScreen'),
         editor: document.getElementById('mapEditorScreen'),
-        mapSavedInfo: document.getElementById('mapSavedInfoScreen'),
         joinForm: document.getElementById('joinForm'),
         nickname: document.getElementById('nicknameInput'),
         joinButton: document.getElementById('joinButton'),
@@ -54,15 +51,6 @@
         openCharacterSelect: document.getElementById('openCharacterSelectButton'),
         closeCharacterSelect: document.getElementById('closeCharacterSelectButton'),
         characterGrid: document.getElementById('characterGrid'),
-        closeMapMode: document.getElementById('closeMapModeButton'),
-        mapModeNext: document.getElementById('mapModeNextButton'),
-        editorModeInputs: [...document.querySelectorAll('input[name="editorMapMode"]')],
-        backMapMode: document.getElementById('backMapModeButton'),
-        mapNameNext: document.getElementById('mapNameNextButton'),
-        backMapEditor: document.getElementById('backMapEditorButton'),
-        mapSavedInfoMini: document.getElementById('mapSavedInfoMini'),
-        mapSavedInfoDescription: document.getElementById('mapSavedInfoDescription'),
-        mapSavedInfoStatus: document.getElementById('mapSavedInfoStatus'),
         lobbyCharacterPreview: document.getElementById('lobbyCharacterPreview'),
         selectedCharacterName: document.getElementById('selectedCharacterName'),
         closeMapEditor: document.getElementById('closeMapEditorButton'),
@@ -71,9 +59,9 @@
         mapMode: document.getElementById('mapModeInput'),
         mapCols: document.getElementById('mapColsInput'),
         mapRows: document.getElementById('mapRowsInput'),
+        mapInfoStep: document.getElementById('mapInfoStep'),
         mapSummary: document.getElementById('mapSummaryInput'),
         publishMap: document.getElementById('publishMapButton'),
-        mapEditorFlowSummary: document.getElementById('mapEditorFlowSummary'),
         mapEditorCanvasWrap: document.getElementById('mapEditorCanvasWrap'),
         newMap: document.getElementById('newMapButton'),
         saveMap: document.getElementById('saveMapButton'),
@@ -168,10 +156,7 @@
         elements.lobby.hidden = name !== 'lobby';
         elements.mapSelect.hidden = name !== 'mapSelect';
         elements.characterSelect.hidden = name !== 'characterSelect';
-        elements.mapModeScreen.hidden = name !== 'mapMode';
-        elements.mapNameScreen.hidden = name !== 'mapName';
         elements.editor.hidden = name !== 'editor';
-        elements.mapSavedInfo.hidden = name !== 'mapSavedInfo';
         elements.game.hidden = name !== 'game';
         elements.result.hidden = name !== 'result';
         document.body.classList.toggle('is-playing', name === 'game');
@@ -492,7 +477,7 @@
         drawBackground(width, height);
         drawStaticMapIfNeeded();
         syncCollection(state.render.trails, state.render.trailLayer, state.slimeTrails, trail => trail.id || `${trail.ownerId}:${trail.x}:${trail.y}`, createTrailGraphic, updateTrailGraphic);
-        syncCollection(state.render.projectiles, state.render.projectileLayer, state.projectiles, item => item.id || `${item.ownerId}:${item.x}:${item.y}`, createProjectileGraphic, (entry, item) => updateProjectileGraphic(entry, item, ticker.deltaMS || 16.67));
+        syncCollection(state.render.projectiles, state.render.projectileLayer, state.projectiles, item => item.id || `${item.ownerId}:${item.x}:${item.y}`, createProjectileGraphic, updateProjectileGraphic);
         syncCollection(state.render.summons, state.render.summonLayer, state.summons, item => item.id, createSummonGraphic, (entry, item) => updateSummonGraphic(entry, item, ticker.deltaMS || 16.67));
         drawEffectParticles(ticker.deltaMS || 16.67);
         syncCollection(state.render.players, state.render.playerLayer, state.players, item => item.id, createPlayerGraphic, (entry, item) => updatePlayerGraphic(entry, item, ticker.deltaMS || 16.67));
@@ -661,66 +646,43 @@
         return true;
     }
 
-    function drawWorldHealthBar(graphics, health, maxHealth, y, radius = 22) {
-        const ratio = Math.max(0, Math.min(1, Number(health) / Math.max(1, Number(maxHealth) || PLAYER_MAX_HEALTH)));
-        const barW = radius * 3.36;
-        const barH = radius * 0.68;
-        const inset = radius * 0.09;
-        graphics.clear();
-        graphics.roundRect(-barW / 2, y, barW, barH, barH / 2).fill({ color: 0x080d0a, alpha: 0.82 });
-        graphics.roundRect(-barW / 2 + inset, y + inset, Math.max(0, (barW - inset * 2) * ratio), Math.max(1, barH - inset * 2), barH / 2).fill(ratio <= 0.32 ? 0xe05252 : 0xd7f252);
-        graphics.roundRect(-barW / 2 + 0.5, y + 0.5, barW - 1, barH - 1, barH / 2).stroke({ width: 1, color: 0xffffff, alpha: 0.72 });
-        return { width: barW, height: barH };
-    }
-
-    function createProjectileGraphic(projectile = {}) {
+    function createProjectileGraphic() {
         const node = new PIXI.Container();
         const body = new PIXI.Graphics();
-        const hud = new PIXI.Container();
-        const healthBar = new PIXI.Graphics();
         const healthText = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '900', fill: 0xfffdf8, stroke: { color: 0x000000, width: 2 }, align: 'center' } });
         healthText.anchor.set(0.5, 0.5);
-        hud.addChild(healthBar, healthText);
-        node.addChild(body, hud);
-        return { node, body, hud, healthBar, healthText, x: projectile.x, y: projectile.y };
+        node.addChild(body, healthText);
+        return { node, body, healthText };
     }
-    function updateProjectileGraphic(entry, projectile, deltaMS = 16.67) {
-        smoothPosition(entry, projectile, deltaMS);
+    function updateProjectileGraphic(entry, projectile) {
         const radius = Number(projectile.radius) || 8;
         const color = projectile.kind === 'ultimate' ? 0xf6c84f : projectile.kind === 'slime' ? 0x70f45e : 0xfff7a5;
+        entry.node.position.set(projectile.x, projectile.y);
         entry.body.clear();
         entry.body.circle(0, 0, radius + 6).fill({ color, alpha: projectile.kind === 'ultimate' ? 0.18 : 0.12 });
         entry.body.circle(0, 0, radius).fill(color);
         if (projectile.kind === 'ultimate') entry.body.circle(0, 0, radius + 2).stroke({ width: 3, color: 0xffffff, alpha: 0.45 });
-        const health = Math.max(0, Math.round(Number(projectile.health) || 0));
-        const maxHealth = Number(projectile.maxHealth) || 3000;
-        const showHealth = projectile.kind === 'ultimate' && health > 0;
-        entry.hud.visible = showHealth;
+        const showHealth = projectile.kind === 'ultimate' && Number.isFinite(Number(projectile.health));
+        entry.healthText.visible = showHealth;
         if (showHealth) {
-            const y = -radius - 34;
-            const bar = drawWorldHealthBar(entry.healthBar, health, maxHealth, y, 22);
-            entry.healthText.text = String(health);
-            entry.healthText.position.set(0, y + bar.height / 2);
-            entry.hud.rotation = 0;
+            entry.healthText.text = String(Math.max(0, Math.round(Number(projectile.health))));
+            entry.healthText.position.set(0, -radius - 18);
         }
     }
 
     function createSummonGraphic(summon) {
         const node = new PIXI.Container();
         const body = new PIXI.Graphics();
-        const hud = new PIXI.Container();
-        const healthBar = new PIXI.Graphics();
-        const healthText = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '900', fill: 0xfffdf8, stroke: { color: 0x000000, width: 2 }, align: 'center' } });
+        const healthText = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 9, fontWeight: '900', fill: 0xfffdf8, stroke: { color: 0x000000, width: 2 }, align: 'center' } });
         healthText.anchor.set(0.5, 0.5);
-        hud.addChild(healthBar, healthText);
-        node.addChild(body, hud);
-        return { node, body, hud, healthBar, healthText, x: summon.x, y: summon.y };
+        node.addChild(body, healthText);
+        return { node, body, healthText, x: summon.x, y: summon.y };
     }
     function updateSummonGraphic(entry, summon, deltaMS) {
         smoothPosition(entry, summon, deltaMS);
         const radius = Number(summon.radius) || 14;
         const health = Math.max(0, Math.round(Number(summon.health) || 0));
-        const maxHealth = Number(summon.maxHealth) || 500;
+        const ratio = Math.max(0, Math.min(1, health / (Number(summon.maxHealth) || 500)));
         const facingX = summon.facingX ?? summon.facing?.x ?? 1;
         const facingY = summon.facingY ?? summon.facing?.y ?? 0;
         const facingLength = Math.hypot(facingX, facingY) || 1;
@@ -729,11 +691,10 @@
         entry.body.ellipse(0, 0, radius * 1.15, radius * 0.92).fill(summon.ownerId === state.playerId ? 0x9dff76 : 0x4ade80);
         entry.body.circle(radius * 0.25, -radius * 0.18, radius * 0.12).fill(0x12351d);
         entry.body.circle(radius * 0.25, radius * 0.18, radius * 0.12).fill(0x12351d);
-        const y = -radius - 34;
-        const bar = drawWorldHealthBar(entry.healthBar, health, maxHealth, y, 22);
+        entry.body.roundRect(-radius, -radius - 8, radius * 2, 4, 2).fill({ color: 0x080d0a, alpha: 0.75 });
+        entry.body.roundRect(-radius, -radius - 8, radius * 2 * ratio, 4, 2).fill(0xd7f252);
         entry.healthText.text = String(health);
-        entry.healthText.position.set(0, y + bar.height / 2);
-        entry.hud.rotation = 0;
+        entry.healthText.position.set(0, -radius - 16);
     }
 
     function createPlayerGraphic(player) {
@@ -1220,28 +1181,12 @@
     function openCharacterSelect() { renderCharacterSelectScreen(); setScreen('characterSelect'); }
     function closeCharacterSelect() { setScreen('lobby'); }
 
-    function selectedEditorMode() {
-        return elements.editorModeInputs.find(input => input.checked)?.value || elements.mapMode.value || 'survival';
-    }
-
-    function setEditorMode(mode) {
-        const normalized = mode === 'duel' ? 'duel' : 'survival';
-        elements.mapMode.value = normalized;
-        elements.editorModeInputs.forEach(input => { input.checked = input.value === normalized; });
-    }
-
-    function updateEditorFlowSummary() {
-        const modeLabel = elements.mapMode.value === 'duel' ? '1:1' : '4인 생존전';
-        const name = (elements.mapName.value || '').trim() || '이름 없음';
-        if (elements.mapEditorFlowSummary) elements.mapEditorFlowSummary.textContent = `${modeLabel} · ${name}`;
-    }
-
     function openMapEditor(id = null) {
         const source = id ? mapMeta(id) : null;
         state.editor.editingId = id && !isOfficialMapId(id) ? id : null;
         state.editor.zoom = 1;
         elements.mapName.value = source?.name || '';
-        setEditorMode(source?.mode || 'survival');
+        elements.mapMode.value = source?.mode || 'survival';
         elements.mapCols.value = source?.cols || 24;
         elements.mapRows.value = source?.rows || 16;
         elements.mapSummary.value = source?.summary || source?.description || '';
@@ -1249,47 +1194,26 @@
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
         state.editor.walls = new Set((source?.walls || []).map(wall => `${wall.col},${wall.row}`));
         state.editor.spawns = new Set((source?.spawns || []).map(spawn => `${spawn.col},${spawn.row}`));
-        updateEditorFlowSummary();
-        elements.mapEditorStatus.textContent = id ? '기존 맵을 수정 중입니다. 저장하면 정보 화면으로 넘어갑니다.' : '1단계: 모드를 고르세요.';
+        elements.mapInfoStep.hidden = true;
+        elements.mapEditorStatus.textContent = id ? '기존 맵을 수정 중입니다. 저장 후 정보를 확인하세요.' : '1단계: 맵 이름을 쓰고 제작 시작을 누르세요.';
         drawEditor();
-        setScreen('mapMode');
+        setScreen('editor');
     }
-    function closeMapEditor() { setScreen('mapName'); }
+    function closeMapEditor() { setScreen('mapSelect'); }
 
-    function continueToNameStep() {
-        setEditorMode(selectedEditorMode());
-        elements.mapEditorStatus.textContent = '2단계: 맵 이름과 크기를 정하세요.';
-        setScreen('mapName');
-        elements.mapName.focus();
-    }
-
-    function continueToEditorStep() {
+    function applyEditorSize() {
         if (!(elements.mapName.value || '').trim()) {
             elements.mapEditorStatus.textContent = '먼저 맵 이름을 정하세요.';
             elements.mapName.focus();
             return;
         }
-        applyEditorSize({ resetTiles: !state.editor.editingId });
-        updateEditorFlowSummary();
-        setScreen('editor');
-        resizeEditorCanvasDisplay();
-    }
-
-    function applyEditorSize({ resetTiles = true } = {}) {
-        if (!(elements.mapName.value || '').trim()) {
-            elements.mapEditorStatus.textContent = '먼저 맵 이름을 정하세요.';
-            elements.mapName.focus();
-            return false;
-        }
         state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
-        if (resetTiles) {
-            state.editor.walls.clear();
-            state.editor.spawns.clear();
-        }
+        state.editor.walls.clear();
+        state.editor.spawns.clear();
+        elements.mapInfoStep.hidden = true;
         elements.mapEditorStatus.textContent = `${elements.mapMode.value === 'duel' ? '1:1' : '4인 생존전'} 맵 제작: 벽과 플레이어 생성 지점을 배치하세요. 두 손가락으로 확대/축소합니다.`;
         drawEditor();
-        return true;
     }
 
     function resizeEditorCanvasDisplay() {
@@ -1343,34 +1267,16 @@
 
     async function saveCustomMap() {
         const name = (elements.mapName.value || '').trim();
-        if (!name) { elements.mapEditorStatus.textContent = '맵 이름을 먼저 정하세요.'; setScreen('mapName'); return; }
+        if (!name) { elements.mapEditorStatus.textContent = '맵 이름을 먼저 정하세요.'; return; }
         if (state.editor.spawns.size < (elements.mapMode.value === 'duel' ? 2 : 4)) { elements.mapEditorStatus.textContent = '플레이어 생성 지점을 충분히 배치하세요.'; return; }
-        const draft = mapMetaFromEditor();
-        elements.mapSavedInfoDescription.textContent = `${draft.name} · ${draft.mode === 'duel' ? '1:1' : '4인 생존전'} · ${draft.cols}x${draft.rows} · 생성 지점 ${state.editor.spawns.size}개`;
-        drawMiniMap(elements.mapSavedInfoMini, draft);
-        elements.mapSavedInfoStatus.textContent = '맵 정보를 확인하고 설명을 쓴 뒤 정식 맵으로 올리세요.';
-        setScreen('mapSavedInfo');
-    }
-
-    function mapMetaFromEditor() {
-        return {
-            id: state.editor.editingId || 'draft',
-            name: (elements.mapName.value || '정식 맵').trim(),
-            mode: elements.mapMode.value,
-            summary: (elements.mapSummary.value || '').trim() || '아직 설명 없음',
-            description: (elements.mapSummary.value || '').trim() || '아직 설명 없음',
-            cols: state.editor.cols,
-            rows: state.editor.rows,
-            walls: [...state.editor.walls].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; }),
-            spawns: [...state.editor.spawns].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; })
-        };
+        elements.mapInfoStep.hidden = false;
+        elements.mapEditorStatus.textContent = '맵 특징/정보를 쓰고 정식 맵으로 올리기를 누르세요.';
     }
 
     async function publishCustomMap() {
         const name = (elements.mapName.value || '정식 맵').trim();
         const method = state.editor.editingId ? 'PUT' : 'POST';
         const url = state.editor.editingId ? `/api/guangboo/maps/${encodeURIComponent(state.editor.editingId)}` : '/api/guangboo/maps';
-        elements.mapSavedInfoStatus.textContent = '정식 맵 저장 중...';
         elements.mapEditorStatus.textContent = '정식 맵 저장 중...';
         const response = await fetch(url, {
             method,
@@ -1380,7 +1286,6 @@
         const data = await response.json();
         if (!data.ok) throw new Error(data.error || 'save_failed');
         elements.mapEditorStatus.textContent = '정식 맵 저장 완료';
-        elements.mapSavedInfoStatus.textContent = '정식 맵 저장 완료';
         await loadCustomMaps();
         selectMap(data.map.id);
     }
@@ -1506,16 +1411,10 @@
     elements.openCharacterSelect.addEventListener('click', openCharacterSelect);
     elements.closeCharacterSelect.addEventListener('click', closeCharacterSelect);
     elements.mapSelectEditor.addEventListener('click', () => openMapEditor());
-    elements.closeMapMode.addEventListener('click', () => setScreen('mapSelect'));
-    elements.mapModeNext.addEventListener('click', continueToNameStep);
-    elements.backMapMode.addEventListener('click', () => setScreen('mapMode'));
-    elements.mapNameNext.addEventListener('click', continueToEditorStep);
     elements.closeMapEditor.addEventListener('click', closeMapEditor);
-    elements.backMapEditor.addEventListener('click', () => { updateEditorFlowSummary(); setScreen('editor'); resizeEditorCanvasDisplay(); });
-    elements.mapName.addEventListener('input', updateEditorFlowSummary);
-    elements.editorModeInputs.forEach(input => input.addEventListener('change', () => { setEditorMode(selectedEditorMode()); updateEditorFlowSummary(); }));
+    elements.newMap.addEventListener('click', applyEditorSize);
     elements.saveMap.addEventListener('click', () => saveCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
-    elements.publishMap.addEventListener('click', () => publishCustomMap().catch(error => { elements.mapSavedInfoStatus.textContent = `저장 실패: ${error.message}`; elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
+    elements.publishMap.addEventListener('click', () => publishCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
     elements.mapTools.forEach(button => {
         button.addEventListener('click', () => {
             state.editor.tool = button.dataset.tool || 'wall';
