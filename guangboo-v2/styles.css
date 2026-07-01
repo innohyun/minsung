@@ -1577,12 +1577,20 @@ html:fullscreen body.is-playing #gameCanvas {
 }
 
 #mapEditorCanvas {
-    width: 100%;
+    display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
     max-height: 66vh;
     border: 1px solid rgba(23, 32, 24, 0.18);
     border-radius: 8px;
     background: #172018;
     touch-action: none;
+    image-rendering: pixelated;
+}
+
+.top-hud {
+    display: none;
 }
 
 .map-toolbox {

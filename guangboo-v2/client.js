@@ -7,6 +7,7 @@
     const BOT_KEY = 'guangboo_v2_bots';
     const MAP_KEY = 'guangboo_v2_map';
     const EDITOR_TILE_SIZE = 40;
+    const PROJECTILE_RANGE = 300;
     const DEFAULT_OFFICIAL_MAP_ID = 'official:crossroads';
     const OFFICIAL_MAPS = [
         { id: 'official:crossroads', name: '초원 교차로', summary: '가운데 벽을 활용해 견제하는 기본 정식 맵', description: '가운데에 짧은 벽들이 있어 숨고 빠지면서 싸우기 좋습니다. 처음 플레이하기 쉬운 균형형 맵입니다.', cols: 24, rows: 16, walls: [{ col: 10, row: 6 }, { col: 11, row: 6 }, { col: 12, row: 6 }, { col: 13, row: 6 }, { col: 10, row: 9 }, { col: 11, row: 9 }, { col: 12, row: 9 }, { col: 13, row: 9 }, { col: 6, row: 8 }, { col: 17, row: 8 }], spawns: [{ col: 4, row: 4 }, { col: 19, row: 11 }, { col: 4, row: 11 }, { col: 19, row: 4 }] },
@@ -105,6 +106,8 @@
         inputSeq: 0,
         queuedShots: [],
         queuedUltimate: false,
+        projectileMemory: new Map(),
+        audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 },
         lastAim: { x: 1, y: 0 },
         mouseAim: { active: false, x: 1, y: 0 },
         leftStick: stickState(),
@@ -126,7 +129,8 @@
             players: new Map(),
             projectiles: new Map(),
             summons: new Map(),
-            trails: new Map()
+            trails: new Map(),
+            camera: { x: 0, y: 0, scale: 1, initialized: false }
         }
     };
 
@@ -186,6 +190,60 @@
         if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return false;
         state.ws.send(JSON.stringify(payload));
         return true;
+    }
+
+    function audioContext() {
+        if (!state.audio.context) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return null;
+            state.audio.context = new AudioCtx();
+        }
+        return state.audio.context;
+    }
+
+    function unlockAudio() {
+        const context = audioContext();
+        if (!context) return;
+        if (context.state === 'suspended') context.resume().catch(() => {});
+        state.audio.unlocked = true;
+    }
+
+    function playTone({ frequency = 440, endFrequency = frequency, duration = 0.12, volume = 0.04, type = 'sine', delay = 0 }) {
+        if (!state.audio.unlocked) return;
+        const context = audioContext();
+        if (!context) return;
+        const start = context.currentTime + delay;
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = type;
+        oscillator.frequency.setValueAtTime(frequency, start);
+        oscillator.frequency.exponentialRampToValueAtTime(Math.max(1, endFrequency), start + duration);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(volume, start + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+        oscillator.connect(gain).connect(context.destination);
+        oscillator.start(start);
+        oscillator.stop(start + duration + 0.02);
+    }
+
+    function playShotSound() {
+        playTone({ frequency: 780, endFrequency: 420, duration: 0.11, volume: 0.055, type: 'square' });
+        playTone({ frequency: 1180, endFrequency: 720, duration: 0.07, volume: 0.025, type: 'sine', delay: 0.015 });
+    }
+
+    function playProjectileFlySound() {
+        const now = performance.now();
+        if (now - state.audio.lastFlyAt < 65) return;
+        state.audio.lastFlyAt = now;
+        playTone({ frequency: 260, endFrequency: 620, duration: 0.32, volume: 0.018, type: 'sawtooth' });
+    }
+
+    function playProjectileImpactSound() {
+        const now = performance.now();
+        if (now - state.audio.lastImpactAt < 45) return;
+        state.audio.lastImpactAt = now;
+        playTone({ frequency: 180, endFrequency: 70, duration: 0.12, volume: 0.06, type: 'triangle' });
+        playTone({ frequency: 90, endFrequency: 45, duration: 0.08, volume: 0.035, type: 'square', delay: 0.018 });
     }
 
     function connect() {
@@ -262,6 +320,9 @@
             state.map = normalizeMap(message.map || BASE_WORLD);
             state.players = message.players || [];
             state.projectiles = [];
+            state.projectileMemory.clear();
+            state.render.camera.initialized = false;
+            state.mapSignature = '';
             state.slimeTrails = [];
             state.summons = [];
             elements.joinButton.disabled = false;
@@ -275,7 +336,7 @@
         if (message.type === 'state') {
             if (message.map) state.map = normalizeMap(message.map);
             state.players = message.players || [];
-            state.projectiles = message.projectiles || [];
+            state.projectiles = rememberAndFilterProjectiles(message.projectiles || []);
             state.slimeTrails = message.slimeTrails || [];
             state.summons = message.summons || [];
             updateHud();
@@ -337,13 +398,13 @@
         const width = app.screen.width;
         const height = app.screen.height;
         drawBackground(width, height);
-        updateCamera(width, height);
         drawStaticMapIfNeeded();
-        drawAimGuide();
         syncCollection(state.render.trails, state.render.trailLayer, state.slimeTrails, trail => trail.id || `${trail.ownerId}:${trail.x}:${trail.y}`, createTrailGraphic, updateTrailGraphic);
         syncCollection(state.render.projectiles, state.render.projectileLayer, state.projectiles, item => item.id || `${item.ownerId}:${item.x}:${item.y}`, createProjectileGraphic, updateProjectileGraphic);
         syncCollection(state.render.summons, state.render.summonLayer, state.summons, item => item.id, createSummonGraphic, (entry, item) => updateSummonGraphic(entry, item, ticker.deltaMS || 16.67));
         syncCollection(state.render.players, state.render.playerLayer, state.players, item => item.id, createPlayerGraphic, (entry, item) => updatePlayerGraphic(entry, item, ticker.deltaMS || 16.67));
+        updateCamera(width, height, ticker.deltaMS || 16.67);
+        drawAimGuide();
     }
 
     function drawBackground(width, height) {
@@ -354,19 +415,34 @@
         g.circle(width * 0.82, height * 0.28, Math.max(width, height) * 0.34).fill({ color: 0x17304f, alpha: 0.26 });
     }
 
-    function updateCamera(screenW, screenH) {
+    function updateCamera(screenW, screenH, deltaMS = 16.67) {
         const map = state.map || BASE_WORLD;
         const local = state.players.find(player => player.id === state.playerId && player.alive !== false);
+        const localEntry = local ? state.render.players.get(local.id) : null;
+        const followX = localEntry?.x ?? local?.x;
+        const followY = localEntry?.y ?? local?.y;
         const fitScale = Math.min(screenW / map.width, screenH / map.height);
         const followScale = Math.min(screenW / BASE_WORLD.width, screenH / BASE_WORLD.height);
         const largeMap = map.width > BASE_WORLD.width || map.height > BASE_WORLD.height;
         const scale = largeMap && local ? followScale : fitScale;
-        let x = largeMap && local ? screenW / 2 - local.x * scale : (screenW - map.width * scale) / 2;
-        let y = largeMap && local ? screenH / 2 - local.y * scale : (screenH - map.height * scale) / 2;
-        x = centeredClamp(x, screenW, map.width, scale);
-        y = centeredClamp(y, screenH, map.height, scale);
-        state.render.world.scale.set(scale);
-        state.render.world.position.set(x, y);
+        let targetX = largeMap && local ? screenW / 2 - followX * scale : (screenW - map.width * scale) / 2;
+        let targetY = largeMap && local ? screenH / 2 - followY * scale : (screenH - map.height * scale) / 2;
+        targetX = centeredClamp(targetX, screenW, map.width, scale);
+        targetY = centeredClamp(targetY, screenH, map.height, scale);
+        const camera = state.render.camera;
+        if (!camera.initialized || Math.abs(camera.scale - scale) > 0.001) {
+            camera.x = targetX;
+            camera.y = targetY;
+            camera.scale = scale;
+            camera.initialized = true;
+        } else {
+            const alpha = 1 - Math.pow(0.001, Math.min(80, deltaMS) / 150);
+            camera.x += (targetX - camera.x) * alpha;
+            camera.y += (targetY - camera.y) * alpha;
+            camera.scale += (scale - camera.scale) * alpha;
+        }
+        state.render.world.scale.set(camera.scale);
+        state.render.world.position.set(Math.round(camera.x * 10) / 10, Math.round(camera.y * 10) / 10);
     }
 
     function centeredClamp(offset, screenSize, worldSize, scale) {
@@ -424,6 +500,54 @@
         entry.node.position.set(trail.x, trail.y);
         entry.node.circle(0, 0, radius).fill({ color: trail.ownerId === state.playerId ? 0x65d96d : 0x40b95d, alpha: trail.ownerId === state.playerId ? 0.22 : 0.34 });
         entry.node.circle(0, 0, radius).stroke({ width: 2, color: 0x0f5c23, alpha: 0.28 });
+    }
+
+    function rememberAndFilterProjectiles(projectiles) {
+        const activeIds = new Set(projectiles.map(projectile => projectile.id).filter(Boolean));
+        for (const id of state.projectileMemory.keys()) {
+            if (!activeIds.has(id)) {
+                playProjectileImpactSound();
+                state.projectileMemory.delete(id);
+            }
+        }
+        return projectiles.filter(projectile => {
+            if (!projectile.id) return isProjectileWithinRange(projectile);
+            let memory = state.projectileMemory.get(projectile.id);
+            if (!memory) {
+                memory = {
+                    startX: Number.isFinite(projectile.startX) ? projectile.startX : projectile.x,
+                    startY: Number.isFinite(projectile.startY) ? projectile.startY : projectile.y,
+                    firstSeenAt: performance.now()
+                };
+                state.projectileMemory.set(projectile.id, memory);
+                playShotSound();
+                playProjectileFlySound();
+            }
+            projectile.startX = Number.isFinite(projectile.startX) ? projectile.startX : memory.startX;
+            projectile.startY = Number.isFinite(projectile.startY) ? projectile.startY : memory.startY;
+            projectile.maxDistance = Number.isFinite(projectile.maxDistance) ? projectile.maxDistance : PROJECTILE_RANGE;
+            const visible = isProjectileWithinRange(projectile) && performance.now() - memory.firstSeenAt < 1400;
+            if (!visible) {
+                playProjectileImpactSound();
+                state.projectileMemory.delete(projectile.id);
+            }
+            return visible;
+        });
+    }
+
+    function isProjectileWithinRange(projectile) {
+        const maxDistance = Number(projectile.maxDistance) || PROJECTILE_RANGE;
+        if (Number.isFinite(projectile.traveled) && projectile.traveled > maxDistance) return false;
+        if (Number.isFinite(projectile.startX) && Number.isFinite(projectile.startY)) {
+            const distance = Math.hypot(projectile.x - projectile.startX, projectile.y - projectile.startY);
+            if (distance > maxDistance + 8) return false;
+        }
+        if (Number.isFinite(projectile.targetX) && Number.isFinite(projectile.targetY)) {
+            const startDistance = Math.hypot(projectile.x - projectile.startX, projectile.y - projectile.startY);
+            const targetDistance = Math.hypot(projectile.targetX - projectile.startX, projectile.targetY - projectile.startY) || maxDistance;
+            return startDistance <= targetDistance + 8;
+        }
+        return true;
     }
 
     function createProjectileGraphic() { return { node: new PIXI.Graphics() }; }
@@ -581,6 +705,7 @@
     function currentAim() {
         if (state.rightStick.active && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.08) return normalizeAim(state.rightStick);
         if (state.mouseAim.active) return normalizeAim(state.mouseAim);
+        if (state.queuedShots.length) return normalizeAim(state.queuedShots[0]);
         return state.lastAim || { x: 1, y: 0 };
     }
     function currentInput() {
@@ -596,12 +721,14 @@
         window.setTimeout(sendInputLoop, SEND_MS);
     }
     function queueShot(aim) {
+        unlockAudio();
         const normalized = normalizeAim(aim);
         state.lastAim = normalized;
         state.queuedShots.push(normalized);
         if (state.matchActive) send(currentInput());
     }
     function fireUltimate() {
+        unlockAudio();
         const me = state.players.find(player => player.id === state.playerId);
         const ready = me?.character === 'slime' ? (Number(me?.ultimateHits) || 0) >= 1 : Boolean(me?.ultimateReady);
         if (!state.matchActive || !ready) return;
@@ -657,13 +784,13 @@
                 thumb.style.transform = 'translate(-50%, -50%)';
                 return;
             }
-            const nx = length > 3 ? dx / length : (isRight ? state.lastAim.x : 0);
-            const ny = length > 3 ? dy / length : (isRight ? state.lastAim.y : 0);
-            const clamped = length > 3 ? Math.min(limit, length) : Math.min(limit, limit * 0.42);
+            const nx = length > 3 ? dx / length : 0;
+            const ny = length > 3 ? dy / length : 0;
+            const clamped = length > 3 ? Math.min(limit, length) : 0;
             stick.x = nx * (clamped / limit);
             stick.y = ny * (clamped / limit);
             thumb.style.transform = `translate(calc(-50% + ${nx * clamped}px), calc(-50% + ${ny * clamped}px))`;
-            if (isRight) state.lastAim = normalizeAim({ x: nx, y: ny });
+            if (isRight && length > 3) state.lastAim = normalizeAim({ x: nx, y: ny });
         }
 
         function begin(event) {
@@ -676,6 +803,8 @@
             stick.moved = false;
             stick.shotQueued = false;
             moveStickBase(event.clientX, event.clientY);
+            if (isRight) state.lastAim = nearestOpponentAim() || { x: 1, y: 0 };
+            unlockAudio();
             elements.game.setPointerCapture?.(event.pointerId);
             update(event);
         }
@@ -733,7 +862,7 @@
         const me = state.players.find(player => player.id === state.playerId && player.alive !== false);
         if (!me) return state.lastAim;
         const nearest = state.players.filter(player => player.id !== state.playerId && player.alive !== false).sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y))[0];
-        return nearest ? normalizeAim({ x: nearest.x - me.x, y: nearest.y - me.y }) : state.lastAim;
+        return nearest ? normalizeAim({ x: nearest.x - me.x, y: nearest.y - me.y }) : null;
     }
     function updateMouseAim(event) {
         const app = state.render.app;
@@ -921,6 +1050,7 @@
         const { cols, rows } = state.editor;
         canvas.width = cols * EDITOR_TILE_SIZE;
         canvas.height = rows * EDITOR_TILE_SIZE;
+        canvas.style.setProperty('--editor-aspect', String(cols / rows));
         ctx.fillStyle = '#13361f'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
         for (let col = 0; col <= cols; col += 1) { ctx.beginPath(); ctx.moveTo(col * EDITOR_TILE_SIZE, 0); ctx.lineTo(col * EDITOR_TILE_SIZE, canvas.height); ctx.stroke(); }
@@ -1080,7 +1210,7 @@
     elements.characterInputs.forEach(input => input.addEventListener('change', () => { localStorage.setItem(CHARACTER_KEY, selectedCharacter()); renderLobbyCharacter(); renderCharacterSelectScreen(); }));
     elements.ultimateButton.addEventListener('pointerdown', event => { event.preventDefault(); fireUltimate(); });
     elements.pixiHost.addEventListener('pointermove', event => { if (event.pointerType !== 'mouse' || !state.matchActive) return; updateMouseAim(event); });
-    elements.pixiHost.addEventListener('pointerdown', event => { if (event.pointerType !== 'mouse' || !state.matchActive) return; updateMouseAim(event); });
+    elements.pixiHost.addEventListener('pointerdown', event => { if (event.pointerType !== 'mouse' || !state.matchActive) return; unlockAudio(); updateMouseAim(event); });
     window.addEventListener('pointerup', event => {
         if (event.pointerType === 'mouse' && state.mouseAim.active && state.matchActive) queueShot(state.mouseAim);
         state.mouseAim.active = false;

@@ -347,7 +347,7 @@ export function createGuangbooStore(db) {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const listCustomMapsStmt = db.prepare(`
-        SELECT id, name, creator, width, height, tile_size AS tileSize, created_at AS createdAt, updated_at AS updatedAt
+        SELECT id, name, creator, width, height, tile_size AS tileSize, data_json AS dataJson, created_at AS createdAt, updated_at AS updatedAt
         FROM guangboo_custom_maps
         ORDER BY updated_at DESC
         LIMIT 50
@@ -412,16 +412,36 @@ export function createGuangbooStore(db) {
     }
 
     function publicMapRow(row) {
-        return row ? {
+        if (!row) return null;
+        let mapData = null;
+        const rawData = row.dataJson || row.data_json;
+        if (rawData) {
+            try {
+                const parsed = JSON.parse(rawData);
+                mapData = {
+                    cols: parsed.cols,
+                    rows: parsed.rows,
+                    tileSize: parsed.tileSize,
+                    walls: Array.isArray(parsed.walls) ? parsed.walls.map(({ col, row }) => ({ col, row })) : [],
+                    spawnPoints: Array.isArray(parsed.spawnPoints) ? parsed.spawnPoints.map(({ col, row, x, y }) => ({ col, row, x, y })) : []
+                };
+            } catch {
+                mapData = null;
+            }
+        }
+        return {
             id: row.id,
             name: row.name,
             creator: row.creator,
             width: row.width,
             height: row.height,
             tileSize: row.tileSize || row.tile_size,
+            map: mapData,
+            walls: mapData?.walls || [],
+            spawnPoints: mapData?.spawnPoints || [],
             createdAt: row.createdAt || row.created_at,
             updatedAt: row.updatedAt || row.updated_at
-        } : null;
+        };
     }
 
     function saveCustomMap({ name, creator, map }) {
