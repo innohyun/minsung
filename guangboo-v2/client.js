@@ -56,8 +56,13 @@
         closeMapEditor: document.getElementById('closeMapEditorButton'),
         mapEditorCanvas: document.getElementById('mapEditorCanvas'),
         mapName: document.getElementById('mapNameInput'),
+        mapMode: document.getElementById('mapModeInput'),
         mapCols: document.getElementById('mapColsInput'),
         mapRows: document.getElementById('mapRowsInput'),
+        mapInfoStep: document.getElementById('mapInfoStep'),
+        mapSummary: document.getElementById('mapSummaryInput'),
+        publishMap: document.getElementById('publishMapButton'),
+        mapEditorCanvasWrap: document.getElementById('mapEditorCanvasWrap'),
         newMap: document.getElementById('newMapButton'),
         saveMap: document.getElementById('saveMapButton'),
         mapEditorStatus: document.getElementById('mapEditorStatus'),
@@ -107,14 +112,16 @@
         queuedShots: [],
         queuedUltimate: false,
         projectileMemory: new Map(),
-        audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0 },
+        audio: { context: null, unlocked: false, lastImpactAt: 0, lastFlyAt: 0, lastHealAt: 0, lastWallBreakAt: 0 },
         lastAim: { x: 1, y: 0 },
         mouseAim: { active: false, x: 1, y: 0 },
         leftStick: stickState(),
         rightStick: stickState(),
         customMaps: [],
+        effects: [],
+        effectMemory: new Set(),
         selectedMapId: DEFAULT_OFFICIAL_MAP_ID,
-        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), spawns: new Set(), tool: 'wall' },
+        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), spawns: new Set(), tool: 'wall', editingId: null, zoom: 1, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1 },
         render: {
             app: null,
             ready: false,
@@ -125,6 +132,7 @@
             trailLayer: null,
             projectileLayer: null,
             summonLayer: null,
+            effectLayer: null,
             playerLayer: null,
             players: new Map(),
             projectiles: new Map(),
@@ -163,7 +171,7 @@
     }
 
     function selectedMode() {
-        return 'survival';
+        return mapMeta(selectedMapId()).mode || 'survival';
     }
 
     function selectedCharacter() {
@@ -246,6 +254,63 @@
         playTone({ frequency: 90, endFrequency: 45, duration: 0.08, volume: 0.035, type: 'square', delay: 0.018 });
     }
 
+    function playWallBreakSound() {
+        const now = performance.now();
+        if (now - state.audio.lastWallBreakAt < 90) return;
+        state.audio.lastWallBreakAt = now;
+        playTone({ frequency: 150, endFrequency: 42, duration: 0.18, volume: 0.075, type: 'sawtooth' });
+        playTone({ frequency: 620, endFrequency: 180, duration: 0.11, volume: 0.035, type: 'square', delay: 0.02 });
+    }
+
+    function playHealSound() {
+        const now = performance.now();
+        if (now - state.audio.lastHealAt < 420) return;
+        state.audio.lastHealAt = now;
+        playTone({ frequency: 420, endFrequency: 780, duration: 0.16, volume: 0.035, type: 'sine' });
+        playTone({ frequency: 640, endFrequency: 960, duration: 0.14, volume: 0.025, type: 'triangle', delay: 0.06 });
+    }
+
+    function handleEffects(effects = []) {
+        effects.forEach(effect => {
+            if (!effect?.id || state.effectMemory.has(effect.id)) return;
+            state.effectMemory.add(effect.id);
+            if (state.effectMemory.size > 120) state.effectMemory = new Set([...state.effectMemory].slice(-80));
+            if (effect.kind === 'wallBreak') { playWallBreakSound(); spawnWallBreakFragments(effect); }
+            if (effect.kind === 'heal') playHealSound();
+        });
+    }
+
+    function spawnWallBreakFragments(effect) {
+        const x = Number(effect.x) || 0;
+        const y = Number(effect.y) || 0;
+        for (let index = 0; index < 12; index += 1) {
+            const angle = (Math.PI * 2 * index) / 12 + Math.random() * 0.35;
+            const speed = 80 + Math.random() * 150;
+            state.effects.push({
+                id: `${effect.id}-${index}`,
+                kind: 'wallFragment',
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                size: 4 + Math.random() * 7,
+                age: 0,
+                life: 520 + Math.random() * 220
+            });
+        }
+    }
+
+    function leaveQueue() {
+        if (!state.joining) return;
+        send({ type: 'leaveQueue' });
+        state.joining = false;
+        elements.joinButton.disabled = false;
+        elements.joinButton.textContent = '플레이';
+        elements.status.textContent = '매칭 취소됨';
+        if (elements.queueCopy) elements.queueCopy.textContent = '정식 맵 전투';
+        if (elements.queueFill) elements.queueFill.style.width = '0%';
+    }
+
     function connect() {
         if (state.ws && (state.ws.readyState === WebSocket.OPEN || state.ws.readyState === WebSocket.CONNECTING)) return;
         state.ws = new WebSocket(wsUrl());
@@ -284,8 +349,8 @@
         localStorage.setItem(CHARACTER_KEY, character);
         localStorage.setItem(BOT_KEY, elements.botToggle.checked ? '1' : '0');
         localStorage.setItem(MAP_KEY, mapId);
-        elements.joinButton.disabled = true;
-        elements.joinButton.textContent = '매칭 중';
+        elements.joinButton.disabled = false;
+        elements.joinButton.textContent = '매칭 취소';
         elements.status.textContent = '매칭 요청 중';
         if (elements.queueCopy) elements.queueCopy.textContent = `정식 맵 전투: 선택한 맵 ${mapMeta(mapId).name}`;
         if (elements.queueFill) elements.queueFill.style.width = '35%';
@@ -310,6 +375,15 @@
             elements.status.textContent = `${message.modeLabel || message.mode}: ${message.playersWaiting}/${message.requiredPlayers} 대기 중`;
             if (elements.queueCopy) elements.queueCopy.textContent = `${message.modeLabel || message.mode}: ${message.playersWaiting}/${message.requiredPlayers} 대기 중 (총 ${message.requiredPlayers || 4}명)`;
             if (elements.queueFill) elements.queueFill.style.width = `${Math.max(8, Math.min(100, ((message.playersWaiting || 0) / (message.requiredPlayers || 4)) * 100))}%`;
+            return;
+        }
+        if (message.type === 'queueLeft') {
+            state.joining = false;
+            elements.joinButton.disabled = false;
+            elements.joinButton.textContent = '플레이';
+            elements.status.textContent = '매칭 취소됨';
+            if (elements.queueCopy) elements.queueCopy.textContent = '정식 맵 전투';
+            if (elements.queueFill) elements.queueFill.style.width = '0%';
             return;
         }
         if (message.type === 'matchStart') {
@@ -339,6 +413,7 @@
             state.projectiles = rememberAndFilterProjectiles(message.projectiles || []);
             state.slimeTrails = message.slimeTrails || [];
             state.summons = message.summons || [];
+            handleEffects(message.effects || []);
             updateHud();
             return;
         }
@@ -379,6 +454,7 @@
         state.render.trailLayer = new PIXI.Container();
         state.render.projectileLayer = new PIXI.Container();
         state.render.summonLayer = new PIXI.Container();
+        state.render.effectLayer = new PIXI.Graphics();
         state.render.playerLayer = new PIXI.Container();
         app.stage.addChild(state.render.background);
         app.stage.addChild(state.render.world);
@@ -387,6 +463,7 @@
         state.render.world.addChild(state.render.aimGuide);
         state.render.world.addChild(state.render.projectileLayer);
         state.render.world.addChild(state.render.summonLayer);
+        state.render.world.addChild(state.render.effectLayer);
         state.render.world.addChild(state.render.playerLayer);
         app.ticker.add(tickRender);
         state.render.ready = true;
@@ -402,6 +479,7 @@
         syncCollection(state.render.trails, state.render.trailLayer, state.slimeTrails, trail => trail.id || `${trail.ownerId}:${trail.x}:${trail.y}`, createTrailGraphic, updateTrailGraphic);
         syncCollection(state.render.projectiles, state.render.projectileLayer, state.projectiles, item => item.id || `${item.ownerId}:${item.x}:${item.y}`, createProjectileGraphic, updateProjectileGraphic);
         syncCollection(state.render.summons, state.render.summonLayer, state.summons, item => item.id, createSummonGraphic, (entry, item) => updateSummonGraphic(entry, item, ticker.deltaMS || 16.67));
+        drawEffectParticles(ticker.deltaMS || 16.67);
         syncCollection(state.render.players, state.render.playerLayer, state.players, item => item.id, createPlayerGraphic, (entry, item) => updatePlayerGraphic(entry, item, ticker.deltaMS || 16.67));
         updateCamera(width, height, ticker.deltaMS || 16.67);
         drawAimGuide();
@@ -469,6 +547,24 @@
         walls.forEach(rect => {
             g.roundRect(rect.x - rect.w / 2, rect.y - rect.h / 2, rect.w, rect.h, 4).fill(0x8a6b3d).stroke({ width: 1, color: 0x3a2813, alpha: 0.42 });
             g.roundRect(rect.x - rect.w / 2 + 5, rect.y - rect.h / 2 + 5, Math.max(1, rect.w - 10), Math.max(1, rect.h - 10), 3).fill({ color: 0xffffff, alpha: 0.12 });
+        });
+    }
+
+    function drawEffectParticles(deltaMS) {
+        const layer = state.render.effectLayer;
+        if (!layer) return;
+        layer.clear();
+        state.effects = state.effects.filter(effect => {
+            effect.age += deltaMS;
+            if (effect.age >= effect.life) return false;
+            const dt = deltaMS / 1000;
+            effect.x += effect.vx * dt;
+            effect.y += effect.vy * dt;
+            effect.vy += 420 * dt;
+            const alpha = 1 - effect.age / effect.life;
+            layer.rect(effect.x - effect.size / 2, effect.y - effect.size / 2, effect.size, effect.size).fill({ color: 0x9b6a38, alpha });
+            layer.rect(effect.x - effect.size / 2, effect.y - effect.size / 2, effect.size, effect.size).stroke({ width: 1, color: 0x3a2813, alpha: alpha * 0.75 });
+            return true;
         });
     }
 
@@ -550,33 +646,55 @@
         return true;
     }
 
-    function createProjectileGraphic() { return { node: new PIXI.Graphics() }; }
+    function createProjectileGraphic() {
+        const node = new PIXI.Container();
+        const body = new PIXI.Graphics();
+        const healthText = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '900', fill: 0xfffdf8, stroke: { color: 0x000000, width: 2 }, align: 'center' } });
+        healthText.anchor.set(0.5, 0.5);
+        node.addChild(body, healthText);
+        return { node, body, healthText };
+    }
     function updateProjectileGraphic(entry, projectile) {
         const radius = Number(projectile.radius) || 8;
         const color = projectile.kind === 'ultimate' ? 0xf6c84f : projectile.kind === 'slime' ? 0x70f45e : 0xfff7a5;
-        entry.node.clear();
         entry.node.position.set(projectile.x, projectile.y);
-        entry.node.circle(0, 0, radius + 6).fill({ color, alpha: projectile.kind === 'ultimate' ? 0.18 : 0.12 });
-        entry.node.circle(0, 0, radius).fill(color);
-        if (projectile.kind === 'ultimate') entry.node.circle(0, 0, radius + 2).stroke({ width: 3, color: 0xffffff, alpha: 0.45 });
+        entry.body.clear();
+        entry.body.circle(0, 0, radius + 6).fill({ color, alpha: projectile.kind === 'ultimate' ? 0.18 : 0.12 });
+        entry.body.circle(0, 0, radius).fill(color);
+        if (projectile.kind === 'ultimate') entry.body.circle(0, 0, radius + 2).stroke({ width: 3, color: 0xffffff, alpha: 0.45 });
+        const showHealth = projectile.kind === 'ultimate' && Number.isFinite(Number(projectile.health));
+        entry.healthText.visible = showHealth;
+        if (showHealth) {
+            entry.healthText.text = String(Math.max(0, Math.round(Number(projectile.health))));
+            entry.healthText.position.set(0, -radius - 18);
+        }
     }
 
     function createSummonGraphic(summon) {
         const node = new PIXI.Container();
         const body = new PIXI.Graphics();
-        node.addChild(body);
-        return { node, body, x: summon.x, y: summon.y };
+        const healthText = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 9, fontWeight: '900', fill: 0xfffdf8, stroke: { color: 0x000000, width: 2 }, align: 'center' } });
+        healthText.anchor.set(0.5, 0.5);
+        node.addChild(body, healthText);
+        return { node, body, healthText, x: summon.x, y: summon.y };
     }
     function updateSummonGraphic(entry, summon, deltaMS) {
         smoothPosition(entry, summon, deltaMS);
         const radius = Number(summon.radius) || 14;
-        const ratio = Math.max(0, Math.min(1, (Number(summon.health) || 0) / (Number(summon.maxHealth) || 500)));
+        const health = Math.max(0, Math.round(Number(summon.health) || 0));
+        const ratio = Math.max(0, Math.min(1, health / (Number(summon.maxHealth) || 500)));
+        const facingX = summon.facingX ?? summon.facing?.x ?? 1;
+        const facingY = summon.facingY ?? summon.facing?.y ?? 0;
+        const facingLength = Math.hypot(facingX, facingY) || 1;
         entry.body.clear();
+        entry.body.rotation = Math.atan2(facingY / facingLength, facingX / facingLength);
         entry.body.ellipse(0, 0, radius * 1.15, radius * 0.92).fill(summon.ownerId === state.playerId ? 0x9dff76 : 0x4ade80);
         entry.body.circle(radius * 0.25, -radius * 0.18, radius * 0.12).fill(0x12351d);
         entry.body.circle(radius * 0.25, radius * 0.18, radius * 0.12).fill(0x12351d);
         entry.body.roundRect(-radius, -radius - 8, radius * 2, 4, 2).fill({ color: 0x080d0a, alpha: 0.75 });
         entry.body.roundRect(-radius, -radius - 8, radius * 2 * ratio, 4, 2).fill(0xd7f252);
+        entry.healthText.text = String(health);
+        entry.healthText.position.set(0, -radius - 16);
     }
 
     function createPlayerGraphic(player) {
@@ -897,7 +1015,7 @@
             const cols = Math.max(8, Math.round(custom.width / (custom.tileSize || EDITOR_TILE_SIZE)));
             const rows = Math.max(8, Math.round(custom.height / (custom.tileSize || EDITOR_TILE_SIZE)));
             const data = custom.map || custom.data || {};
-            return { id: custom.id, name: custom.name, summary: '내가 만든 사용자 맵', description: `${custom.creator || '플레이어'}가 만든 ${cols}x${rows} 사용자 맵입니다.`, cols, rows, walls: data.walls || [], spawns: data.spawnPoints || [] };
+            return { id: custom.id, name: custom.name, summary: custom.summary || data.summary || '내가 만든 정식 맵', description: custom.summary || data.summary || `${custom.creator || '플레이어'}가 만든 ${cols}x${rows} 정식 맵입니다.`, cols, rows, walls: data.walls || custom.walls || [], spawns: data.spawnPoints || custom.spawnPoints || [], mode: custom.mode || data.mode || 'survival' };
         }
         return OFFICIAL_MAPS[0];
     }
@@ -955,6 +1073,8 @@
     function renderOfficialMapGrid() {
         elements.officialMapGrid.innerHTML = '';
         OFFICIAL_MAPS.forEach(map => {
+            const card = document.createElement('div');
+            card.className = 'map-choice-card-shell';
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'map-choice-card';
@@ -962,7 +1082,21 @@
             button.innerHTML = `<canvas width="180" height="115" aria-hidden="true"></canvas><strong>${escapeHtml(map.name)}</strong><small>${escapeHtml(map.summary)}</small>`;
             drawMiniMap(button.querySelector('canvas'), map);
             button.addEventListener('click', () => selectMap(map.id));
-            elements.officialMapGrid.appendChild(button);
+            const actions = document.createElement('div');
+            actions.className = 'map-choice-actions';
+            const info = document.createElement('button');
+            info.type = 'button';
+            info.className = 'ghost-button';
+            info.textContent = 'i';
+            info.addEventListener('click', () => openMapInfo(map.id));
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'ghost-button';
+            edit.textContent = '수정 복사';
+            edit.addEventListener('click', () => openMapEditor(map.id));
+            actions.append(info, edit);
+            card.append(button, actions);
+            elements.officialMapGrid.appendChild(card);
         });
     }
 
@@ -971,16 +1105,34 @@
         if (state.customMaps.length) {
             const title = document.createElement('p');
             title.className = 'eyebrow';
-            title.textContent = '내가 만든 맵';
+            title.textContent = '내가 정식으로 올린 맵';
             elements.customMapList.appendChild(title);
         }
         state.customMaps.forEach(map => {
+            const row = document.createElement('div');
+            row.className = 'custom-map-choice-row';
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'custom-map-choice';
-            button.textContent = map.name;
+            button.textContent = `${map.name} · ${map.mode === 'duel' ? '1:1' : '4인 생존전'}`;
             button.addEventListener('click', () => selectMap(map.id));
-            elements.customMapList.appendChild(button);
+            const info = document.createElement('button');
+            info.type = 'button';
+            info.className = 'ghost-button';
+            info.textContent = 'i';
+            info.addEventListener('click', () => openMapInfo(map.id));
+            const edit = document.createElement('button');
+            edit.type = 'button';
+            edit.className = 'ghost-button';
+            edit.textContent = '수정';
+            edit.addEventListener('click', () => openMapEditor(map.id));
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'ghost-button';
+            del.textContent = '삭제';
+            del.addEventListener('click', () => deleteCustomMap(map.id));
+            row.append(button, info, edit, del);
+            elements.customMapList.appendChild(row);
         });
     }
 
@@ -1029,18 +1181,50 @@
     function openCharacterSelect() { renderCharacterSelectScreen(); setScreen('characterSelect'); }
     function closeCharacterSelect() { setScreen('lobby'); }
 
-    function openMapEditor() {
+    function openMapEditor(id = null) {
+        const source = id ? mapMeta(id) : null;
+        state.editor.editingId = id && !isOfficialMapId(id) ? id : null;
+        state.editor.zoom = 1;
+        elements.mapName.value = source?.name || '';
+        elements.mapMode.value = source?.mode || 'survival';
+        elements.mapCols.value = source?.cols || 24;
+        elements.mapRows.value = source?.rows || 16;
+        elements.mapSummary.value = source?.summary || source?.description || '';
+        state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
+        state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
+        state.editor.walls = new Set((source?.walls || []).map(wall => `${wall.col},${wall.row}`));
+        state.editor.spawns = new Set((source?.spawns || []).map(spawn => `${spawn.col},${spawn.row}`));
+        elements.mapInfoStep.hidden = true;
+        elements.mapEditorStatus.textContent = id ? '기존 맵을 수정 중입니다. 저장 후 정보를 확인하세요.' : '1단계: 맵 이름을 쓰고 제작 시작을 누르세요.';
         drawEditor();
         setScreen('editor');
     }
-    function closeMapEditor() { setScreen('lobby'); }
+    function closeMapEditor() { setScreen('mapSelect'); }
 
     function applyEditorSize() {
+        if (!(elements.mapName.value || '').trim()) {
+            elements.mapEditorStatus.textContent = '먼저 맵 이름을 정하세요.';
+            elements.mapName.focus();
+            return;
+        }
         state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
         state.editor.walls.clear();
         state.editor.spawns.clear();
+        elements.mapInfoStep.hidden = true;
+        elements.mapEditorStatus.textContent = `${elements.mapMode.value === 'duel' ? '1:1' : '4인 생존전'} 맵 제작: 벽과 플레이어 생성 지점을 배치하세요. 두 손가락으로 확대/축소합니다.`;
         drawEditor();
+    }
+
+    function resizeEditorCanvasDisplay() {
+        const canvas = elements.mapEditorCanvas;
+        const wrap = elements.mapEditorCanvasWrap;
+        if (!canvas || !wrap) return;
+        const maxWidth = Math.max(280, wrap.clientWidth - 20);
+        const maxHeight = Math.max(280, Math.min(window.innerHeight * 0.62, 720));
+        const tile = Math.max(8, Math.min(maxWidth / state.editor.cols, maxHeight / state.editor.rows) * state.editor.zoom);
+        canvas.style.width = `${state.editor.cols * tile}px`;
+        canvas.style.height = `${state.editor.rows * tile}px`;
     }
 
     function drawEditor() {
@@ -1050,7 +1234,7 @@
         const { cols, rows } = state.editor;
         canvas.width = cols * EDITOR_TILE_SIZE;
         canvas.height = rows * EDITOR_TILE_SIZE;
-        canvas.style.setProperty('--editor-aspect', String(cols / rows));
+        resizeEditorCanvasDisplay();
         ctx.fillStyle = '#13361f'; ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.strokeStyle = 'rgba(255,255,255,0.12)'; ctx.lineWidth = 1;
         for (let col = 0; col <= cols; col += 1) { ctx.beginPath(); ctx.moveTo(col * EDITOR_TILE_SIZE, 0); ctx.lineTo(col * EDITOR_TILE_SIZE, canvas.height); ctx.stroke(); }
@@ -1062,11 +1246,11 @@
     }
 
     function editCellFromEvent(event) {
+        if (state.editor.pointers.size >= 2) return;
         const rect = elements.mapEditorCanvas.getBoundingClientRect();
-        const scaleX = elements.mapEditorCanvas.width / rect.width;
-        const scaleY = elements.mapEditorCanvas.height / rect.height;
-        const col = Math.floor((event.clientX - rect.left) * scaleX / EDITOR_TILE_SIZE);
-        const row = Math.floor((event.clientY - rect.top) * scaleY / EDITOR_TILE_SIZE);
+        const scale = elements.mapEditorCanvas.width / Math.max(1, rect.width);
+        const col = Math.floor((event.clientX - rect.left) * scale / EDITOR_TILE_SIZE);
+        const row = Math.floor((event.clientY - rect.top) * scale / EDITOR_TILE_SIZE);
         if (col < 0 || row < 0 || col >= state.editor.cols || row >= state.editor.rows) return;
         const key = `${col},${row}`;
         if (state.editor.tool === 'erase') { state.editor.walls.delete(key); state.editor.spawns.delete(key); }
@@ -1075,21 +1259,52 @@
         drawEditor();
     }
 
-    async function saveCustomMap() {
-        const name = (elements.mapName.value || 'v2 사용자 맵').trim();
+    function editorMapPayload() {
         const walls = [...state.editor.walls].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; });
         const spawnPoints = [...state.editor.spawns].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; });
-        elements.mapEditorStatus.textContent = '저장 중...';
-        const response = await fetch('/api/guangboo/maps', {
-            method: 'POST',
+        return { cols: state.editor.cols, rows: state.editor.rows, tileSize: EDITOR_TILE_SIZE, walls, spawnPoints, mode: elements.mapMode.value, summary: (elements.mapSummary.value || '').trim() };
+    }
+
+    async function saveCustomMap() {
+        const name = (elements.mapName.value || '').trim();
+        if (!name) { elements.mapEditorStatus.textContent = '맵 이름을 먼저 정하세요.'; return; }
+        if (state.editor.spawns.size < (elements.mapMode.value === 'duel' ? 2 : 4)) { elements.mapEditorStatus.textContent = '플레이어 생성 지점을 충분히 배치하세요.'; return; }
+        elements.mapInfoStep.hidden = false;
+        elements.mapEditorStatus.textContent = '맵 특징/정보를 쓰고 정식 맵으로 올리기를 누르세요.';
+    }
+
+    async function publishCustomMap() {
+        const name = (elements.mapName.value || '정식 맵').trim();
+        const method = state.editor.editingId ? 'PUT' : 'POST';
+        const url = state.editor.editingId ? `/api/guangboo/maps/${encodeURIComponent(state.editor.editingId)}` : '/api/guangboo/maps';
+        elements.mapEditorStatus.textContent = '정식 맵 저장 중...';
+        const response = await fetch(url, {
+            method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, creator: elements.nickname.value || 'v2 플레이어', map: { cols: state.editor.cols, rows: state.editor.rows, tileSize: EDITOR_TILE_SIZE, walls, spawnPoints } })
+            body: JSON.stringify({ name, creator: elements.nickname.value || 'v2 플레이어', mode: elements.mapMode.value, summary: (elements.mapSummary.value || '').trim(), map: editorMapPayload() })
         });
         const data = await response.json();
         if (!data.ok) throw new Error(data.error || 'save_failed');
-        elements.mapEditorStatus.textContent = '저장 완료';
+        elements.mapEditorStatus.textContent = '정식 맵 저장 완료';
         await loadCustomMaps();
         selectMap(data.map.id);
+    }
+
+    async function deleteCustomMap(id) {
+        const password = window.prompt('정식 맵을 삭제하려면 비밀번호를 입력하세요.');
+        if (!password) return;
+        const response = await fetch(`/api/guangboo/maps/${encodeURIComponent(id)}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password })
+        });
+        const data = await response.json();
+        if (!data.ok) {
+            window.alert(data.error === 'invalid_password' ? '비밀번호가 틀렸습니다.' : '삭제 실패');
+            return;
+        }
+        await loadCustomMaps();
+        selectMap(DEFAULT_OFFICIAL_MAP_ID);
     }
 
 
@@ -1166,6 +1381,7 @@
 
     elements.joinForm.addEventListener('submit', event => {
         event.preventDefault();
+        if (state.joining) { leaveQueue(); return; }
         state.joining = true;
         connect();
         if (state.ws?.readyState === WebSocket.OPEN && state.serverReady) joinQueue();
@@ -1194,10 +1410,11 @@
     elements.mapInfoModal.addEventListener('click', event => { if (event.target === elements.mapInfoModal) closeMapInfo(); });
     elements.openCharacterSelect.addEventListener('click', openCharacterSelect);
     elements.closeCharacterSelect.addEventListener('click', closeCharacterSelect);
-    elements.mapSelectEditor.addEventListener('click', openMapEditor);
+    elements.mapSelectEditor.addEventListener('click', () => openMapEditor());
     elements.closeMapEditor.addEventListener('click', closeMapEditor);
     elements.newMap.addEventListener('click', applyEditorSize);
     elements.saveMap.addEventListener('click', () => saveCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
+    elements.publishMap.addEventListener('click', () => publishCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
     elements.mapTools.forEach(button => {
         button.addEventListener('click', () => {
             state.editor.tool = button.dataset.tool || 'wall';
@@ -1205,8 +1422,39 @@
             elements.mapEditorStatus.textContent = state.editor.tool === 'spawn' ? '플레이어 생성 지점을 배치하세요.' : state.editor.tool === 'erase' ? '지울 칸을 선택하세요.' : '벽을 배치하세요.';
         });
     });
-    elements.mapEditorCanvas.addEventListener('pointerdown', event => { event.preventDefault(); elements.mapEditorCanvas.setPointerCapture?.(event.pointerId); editCellFromEvent(event); });
-    elements.mapEditorCanvas.addEventListener('pointermove', event => { if (!elements.mapEditorCanvas.hasPointerCapture?.(event.pointerId)) return; event.preventDefault(); editCellFromEvent(event); });
+    function updateEditorPinch() {
+        const points = [...state.editor.pointers.values()];
+        if (points.length < 2) return;
+        const distance = Math.hypot(points[0].clientX - points[1].clientX, points[0].clientY - points[1].clientY);
+        if (!state.editor.pinchStartDistance) {
+            state.editor.pinchStartDistance = distance;
+            state.editor.pinchStartZoom = state.editor.zoom;
+            return;
+        }
+        state.editor.zoom = Math.max(0.6, Math.min(3.2, state.editor.pinchStartZoom * (distance / Math.max(1, state.editor.pinchStartDistance))));
+        resizeEditorCanvasDisplay();
+    }
+    elements.mapEditorCanvas.addEventListener('pointerdown', event => {
+        event.preventDefault();
+        elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
+        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+        if (state.editor.pointers.size >= 2) updateEditorPinch();
+        else editCellFromEvent(event);
+    });
+    elements.mapEditorCanvas.addEventListener('pointermove', event => {
+        if (!elements.mapEditorCanvas.hasPointerCapture?.(event.pointerId)) return;
+        event.preventDefault();
+        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
+        if (state.editor.pointers.size >= 2) updateEditorPinch();
+        else editCellFromEvent(event);
+    });
+    const endEditorPointer = event => {
+        state.editor.pointers.delete(event.pointerId);
+        if (state.editor.pointers.size < 2) state.editor.pinchStartDistance = 0;
+    };
+    elements.mapEditorCanvas.addEventListener('pointerup', endEditorPointer);
+    elements.mapEditorCanvas.addEventListener('pointercancel', endEditorPointer);
+    window.addEventListener('resize', resizeEditorCanvasDisplay);
     elements.characterInputs.forEach(input => input.addEventListener('change', () => { localStorage.setItem(CHARACTER_KEY, selectedCharacter()); renderLobbyCharacter(); renderCharacterSelectScreen(); }));
     elements.ultimateButton.addEventListener('pointerdown', event => { event.preventDefault(); fireUltimate(); });
     elements.pixiHost.addEventListener('pointermove', event => { if (event.pointerType !== 'mouse' || !state.matchActive) return; updateMouseAim(event); });

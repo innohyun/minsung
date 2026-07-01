@@ -168,6 +168,12 @@ function createDatabase(dbPath) {
         );
     `);
     db.exec(GUANGBOO_SCHEMA_SQL);
+    for (const statement of [
+        "ALTER TABLE guangboo_custom_maps ADD COLUMN mode TEXT NOT NULL DEFAULT 'survival'",
+        "ALTER TABLE guangboo_custom_maps ADD COLUMN summary TEXT NOT NULL DEFAULT ''"
+    ]) {
+        try { db.exec(statement); } catch {}
+    }
     return db;
 }
 
@@ -384,8 +390,27 @@ export function createMinsungServer(options = {}) {
                 if (req.method === 'POST') {
                     if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
                     const body = await readJsonBody(req);
-                    const map = guangbooStore.saveCustomMap({ name: body.name, creator: body.creator, map: body.map });
+                    const map = guangbooStore.saveCustomMap({ name: body.name, creator: body.creator, map: body.map, mode: body.mode, summary: body.summary });
                     return sendJson(res, 200, { ok: true, map });
+                }
+                return writeMethodNotAllowed(res);
+            }
+
+            if (url.pathname.startsWith('/api/guangboo/maps/')) {
+                const mapId = decodeURIComponent(url.pathname.slice('/api/guangboo/maps/'.length));
+                if (!mapId) return sendJson(res, 400, { ok: false, error: 'missing_map_id' });
+                if (req.method === 'PUT') {
+                    if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
+                    const body = await readJsonBody(req);
+                    const map = guangbooStore.updateCustomMap(mapId, { name: body.name, creator: body.creator, map: body.map, mode: body.mode, summary: body.summary });
+                    if (!map) return sendJson(res, 404, { ok: false, error: 'map_not_found' });
+                    return sendJson(res, 200, { ok: true, map });
+                }
+                if (req.method === 'DELETE') {
+                    if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
+                    const body = await readJsonBody(req);
+                    if (!store.verifyPassword(String(body.password || ''))) return sendJson(res, 401, { ok: false, error: 'invalid_password' });
+                    return sendJson(res, 200, { ok: guangbooStore.deleteCustomMap(mapId) });
                 }
                 return writeMethodNotAllowed(res);
             }

@@ -269,7 +269,10 @@ test('starts a guangboo official-map match with selected map data', async () => 
                 hellos[0].modes.find(mode => mode.key === 'survival'),
                 { key: 'survival', label: '정식 맵 전투', size: 4 }
             );
-            assert.equal(hellos[0].modes.some(mode => mode.key === 'duel'), false);
+            assert.deepEqual(
+                hellos[0].modes.find(mode => mode.key === 'duel'),
+                { key: 'duel', label: '1:1', size: 2 }
+            );
             sockets.forEach((socket, index) => {
                 socket.send(JSON.stringify({
                     type: 'joinQueue',

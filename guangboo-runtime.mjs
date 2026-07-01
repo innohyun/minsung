@@ -5,6 +5,7 @@ const TICK_MS = 50;
 const WS_PATH = '/guangboo/ws';
 const DEFAULT_MODE = 'survival';
 const MODES = {
+    duel: { key: 'duel', label: '1:1', size: 2 },
     survival: { key: 'survival', label: '정식 맵 전투', size: 4 }
 };
 const PROJECTILE_RANGE = 300;
@@ -169,7 +170,9 @@ export const GUANGBOO_SCHEMA_SQL = `
         tile_size INTEGER NOT NULL,
         data_json TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'survival',
+        summary TEXT NOT NULL DEFAULT ''
     );
 `;
 
@@ -299,7 +302,7 @@ function destroyWallHitByProjectile(map, projectile) {
     if (!hit) return false;
     map.walls = map.walls.filter(wall => wall.id !== hit.id);
     map.obstacles = map.obstacles.filter(rect => rect.id !== hit.id);
-    return true;
+    return hit;
 }
 
 function sendJson(socket, payload) {
@@ -343,11 +346,18 @@ export function createGuangbooStore(db) {
         WHERE id = ?
     `);
     const insertCustomMap = db.prepare(`
-        INSERT INTO guangboo_custom_maps (id, name, creator, width, height, tile_size, data_json, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO guangboo_custom_maps (id, name, creator, width, height, tile_size, data_json, created_at, updated_at, mode, summary)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const updateCustomMapStmt = db.prepare(`
+        UPDATE guangboo_custom_maps
+        SET name = ?, creator = ?, width = ?, height = ?, tile_size = ?, data_json = ?, updated_at = ?, mode = ?, summary = ?
+        WHERE id = ?
+    `);
+    const deleteCustomMapStmt = db.prepare('DELETE FROM guangboo_custom_maps WHERE id = ?');
+    const clearCustomMapsStmt = db.prepare('DELETE FROM guangboo_custom_maps');
     const listCustomMapsStmt = db.prepare(`
-        SELECT id, name, creator, width, height, tile_size AS tileSize, data_json AS dataJson, created_at AS createdAt, updated_at AS updatedAt
+        SELECT id, name, creator, width, height, tile_size AS tileSize, data_json AS dataJson, created_at AS createdAt, updated_at AS updatedAt, mode, summary
         FROM guangboo_custom_maps
         ORDER BY updated_at DESC
         LIMIT 50
@@ -422,6 +432,8 @@ export function createGuangbooStore(db) {
                     cols: parsed.cols,
                     rows: parsed.rows,
                     tileSize: parsed.tileSize,
+                    mode: parsed.mode || row.mode || 'survival',
+                    summary: parsed.summary || row.summary || '',
                     walls: Array.isArray(parsed.walls) ? parsed.walls.map(({ col, row }) => ({ col, row })) : [],
                     spawnPoints: Array.isArray(parsed.spawnPoints) ? parsed.spawnPoints.map(({ col, row, x, y }) => ({ col, row, x, y })) : []
                 };
@@ -436,6 +448,8 @@ export function createGuangbooStore(db) {
             width: row.width,
             height: row.height,
             tileSize: row.tileSize || row.tile_size,
+            mode: row.mode || mapData?.mode || 'survival',
+            summary: row.summary || mapData?.summary || '',
             map: mapData,
             walls: mapData?.walls || [],
             spawnPoints: mapData?.spawnPoints || [],
@@ -444,25 +458,42 @@ export function createGuangbooStore(db) {
         };
     }
 
-    function saveCustomMap({ name, creator, map }) {
-        const normalized = normalizeCustomMapData({ ...map, name });
-        const id = `gbm_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
-        normalized.id = id;
+    function normalizeMapMeta({ mode, summary } = {}) {
+        const normalizedMode = MODES[mode] ? mode : DEFAULT_MODE;
+        const normalizedSummary = String(summary || '').trim().slice(0, 180);
+        return { mode: normalizedMode, summary: normalizedSummary };
+    }
+
+    function saveCustomMap({ name, creator, map, mode, summary, id = null }) {
+        const meta = normalizeMapMeta({ mode: mode || map?.mode, summary: summary || map?.summary });
+        const normalized = normalizeCustomMapData({ ...map, name, mode: meta.mode, summary: meta.summary });
+        const mapId = id ? String(id) : `gbm_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
+        normalized.id = mapId;
         normalized.name = String(name || normalized.name).trim().slice(0, 30) || normalized.name;
+        normalized.mode = meta.mode;
+        normalized.summary = meta.summary;
         const timestamp = nowIso();
         const normalizedCreator = normalizeNickname(creator || 'Map Maker');
+        const payload = JSON.stringify(normalized);
+        if (id) {
+            const result = updateCustomMapStmt.run(normalized.name, normalizedCreator, normalized.width, normalized.height, normalized.tileSize, payload, timestamp, meta.mode, meta.summary, mapId);
+            if (result.changes === 0) return null;
+            return publicMapRow({ id: mapId, name: normalized.name, creator: normalizedCreator, width: normalized.width, height: normalized.height, tileSize: normalized.tileSize, dataJson: payload, updatedAt: timestamp, mode: meta.mode, summary: meta.summary });
+        }
         insertCustomMap.run(
-            id,
+            mapId,
             normalized.name,
             normalizedCreator,
             normalized.width,
             normalized.height,
             normalized.tileSize,
-            JSON.stringify(normalized),
+            payload,
             timestamp,
-            timestamp
+            timestamp,
+            meta.mode,
+            meta.summary
         );
-        return publicMapRow({ id, name: normalized.name, creator: normalizedCreator, width: normalized.width, height: normalized.height, tileSize: normalized.tileSize, createdAt: timestamp, updatedAt: timestamp });
+        return publicMapRow({ id: mapId, name: normalized.name, creator: normalizedCreator, width: normalized.width, height: normalized.height, tileSize: normalized.tileSize, dataJson: payload, createdAt: timestamp, updatedAt: timestamp, mode: meta.mode, summary: meta.summary });
     }
 
     function listCustomMaps() {
@@ -473,13 +504,25 @@ export function createGuangbooStore(db) {
         const row = getCustomMapStmt.get(String(id || ''));
         if (!row) return null;
         try {
-            return normalizeCustomMapData({ ...JSON.parse(row.data_json), id: row.id, name: row.name });
+            return normalizeCustomMapData({ ...JSON.parse(row.data_json), id: row.id, name: row.name, mode: row.mode || DEFAULT_MODE, summary: row.summary || '' });
         } catch {
             return null;
         }
     }
 
-    return { ensurePlayer, recordMatch, getLeaderboard, listCustomMaps, saveCustomMap, getCustomMap };
+    function updateCustomMap(id, payload) {
+        return saveCustomMap({ ...payload, id });
+    }
+
+    function deleteCustomMap(id) {
+        return deleteCustomMapStmt.run(String(id || '')).changes > 0;
+    }
+
+    function clearCustomMaps() {
+        clearCustomMapsStmt.run();
+    }
+
+    return { ensurePlayer, recordMatch, getLeaderboard, listCustomMaps, saveCustomMap, updateCustomMap, deleteCustomMap, clearCustomMaps, getCustomMap };
 }
 
 export function createGuangbooRealtime(server, store) {
@@ -558,6 +601,8 @@ export function createGuangbooRealtime(server, store) {
                 targetY: Math.round(projectile.targetY ?? projectile.y),
                 traveled: Math.round(projectile.traveled ?? 0),
                 maxDistance: Math.round(projectile.maxDistance ?? PROJECTILE_RANGE),
+                health: projectile.health,
+                maxHealth: projectile.kind === 'ultimate' ? ULTIMATE_PROJECTILE_HEALTH : undefined,
                 kind: projectile.kind || 'normal',
                 radius: Math.round(projectile.radius || 8)
             })),
@@ -566,8 +611,10 @@ export function createGuangbooRealtime(server, store) {
             })),
             summons: match.summons.map(summon => ({
                 id: summon.id, ownerId: summon.ownerId, kind: summon.kind, x: Math.round(summon.x), y: Math.round(summon.y),
-                health: Math.max(0, Math.round(summon.health)), maxHealth: summon.maxHealth, radius: summon.radius
+                health: Math.max(0, Math.round(summon.health)), maxHealth: summon.maxHealth, radius: summon.radius,
+                facingX: Number((summon.facing?.x ?? 1).toFixed(3)), facingY: Number((summon.facing?.y ?? 0).toFixed(3))
             })),
+            effects: match.effects.splice(0, match.effects.length),
             map: match.map,
             aliveCount: [...match.players.values()].filter(player => player.alive).length
         };
@@ -653,7 +700,11 @@ export function createGuangbooRealtime(server, store) {
         const elapsed = now - player.lastRegenAt;
         if (elapsed < REGEN_TICK_MS) return;
         const regenTicks = Math.floor(elapsed / REGEN_TICK_MS);
+        const before = player.health;
         player.health = Math.min(PLAYER_MAX_HEALTH, player.health + regenTicks * REGEN_PER_TICK);
+        if (player.health > before && player.client?.match?.effects) {
+            player.client.match.effects.push({ id: `${player.client.match.id}-heal-${player.id}-${now}`, kind: 'heal', ownerId: player.id, x: Math.round(player.x), y: Math.round(player.y) });
+        }
         player.lastRegenAt += regenTicks * REGEN_TICK_MS;
         if (player.health >= PLAYER_MAX_HEALTH) player.lastRegenAt = now;
     }
@@ -758,6 +809,7 @@ export function createGuangbooRealtime(server, store) {
                 health: BABY_SLIME_HEALTH,
                 maxHealth: BABY_SLIME_HEALTH,
                 radius: BABY_SLIME_RADIUS,
+                facing: { x: Math.cos(angle), y: Math.sin(angle) },
                 expiresAt: now + BABY_SLIME_LIFETIME_MS
             });
         }
@@ -837,6 +889,8 @@ export function createGuangbooRealtime(server, store) {
         ].sort((a, b) => Math.hypot(a.x - waypoint.x, a.y - waypoint.y) - Math.hypot(b.x - waypoint.x, b.y - waypoint.y));
         const next = candidates.find(candidate => !isSummonBlocked(match.map, candidate.x, candidate.y, radius));
         if (!next) return;
+        const moveLength = Math.hypot(next.x - summon.x, next.y - summon.y);
+        if (moveLength > 0.01) summon.facing = { x: (next.x - summon.x) / moveLength, y: (next.y - summon.y) / moveLength };
         summon.x = next.x;
         summon.y = next.y;
     }
@@ -1082,7 +1136,11 @@ export function createGuangbooRealtime(server, store) {
             projectile.traveled += travelThisTick;
             if (projectile.traveled >= projectile.maxDistance) return;
             if (projectile.kind === 'ultimate') {
-                destroyWallHitByProjectile(match.map, projectile);
+                const wallHit = destroyWallHitByProjectile(match.map, projectile);
+                if (wallHit) {
+                    match.effects.push({ id: `${match.id}-wall-${projectile.id}-${match.tick}`, kind: 'wallBreak', x: Math.round(wallHit.x), y: Math.round(wallHit.y) });
+                    return;
+                }
             } else if (isProjectileBlocked(projectile, match.map)) {
                 return;
             }
@@ -1173,6 +1231,7 @@ export function createGuangbooRealtime(server, store) {
             projectiles: [],
             slimeTrails: [],
             summons: [],
+            effects: [],
             map: customMap ? normalizeCustomMapData(customMap) : (getOfficialMap(officialMapId) || createMap()),
             nextProjectileId: 1,
             nextSlimeTrailId: 1,

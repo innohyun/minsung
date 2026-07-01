@@ -1576,17 +1576,64 @@ html:fullscreen body.is-playing #gameCanvas {
     text-transform: uppercase;
 }
 
+.map-editor-canvas-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    min-height: 320px;
+    max-height: 68vh;
+    overflow: auto;
+    padding: 10px;
+    border: 1px solid rgba(23, 32, 24, 0.12);
+    border-radius: 10px;
+    background: rgba(19, 54, 31, 0.08);
+    overscroll-behavior: contain;
+}
+
 #mapEditorCanvas {
     display: block;
-    width: auto;
-    height: auto;
-    max-width: 100%;
-    max-height: 66vh;
+    flex: 0 0 auto;
     border: 1px solid rgba(23, 32, 24, 0.18);
     border-radius: 8px;
     background: #172018;
     touch-action: none;
     image-rendering: pixelated;
+}
+
+.map-choice-card-shell {
+    display: grid;
+    gap: 8px;
+}
+
+.map-choice-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+}
+
+.custom-map-choice-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.map-info-step {
+    display: grid;
+    gap: 8px;
+}
+
+.map-info-step textarea {
+    min-height: 84px;
+    resize: vertical;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--ink);
+    background: #fffdf8;
+    font: inherit;
+    font-weight: 700;
 }
 
 .top-hud {
