@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Guangboo v2 · PixiJS</title>
-    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260701-v2-map-flow-fixes">
+    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260701-v2-approved-map-flow">
 </head>
 <body>
     <main id="app">
@@ -120,33 +120,72 @@
             </div>
         </div>
 
+        <section class="screen map-setup-screen" id="mapModeSetupScreen" hidden aria-labelledby="mapModeSetupTitle">
+            <div class="selection-panel map-setup-panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="eyebrow">Step 1</p>
+                        <h2 id="mapModeSetupTitle">모드 설정</h2>
+                    </div>
+                    <button class="ghost-button" id="closeMapModeSetupButton" type="button">맵 선택</button>
+                </div>
+                <label class="map-setup-field">모드
+                    <select id="mapModeInput">
+                        <option value="duel">1:1</option>
+                        <option value="survival">4인 생존전</option>
+                    </select>
+                </label>
+                <button id="nextMapNameButton" type="button">다음</button>
+            </div>
+        </section>
+
+        <section class="screen map-setup-screen" id="mapNameSetupScreen" hidden aria-labelledby="mapNameSetupTitle">
+            <div class="selection-panel map-setup-panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="eyebrow">Step 2</p>
+                        <h2 id="mapNameSetupTitle">이름 설정</h2>
+                    </div>
+                    <button class="ghost-button" id="backMapModeButton" type="button">모드</button>
+                </div>
+                <label class="map-setup-field">맵 이름
+                    <input id="mapNameInput" maxlength="30" placeholder="맵 이름">
+                </label>
+                <button id="nextMapEditorButton" type="button">맵 만들기</button>
+            </div>
+        </section>
+
+        <section class="screen map-saved-info-screen" id="mapSavedInfoScreen" hidden aria-labelledby="mapSavedInfoTitle">
+            <div class="selection-panel map-setup-panel">
+                <div class="panel-head">
+                    <div>
+                        <p class="eyebrow">Step 4</p>
+                        <h2 id="mapSavedInfoTitle">정보 알려주기</h2>
+                    </div>
+                    <button class="ghost-button" id="backMapEditorButton" type="button">맵 수정</button>
+                </div>
+                <label class="map-setup-field">맵 특징/정보
+                    <textarea id="mapSummaryInput" maxlength="180" placeholder="이 맵의 특징을 적어 주세요."></textarea>
+                </label>
+                <button id="publishMapButton" type="button">저장 완료</button>
+                <p class="map-editor-status" id="mapSavedInfoStatus">정보를 적고 저장 완료를 누르세요.</p>
+            </div>
+        </section>
+
         <section class="screen map-editor-screen" id="mapEditorScreen" hidden aria-labelledby="mapEditorTitle">
             <div class="map-editor-panel">
                 <div class="panel-head">
                     <div>
-                        <p class="eyebrow">Custom map</p>
+                        <p class="eyebrow">Step 3</p>
                         <h2 id="mapEditorTitle">맵 제작</h2>
                     </div>
-                    <button class="ghost-button" id="closeMapEditorButton" type="button">로비</button>
+                    <button class="ghost-button" id="closeMapEditorButton" type="button">맵 선택</button>
                 </div>
                 <div class="map-editor-controls">
-                    <label>맵 이름 <input id="mapNameInput" maxlength="30" placeholder="내가 만든 맵"></label>
-                    <label>모드
-                        <select id="mapModeInput">
-                            <option value="duel">1:1</option>
-                            <option value="survival">4인 생존전</option>
-                        </select>
-                    </label>
                     <label>가로 칸 <input id="mapColsInput" type="number" min="8" max="100" value="24"></label>
                     <label>세로 칸 <input id="mapRowsInput" type="number" min="8" max="100" value="16"></label>
                     <button id="newMapButton" type="button">제작 시작</button>
-                    <button id="saveMapButton" type="button">저장 후 정보 입력</button>
-                </div>
-                <div class="map-info-step" id="mapInfoStep" hidden>
-                    <label>맵 특징/정보
-                        <textarea id="mapSummaryInput" maxlength="180" placeholder="이 맵의 특징을 적어 주세요."></textarea>
-                    </label>
-                    <button id="publishMapButton" type="button">정식 맵으로 올리기</button>
+                    <button id="saveMapButton" type="button">저장하고 정보 쓰기</button>
                 </div>
                 <div class="map-editor-canvas-wrap" id="mapEditorCanvasWrap">
                     <canvas id="mapEditorCanvas" width="960" height="640"></canvas>
@@ -207,6 +246,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
-    <script src="/guangboo-v2/client.js?v=20260701-v2-map-flow-fixes" defer></script>
+    <script src="/guangboo-v2/client.js?v=20260701-v2-approved-map-flow" defer></script>
 </body>
 </html>

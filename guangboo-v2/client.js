@@ -27,6 +27,9 @@
         result: document.getElementById('resultScreen'),
         mapSelect: document.getElementById('mapSelectScreen'),
         characterSelect: document.getElementById('characterSelectScreen'),
+        mapModeSetup: document.getElementById('mapModeSetupScreen'),
+        mapNameSetup: document.getElementById('mapNameSetupScreen'),
+        mapSavedInfo: document.getElementById('mapSavedInfoScreen'),
         editor: document.getElementById('mapEditorScreen'),
         joinForm: document.getElementById('joinForm'),
         nickname: document.getElementById('nicknameInput'),
@@ -53,13 +56,18 @@
         characterGrid: document.getElementById('characterGrid'),
         lobbyCharacterPreview: document.getElementById('lobbyCharacterPreview'),
         selectedCharacterName: document.getElementById('selectedCharacterName'),
+        closeMapModeSetup: document.getElementById('closeMapModeSetupButton'),
+        nextMapName: document.getElementById('nextMapNameButton'),
+        backMapMode: document.getElementById('backMapModeButton'),
+        nextMapEditor: document.getElementById('nextMapEditorButton'),
+        backMapEditor: document.getElementById('backMapEditorButton'),
+        mapSavedInfoStatus: document.getElementById('mapSavedInfoStatus'),
         closeMapEditor: document.getElementById('closeMapEditorButton'),
         mapEditorCanvas: document.getElementById('mapEditorCanvas'),
         mapName: document.getElementById('mapNameInput'),
         mapMode: document.getElementById('mapModeInput'),
         mapCols: document.getElementById('mapColsInput'),
         mapRows: document.getElementById('mapRowsInput'),
-        mapInfoStep: document.getElementById('mapInfoStep'),
         mapSummary: document.getElementById('mapSummaryInput'),
         publishMap: document.getElementById('publishMapButton'),
         mapEditorCanvasWrap: document.getElementById('mapEditorCanvasWrap'),
@@ -156,6 +164,9 @@
         elements.lobby.hidden = name !== 'lobby';
         elements.mapSelect.hidden = name !== 'mapSelect';
         elements.characterSelect.hidden = name !== 'characterSelect';
+        elements.mapModeSetup.hidden = name !== 'mapModeSetup';
+        elements.mapNameSetup.hidden = name !== 'mapNameSetup';
+        elements.mapSavedInfo.hidden = name !== 'mapSavedInfo';
         elements.editor.hidden = name !== 'editor';
         elements.game.hidden = name !== 'game';
         elements.result.hidden = name !== 'result';
@@ -477,7 +488,7 @@
         drawBackground(width, height);
         drawStaticMapIfNeeded();
         syncCollection(state.render.trails, state.render.trailLayer, state.slimeTrails, trail => trail.id || `${trail.ownerId}:${trail.x}:${trail.y}`, createTrailGraphic, updateTrailGraphic);
-        syncCollection(state.render.projectiles, state.render.projectileLayer, state.projectiles, item => item.id || `${item.ownerId}:${item.x}:${item.y}`, createProjectileGraphic, updateProjectileGraphic);
+        syncCollection(state.render.projectiles, state.render.projectileLayer, state.projectiles, item => item.id || `${item.ownerId}:${item.x}:${item.y}`, createProjectileGraphic, (entry, item) => updateProjectileGraphic(entry, item, ticker.deltaMS || 16.67));
         syncCollection(state.render.summons, state.render.summonLayer, state.summons, item => item.id, createSummonGraphic, (entry, item) => updateSummonGraphic(entry, item, ticker.deltaMS || 16.67));
         drawEffectParticles(ticker.deltaMS || 16.67);
         syncCollection(state.render.players, state.render.playerLayer, state.players, item => item.id, createPlayerGraphic, (entry, item) => updatePlayerGraphic(entry, item, ticker.deltaMS || 16.67));
@@ -646,37 +657,55 @@
         return true;
     }
 
-    function createProjectileGraphic() {
-        const node = new PIXI.Container();
-        const body = new PIXI.Graphics();
+    function createHudHealth() {
+        const hud = new PIXI.Container();
+        const healthBar = new PIXI.Graphics();
         const healthText = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '900', fill: 0xfffdf8, stroke: { color: 0x000000, width: 2 }, align: 'center' } });
         healthText.anchor.set(0.5, 0.5);
-        node.addChild(body, healthText);
-        return { node, body, healthText };
+        hud.addChild(healthBar, healthText);
+        return { hud, healthBar, healthText };
     }
-    function updateProjectileGraphic(entry, projectile) {
+
+    function drawWorldHealthBar(healthBar, healthText, health, maxHealth, y) {
+        const radius = 22;
+        const ratio = Math.max(0, Math.min(1, health / Math.max(1, maxHealth)));
+        const barW = radius * 3.36;
+        const barH = radius * 0.68;
+        const inset = radius * 0.09;
+        healthBar.clear();
+        healthBar.roundRect(-barW / 2, y, barW, barH, barH / 2).fill({ color: 0x080d0a, alpha: 0.82 });
+        healthBar.roundRect(-barW / 2 + inset, y + inset, Math.max(0, (barW - inset * 2) * ratio), Math.max(1, barH - inset * 2), barH / 2).fill(ratio <= 0.32 ? 0xe05252 : 0xd7f252);
+        healthBar.roundRect(-barW / 2 + 0.5, y + 0.5, barW - 1, barH - 1, barH / 2).stroke({ width: 1, color: 0xffffff, alpha: 0.72 });
+        healthText.text = String(Math.max(0, Math.round(health)));
+        healthText.position.set(0, y + barH / 2);
+    }
+
+    function createProjectileGraphic(projectile) {
+        const node = new PIXI.Container();
+        const body = new PIXI.Graphics();
+        const hud = createHudHealth();
+        node.addChild(body, hud.hud);
+        return { node, body, hud: hud.hud, healthBar: hud.healthBar, healthText: hud.healthText, x: projectile.x, y: projectile.y };
+    }
+    function updateProjectileGraphic(entry, projectile, deltaMS) {
         const radius = Number(projectile.radius) || 8;
         const color = projectile.kind === 'ultimate' ? 0xf6c84f : projectile.kind === 'slime' ? 0x70f45e : 0xfff7a5;
-        entry.node.position.set(projectile.x, projectile.y);
+        smoothPosition(entry, projectile, deltaMS);
         entry.body.clear();
         entry.body.circle(0, 0, radius + 6).fill({ color, alpha: projectile.kind === 'ultimate' ? 0.18 : 0.12 });
         entry.body.circle(0, 0, radius).fill(color);
         if (projectile.kind === 'ultimate') entry.body.circle(0, 0, radius + 2).stroke({ width: 3, color: 0xffffff, alpha: 0.45 });
         const showHealth = projectile.kind === 'ultimate' && Number.isFinite(Number(projectile.health));
-        entry.healthText.visible = showHealth;
-        if (showHealth) {
-            entry.healthText.text = String(Math.max(0, Math.round(Number(projectile.health))));
-            entry.healthText.position.set(0, -radius - 18);
-        }
+        entry.hud.visible = showHealth;
+        if (showHealth) drawWorldHealthBar(entry.healthBar, entry.healthText, Number(projectile.health) || 0, Number(projectile.maxHealth) || 3000, -radius - 30);
     }
 
     function createSummonGraphic(summon) {
         const node = new PIXI.Container();
         const body = new PIXI.Graphics();
-        const healthText = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 9, fontWeight: '900', fill: 0xfffdf8, stroke: { color: 0x000000, width: 2 }, align: 'center' } });
-        healthText.anchor.set(0.5, 0.5);
-        node.addChild(body, healthText);
-        return { node, body, healthText, x: summon.x, y: summon.y };
+        const hud = createHudHealth();
+        node.addChild(body, hud.hud);
+        return { node, body, hud: hud.hud, healthBar: hud.healthBar, healthText: hud.healthText, x: summon.x, y: summon.y };
     }
     function updateSummonGraphic(entry, summon, deltaMS) {
         smoothPosition(entry, summon, deltaMS);
@@ -691,10 +720,7 @@
         entry.body.ellipse(0, 0, radius * 1.15, radius * 0.92).fill(summon.ownerId === state.playerId ? 0x9dff76 : 0x4ade80);
         entry.body.circle(radius * 0.25, -radius * 0.18, radius * 0.12).fill(0x12351d);
         entry.body.circle(radius * 0.25, radius * 0.18, radius * 0.12).fill(0x12351d);
-        entry.body.roundRect(-radius, -radius - 8, radius * 2, 4, 2).fill({ color: 0x080d0a, alpha: 0.75 });
-        entry.body.roundRect(-radius, -radius - 8, radius * 2 * ratio, 4, 2).fill(0xd7f252);
-        entry.healthText.text = String(health);
-        entry.healthText.position.set(0, -radius - 16);
+        drawWorldHealthBar(entry.healthBar, entry.healthText, health, Number(summon.maxHealth) || 500, -radius - 30);
     }
 
     function createPlayerGraphic(player) {
@@ -817,7 +843,10 @@
     }
 
     function currentMove() {
-        if (state.leftStick.active) return clampUnit(state.leftStick);
+        if (state.leftStick.active) {
+            const length = Math.hypot(state.leftStick.x, state.leftStick.y);
+            return length > 0.08 ? { x: state.leftStick.x / length, y: state.leftStick.y / length } : { x: 0, y: 0 };
+        }
         return clampUnit({ x: (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0), y: (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) - (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) });
     }
     function currentAim() {
@@ -1015,7 +1044,7 @@
             const cols = Math.max(8, Math.round(custom.width / (custom.tileSize || EDITOR_TILE_SIZE)));
             const rows = Math.max(8, Math.round(custom.height / (custom.tileSize || EDITOR_TILE_SIZE)));
             const data = custom.map || custom.data || {};
-            return { id: custom.id, name: custom.name, summary: custom.summary || data.summary || '내가 만든 정식 맵', description: custom.summary || data.summary || `${custom.creator || '플레이어'}가 만든 ${cols}x${rows} 정식 맵입니다.`, cols, rows, walls: data.walls || custom.walls || [], spawns: data.spawnPoints || custom.spawnPoints || [], mode: custom.mode || data.mode || 'survival' };
+            return { id: custom.id, name: custom.name, summary: custom.summary || data.summary || '정식 맵', description: custom.summary || data.summary || `${cols}x${rows} 정식 맵입니다.`, cols, rows, walls: data.walls || custom.walls || [], spawns: data.spawnPoints || custom.spawnPoints || [], mode: custom.mode || data.mode || 'survival' };
         }
         return OFFICIAL_MAPS[0];
     }
@@ -1092,8 +1121,8 @@
             const edit = document.createElement('button');
             edit.type = 'button';
             edit.className = 'ghost-button';
-            edit.textContent = '수정 복사';
-            edit.addEventListener('click', () => openMapEditor(map.id));
+            edit.textContent = '수정';
+            edit.addEventListener('click', () => requestEditMap(map.id));
             actions.append(info, edit);
             card.append(button, actions);
             elements.officialMapGrid.appendChild(card);
@@ -1102,37 +1131,37 @@
 
     function renderCustomMapList() {
         elements.customMapList.innerHTML = '';
-        if (state.customMaps.length) {
-            const title = document.createElement('p');
-            title.className = 'eyebrow';
-            title.textContent = '내가 정식으로 올린 맵';
-            elements.customMapList.appendChild(title);
-        }
         state.customMaps.forEach(map => {
-            const row = document.createElement('div');
-            row.className = 'custom-map-choice-row';
+            const meta = mapMeta(map.id);
+            const card = document.createElement('div');
+            card.className = 'map-choice-card-shell';
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'custom-map-choice';
-            button.textContent = `${map.name} · ${map.mode === 'duel' ? '1:1' : '4인 생존전'}`;
+            button.className = 'map-choice-card custom-map-choice';
+            button.classList.toggle('is-selected', selectedMapId() === map.id);
+            button.innerHTML = `<canvas width="180" height="115" aria-hidden="true"></canvas><strong>${escapeHtml(meta.name)}</strong><small>${escapeHtml(meta.summary || (meta.mode === 'duel' ? '1:1' : '4인 생존전'))}</small>`;
+            drawMiniMap(button.querySelector('canvas'), meta);
             button.addEventListener('click', () => selectMap(map.id));
+            const actions = document.createElement('div');
+            actions.className = 'map-choice-actions';
             const info = document.createElement('button');
             info.type = 'button';
             info.className = 'ghost-button';
             info.textContent = 'i';
-            info.addEventListener('click', () => openMapInfo(map.id));
+            info.addEventListener('click', event => { event.stopPropagation(); openMapInfo(map.id); });
             const edit = document.createElement('button');
             edit.type = 'button';
             edit.className = 'ghost-button';
             edit.textContent = '수정';
-            edit.addEventListener('click', () => openMapEditor(map.id));
+            edit.addEventListener('click', () => requestEditMap(map.id));
             const del = document.createElement('button');
             del.type = 'button';
             del.className = 'ghost-button';
             del.textContent = '삭제';
             del.addEventListener('click', () => deleteCustomMap(map.id));
-            row.append(button, info, edit, del);
-            elements.customMapList.appendChild(row);
+            actions.append(info, edit, del);
+            card.append(button, actions);
+            elements.customMapList.appendChild(card);
         });
     }
 
@@ -1159,6 +1188,36 @@
         elements.lobbyCharacterPreview.classList.toggle('is-slime', character === 'slime');
     }
 
+    function requireMapPassword(message = '비밀번호를 입력하세요.') {
+        const password = window.prompt(message);
+        if (password === null) return null;
+        if (password !== '1234567890') {
+            window.alert('비밀번호가 틀렸습니다.');
+            return null;
+        }
+        return password;
+    }
+
+    function openMapModeSetup() {
+        state.editor.editingId = null;
+        state.editor.zoom = 1;
+        elements.mapMode.value = 'survival';
+        elements.mapName.value = '';
+        elements.mapSummary.value = '';
+        setScreen('mapModeSetup');
+    }
+
+    function openMapNameSetup() {
+        setScreen('mapNameSetup');
+        elements.mapName.focus();
+    }
+
+    function requestEditMap(id) {
+        const password = requireMapPassword('맵을 수정하려면 비밀번호를 입력하세요.');
+        if (!password) return;
+        openMapEditor(id, { password });
+    }
+
     function renderCharacterSelectScreen() {
         elements.characterGrid.innerHTML = '';
         CHARACTER_CARDS.forEach(card => {
@@ -1181,9 +1240,10 @@
     function openCharacterSelect() { renderCharacterSelectScreen(); setScreen('characterSelect'); }
     function closeCharacterSelect() { setScreen('lobby'); }
 
-    function openMapEditor(id = null) {
+    function openMapEditor(id = null, options = {}) {
         const source = id ? mapMeta(id) : null;
         state.editor.editingId = id && !isOfficialMapId(id) ? id : null;
+        state.editor.editPassword = options.password || null;
         state.editor.zoom = 1;
         elements.mapName.value = source?.name || '';
         elements.mapMode.value = source?.mode || 'survival';
@@ -1194,24 +1254,17 @@
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
         state.editor.walls = new Set((source?.walls || []).map(wall => `${wall.col},${wall.row}`));
         state.editor.spawns = new Set((source?.spawns || []).map(spawn => `${spawn.col},${spawn.row}`));
-        elements.mapInfoStep.hidden = true;
-        elements.mapEditorStatus.textContent = id ? '기존 맵을 수정 중입니다. 저장 후 정보를 확인하세요.' : '1단계: 맵 이름을 쓰고 제작 시작을 누르세요.';
+        elements.mapEditorStatus.textContent = id ? '기존 맵을 수정 중입니다. 저장하면 정보 화면으로 넘어갑니다.' : '벽과 플레이어 생성 지점을 배치하세요.';
         drawEditor();
         setScreen('editor');
     }
     function closeMapEditor() { setScreen('mapSelect'); }
 
     function applyEditorSize() {
-        if (!(elements.mapName.value || '').trim()) {
-            elements.mapEditorStatus.textContent = '먼저 맵 이름을 정하세요.';
-            elements.mapName.focus();
-            return;
-        }
         state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
         state.editor.walls.clear();
         state.editor.spawns.clear();
-        elements.mapInfoStep.hidden = true;
         elements.mapEditorStatus.textContent = `${elements.mapMode.value === 'duel' ? '1:1' : '4인 생존전'} 맵 제작: 벽과 플레이어 생성 지점을 배치하세요. 두 손가락으로 확대/축소합니다.`;
         drawEditor();
     }
@@ -1269,29 +1322,29 @@
         const name = (elements.mapName.value || '').trim();
         if (!name) { elements.mapEditorStatus.textContent = '맵 이름을 먼저 정하세요.'; return; }
         if (state.editor.spawns.size < (elements.mapMode.value === 'duel' ? 2 : 4)) { elements.mapEditorStatus.textContent = '플레이어 생성 지점을 충분히 배치하세요.'; return; }
-        elements.mapInfoStep.hidden = false;
-        elements.mapEditorStatus.textContent = '맵 특징/정보를 쓰고 정식 맵으로 올리기를 누르세요.';
+        elements.mapSavedInfoStatus.textContent = '정보를 적고 저장 완료를 누르세요.';
+        setScreen('mapSavedInfo');
     }
 
     async function publishCustomMap() {
         const name = (elements.mapName.value || '정식 맵').trim();
         const method = state.editor.editingId ? 'PUT' : 'POST';
         const url = state.editor.editingId ? `/api/guangboo/maps/${encodeURIComponent(state.editor.editingId)}` : '/api/guangboo/maps';
-        elements.mapEditorStatus.textContent = '정식 맵 저장 중...';
+        elements.mapSavedInfoStatus.textContent = '정식 맵 저장 중...';
         const response = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, creator: elements.nickname.value || 'v2 플레이어', mode: elements.mapMode.value, summary: (elements.mapSummary.value || '').trim(), map: editorMapPayload() })
+            body: JSON.stringify({ name, creator: elements.nickname.value || 'v2 플레이어', mode: elements.mapMode.value, summary: (elements.mapSummary.value || '').trim(), map: editorMapPayload(), password: state.editor.editPassword })
         });
         const data = await response.json();
         if (!data.ok) throw new Error(data.error || 'save_failed');
-        elements.mapEditorStatus.textContent = '정식 맵 저장 완료';
+        elements.mapSavedInfoStatus.textContent = '정식 맵 저장 완료';
         await loadCustomMaps();
         selectMap(data.map.id);
     }
 
     async function deleteCustomMap(id) {
-        const password = window.prompt('정식 맵을 삭제하려면 비밀번호를 입력하세요.');
+        const password = requireMapPassword('맵을 삭제하려면 비밀번호를 입력하세요.');
         if (!password) return;
         const response = await fetch(`/api/guangboo/maps/${encodeURIComponent(id)}`, {
             method: 'DELETE',
@@ -1410,11 +1463,20 @@
     elements.mapInfoModal.addEventListener('click', event => { if (event.target === elements.mapInfoModal) closeMapInfo(); });
     elements.openCharacterSelect.addEventListener('click', openCharacterSelect);
     elements.closeCharacterSelect.addEventListener('click', closeCharacterSelect);
-    elements.mapSelectEditor.addEventListener('click', () => openMapEditor());
+    elements.mapSelectEditor.addEventListener('click', openMapModeSetup);
+    elements.closeMapModeSetup.addEventListener('click', openMapSelect);
+    elements.nextMapName.addEventListener('click', openMapNameSetup);
+    elements.backMapMode.addEventListener('click', () => setScreen('mapModeSetup'));
+    elements.nextMapEditor.addEventListener('click', () => {
+        if (!(elements.mapName.value || '').trim()) { elements.mapName.focus(); return; }
+        openMapEditor(null);
+        applyEditorSize();
+    });
+    elements.backMapEditor.addEventListener('click', () => setScreen('editor'));
     elements.closeMapEditor.addEventListener('click', closeMapEditor);
     elements.newMap.addEventListener('click', applyEditorSize);
     elements.saveMap.addEventListener('click', () => saveCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
-    elements.publishMap.addEventListener('click', () => publishCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
+    elements.publishMap.addEventListener('click', () => publishCustomMap().catch(error => { elements.mapSavedInfoStatus.textContent = `저장 실패: ${error.message}`; }));
     elements.mapTools.forEach(button => {
         button.addEventListener('click', () => {
             state.editor.tool = button.dataset.tool || 'wall';

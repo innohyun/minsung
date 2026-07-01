@@ -16,6 +16,7 @@ const MAX_JSON_BYTES = 512 * 1024;
 const ALLOWED_BRIDGE_ORIGINS = new Set([
     'https://minsung.classaimate.com'
 ]);
+const GUANGBOO_MAP_EDIT_PASSWORD = process.env.GUANGBOO_MAP_EDIT_PASSWORD || '1234567890';
 
 const PROTECTED_ENTRY_PATHS = new Set([
     '/ball/ball.html',
@@ -82,7 +83,7 @@ function applyCorsHeaders(req, res) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Vary', 'Origin');
     if (req.headers['access-control-request-private-network'] === 'true') {
         res.setHeader('Access-Control-Allow-Private-Network', 'true');
@@ -254,6 +255,10 @@ function isAuthenticated(req, store) {
     return Boolean(store.getValidSession(getAuthToken(req)));
 }
 
+function isGuangbooMapEditPassword(value) {
+    return String(value || '') === GUANGBOO_MAP_EDIT_PASSWORD;
+}
+
 function normalizeRequestPath(url) {
     const rawPath = url.pathname === '/' ? '/index.html' : url.pathname;
     if (rawPath === '/mario' || rawPath === '/mario/') return '/mario/index.html';
@@ -402,6 +407,7 @@ export function createMinsungServer(options = {}) {
                 if (req.method === 'PUT') {
                     if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
                     const body = await readJsonBody(req);
+                    if (!isGuangbooMapEditPassword(body.password)) return sendJson(res, 401, { ok: false, error: 'invalid_password' });
                     const map = guangbooStore.updateCustomMap(mapId, { name: body.name, creator: body.creator, map: body.map, mode: body.mode, summary: body.summary });
                     if (!map) return sendJson(res, 404, { ok: false, error: 'map_not_found' });
                     return sendJson(res, 200, { ok: true, map });
@@ -409,7 +415,7 @@ export function createMinsungServer(options = {}) {
                 if (req.method === 'DELETE') {
                     if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
                     const body = await readJsonBody(req);
-                    if (!store.verifyPassword(String(body.password || ''))) return sendJson(res, 401, { ok: false, error: 'invalid_password' });
+                    if (!isGuangbooMapEditPassword(body.password)) return sendJson(res, 401, { ok: false, error: 'invalid_password' });
                     return sendJson(res, 200, { ok: guangbooStore.deleteCustomMap(mapId) });
                 }
                 return writeMethodNotAllowed(res);

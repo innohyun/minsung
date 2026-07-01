@@ -219,7 +219,9 @@ html:fullscreen body.is-playing .match-screen {
 }
 
 .map-select-screen,
-.character-select-screen {
+.character-select-screen,
+.map-setup-screen,
+.map-saved-info-screen {
     min-height: 100vh;
     min-height: 100dvh;
     padding: max(22px, env(safe-area-inset-top)) 18px max(22px, env(safe-area-inset-bottom));
@@ -229,6 +231,32 @@ html:fullscreen body.is-playing .match-screen {
     width: min(980px, 100%);
     margin: 0 auto;
     padding: 18px;
+}
+
+.map-setup-panel {
+    display: grid;
+    gap: 14px;
+}
+
+.map-setup-field {
+    display: grid;
+    gap: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+
+.map-setup-field textarea {
+    min-height: 120px;
+    resize: vertical;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px;
+    color: var(--ink);
+    background: #fffdf8;
+    font: inherit;
+    font-weight: 700;
 }
 
 .map-grid,
@@ -268,7 +296,8 @@ html:fullscreen body.is-playing .match-screen {
 
 .custom-map-list {
     display: grid;
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
     margin: 14px 0;
 }
 
@@ -849,7 +878,9 @@ button:active {
 }
 
 .map-select-screen,
-.character-select-screen {
+.character-select-screen,
+.map-setup-screen,
+.map-saved-info-screen {
     min-height: 100vh;
     min-height: 100dvh;
     padding: max(22px, env(safe-area-inset-top)) 18px max(22px, env(safe-area-inset-bottom));
@@ -898,7 +929,8 @@ button:active {
 
 .custom-map-list {
     display: grid;
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
     margin: 14px 0;
 }
 
@@ -1145,7 +1177,9 @@ body.is-playing.is-game-fullscreen .match-screen {
 }
 
 .map-select-screen,
-.character-select-screen {
+.character-select-screen,
+.map-setup-screen,
+.map-saved-info-screen {
     min-height: 100vh;
     min-height: 100dvh;
     padding: max(22px, env(safe-area-inset-top)) 18px max(22px, env(safe-area-inset-bottom));
@@ -1194,7 +1228,8 @@ body.is-playing.is-game-fullscreen .match-screen {
 
 .custom-map-list {
     display: grid;
-    gap: 8px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
     margin: 14px 0;
 }
 
@@ -1562,7 +1597,7 @@ html:fullscreen body.is-playing #gameCanvas {
 
 .map-editor-controls {
     display: grid;
-    grid-template-columns: minmax(180px, 1fr) repeat(2, minmax(88px, 120px)) auto auto;
+    grid-template-columns: repeat(2, minmax(88px, 120px)) auto auto;
     gap: 8px;
     align-items: end;
 }
