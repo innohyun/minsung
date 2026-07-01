@@ -1741,3 +1741,46 @@ html:fullscreen body.is-playing #gameCanvas {
     -webkit-user-select: none;
     -webkit-touch-callout: none;
 }
+
+
+/* Approved fix: custom map cards should match the official 4-column map grid instead of stretching. */
+.map-grid,
+.custom-map-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: start;
+}
+
+.map-choice-card-shell {
+    min-width: 0;
+}
+
+.map-choice-card canvas,
+.custom-map-choice canvas {
+    aspect-ratio: 180 / 115;
+    height: auto;
+}
+
+body,
+#app,
+.screen {
+    touch-action: manipulation;
+    overscroll-behavior: contain;
+}
+
+#mapEditorCanvas {
+    touch-action: none;
+}
+
+@media (max-width: 860px) {
+    .map-grid,
+    .custom-map-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 520px) {
+    .map-grid,
+    .custom-map-list {
+        grid-template-columns: 1fr;
+    }
+}

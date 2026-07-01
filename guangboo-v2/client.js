@@ -129,7 +129,7 @@
         effects: [],
         effectMemory: new Set(),
         selectedMapId: DEFAULT_OFFICIAL_MAP_ID,
-        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), spawns: new Set(), tool: 'wall', editingId: null, zoom: 1, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1 },
+        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), spawns: new Set(), tool: 'wall', editingId: null, zoom: 1, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1, pinching: false, pinchBlockUntil: 0 },
         render: {
             app: null,
             ready: false,
@@ -950,7 +950,6 @@
             stick.moved = false;
             stick.shotQueued = false;
             moveStickBase(event.clientX, event.clientY);
-            if (isRight) state.lastAim = nearestOpponentAim() || { x: 1, y: 0 };
             unlockAudio();
             elements.game.setPointerCapture?.(event.pointerId);
             update(event);
@@ -1487,6 +1486,8 @@
     function updateEditorPinch() {
         const points = [...state.editor.pointers.values()];
         if (points.length < 2) return;
+        state.editor.pinching = true;
+        state.editor.pinchBlockUntil = Date.now() + 220;
         const distance = Math.hypot(points[0].clientX - points[1].clientX, points[0].clientY - points[1].clientY);
         if (!state.editor.pinchStartDistance) {
             state.editor.pinchStartDistance = distance;
@@ -1496,23 +1497,30 @@
         state.editor.zoom = Math.max(0.6, Math.min(3.2, state.editor.pinchStartZoom * (distance / Math.max(1, state.editor.pinchStartDistance))));
         resizeEditorCanvasDisplay();
     }
+    function canPlaceEditorElement() {
+        return !state.editor.pinching && state.editor.pointers.size < 2 && Date.now() >= (state.editor.pinchBlockUntil || 0);
+    }
     elements.mapEditorCanvas.addEventListener('pointerdown', event => {
         event.preventDefault();
         elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
         state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
-        if (state.editor.pointers.size >= 2) updateEditorPinch();
-        else editCellFromEvent(event);
+        if (state.editor.pointers.size >= 2) { updateEditorPinch(); return; }
+        if (canPlaceEditorElement()) editCellFromEvent(event);
     });
     elements.mapEditorCanvas.addEventListener('pointermove', event => {
         if (!elements.mapEditorCanvas.hasPointerCapture?.(event.pointerId)) return;
         event.preventDefault();
         state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
-        if (state.editor.pointers.size >= 2) updateEditorPinch();
-        else editCellFromEvent(event);
+        if (state.editor.pointers.size >= 2) { updateEditorPinch(); return; }
+        if (canPlaceEditorElement()) editCellFromEvent(event);
     });
     const endEditorPointer = event => {
         state.editor.pointers.delete(event.pointerId);
-        if (state.editor.pointers.size < 2) state.editor.pinchStartDistance = 0;
+        if (state.editor.pointers.size < 2) {
+            state.editor.pinchStartDistance = 0;
+            if (state.editor.pinching) state.editor.pinchBlockUntil = Date.now() + 220;
+        }
+        if (state.editor.pointers.size === 0) state.editor.pinching = false;
     };
     elements.mapEditorCanvas.addEventListener('pointerup', endEditorPointer);
     elements.mapEditorCanvas.addEventListener('pointercancel', endEditorPointer);
@@ -1531,12 +1539,24 @@
     });
     window.addEventListener('keyup', event => keys.delete(event.code));
 
+    function isEditorCanvasGesture(event) {
+        return elements.editor && !elements.editor.hidden && event.target === elements.mapEditorCanvas;
+    }
+    function blockPageZoom(event) {
+        if (isEditorCanvasGesture(event)) return;
+        event.preventDefault();
+    }
     let lastTouchEndAt = 0;
-    document.addEventListener('gesturestart', event => event.preventDefault(), { passive: false });
+    document.addEventListener('gesturestart', blockPageZoom, { passive: false });
+    document.addEventListener('gesturechange', blockPageZoom, { passive: false });
+    document.addEventListener('gestureend', blockPageZoom, { passive: false });
+    document.addEventListener('touchmove', event => {
+        if (event.touches && event.touches.length > 1) blockPageZoom(event);
+    }, { passive: false });
+    document.addEventListener('dblclick', blockPageZoom, { passive: false });
     document.addEventListener('touchend', event => {
-        if (!state.matchActive) return;
         const now = Date.now();
-        if (now - lastTouchEndAt < 340) event.preventDefault();
+        if (now - lastTouchEndAt < 340 && !isEditorCanvasGesture(event)) event.preventDefault();
         lastTouchEndAt = now;
     }, { passive: false });
 
