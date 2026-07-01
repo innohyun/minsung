@@ -6,6 +6,7 @@
     const CHARACTER_KEY = 'guangboo_v2_character';
     const BOT_KEY = 'guangboo_v2_bots';
     const MAP_KEY = 'guangboo_v2_map';
+    const HIDDEN_OFFICIAL_MAPS_KEY = 'guangboo_v2_hidden_official_maps';
     const EDITOR_TILE_SIZE = 40;
     const PROJECTILE_RANGE = 300;
     const DEFAULT_OFFICIAL_MAP_ID = 'official:crossroads';
@@ -430,6 +431,10 @@
             updateHud();
             return;
         }
+        if (message.type === 'mapsChanged') {
+            applyCustomMaps(message.maps || []);
+            return;
+        }
         if (message.type === 'matchEnd') {
             state.matchActive = false;
             renderResults(message.winnerId, message.results || []);
@@ -449,6 +454,21 @@
         const bushes = Array.isArray(map.bushes) ? map.bushes : [];
         const obstacles = Array.isArray(map.obstacles) ? map.obstacles : walls.map(wall => ({ id: wall.id || `${wall.col},${wall.row}`, col: wall.col, row: wall.row, x: wall.col * tileSize + tileSize / 2, y: wall.row * tileSize + tileSize / 2, w: tileSize, h: tileSize }));
         return { ...map, width, height, tileSize, walls, bushes, obstacles };
+    }
+
+    function bushContainsPoint(map, x, y) {
+        const tileSize = Number(map?.tileSize) || 40;
+        return (map?.bushes || []).some(bush =>
+            x >= bush.col * tileSize && x <= (bush.col + 1) * tileSize &&
+            y >= bush.row * tileSize && y <= (bush.row + 1) * tileSize
+        );
+    }
+
+    function isPlayerMostlyInsideBush(map, player) {
+        const radius = 22;
+        const samples = [[0, 0], [-radius, 0], [radius, 0], [0, -radius], [0, radius], [-radius * 0.7, -radius * 0.7], [radius * 0.7, -radius * 0.7], [-radius * 0.7, radius * 0.7], [radius * 0.7, radius * 0.7]];
+        const covered = samples.filter(([dx, dy]) => bushContainsPoint(map, player.x + dx, player.y + dy)).length;
+        return covered >= Math.ceil(samples.length / 2);
     }
 
     async function ensurePixi() {
@@ -565,9 +585,11 @@
         (map.bushes || []).forEach(bush => {
             const x = bush.col * map.tileSize;
             const y = bush.row * map.tileSize;
-            g.roundRect(x + 3, y + 3, map.tileSize - 6, map.tileSize - 6, 10).fill({ color: 0x1f8f3a, alpha: 0.72 });
-            g.circle(x + map.tileSize * 0.34, y + map.tileSize * 0.42, map.tileSize * 0.2).fill({ color: 0x2fbf5b, alpha: 0.76 });
-            g.circle(x + map.tileSize * 0.62, y + map.tileSize * 0.58, map.tileSize * 0.22).fill({ color: 0x146c2c, alpha: 0.68 });
+            g.rect(x, y, map.tileSize, map.tileSize).fill({ color: 0x0f6f2e, alpha: 0.82 });
+            g.circle(x + map.tileSize * 0.24, y + map.tileSize * 0.3, map.tileSize * 0.24).fill({ color: 0x2fbf5b, alpha: 0.86 });
+            g.circle(x + map.tileSize * 0.58, y + map.tileSize * 0.42, map.tileSize * 0.3).fill({ color: 0x1f8f3a, alpha: 0.82 });
+            g.circle(x + map.tileSize * 0.78, y + map.tileSize * 0.7, map.tileSize * 0.28).fill({ color: 0x145c2b, alpha: 0.84 });
+            g.circle(x + map.tileSize * 0.38, y + map.tileSize * 0.72, map.tileSize * 0.18).fill({ color: 0xffffff, alpha: 0.12 });
         });
     }
 
@@ -762,7 +784,7 @@
         const health = Math.max(0, Math.round(Number(player.health) || 0));
         const maxHealth = Number(player.maxHealth) || PLAYER_MAX_HEALTH;
         const ratio = Math.max(0, Math.min(1, health / maxHealth));
-        entry.node.alpha = player.alive ? 1 : 0.36;
+        entry.node.alpha = player.alive ? (player.id === state.playerId && isPlayerMostlyInsideBush(state.map, player) ? 0.48 : 1) : 0.36;
         entry.body.clear();
         entry.body.rotation = angle;
         if (player.id === state.playerId) entry.body.circle(0, 0, radius + 7).stroke({ width: 3, color: 0xd7f252, alpha: 0.9 });
@@ -818,11 +840,14 @@
         guide.clear();
         const me = state.players.find(player => player.id === state.playerId);
         if (!me || !me.alive || !isAttackControlActive()) return;
+        const localEntry = state.render.players.get(me.id);
+        const originX = localEntry?.x ?? me.x;
+        const originY = localEntry?.y ?? me.y;
         const aim = currentAim();
-        const startX = me.x + aim.x * 34;
-        const startY = me.y + aim.y * 34;
-        const endX = me.x + aim.x * 300;
-        const endY = me.y + aim.y * 300;
+        const startX = originX + aim.x * 34;
+        const startY = originY + aim.y * 34;
+        const endX = originX + aim.x * 300;
+        const endY = originY + aim.y * 300;
         guide.moveTo(startX, startY).lineTo(endX, endY).stroke({ width: 18, color: 0xffffff, alpha: 0.18, cap: 'round' });
         guide.moveTo(startX, startY).lineTo(endX, endY).stroke({ width: 10, color: 0xd7f252, alpha: 0.34, cap: 'round' });
         guide.circle(endX, endY, 10).stroke({ width: 4, color: 0xd7f252, alpha: 0.48 });
@@ -1046,6 +1071,20 @@
         return state.selectedMapId || localStorage.getItem(MAP_KEY) || DEFAULT_OFFICIAL_MAP_ID;
     }
 
+    function hiddenOfficialMapIds() {
+        try {
+            const value = JSON.parse(localStorage.getItem(HIDDEN_OFFICIAL_MAPS_KEY) || '[]');
+            return new Set(Array.isArray(value) ? value : []);
+        } catch {
+            return new Set();
+        }
+    }
+
+    function visibleOfficialMaps() {
+        const hidden = hiddenOfficialMapIds();
+        return OFFICIAL_MAPS.filter(map => !hidden.has(map.id));
+    }
+
     function mapMeta(id = selectedMapId()) {
         if (isOfficialMapId(id)) {
             return OFFICIAL_MAPS.find(map => map.id === id) || OFFICIAL_MAPS[0];
@@ -1068,6 +1107,18 @@
         renderOfficialMapGrid();
         renderCustomMapList();
         setScreen('lobby');
+    }
+
+    function drawCanvasBush(ctx, x, y, size) {
+        ctx.fillStyle = '#0f6f2e';
+        ctx.fillRect(x, y, size, size);
+        ctx.fillStyle = '#2fbf5b';
+        ctx.beginPath(); ctx.arc(x + size * 0.24, y + size * 0.3, size * 0.24, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x + size * 0.58, y + size * 0.42, size * 0.3, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#145c2b';
+        ctx.beginPath(); ctx.arc(x + size * 0.78, y + size * 0.7, size * 0.28, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.beginPath(); ctx.arc(x + size * 0.38, y + size * 0.72, size * 0.18, 0, Math.PI * 2); ctx.fill();
     }
 
     function drawMiniMap(canvas, map) {
@@ -1095,8 +1146,7 @@
         }
         ctx.fillStyle = '#8b5e34';
         (map.walls || []).forEach(wall => ctx.fillRect(offsetX + wall.col * scale, offsetY + wall.row * scale, scale, scale));
-        ctx.fillStyle = '#168a36';
-        (map.bushes || []).forEach(bush => ctx.fillRect(offsetX + bush.col * scale, offsetY + bush.row * scale, scale, scale));
+        (map.bushes || []).forEach(bush => drawCanvasBush(ctx, offsetX + bush.col * scale, offsetY + bush.row * scale, scale));
         (map.spawns || []).forEach(spawn => {
             ctx.fillStyle = spawn.team === 'enemy' ? '#ef4444' : '#f8fb7b';
             ctx.beginPath();
@@ -1114,7 +1164,7 @@
 
     function renderOfficialMapGrid() {
         elements.officialMapGrid.innerHTML = '';
-        OFFICIAL_MAPS.forEach(map => {
+        visibleOfficialMaps().forEach(map => {
             const card = document.createElement('div');
             card.className = 'map-choice-card-shell';
             const button = document.createElement('button');
@@ -1136,7 +1186,12 @@
             edit.className = 'ghost-button';
             edit.textContent = '수정';
             edit.addEventListener('click', () => requestEditMap(map.id));
-            actions.append(info, edit);
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'ghost-button';
+            del.textContent = '삭제';
+            del.addEventListener('click', event => { event.stopPropagation(); deleteOfficialMap(map.id); });
+            actions.append(info, edit, del);
             card.append(button, actions);
             elements.officialMapGrid.appendChild(card);
         });
@@ -1330,8 +1385,7 @@
         for (let row = 0; row <= rows; row += 1) { ctx.beginPath(); ctx.moveTo(0, row * EDITOR_TILE_SIZE); ctx.lineTo(canvas.width, row * EDITOR_TILE_SIZE); ctx.stroke(); }
         ctx.fillStyle = '#8b5e34';
         state.editor.walls.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.fillRect(col * EDITOR_TILE_SIZE, row * EDITOR_TILE_SIZE, EDITOR_TILE_SIZE, EDITOR_TILE_SIZE); });
-        ctx.fillStyle = '#168a36';
-        state.editor.bushes.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.fillRect(col * EDITOR_TILE_SIZE + 3, row * EDITOR_TILE_SIZE + 3, EDITOR_TILE_SIZE - 6, EDITOR_TILE_SIZE - 6); });
+        state.editor.bushes.forEach(key => { const [col, row] = key.split(',').map(Number); drawCanvasBush(ctx, col * EDITOR_TILE_SIZE, row * EDITOR_TILE_SIZE, EDITOR_TILE_SIZE); });
         ctx.fillStyle = '#f8fb7b';
         state.editor.spawns.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.beginPath(); ctx.arc((col + 0.5) * EDITOR_TILE_SIZE, (row + 0.5) * EDITOR_TILE_SIZE, 10, 0, Math.PI * 2); ctx.fill(); });
         ctx.fillStyle = '#ef4444';
@@ -1447,6 +1501,15 @@
         selectMap(data.map.id);
     }
 
+    function deleteOfficialMap(id) {
+        const hidden = hiddenOfficialMapIds();
+        hidden.add(id);
+        localStorage.setItem(HIDDEN_OFFICIAL_MAPS_KEY, JSON.stringify([...hidden]));
+        if (selectedMapId() === id) selectMap(DEFAULT_OFFICIAL_MAP_ID);
+        renderOfficialMapGrid();
+        renderSelectedMapCard();
+    }
+
     async function deleteCustomMap(id) {
         const password = requireMapPassword('맵을 삭제하려면 비밀번호를 입력하세요.');
         if (!password) return;
@@ -1506,30 +1569,31 @@
         loadLeaderboard();
         setScreen('result');
     }
+    function applyCustomMaps(maps) {
+        state.customMaps = Array.isArray(maps) ? maps : [];
+        const saved = localStorage.getItem(MAP_KEY) || DEFAULT_OFFICIAL_MAP_ID;
+        state.selectedMapId = saved;
+        elements.customMapSelect.innerHTML = visibleOfficialMaps().map(map => `<option value="${map.id}">${map.name}</option>`).join('');
+        state.customMaps.forEach(map => {
+            const option = document.createElement('option');
+            option.value = map.id;
+            option.textContent = `${map.name} (${Math.round(map.width / map.tileSize)}x${Math.round(map.height / map.tileSize)})`;
+            elements.customMapSelect.appendChild(option);
+        });
+        if (![...elements.customMapSelect.options].some(option => option.value === state.selectedMapId)) state.selectedMapId = DEFAULT_OFFICIAL_MAP_ID;
+        elements.customMapSelect.value = state.selectedMapId;
+        renderSelectedMapCard();
+        renderOfficialMapGrid();
+        renderCustomMapList();
+    }
+
     async function loadCustomMaps() {
         try {
             const response = await fetch('/api/guangboo/maps', { cache: 'no-store' });
             const data = await response.json();
-            state.customMaps = data.maps || [];
-            const saved = localStorage.getItem(MAP_KEY) || DEFAULT_OFFICIAL_MAP_ID;
-            state.selectedMapId = saved;
-            elements.customMapSelect.innerHTML = OFFICIAL_MAPS.map(map => `<option value="${map.id}">${map.name}</option>`).join('');
-            state.customMaps.forEach(map => {
-                const option = document.createElement('option');
-                option.value = map.id;
-                option.textContent = `${map.name} (${Math.round(map.width / map.tileSize)}x${Math.round(map.height / map.tileSize)})`;
-                elements.customMapSelect.appendChild(option);
-            });
-            if (![...elements.customMapSelect.options].some(option => option.value === state.selectedMapId)) state.selectedMapId = DEFAULT_OFFICIAL_MAP_ID;
-            elements.customMapSelect.value = state.selectedMapId;
-            renderSelectedMapCard();
-            renderOfficialMapGrid();
-            renderCustomMapList();
+            applyCustomMaps(data.maps || []);
         } catch {
-            state.customMaps = [];
-            state.selectedMapId = DEFAULT_OFFICIAL_MAP_ID;
-            elements.customMapSelect.innerHTML = '<option value="official:crossroads">초원 교차로</option>';
-            renderSelectedMapCard();
+            applyCustomMaps([]);
         }
     }
     function escapeHtml(value) {
@@ -1604,6 +1668,14 @@
     function canPlaceEditorElement() {
         return !state.editor.pinching && state.editor.pointers.size < 2 && Date.now() >= (state.editor.pinchBlockUntil || 0);
     }
+    function panEditorCanvasWrap(point, event) {
+        const wrap = elements.mapEditorCanvasWrap;
+        if (!wrap) return;
+        const nextLeft = point.scrollLeft + point.startX - event.clientX;
+        const nextTop = point.scrollTop + point.startY - event.clientY;
+        wrap.scrollLeft = Math.max(0, Math.min(wrap.scrollWidth - wrap.clientWidth, nextLeft));
+        wrap.scrollTop = Math.max(0, Math.min(wrap.scrollHeight - wrap.clientHeight, nextTop));
+    }
     elements.mapEditorCanvas.addEventListener('pointerdown', event => {
         if (event.pointerType !== 'touch') event.preventDefault();
         if (event.pointerType !== 'touch') elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
@@ -1622,8 +1694,7 @@
         if (state.editor.pointers.size >= 2) { event.preventDefault(); state.editor.dragPointerId = null; updateEditorPinch(); return; }
         if (event.pointerType === 'touch' && moved && elements.mapEditorCanvasWrap) {
             event.preventDefault();
-            elements.mapEditorCanvasWrap.scrollLeft = previousPoint.scrollLeft - (event.clientX - previousPoint.startX);
-            elements.mapEditorCanvasWrap.scrollTop = previousPoint.scrollTop - (event.clientY - previousPoint.startY);
+            panEditorCanvasWrap(previousPoint, event);
         }
     });
     const endEditorPointer = event => {

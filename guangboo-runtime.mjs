@@ -74,6 +74,7 @@ function createMap(definition = null) {
     const cols = Math.max(8, Math.floor(Number(source.cols) || 24));
     const rows = Math.max(8, Math.floor(Number(source.rows) || 16));
     const walls = (source.walls || WALL_TILES).map((wall, index) => ({ id: `w${index}`, col: wall.col, row: wall.row }));
+    const bushes = (source.bushes || []).map((bush, index) => ({ id: `b${index}`, col: bush.col, row: bush.row }));
     const spawnPoints = (source.spawnPoints || []).map(spawn => {
         if (Number.isFinite(spawn.x) && Number.isFinite(spawn.y)) return { x: spawn.x, y: spawn.y };
         return { x: (Number(spawn.col) + 0.5) * tileSize, y: (Number(spawn.row) + 0.5) * tileSize };
@@ -87,6 +88,7 @@ function createMap(definition = null) {
         cols,
         rows,
         walls,
+        bushes,
         spawnPoints,
         obstacles: walls.map(wall => tileToRect(wall))
     };
@@ -338,6 +340,25 @@ function destroyWallsTouchedByUltimate(map, projectile, previousX, previousY) {
     return hits;
 }
 
+function keepUltimateProjectileInsideMap(projectile, map = MAP) {
+    if (projectile.kind !== 'ultimate') return;
+    const radius = projectile.radius || ULTIMATE_RADIUS;
+    const minX = radius;
+    const maxX = Math.max(radius, map.width - radius);
+    const minY = radius;
+    const maxY = Math.max(radius, map.height - radius);
+    const clampedX = Math.max(minX, Math.min(maxX, projectile.x));
+    const clampedY = Math.max(minY, Math.min(maxY, projectile.y));
+    if (clampedX !== projectile.x) {
+        projectile.x = clampedX;
+        projectile.vx = -projectile.vx;
+    }
+    if (clampedY !== projectile.y) {
+        projectile.y = clampedY;
+        projectile.vy = -projectile.vy;
+    }
+}
+
 function distanceFromPointToSegment(px, py, ax, ay, bx, by) {
     const dx = bx - ax;
     const dy = by - ay;
@@ -355,6 +376,17 @@ function bushContainsPoint(map, x, y) {
     );
 }
 
+function isPlayerMostlyInsideBush(map, player) {
+    const radius = 22;
+    const samples = [
+        [0, 0], [-radius, 0], [radius, 0], [0, -radius], [0, radius],
+        [-radius * 0.7, -radius * 0.7], [radius * 0.7, -radius * 0.7],
+        [-radius * 0.7, radius * 0.7], [radius * 0.7, radius * 0.7]
+    ];
+    const covered = samples.filter(([dx, dy]) => bushContainsPoint(map, player.x + dx, player.y + dy)).length;
+    return covered >= Math.ceil(samples.length / 2);
+}
+
 function revealPlayer(player, now = Date.now(), duration = 1000) {
     player.revealedUntil = Math.max(player.revealedUntil || 0, now + duration);
 }
@@ -362,7 +394,7 @@ function revealPlayer(player, now = Date.now(), duration = 1000) {
 function isPlayerHiddenFrom(match, player, viewerId, now = Date.now()) {
     if (!player.alive || player.id === viewerId) return false;
     if ((player.revealedUntil || 0) > now) return false;
-    return bushContainsPoint(match.map, player.x, player.y);
+    return isPlayerMostlyInsideBush(match.map, player);
 }
 
 function sendJson(socket, payload) {
@@ -689,6 +721,11 @@ export function createGuangbooRealtime(server, store) {
             const nextPayload = typeof payload === 'function' ? payload(player.id) : payload;
             sendJson(player.client.socket, nextPayload);
         });
+    }
+
+    function broadcastCustomMapsChanged() {
+        const maps = store.listCustomMaps();
+        clients.forEach(client => sendJson(client.socket, { type: 'mapsChanged', maps }));
     }
 
     function finishMatch(match) {
@@ -1238,6 +1275,7 @@ export function createGuangbooRealtime(server, store) {
             const previousY = projectile.y;
             projectile.x += (projectile.vx / velocityLength) * travelThisTick;
             projectile.y += (projectile.vy / velocityLength) * travelThisTick;
+            if (isUltimateProjectile) keepUltimateProjectileInsideMap(projectile, match.map);
             projectile.traveled += travelThisTick;
             if (!isUltimateProjectile && projectile.traveled >= projectile.maxDistance) return;
             if (isUltimateProjectile) {
@@ -1474,7 +1512,7 @@ export function createGuangbooRealtime(server, store) {
             const client = player.client;
             if (!client.bot || !player.alive) return;
             const target = players
-                .filter(candidate => candidate.id !== player.id && candidate.alive)
+                .filter(candidate => candidate.id !== player.id && candidate.alive && !isPlayerHiddenFrom(match, candidate, player.id, now))
                 .sort((a, b) =>
                     Math.hypot(a.x - player.x, a.y - player.y) -
                     Math.hypot(b.x - player.x, b.y - player.y)
@@ -1626,6 +1664,7 @@ export function createGuangbooRealtime(server, store) {
     });
 
     return {
+        broadcastCustomMapsChanged,
         close() {
             shuttingDown = true;
             queues.forEach(queue => queue.splice(0, queue.length));

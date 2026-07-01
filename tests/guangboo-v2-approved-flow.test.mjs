@@ -37,6 +37,7 @@ test('v2 edit and delete require the map edit password', () => {
     assert.match(clientSource, /맵을 수정하려면 비밀번호를 입력하세요/);
     assert.match(clientSource, /맵을 삭제하려면 비밀번호를 입력하세요/);
     assert.match(serverSource, /function isGuangbooMapEditPassword/);
+    assert.match(serverSource, /String\(GUANGBOO_MAP_EDIT_PASSWORD \|\| ''\)\.trim\(\)/);
     assert.match(serverSource, /if \(!isGuangbooMapEditPassword\(body\.password\)\) return sendJson\(res, 401/);
 });
 
@@ -52,6 +53,8 @@ test('v2 ultimate and summon healthbars are non-rotating HUD graphics and ultima
     assert.match(runtimeSource, /function stepPlayerKnockback/);
     assert.match(runtimeSource, /const move = knockbackActive \? \{ x: 0, y: 0 \} : clampUnitVector\(input\.move\)/);
     assert.match(runtimeSource, /projectileTouchesPlayer\(projectile, player, previousX, previousY\)/);
+    assert.match(runtimeSource, /function keepUltimateProjectileInsideMap/);
+    assert.match(runtimeSource, /if \(isUltimateProjectile\) keepUltimateProjectileInsideMap\(projectile, match\.map\)/);
     assert.match(runtimeSource, /if \(projectile\.kind === 'ultimate'\) return;\n\s*return;/);
 });
 
@@ -68,6 +71,8 @@ test('v2 blocks page zoom except editor canvas pinch and prevents placement duri
     assert.match(clientSource, /touchmove/);
     assert.match(clientSource, /dblclick/);
     assert.match(clientSource, /function canPlaceEditorElement/);
+    assert.match(clientSource, /function panEditorCanvasWrap/);
+    assert.match(stylesSource, /\.map-editor-canvas-wrap \{[\s\S]*justify-content: flex-start;[\s\S]*align-items: flex-start;[\s\S]*touch-action: none;/);
     assert.match(clientSource, /pinchBlockUntil/);
     assert.match(clientSource, /if \(state\.editor\.pointers\.size >= 2\) \{ state\.editor\.dragPointerId = null; updateEditorPinch\(\); return; \}/);
 });
@@ -75,5 +80,22 @@ test('v2 blocks page zoom except editor canvas pinch and prevents placement duri
 test('v2 right stick does not auto-lock aim while dragging', () => {
     assert.doesNotMatch(clientSource, /if \(isRight\) state\.lastAim = nearestOpponentAim/);
     assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| state\.lastAim/);
-    assert.match(htmlSource, /20260701-v2-ultimate-hp-only/);
+    assert.match(clientSource, /const localEntry = state\.render\.players\.get\(me\.id\)/);
+    assert.match(clientSource, /const originX = localEntry\?\.x \?\? me\.x/);
+    assert.match(htmlSource, /20260701-v2-map-bush-realtime/);
+});
+
+test('v2 map updates and bush hiding are realtime and bush graphics fill tiles', () => {
+    assert.match(clientSource, /if \(message\.type === 'mapsChanged'\)/);
+    assert.match(clientSource, /applyCustomMaps\(message\.maps \|\| \[\]\)/);
+    assert.match(runtimeSource, /function broadcastCustomMapsChanged/);
+    assert.match(serverSource, /guangbooRealtime\.broadcastCustomMapsChanged\(\)/);
+    assert.match(runtimeSource, /function isPlayerMostlyInsideBush/);
+    assert.match(runtimeSource, /!isPlayerHiddenFrom\(match, candidate, player\.id, now\)/);
+    assert.match(clientSource, /player\.id === state\.playerId && isPlayerMostlyInsideBush\(state\.map, player\) \? 0\.48 : 1/);
+    assert.match(clientSource, /function drawCanvasBush/);
+    assert.match(clientSource, /ctx\.fillRect\(x, y, size, size\)/);
+    assert.match(clientSource, /g\.rect\(x, y, map\.tileSize, map\.tileSize\)\.fill/);
+    assert.match(clientSource, /function deleteOfficialMap/);
+    assert.match(clientSource, /visibleOfficialMaps\(\)\.forEach\(map =>/);
 });

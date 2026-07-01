@@ -256,7 +256,7 @@ function isAuthenticated(req, store) {
 }
 
 function isGuangbooMapEditPassword(value) {
-    return String(value || '').trim() === GUANGBOO_MAP_EDIT_PASSWORD;
+    return String(value || '').trim() === String(GUANGBOO_MAP_EDIT_PASSWORD || '').trim();
 }
 
 function normalizeRequestPath(url) {
@@ -396,6 +396,7 @@ export function createMinsungServer(options = {}) {
                     if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
                     const body = await readJsonBody(req);
                     const map = guangbooStore.saveCustomMap({ name: body.name, creator: body.creator, map: body.map, mode: body.mode, summary: body.summary });
+                    guangbooRealtime.broadcastCustomMapsChanged();
                     return sendJson(res, 200, { ok: true, map });
                 }
                 return writeMethodNotAllowed(res);
@@ -410,13 +411,16 @@ export function createMinsungServer(options = {}) {
                     if (!isGuangbooMapEditPassword(body.password)) return sendJson(res, 401, { ok: false, error: 'invalid_password' });
                     const map = guangbooStore.updateCustomMap(mapId, { name: body.name, creator: body.creator, map: body.map, mode: body.mode, summary: body.summary });
                     if (!map) return sendJson(res, 404, { ok: false, error: 'map_not_found' });
+                    guangbooRealtime.broadcastCustomMapsChanged();
                     return sendJson(res, 200, { ok: true, map });
                 }
                 if (req.method === 'DELETE') {
                     if (!isTrustedWriteRequest(req)) return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
                     const body = await readJsonBody(req);
                     if (!isGuangbooMapEditPassword(body.password)) return sendJson(res, 401, { ok: false, error: 'invalid_password' });
-                    return sendJson(res, 200, { ok: guangbooStore.deleteCustomMap(mapId) });
+                    const ok = guangbooStore.deleteCustomMap(mapId);
+                    if (ok) guangbooRealtime.broadcastCustomMapsChanged();
+                    return sendJson(res, 200, { ok });
                 }
                 return writeMethodNotAllowed(res);
             }

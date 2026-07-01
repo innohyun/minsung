@@ -174,7 +174,7 @@ test('guangboo supports charged wall-breaking homing ultimate attacks', () => {
     assert.match(runtimeSource, /const ULTIMATE_RADIUS = 24/);
     assert.match(runtimeSource, /const ULTIMATE_PROJECTILE_HEALTH = 3000/);
     assert.match(runtimeSource, /function createMap\(definition = null\)/);
-    assert.match(runtimeSource, /walls,\n\s*spawnPoints,\n\s*obstacles: walls\.map\(wall => tileToRect\(wall\)\)/);
+    assert.match(runtimeSource, /walls,\n\s*bushes,\n\s*spawnPoints,\n\s*obstacles: walls\.map\(wall => tileToRect\(wall\)\)/);
     assert.match(runtimeSource, /function queueUltimateInput\(player, aim\)/);
     assert.match(runtimeSource, /function spawnUltimateProjectile\(match, player, now\)/);
     assert.match(runtimeSource, /kind: 'ultimate'/);

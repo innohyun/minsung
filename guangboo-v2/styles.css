@@ -1637,8 +1637,8 @@ html:fullscreen body.is-playing #gameCanvas {
 
 .map-editor-canvas-wrap {
     display: flex;
-    justify-content: center;
-    align-items: center;
+    justify-content: flex-start;
+    align-items: flex-start;
     width: 100%;
     min-height: 320px;
     max-height: 68vh;
@@ -1648,6 +1648,7 @@ html:fullscreen body.is-playing #gameCanvas {
     border-radius: 10px;
     background: rgba(19, 54, 31, 0.08);
     overscroll-behavior: contain;
+    touch-action: none;
 }
 
 #mapEditorCanvas {
