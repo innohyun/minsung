@@ -1190,17 +1190,18 @@ export function createGuangbooRealtime(server, store) {
                 return;
             }
             steerUltimateProjectile(match, projectile);
+            const isUltimateProjectile = projectile.kind === 'ultimate';
             const stepDistance = Math.hypot(projectile.vx * dt, projectile.vy * dt);
             const remaining = Math.max(0, projectile.maxDistance - projectile.traveled);
-            const travelThisTick = Math.min(stepDistance, remaining);
+            const travelThisTick = isUltimateProjectile ? stepDistance : Math.min(stepDistance, remaining);
             const velocityLength = Math.hypot(projectile.vx, projectile.vy) || 1;
             const previousX = projectile.x;
             const previousY = projectile.y;
             projectile.x += (projectile.vx / velocityLength) * travelThisTick;
             projectile.y += (projectile.vy / velocityLength) * travelThisTick;
             projectile.traveled += travelThisTick;
-            if (projectile.traveled >= projectile.maxDistance) return;
-            if (projectile.kind === 'ultimate') {
+            if (!isUltimateProjectile && projectile.traveled >= projectile.maxDistance) return;
+            if (isUltimateProjectile) {
                 const wallHits = destroyWallsTouchedByUltimate(match.map, projectile, previousX, previousY);
                 wallHits.forEach((wallHit, wallBreaks) => {
                     match.effects.push({ id: `${match.id}-wall-${projectile.id}-${match.tick}-${wallBreaks}`, kind: 'wallBreak', x: Math.round(wallHit.x), y: Math.round(wallHit.y) });

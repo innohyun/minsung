@@ -643,7 +643,9 @@
             projectile.startX = Number.isFinite(projectile.startX) ? projectile.startX : memory.startX;
             projectile.startY = Number.isFinite(projectile.startY) ? projectile.startY : memory.startY;
             projectile.maxDistance = Number.isFinite(projectile.maxDistance) ? projectile.maxDistance : PROJECTILE_RANGE;
-            const visible = isProjectileWithinRange(projectile) && performance.now() - memory.firstSeenAt < 1400;
+            const visible = projectile.kind === 'ultimate'
+                ? Number(projectile.health) > 0
+                : isProjectileWithinRange(projectile) && performance.now() - memory.firstSeenAt < 1400;
             if (!visible) {
                 playProjectileImpactSound();
                 state.projectileMemory.delete(projectile.id);
