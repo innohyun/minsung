@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Guangboo v2 · PixiJS</title>
-    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260701-v2-bush-editor">
+    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260701-v2-map-fs-ultfix">
 </head>
 <body>
     <main id="app">
@@ -31,6 +31,7 @@
                     <div class="join-row">
                         <input id="nicknameInput" name="nickname" maxlength="18" autocomplete="nickname" placeholder="Monster" required>
                         <button id="joinButton" type="submit">플레이</button>
+                        <button class="ghost-button fullscreen-enter" id="fullscreenEnterButton" type="button">전체화면</button>
                     </div>
 
                     <fieldset class="character-picker sr-only" aria-label="캐릭터 선택">
@@ -51,7 +52,7 @@
                         <div>
                             <p class="eyebrow">Official map</p>
                             <h2 id="selectedMapName">초원 교차로</h2>
-                            <p id="selectedMapSummary">가운데 벽을 활용해 견제하는 기본 정식 맵</p>
+                            <p id="selectedMapSummary" hidden></p>
                         </div>
                     </article>
                     <div class="map-card-actions">
@@ -203,8 +204,6 @@
 
         <section class="screen match-screen game-screen" id="gameScreen" hidden>
             <div id="pixiHost" class="pixi-host"></div>
-            <button class="fullscreen-exit" id="fullscreenExitButton" type="button" aria-label="전체화면 나가기">×</button>
-
             <div class="hud top-hud">
                 <div>
                     <span class="hud-label">체력</span>
@@ -246,8 +245,9 @@
             </div>
         </section>
     </main>
+    <button class="fullscreen-exit" id="fullscreenExitButton" type="button" aria-label="전체화면 나가기">×</button>
 
     <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
-    <script src="/guangboo-v2/client.js?v=20260701-v2-bush-editor" defer></script>
+    <script src="/guangboo-v2/client.js?v=20260701-v2-map-fs-ultfix" defer></script>
 </body>
 </html>

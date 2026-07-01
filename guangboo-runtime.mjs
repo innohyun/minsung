@@ -310,11 +310,31 @@ export function isBabySlimeCellPassable(map, cell, radius = BABY_SLIME_RADIUS) {
 }
 
 function destroyWallHitByProjectile(map, projectile) {
-    const hit = map.obstacles.find(rect => rectContainsCircle(rect, projectile.x, projectile.y, projectile.radius || ULTIMATE_RADIUS));
+    const radius = projectile.radius || ULTIMATE_RADIUS;
+    const hit = map.obstacles.find(rect => rectContainsCircle(rect, projectile.x, projectile.y, radius));
     if (!hit) return false;
     map.walls = map.walls.filter(wall => wall.id !== hit.id);
     map.obstacles = map.obstacles.filter(rect => rect.id !== hit.id);
     return hit;
+}
+
+function destroyWallsTouchedByUltimate(map, projectile, previousX, previousY) {
+    const radius = projectile.radius || ULTIMATE_RADIUS;
+    const samples = 8;
+    const hits = [];
+    for (let index = 0; index <= samples; index += 1) {
+        const ratio = index / samples;
+        const x = previousX + (projectile.x - previousX) * ratio;
+        const y = previousY + (projectile.y - previousY) * ratio;
+        let hit = map.obstacles.find(rect => rectContainsCircle(rect, x, y, radius));
+        while (hit) {
+            hits.push(hit);
+            map.walls = map.walls.filter(wall => wall.id !== hit.id);
+            map.obstacles = map.obstacles.filter(rect => rect.id !== hit.id);
+            hit = map.obstacles.find(rect => rectContainsCircle(rect, x, y, radius));
+        }
+    }
+    return hits;
 }
 
 function bushContainsPoint(map, x, y) {
@@ -465,6 +485,7 @@ export function createGuangbooStore(db) {
                     mode: parsed.mode || row.mode || 'survival',
                     summary: parsed.summary || row.summary || '',
                     walls: Array.isArray(parsed.walls) ? parsed.walls.map(({ col, row }) => ({ col, row })) : [],
+                    bushes: Array.isArray(parsed.bushes) ? parsed.bushes.map(({ col, row }) => ({ col, row })) : [],
                     spawnPoints: Array.isArray(parsed.spawnPoints) ? parsed.spawnPoints.map(({ col, row, x, y, team }) => ({ col, row, x, y, team: team === 'enemy' ? 'enemy' : 'own' })) : []
                 };
             } catch {
@@ -482,6 +503,7 @@ export function createGuangbooStore(db) {
             summary: row.summary || mapData?.summary || '',
             map: mapData,
             walls: mapData?.walls || [],
+            bushes: mapData?.bushes || [],
             spawnPoints: mapData?.spawnPoints || [],
             createdAt: row.createdAt || row.created_at,
             updatedAt: row.updatedAt || row.updated_at
@@ -1172,18 +1194,17 @@ export function createGuangbooRealtime(server, store) {
             const remaining = Math.max(0, projectile.maxDistance - projectile.traveled);
             const travelThisTick = Math.min(stepDistance, remaining);
             const velocityLength = Math.hypot(projectile.vx, projectile.vy) || 1;
+            const previousX = projectile.x;
+            const previousY = projectile.y;
             projectile.x += (projectile.vx / velocityLength) * travelThisTick;
             projectile.y += (projectile.vy / velocityLength) * travelThisTick;
             projectile.traveled += travelThisTick;
             if (projectile.traveled >= projectile.maxDistance) return;
             if (projectile.kind === 'ultimate') {
-                let wallHit = destroyWallHitByProjectile(match.map, projectile);
-                let wallBreaks = 0;
-                while (wallHit && wallBreaks < 6) {
+                const wallHits = destroyWallsTouchedByUltimate(match.map, projectile, previousX, previousY);
+                wallHits.forEach((wallHit, wallBreaks) => {
                     match.effects.push({ id: `${match.id}-wall-${projectile.id}-${match.tick}-${wallBreaks}`, kind: 'wallBreak', x: Math.round(wallHit.x), y: Math.round(wallHit.y) });
-                    wallBreaks += 1;
-                    wallHit = destroyWallHitByProjectile(match.map, projectile);
-                }
+                });
             } else if (isProjectileBlocked(projectile, match.map)) {
                 return;
             }
@@ -1191,24 +1212,30 @@ export function createGuangbooRealtime(server, store) {
             if (collideWithEnemyUltimateProjectile(match, projectile)) return;
 
             const owner = match.players.get(projectile.ownerId);
+            const projectileHitTargets = projectile.hitTargetIds || new Set();
+            projectile.hitTargetIds = projectileHitTargets;
             const summonHit = match.summons.find(summon =>
                 summon.ownerId !== projectile.ownerId &&
+                !projectileHitTargets.has(`summon:${summon.id}`) &&
                 Math.hypot(summon.x - projectile.x, summon.y - projectile.y) <= summon.radius + (projectile.radius || 8)
             );
             if (summonHit) {
+                projectileHitTargets.add(`summon:${summonHit.id}`);
                 summonHit.health -= projectile.damage;
                 if (summonHit.health <= 0) {
                     match.summons = match.summons.filter(summon => summon.id !== summonHit.id);
                 }
-                return;
+                if (projectile.kind !== 'ultimate') return;
             }
 
             const hit = [...match.players.values()].find(player =>
                 player.alive &&
                 player.id !== projectile.ownerId &&
+                !projectileHitTargets.has(`player:${player.id}`) &&
                 Math.hypot(player.x - projectile.x, player.y - projectile.y) <= 22 + (projectile.radius || 8)
             );
             if (hit) {
+                projectileHitTargets.add(`player:${hit.id}`);
                 hit.health -= projectile.damage;
                 revealPlayer(hit, now);
                 resetRegenTimer(hit, now);
@@ -1228,7 +1255,7 @@ export function createGuangbooRealtime(server, store) {
                 if (hit.health <= 0) {
                     eliminatePlayer(match, hit, owner);
                 }
-                return;
+                if (projectile.kind !== 'ultimate') return;
             }
             projectiles.push(projectile);
         });

@@ -16,7 +16,7 @@ const MAX_JSON_BYTES = 512 * 1024;
 const ALLOWED_BRIDGE_ORIGINS = new Set([
     'https://minsung.classaimate.com'
 ]);
-const GUANGBOO_MAP_EDIT_PASSWORD = process.env.GUANGBOO_MAP_EDIT_PASSWORD || '1234567890';
+const GUANGBOO_MAP_EDIT_PASSWORD = process.env.GUANGBOO_MAP_EDIT_PASSWORD || '1183';
 
 const PROTECTED_ENTRY_PATHS = new Set([
     '/ball/ball.html',

@@ -1387,13 +1387,13 @@ html:fullscreen body.is-playing #gameCanvas {
 }
 
 .fullscreen-exit {
-    position: absolute;
+    position: fixed;
     top: max(14px, env(safe-area-inset-top));
     left: max(12px, env(safe-area-inset-left));
-    z-index: 35;
+    z-index: 1200;
     width: 46px;
     height: 46px;
-    display: grid;
+    display: none;
     place-items: center;
     border: 1px solid rgba(255, 255, 255, 0.34);
     border-radius: 999px;
@@ -1656,8 +1656,31 @@ html:fullscreen body.is-playing #gameCanvas {
     border: 1px solid rgba(23, 32, 24, 0.18);
     border-radius: 8px;
     background: #172018;
-    touch-action: pan-x pan-y pinch-zoom;
+    touch-action: none;
     image-rendering: pixelated;
+}
+
+body.is-app-fullscreen {
+    overflow: hidden;
+    background: #172018;
+}
+
+body.is-app-fullscreen .match-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+}
+
+body.is-app-fullscreen .fullscreen-exit {
+    display: grid;
+    place-items: center;
+    left: max(10px, env(safe-area-inset-left));
+    right: auto;
+    top: max(10px, env(safe-area-inset-top));
+}
+
+.fullscreen-enter {
+    white-space: nowrap;
 }
 
 .map-choice-card-shell {

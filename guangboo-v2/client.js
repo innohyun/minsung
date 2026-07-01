@@ -77,6 +77,7 @@
         mapTools: [...document.querySelectorAll('.map-tool')],
         status: document.getElementById('statusLine'),
         pixiHost: document.getElementById('pixiHost'),
+        fullscreenEnter: document.getElementById('fullscreenEnterButton'),
         fullscreenExit: document.getElementById('fullscreenExitButton'),
         health: document.getElementById('healthReadout'),
         alive: document.getElementById('aliveReadout'),
@@ -130,6 +131,7 @@
         effectMemory: new Set(),
         selectedMapId: DEFAULT_OFFICIAL_MAP_ID,
         editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), bushes: new Set(), spawns: new Set(), enemySpawns: new Set(), tool: 'wall', editingId: null, editPassword: null, zoom: 1, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1, pinching: false, pinchBlockUntil: 0, dragPointerId: null, draggedCell: '', statusToken: null },
+        fullscreenWanted: false,
         render: {
             app: null,
             ready: false,
@@ -1104,7 +1106,7 @@
     function renderSelectedMapCard() {
         const map = mapMeta();
         elements.selectedMapName.textContent = map.name;
-        elements.selectedMapSummary.textContent = map.summary || map.description || '정식 맵';
+        elements.selectedMapSummary.textContent = '';
         drawMiniMap(elements.selectedMapMini, map);
     }
 
@@ -1117,7 +1119,7 @@
             button.type = 'button';
             button.className = 'map-choice-card';
             button.classList.toggle('is-selected', selectedMapId() === map.id);
-            button.innerHTML = `<canvas width="180" height="115" aria-hidden="true"></canvas><strong>${escapeHtml(map.name)}</strong><small>${escapeHtml(map.summary)}</small>`;
+            button.innerHTML = `<canvas width="180" height="115" aria-hidden="true"></canvas><strong>${escapeHtml(map.name)}</strong>`;
             drawMiniMap(button.querySelector('canvas'), map);
             button.addEventListener('click', () => selectMap(map.id));
             const actions = document.createElement('div');
@@ -1148,7 +1150,7 @@
             button.type = 'button';
             button.className = 'map-choice-card custom-map-choice';
             button.classList.toggle('is-selected', selectedMapId() === map.id);
-            button.innerHTML = `<canvas width="180" height="115" aria-hidden="true"></canvas><strong>${escapeHtml(meta.name)}</strong><small>${escapeHtml(meta.summary || (meta.mode === 'duel' ? '1:1' : '4인 생존전'))}</small>`;
+            button.innerHTML = `<canvas width="180" height="115" aria-hidden="true"></canvas><strong>${escapeHtml(meta.name)}</strong>`;
             drawMiniMap(button.querySelector('canvas'), meta);
             button.addEventListener('click', () => selectMap(map.id));
             const actions = document.createElement('div');
@@ -1190,6 +1192,23 @@
     }
     function closeMapInfo() { elements.mapInfoModal.hidden = true; }
 
+    async function enterFullscreenMode() {
+        state.fullscreenWanted = true;
+        document.body.classList.add('is-app-fullscreen');
+        try {
+            if (!document.fullscreenElement && document.documentElement.requestFullscreen) await document.documentElement.requestFullscreen();
+        } catch {}
+        window.scrollTo(0, 1);
+    }
+
+    async function exitFullscreenMode() {
+        state.fullscreenWanted = false;
+        document.body.classList.remove('is-app-fullscreen');
+        try {
+            if (document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen();
+        } catch {}
+    }
+
     function renderLobbyCharacter() {
         const character = selectedCharacter();
         const card = CHARACTER_CARDS.find(item => item.key === character) || CHARACTER_CARDS[0];
@@ -1200,7 +1219,7 @@
     function requireMapPassword(message = '비밀번호를 입력하세요.') {
         const password = window.prompt(message);
         if (password === null) return null;
-        if (String(password).trim() !== '1234567890') {
+        if (String(password).trim() !== '1183') {
             window.alert('비밀번호가 틀렸습니다.');
             return null;
         }
@@ -1529,12 +1548,10 @@
         if (state.ws?.readyState === WebSocket.OPEN && state.serverReady) joinQueue();
     });
     elements.backLobby.addEventListener('click', () => setScreen('lobby'));
-    elements.fullscreenExit?.addEventListener('click', () => {
-        state.matchActive = false;
-        try { state.ws?.close(); } catch {}
-        elements.joinButton.disabled = false;
-        elements.joinButton.textContent = '플레이';
-        setScreen('lobby');
+    elements.fullscreenEnter?.addEventListener('click', () => { enterFullscreenMode(); });
+    elements.fullscreenExit?.addEventListener('click', () => { exitFullscreenMode(); });
+    document.addEventListener('fullscreenchange', () => {
+        document.body.classList.toggle('is-app-fullscreen', Boolean(document.fullscreenElement) || state.fullscreenWanted);
     });
     elements.refreshBoard?.addEventListener('click', loadLeaderboard);
     elements.selectedMapCard.addEventListener('click', openMapSelect);
@@ -1588,7 +1605,8 @@
     elements.mapEditorCanvas.addEventListener('pointerdown', event => {
         if (event.pointerType !== 'touch') event.preventDefault();
         if (event.pointerType !== 'touch') elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
-        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY, startX: event.clientX, startY: event.clientY, startedAt: Date.now(), pointerType: event.pointerType, moved: false });
+        if (event.pointerType === 'touch') elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
+        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY, startX: event.clientX, startY: event.clientY, scrollLeft: elements.mapEditorCanvasWrap?.scrollLeft || 0, scrollTop: elements.mapEditorCanvasWrap?.scrollTop || 0, startedAt: Date.now(), pointerType: event.pointerType, moved: false });
         if (state.editor.pointers.size >= 2) { state.editor.dragPointerId = null; updateEditorPinch(); return; }
         state.editor.dragPointerId = event.pointerId;
         state.editor.draggedCell = '';
@@ -1600,6 +1618,11 @@
         const moved = previousPoint.moved || Math.hypot(event.clientX - previousPoint.startX, event.clientY - previousPoint.startY) > 8;
         state.editor.pointers.set(event.pointerId, { ...previousPoint, clientX: event.clientX, clientY: event.clientY, moved });
         if (state.editor.pointers.size >= 2) { event.preventDefault(); state.editor.dragPointerId = null; updateEditorPinch(); return; }
+        if (event.pointerType === 'touch' && moved && elements.mapEditorCanvasWrap) {
+            event.preventDefault();
+            elements.mapEditorCanvasWrap.scrollLeft = previousPoint.scrollLeft - (event.clientX - previousPoint.startX);
+            elements.mapEditorCanvasWrap.scrollTop = previousPoint.scrollTop - (event.clientY - previousPoint.startY);
+        }
     });
     const endEditorPointer = event => {
         const point = state.editor.pointers.get(event.pointerId);
