@@ -230,7 +230,7 @@ function normalizeCustomMapData(value) {
         const key = `${col},${row}`;
         if (spawnOccupied.has(key)) continue;
         spawnOccupied.add(key);
-        spawnPoints.push({ col, row, x: (col + 0.5) * tileSize, y: (row + 0.5) * tileSize });
+        spawnPoints.push({ col, row, x: (col + 0.5) * tileSize, y: (row + 0.5) * tileSize, team: spawn?.team === 'enemy' ? 'enemy' : 'own' });
     }
     const map = {
         id: String(input.id || ''),
@@ -435,7 +435,7 @@ export function createGuangbooStore(db) {
                     mode: parsed.mode || row.mode || 'survival',
                     summary: parsed.summary || row.summary || '',
                     walls: Array.isArray(parsed.walls) ? parsed.walls.map(({ col, row }) => ({ col, row })) : [],
-                    spawnPoints: Array.isArray(parsed.spawnPoints) ? parsed.spawnPoints.map(({ col, row, x, y }) => ({ col, row, x, y })) : []
+                    spawnPoints: Array.isArray(parsed.spawnPoints) ? parsed.spawnPoints.map(({ col, row, x, y, team }) => ({ col, row, x, y, team: team === 'enemy' ? 'enemy' : 'own' })) : []
                 };
             } catch {
                 mapData = null;
@@ -1038,6 +1038,7 @@ export function createGuangbooRealtime(server, store) {
             traveled: 0,
             maxDistance: ULTIMATE_RANGE,
             health: ULTIMATE_PROJECTILE_HEALTH,
+            maxHealth: ULTIMATE_PROJECTILE_HEALTH,
             spawnedTick: match.tick
         });
     }
@@ -1136,11 +1137,12 @@ export function createGuangbooRealtime(server, store) {
             projectile.traveled += travelThisTick;
             if (projectile.traveled >= projectile.maxDistance) return;
             if (projectile.kind === 'ultimate') {
-                const wallHit = destroyWallHitByProjectile(match.map, projectile);
-                if (wallHit) {
-                    match.effects.push({ id: `${match.id}-wall-${projectile.id}-${match.tick}`, kind: 'wallBreak', x: Math.round(wallHit.x), y: Math.round(wallHit.y) });
-                    projectiles.push(projectile);
-                    return;
+                let wallHit = destroyWallHitByProjectile(match.map, projectile);
+                let wallBreaks = 0;
+                while (wallHit && wallBreaks < 6) {
+                    match.effects.push({ id: `${match.id}-wall-${projectile.id}-${match.tick}-${wallBreaks}`, kind: 'wallBreak', x: Math.round(wallHit.x), y: Math.round(wallHit.y) });
+                    wallBreaks += 1;
+                    wallHit = destroyWallHitByProjectile(match.map, projectile);
                 }
             } else if (isProjectileBlocked(projectile, match.map)) {
                 return;

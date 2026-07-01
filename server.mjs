@@ -256,7 +256,7 @@ function isAuthenticated(req, store) {
 }
 
 function isGuangbooMapEditPassword(value) {
-    return String(value || '') === GUANGBOO_MAP_EDIT_PASSWORD;
+    return String(value || '').trim() === GUANGBOO_MAP_EDIT_PASSWORD;
 }
 
 function normalizeRequestPath(url) {

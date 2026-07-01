@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Guangboo v2 · PixiJS</title>
-    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260701-v2-zoom-aim-wall">
+    <link rel="stylesheet" href="/guangboo-v2/styles.css?v=20260701-v2-editor-aim-only">
 </head>
 <body>
     <main id="app">
@@ -184,7 +184,6 @@
                 <div class="map-editor-controls">
                     <label>가로 칸 <input id="mapColsInput" type="number" min="8" max="100" value="24"></label>
                     <label>세로 칸 <input id="mapRowsInput" type="number" min="8" max="100" value="16"></label>
-                    <button id="newMapButton" type="button">제작 시작</button>
                     <button id="saveMapButton" type="button">저장하고 정보 쓰기</button>
                 </div>
                 <div class="map-editor-canvas-wrap" id="mapEditorCanvasWrap">
@@ -192,7 +191,8 @@
                 </div>
                 <div class="map-toolbox" role="toolbar" aria-label="맵 배치 요소">
                     <button class="map-tool is-selected" data-tool="wall" type="button">벽</button>
-                    <button class="map-tool" data-tool="spawn" type="button">플레이어 생성 지점</button>
+                    <button class="map-tool" data-tool="spawn" type="button">내 플레이어 지점</button>
+                    <button class="map-tool" data-tool="enemySpawn" type="button" hidden>상대 플레이어 지점</button>
                     <button class="map-tool" data-tool="erase" type="button">지우개</button>
                 </div>
                 <p class="map-editor-status" id="mapEditorStatus">크기를 정하고 하단 도구로 벽을 배치하세요.</p>
@@ -246,6 +246,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js"></script>
-    <script src="/guangboo-v2/client.js?v=20260701-v2-zoom-aim-wall" defer></script>
+    <script src="/guangboo-v2/client.js?v=20260701-v2-editor-aim-only" defer></script>
 </body>
 </html>

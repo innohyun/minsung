@@ -129,7 +129,7 @@
         effects: [],
         effectMemory: new Set(),
         selectedMapId: DEFAULT_OFFICIAL_MAP_ID,
-        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), spawns: new Set(), tool: 'wall', editingId: null, zoom: 1, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1, pinching: false, pinchBlockUntil: 0 },
+        editor: { cols: 24, rows: 16, tileSize: EDITOR_TILE_SIZE, walls: new Set(), spawns: new Set(), enemySpawns: new Set(), tool: 'wall', editingId: null, editPassword: null, zoom: 1, pointers: new Map(), pinchStartDistance: 0, pinchStartZoom: 1, pinching: false, pinchBlockUntil: 0, dragPointerId: null, draggedCell: '', statusToken: null },
         render: {
             app: null,
             ready: false,
@@ -797,7 +797,7 @@
     }
 
     function isAttackControlActive() {
-        return state.rightStick.active || state.mouseAim.active || state.queuedShots.length > 0;
+        return (state.rightStick.active && state.rightStick.moved && Math.hypot(state.rightStick.x, state.rightStick.y) > 0.08) || state.mouseAim.active;
     }
 
     function drawAimGuide() {
@@ -1083,8 +1083,8 @@
         }
         ctx.fillStyle = '#8b5e34';
         (map.walls || []).forEach(wall => ctx.fillRect(offsetX + wall.col * scale, offsetY + wall.row * scale, scale, scale));
-        ctx.fillStyle = '#f8fb7b';
         (map.spawns || []).forEach(spawn => {
+            ctx.fillStyle = spawn.team === 'enemy' ? '#ef4444' : '#f8fb7b';
             ctx.beginPath();
             ctx.arc(offsetX + (Number(spawn.col) + 0.5) * scale, offsetY + (Number(spawn.row) + 0.5) * scale, Math.max(3, scale * 0.25), 0, Math.PI * 2);
             ctx.fill();
@@ -1190,11 +1190,11 @@
     function requireMapPassword(message = '비밀번호를 입력하세요.') {
         const password = window.prompt(message);
         if (password === null) return null;
-        if (password !== '1234567890') {
+        if (String(password).trim() !== '1234567890') {
             window.alert('비밀번호가 틀렸습니다.');
             return null;
         }
-        return password;
+        return String(password).trim();
     }
 
     function openMapModeSetup() {
@@ -1244,15 +1244,18 @@
         state.editor.editingId = id && !isOfficialMapId(id) ? id : null;
         state.editor.editPassword = options.password || null;
         state.editor.zoom = 1;
-        elements.mapName.value = source?.name || '';
-        elements.mapMode.value = source?.mode || 'survival';
+        if (source) elements.mapName.value = source.name || '';
+        elements.mapMode.value = source?.mode || elements.mapMode.value || 'survival';
         elements.mapCols.value = source?.cols || 24;
         elements.mapRows.value = source?.rows || 16;
         elements.mapSummary.value = source?.summary || source?.description || '';
         state.editor.cols = Math.max(8, Math.min(100, Math.floor(Number(elements.mapCols.value) || 24)));
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
         state.editor.walls = new Set((source?.walls || []).map(wall => `${wall.col},${wall.row}`));
-        state.editor.spawns = new Set((source?.spawns || []).map(spawn => `${spawn.col},${spawn.row}`));
+        const sourceSpawns = source?.spawns || [];
+        state.editor.spawns = new Set(sourceSpawns.filter(spawn => spawn.team !== 'enemy').map(spawn => `${spawn.col},${spawn.row}`));
+        state.editor.enemySpawns = new Set(sourceSpawns.filter(spawn => spawn.team === 'enemy').map(spawn => `${spawn.col},${spawn.row}`));
+        updateEditorToolVisibility();
         elements.mapEditorStatus.textContent = id ? '기존 맵을 수정 중입니다. 저장하면 정보 화면으로 넘어갑니다.' : '벽과 플레이어 생성 지점을 배치하세요.';
         drawEditor();
         setScreen('editor');
@@ -1264,6 +1267,7 @@
         state.editor.rows = Math.max(8, Math.min(100, Math.floor(Number(elements.mapRows.value) || 16)));
         state.editor.walls.clear();
         state.editor.spawns.clear();
+        state.editor.enemySpawns.clear();
         elements.mapEditorStatus.textContent = `${elements.mapMode.value === 'duel' ? '1:1' : '4인 생존전'} 맵 제작: 벽과 플레이어 생성 지점을 배치하세요. 두 손가락으로 확대/축소합니다.`;
         drawEditor();
     }
@@ -1295,45 +1299,102 @@
         state.editor.walls.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.fillRect(col * EDITOR_TILE_SIZE, row * EDITOR_TILE_SIZE, EDITOR_TILE_SIZE, EDITOR_TILE_SIZE); });
         ctx.fillStyle = '#f8fb7b';
         state.editor.spawns.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.beginPath(); ctx.arc((col + 0.5) * EDITOR_TILE_SIZE, (row + 0.5) * EDITOR_TILE_SIZE, 10, 0, Math.PI * 2); ctx.fill(); });
+        ctx.fillStyle = '#ef4444';
+        state.editor.enemySpawns.forEach(key => { const [col, row] = key.split(',').map(Number); ctx.beginPath(); ctx.arc((col + 0.5) * EDITOR_TILE_SIZE, (row + 0.5) * EDITOR_TILE_SIZE, 10, 0, Math.PI * 2); ctx.fill(); });
+    }
+
+    function showEditorStatus(message, timeoutMs = 0) {
+        elements.mapEditorStatus.textContent = message;
+        if (timeoutMs > 0) {
+            const token = Symbol(message);
+            state.editor.statusToken = token;
+            window.setTimeout(() => {
+                if (state.editor.statusToken === token) elements.mapEditorStatus.textContent = '';
+            }, timeoutMs);
+        }
+    }
+
+    function selectedEditorMode() {
+        return elements.mapMode.value === 'duel' ? 'duel' : 'survival';
+    }
+
+    function updateEditorToolVisibility() {
+        const duel = selectedEditorMode() === 'duel';
+        elements.mapTools.forEach(button => {
+            if (button.dataset.tool === 'enemySpawn') button.hidden = !duel;
+        });
+        if (!duel && state.editor.tool === 'enemySpawn') {
+            state.editor.tool = 'spawn';
+            elements.mapTools.forEach(candidate => candidate.classList.toggle('is-selected', candidate.dataset.tool === 'spawn'));
+        }
+    }
+
+    function editorSpawnLimit(tool) {
+        if (selectedEditorMode() === 'duel') return tool === 'spawn' || tool === 'enemySpawn' ? 1 : 0;
+        return tool === 'spawn' ? 4 : 0;
     }
 
     function editCellFromEvent(event) {
-        if (state.editor.pointers.size >= 2) return;
+        if (!canPlaceEditorElement() || state.editor.dragPointerId !== event.pointerId) return;
         const rect = elements.mapEditorCanvas.getBoundingClientRect();
         const scale = elements.mapEditorCanvas.width / Math.max(1, rect.width);
         const col = Math.floor((event.clientX - rect.left) * scale / EDITOR_TILE_SIZE);
         const row = Math.floor((event.clientY - rect.top) * scale / EDITOR_TILE_SIZE);
         if (col < 0 || row < 0 || col >= state.editor.cols || row >= state.editor.rows) return;
         const key = `${col},${row}`;
-        if (state.editor.tool === 'erase') { state.editor.walls.delete(key); state.editor.spawns.delete(key); }
-        else if (state.editor.tool === 'spawn') { state.editor.walls.delete(key); state.editor.spawns.add(key); }
-        else { state.editor.spawns.delete(key); state.editor.walls.add(key); }
+        if (state.editor.draggedCell === key) return;
+        state.editor.draggedCell = key;
+        if (state.editor.tool === 'erase') {
+            state.editor.walls.delete(key);
+            state.editor.spawns.delete(key);
+            state.editor.enemySpawns.delete(key);
+        } else if (state.editor.tool === 'spawn' || state.editor.tool === 'enemySpawn') {
+            const set = state.editor.tool === 'enemySpawn' ? state.editor.enemySpawns : state.editor.spawns;
+            const limit = editorSpawnLimit(state.editor.tool);
+            if (!set.has(key) && limit > 0 && set.size >= limit) {
+                showEditorStatus('더 설치할 수 없어', 2000);
+                return;
+            }
+            state.editor.walls.delete(key);
+            state.editor.spawns.delete(key);
+            state.editor.enemySpawns.delete(key);
+            set.add(key);
+        } else {
+            state.editor.spawns.delete(key);
+            state.editor.enemySpawns.delete(key);
+            state.editor.walls.add(key);
+        }
         drawEditor();
     }
 
     function editorMapPayload() {
         const walls = [...state.editor.walls].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; });
-        const spawnPoints = [...state.editor.spawns].map(key => { const [col, row] = key.split(',').map(Number); return { col, row }; });
-        return { cols: state.editor.cols, rows: state.editor.rows, tileSize: EDITOR_TILE_SIZE, walls, spawnPoints, mode: elements.mapMode.value, summary: (elements.mapSummary.value || '').trim() };
+        const ownSpawns = [...state.editor.spawns].map(key => { const [col, row] = key.split(',').map(Number); return { col, row, team: 'own' }; });
+        const enemySpawns = [...state.editor.enemySpawns].map(key => { const [col, row] = key.split(',').map(Number); return { col, row, team: 'enemy' }; });
+        const spawnPoints = selectedEditorMode() === 'duel' ? [...ownSpawns, ...enemySpawns] : ownSpawns;
+        return { cols: state.editor.cols, rows: state.editor.rows, tileSize: EDITOR_TILE_SIZE, walls, spawnPoints, mode: selectedEditorMode(), summary: (elements.mapSummary.value || '').trim() };
     }
 
     async function saveCustomMap() {
         const name = (elements.mapName.value || '').trim();
-        if (!name) { elements.mapEditorStatus.textContent = '맵 이름을 먼저 정하세요.'; return; }
-        if (state.editor.spawns.size < (elements.mapMode.value === 'duel' ? 2 : 4)) { elements.mapEditorStatus.textContent = '플레이어 생성 지점을 충분히 배치하세요.'; return; }
+        if (!name) { showEditorStatus('맵 이름을 먼저 정하세요.', 2000); return; }
+        if (selectedEditorMode() === 'duel') {
+            if (state.editor.spawns.size !== 1 || state.editor.enemySpawns.size !== 1) { showEditorStatus('1:1 모드는 내 지점과 상대 지점이 각각 1개씩 필요해', 2000); return; }
+        } else if (state.editor.spawns.size < 4) { showEditorStatus('플레이어 생성 지점을 충분히 배치하세요.', 2000); return; }
         elements.mapSavedInfoStatus.textContent = '정보를 적고 저장 완료를 누르세요.';
         setScreen('mapSavedInfo');
     }
 
     async function publishCustomMap() {
-        const name = (elements.mapName.value || '정식 맵').trim();
+        const name = (elements.mapName.value || '').trim();
+        if (!name) { elements.mapSavedInfoStatus.textContent = '맵 이름을 먼저 정하세요.'; return; }
         const method = state.editor.editingId ? 'PUT' : 'POST';
         const url = state.editor.editingId ? `/api/guangboo/maps/${encodeURIComponent(state.editor.editingId)}` : '/api/guangboo/maps';
         elements.mapSavedInfoStatus.textContent = '정식 맵 저장 중...';
         const response = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, creator: elements.nickname.value || 'v2 플레이어', mode: elements.mapMode.value, summary: (elements.mapSummary.value || '').trim(), map: editorMapPayload(), password: state.editor.editPassword })
+            body: JSON.stringify({ name, creator: elements.nickname.value || 'v2 플레이어', mode: selectedEditorMode(), summary: (elements.mapSummary.value || '').trim(), map: editorMapPayload(), password: state.editor.editPassword })
         });
         const data = await response.json();
         if (!data.ok) throw new Error(data.error || 'save_failed');
@@ -1470,17 +1531,18 @@
         if (!(elements.mapName.value || '').trim()) { elements.mapName.focus(); return; }
         openMapEditor(null);
         applyEditorSize();
+        updateEditorToolVisibility();
     });
     elements.backMapEditor.addEventListener('click', () => setScreen('editor'));
     elements.closeMapEditor.addEventListener('click', closeMapEditor);
-    elements.newMap.addEventListener('click', applyEditorSize);
+    elements.newMap?.addEventListener('click', applyEditorSize);
     elements.saveMap.addEventListener('click', () => saveCustomMap().catch(error => { elements.mapEditorStatus.textContent = `저장 실패: ${error.message}`; }));
     elements.publishMap.addEventListener('click', () => publishCustomMap().catch(error => { elements.mapSavedInfoStatus.textContent = `저장 실패: ${error.message}`; }));
     elements.mapTools.forEach(button => {
         button.addEventListener('click', () => {
             state.editor.tool = button.dataset.tool || 'wall';
             elements.mapTools.forEach(candidate => candidate.classList.toggle('is-selected', candidate === button));
-            elements.mapEditorStatus.textContent = state.editor.tool === 'spawn' ? '플레이어 생성 지점을 배치하세요.' : state.editor.tool === 'erase' ? '지울 칸을 선택하세요.' : '벽을 배치하세요.';
+            elements.mapEditorStatus.textContent = state.editor.tool === 'enemySpawn' ? '상대 플레이어 지점을 배치하세요.' : state.editor.tool === 'spawn' ? '내 플레이어 지점을 배치하세요.' : state.editor.tool === 'erase' ? '지울 칸을 선택하세요.' : '벽을 배치하세요.';
         });
     });
     function updateEditorPinch() {
@@ -1503,19 +1565,26 @@
     elements.mapEditorCanvas.addEventListener('pointerdown', event => {
         event.preventDefault();
         elements.mapEditorCanvas.setPointerCapture?.(event.pointerId);
-        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
-        if (state.editor.pointers.size >= 2) { updateEditorPinch(); return; }
-        if (canPlaceEditorElement()) editCellFromEvent(event);
+        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY, startedAt: Date.now(), pointerType: event.pointerType });
+        if (state.editor.pointers.size >= 2) { state.editor.dragPointerId = null; updateEditorPinch(); return; }
+        state.editor.dragPointerId = event.pointerId;
+        state.editor.draggedCell = '';
+        if (event.pointerType !== 'touch' && canPlaceEditorElement()) editCellFromEvent(event);
     });
     elements.mapEditorCanvas.addEventListener('pointermove', event => {
         if (!elements.mapEditorCanvas.hasPointerCapture?.(event.pointerId)) return;
         event.preventDefault();
-        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
-        if (state.editor.pointers.size >= 2) { updateEditorPinch(); return; }
+        const previousPoint = state.editor.pointers.get(event.pointerId);
+        state.editor.pointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY, startedAt: previousPoint?.startedAt || Date.now(), pointerType: event.pointerType });
+        if (state.editor.pointers.size >= 2) { state.editor.dragPointerId = null; updateEditorPinch(); return; }
+        if (event.pointerType === 'touch' && Date.now() - (previousPoint?.startedAt || Date.now()) < 140) return;
         if (canPlaceEditorElement()) editCellFromEvent(event);
     });
     const endEditorPointer = event => {
+        if (canPlaceEditorElement() && state.editor.dragPointerId === event.pointerId && event.pointerType === 'touch' && !state.editor.draggedCell) editCellFromEvent(event);
         state.editor.pointers.delete(event.pointerId);
+        if (state.editor.dragPointerId === event.pointerId) state.editor.dragPointerId = null;
+        state.editor.draggedCell = '';
         if (state.editor.pointers.size < 2) {
             state.editor.pinchStartDistance = 0;
             if (state.editor.pinching) state.editor.pinchBlockUntil = Date.now() + 220;
@@ -1524,6 +1593,7 @@
     };
     elements.mapEditorCanvas.addEventListener('pointerup', endEditorPointer);
     elements.mapEditorCanvas.addEventListener('pointercancel', endEditorPointer);
+    elements.mapMode.addEventListener('change', () => { updateEditorToolVisibility(); drawEditor(); });
     window.addEventListener('resize', resizeEditorCanvasDisplay);
     elements.characterInputs.forEach(input => input.addEventListener('change', () => { localStorage.setItem(CHARACTER_KEY, selectedCharacter()); renderLobbyCharacter(); renderCharacterSelectScreen(); }));
     elements.ultimateButton.addEventListener('pointerdown', event => { event.preventDefault(); fireUltimate(); });
