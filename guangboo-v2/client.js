@@ -118,6 +118,7 @@
             background: null,
             world: null,
             mapLayer: null,
+            aimGuide: null,
             trailLayer: null,
             projectileLayer: null,
             summonLayer: null,
@@ -313,6 +314,7 @@
         state.render.background = new PIXI.Graphics();
         state.render.world = new PIXI.Container();
         state.render.mapLayer = new PIXI.Graphics();
+        state.render.aimGuide = new PIXI.Graphics();
         state.render.trailLayer = new PIXI.Container();
         state.render.projectileLayer = new PIXI.Container();
         state.render.summonLayer = new PIXI.Container();
@@ -321,6 +323,7 @@
         app.stage.addChild(state.render.world);
         state.render.world.addChild(state.render.mapLayer);
         state.render.world.addChild(state.render.trailLayer);
+        state.render.world.addChild(state.render.aimGuide);
         state.render.world.addChild(state.render.projectileLayer);
         state.render.world.addChild(state.render.summonLayer);
         state.render.world.addChild(state.render.playerLayer);
@@ -331,11 +334,12 @@
     function tickRender(ticker) {
         const app = state.render.app;
         if (!app) return;
-        const width = app.renderer.width / app.renderer.resolution;
-        const height = app.renderer.height / app.renderer.resolution;
+        const width = app.screen.width;
+        const height = app.screen.height;
         drawBackground(width, height);
         updateCamera(width, height);
         drawStaticMapIfNeeded();
+        drawAimGuide();
         syncCollection(state.render.trails, state.render.trailLayer, state.slimeTrails, trail => trail.id || `${trail.ownerId}:${trail.x}:${trail.y}`, createTrailGraphic, updateTrailGraphic);
         syncCollection(state.render.projectiles, state.render.projectileLayer, state.projectiles, item => item.id || `${item.ownerId}:${item.x}:${item.y}`, createProjectileGraphic, updateProjectileGraphic);
         syncCollection(state.render.summons, state.render.summonLayer, state.summons, item => item.id, createSummonGraphic, (entry, item) => updateSummonGraphic(entry, item, ticker.deltaMS || 16.67));
@@ -454,38 +458,94 @@
     function createPlayerGraphic(player) {
         const node = new PIXI.Container();
         const body = new PIXI.Graphics();
-        const name = new PIXI.Text({ text: player.nickname || 'Monster', style: { fontFamily: 'system-ui, sans-serif', fontSize: 13, fontWeight: '700', fill: 0xf8fff4, align: 'center' } });
+        const hud = new PIXI.Container();
+        const nameBg = new PIXI.Graphics();
+        const name = new PIXI.Text({ text: player.nickname || 'Monster', style: { fontFamily: 'system-ui, sans-serif', fontSize: 12, fontWeight: '700', fill: 0xf8fff4, align: 'center' } });
         name.anchor.set(0.5, 0.5);
-        node.addChild(body, name);
-        return { node, body, name, x: player.x, y: player.y };
+        const healthBar = new PIXI.Graphics();
+        const healthText = new PIXI.Text({ text: '', style: { fontFamily: 'system-ui, sans-serif', fontSize: 10, fontWeight: '900', fill: 0xfffdf8, stroke: { color: 0x000000, width: 2 }, align: 'center' } });
+        healthText.anchor.set(0.5, 0.5);
+        const ammoBar = new PIXI.Graphics();
+        hud.addChild(nameBg, name, healthBar, healthText, ammoBar);
+        node.addChild(body, hud);
+        return { node, body, hud, nameBg, name, healthBar, healthText, ammoBar, x: player.x, y: player.y };
     }
     function updatePlayerGraphic(entry, player, deltaMS) {
         smoothPosition(entry, player, deltaMS);
         const radius = 22;
-        const facingX = player.facingX ?? player.aimX ?? 1;
-        const facingY = player.facingY ?? player.aimY ?? 0;
-        const angle = Math.atan2(facingY, facingX);
+        const facingX = player.facingX ?? player.facing?.x ?? player.aimX ?? player.aim?.x ?? 1;
+        const facingY = player.facingY ?? player.facing?.y ?? player.aimY ?? player.aim?.y ?? 0;
+        const facingLength = Math.hypot(facingX, facingY) || 1;
+        const angle = Math.atan2(facingY / facingLength, facingX / facingLength);
         const color = player.character === 'slime' ? 0x7ee65b : parseHex(player.monster?.color, 0x6ee7b7);
         const accent = player.character === 'slime' ? 0x167a34 : parseHex(player.monster?.accent, 0x064e3b);
-        const health = Math.max(0, Number(player.health) || 0);
-        const ratio = Math.max(0, Math.min(1, health / (Number(player.maxHealth) || PLAYER_MAX_HEALTH)));
-        entry.node.alpha = player.alive ? 1 : 0.38;
+        const health = Math.max(0, Math.round(Number(player.health) || 0));
+        const maxHealth = Number(player.maxHealth) || PLAYER_MAX_HEALTH;
+        const ratio = Math.max(0, Math.min(1, health / maxHealth));
+        entry.node.alpha = player.alive ? 1 : 0.36;
         entry.body.clear();
-        if (player.id === state.playerId) entry.body.circle(0, 0, radius + 8).stroke({ width: 4, color: 0xd7f252, alpha: 0.9 });
-        entry.body.ellipse(0, 0, radius * 1.05, player.character === 'slime' ? radius * 0.78 : radius * 0.92).fill(color);
-        entry.body.moveTo(radius * 0.08, -radius * 0.9).lineTo(radius * 0.46, -radius * 1.32).lineTo(radius * 0.56, -radius * 0.62).fill(accent);
-        entry.body.moveTo(radius * 0.08, radius * 0.9).lineTo(radius * 0.46, radius * 1.32).lineTo(radius * 0.56, radius * 0.62).fill(accent);
-        entry.body.circle(radius * 0.28, -radius * 0.3, radius * 0.21).fill(0xfffdf8);
-        entry.body.circle(radius * 0.28, radius * 0.3, radius * 0.21).fill(0xfffdf8);
-        entry.body.circle(radius * 0.35, -radius * 0.3, radius * 0.08).fill(0x141a12);
-        entry.body.circle(radius * 0.35, radius * 0.3, radius * 0.08).fill(0x141a12);
-        entry.body.moveTo(radius * 0.25, radius * 0.04).lineTo(radius * 0.67, radius * 0.04).stroke({ width: 3, color: accent });
         entry.body.rotation = angle;
-        entry.body.roundRect(-38, -58, 76, 12, 6).fill({ color: 0x080d0a, alpha: 0.78 });
-        entry.body.roundRect(-36, -56, 72 * ratio, 8, 5).fill(ratio <= 0.32 ? 0xe05252 : 0xd7f252);
-        entry.body.rotation = 0;
-        entry.name.text = player.nickname || 'Monster';
-        entry.name.position.set(0, -78);
+        if (player.id === state.playerId) entry.body.circle(0, 0, radius + 7).stroke({ width: 3, color: 0xd7f252, alpha: 0.9 });
+        entry.body.ellipse(0, 0, radius * 1.05, player.character === 'slime' ? radius * 0.78 : radius * 0.92).fill(color);
+        if (player.character === 'slime') entry.body.ellipse(radius * 0.02, -radius * 0.18, radius * 0.54, radius * 0.22).fill({ color: 0xffffff, alpha: 0.26 });
+        entry.body.moveTo(radius * 0.08, -radius * 0.9).lineTo(radius * 0.44, -radius * 1.35).lineTo(radius * 0.56, -radius * 0.62).fill(accent);
+        entry.body.moveTo(radius * 0.08, radius * 0.9).lineTo(radius * 0.44, radius * 1.35).lineTo(radius * 0.56, radius * 0.62).fill(accent);
+        entry.body.circle(radius * 0.26, -radius * 0.3, radius * 0.2).fill(0xfffdf8);
+        entry.body.circle(radius * 0.26, radius * 0.3, radius * 0.2).fill(0xfffdf8);
+        entry.body.circle(radius * 0.33, -radius * 0.3, radius * 0.08).fill(0x141a12);
+        entry.body.circle(radius * 0.33, radius * 0.3, radius * 0.08).fill(0x141a12);
+        entry.body.moveTo(radius * 0.28, radius * 0.04).lineTo(radius * 0.66, radius * 0.04).stroke({ width: Math.max(2, radius * 0.1), color: accent });
+
+        const nameText = player.nickname || 'Monster';
+        const nameW = Math.min(radius * 5.64, nameText.length * 7 + radius * 0.82);
+        const nameH = radius * 0.91;
+        const nameY = -radius * 3.64;
+        entry.name.text = nameText;
+        entry.name.position.set(0, nameY);
+        entry.nameBg.clear();
+        entry.nameBg.roundRect(-nameW / 2, nameY - nameH / 2 - radius * 0.14, nameW, nameH, radius * 0.36).fill({ color: 0x080d0a, alpha: 0.72 });
+
+        const barW = radius * 3.36;
+        const barH = radius * 0.68;
+        const inset = radius * 0.09;
+        const barY = -radius * 2.64;
+        entry.healthBar.clear();
+        entry.healthBar.roundRect(-barW / 2, barY, barW, barH, barH / 2).fill({ color: 0x080d0a, alpha: 0.82 });
+        entry.healthBar.roundRect(-barW / 2 + inset, barY + inset, Math.max(0, (barW - inset * 2) * ratio), Math.max(1, barH - inset * 2), barH / 2).fill(ratio <= 0.32 ? 0xe05252 : 0xd7f252);
+        entry.healthBar.roundRect(-barW / 2 + 0.5, barY + 0.5, barW - 1, barH - 1, barH / 2).stroke({ width: 1, color: 0xffffff, alpha: 0.72 });
+        entry.healthText.text = String(health);
+        entry.healthText.position.set(0, barY + barH / 2);
+        entry.ammoBar.clear();
+        const maxAmmo = Number(player.maxAmmo) || 3;
+        const ammo = Math.max(0, Math.min(maxAmmo, Math.floor(Number(player.ammo) || 0)));
+        const gap = 3;
+        const cellW = (barW - gap * (maxAmmo - 1)) / maxAmmo;
+        const cellH = 6;
+        const ammoY = barY + barH + 4;
+        for (let i = 0; i < maxAmmo; i += 1) {
+            const x = -barW / 2 + i * (cellW + gap);
+            entry.ammoBar.roundRect(x, ammoY, cellW, cellH, 2).fill(i < ammo ? 0xd7f252 : { color: 0xffffff, alpha: 0.18 }).stroke({ width: 1, color: 0x080d0a, alpha: 0.72 });
+        }
+    }
+
+    function isAttackControlActive() {
+        return state.rightStick.active || state.mouseAim.active || state.queuedShots.length > 0;
+    }
+
+    function drawAimGuide() {
+        const guide = state.render.aimGuide;
+        if (!guide) return;
+        guide.clear();
+        const me = state.players.find(player => player.id === state.playerId);
+        if (!me || !me.alive || !isAttackControlActive()) return;
+        const aim = currentAim();
+        const startX = me.x + aim.x * 34;
+        const startY = me.y + aim.y * 34;
+        const endX = me.x + aim.x * 300;
+        const endY = me.y + aim.y * 300;
+        guide.moveTo(startX, startY).lineTo(endX, endY).stroke({ width: 18, color: 0xffffff, alpha: 0.18, cap: 'round' });
+        guide.moveTo(startX, startY).lineTo(endX, endY).stroke({ width: 10, color: 0xd7f252, alpha: 0.34, cap: 'round' });
+        guide.circle(endX, endY, 10).stroke({ width: 4, color: 0xd7f252, alpha: 0.48 });
     }
 
     function smoothPosition(entry, target, deltaMS) {
@@ -554,46 +614,121 @@
         const stick = state[name];
         const thumb = element.querySelector('.stick-thumb');
         const isRight = name === 'rightStick';
-        const radius = 46;
-        function start(event) {
-            if (!state.matchActive || stick.active || event.pointerType === 'mouse') return;
+        const floatingClass = isRight ? 'right-stick-floating' : 'left-stick-floating';
+
+        function isPointerForThisStick(event) {
+            return stick.active && stick.pointerId === event.pointerId;
+        }
+
+        function clampCenter(clientX, clientY) {
+            const screen = elements.game.getBoundingClientRect();
+            const size = Math.min(element.offsetWidth || 120, element.offsetHeight || 120);
+            const half = size / 2;
+            return {
+                x: Math.max(screen.left + half + 8, Math.min(screen.right - half - 8, clientX)),
+                y: Math.max(screen.top + half + 8, Math.min(screen.bottom - half - 8, clientY))
+            };
+        }
+
+        function moveStickBase(clientX, clientY) {
+            const center = clampCenter(clientX, clientY);
+            stick.centerX = center.x;
+            stick.centerY = center.y;
+            element.classList.add('is-floating-stick', floatingClass);
+            element.style.left = `${center.x}px`;
+            element.style.top = `${center.y}px`;
+            element.style.right = 'auto';
+            element.style.bottom = 'auto';
+        }
+
+        function update(event) {
+            if (!isPointerForThisStick(event)) return;
+            const rect = element.getBoundingClientRect();
+            const cx = stick.centerX || rect.left + rect.width / 2;
+            const cy = stick.centerY || rect.top + rect.height / 2;
+            const limit = rect.width * 0.34;
+            const dx = event.clientX - cx;
+            const dy = event.clientY - cy;
+            const length = Math.hypot(dx, dy);
+            if (Math.hypot(event.clientX - (stick.startX || event.clientX), event.clientY - (stick.startY || event.clientY)) > 12) stick.moved = true;
+            if (isRight && !stick.moved) {
+                stick.x = 0;
+                stick.y = 0;
+                thumb.style.transform = 'translate(-50%, -50%)';
+                return;
+            }
+            const nx = length > 3 ? dx / length : (isRight ? state.lastAim.x : 0);
+            const ny = length > 3 ? dy / length : (isRight ? state.lastAim.y : 0);
+            const clamped = length > 3 ? Math.min(limit, length) : Math.min(limit, limit * 0.42);
+            stick.x = nx * (clamped / limit);
+            stick.y = ny * (clamped / limit);
+            thumb.style.transform = `translate(calc(-50% + ${nx * clamped}px), calc(-50% + ${ny * clamped}px))`;
+            if (isRight) state.lastAim = normalizeAim({ x: nx, y: ny });
+        }
+
+        function begin(event) {
+            if (!state.matchActive || stick.active) return;
             event.preventDefault();
             stick.active = true;
             stick.pointerId = event.pointerId;
-            stick.centerX = event.clientX;
-            stick.centerY = event.clientY;
-            element.setPointerCapture?.(event.pointerId);
+            stick.startX = event.clientX;
+            stick.startY = event.clientY;
+            stick.moved = false;
+            stick.shotQueued = false;
+            moveStickBase(event.clientX, event.clientY);
+            elements.game.setPointerCapture?.(event.pointerId);
             update(event);
         }
-        function update(event) {
-            if (!stick.active || stick.pointerId !== event.pointerId) return;
-            const dx = event.clientX - stick.centerX;
-            const dy = event.clientY - stick.centerY;
-            const length = Math.hypot(dx, dy);
-            const limited = Math.min(radius, length);
-            const ux = length ? dx / length : 0;
-            const uy = length ? dy / length : 0;
-            stick.x = (ux * limited) / radius;
-            stick.y = (uy * limited) / radius;
-            thumb.style.transform = `translate(calc(-50% + ${ux * limited}px), calc(-50% + ${uy * limited}px))`;
-            if (isRight && Math.hypot(stick.x, stick.y) > 0.08) state.lastAim = normalizeAim(stick);
+
+        function releasePointerCapture(pointerId) {
+            if (elements.game.releasePointerCapture && elements.game.hasPointerCapture?.(pointerId)) elements.game.releasePointerCapture(pointerId);
         }
-        function end(event) {
-            if (!stick.active || stick.pointerId !== event.pointerId) return;
-            if (isRight) queueShot(Math.hypot(stick.x, stick.y) > 0.08 ? stick : nearestOpponentAim());
+
+        function shotAimForRelease() {
+            if (!isRight) return null;
+            if (!stick.moved) return nearestOpponentAim() || state.lastAim;
+            if (Math.hypot(stick.x, stick.y) > 0.08) return stick;
+            return nearestOpponentAim() || state.lastAim;
+        }
+
+        function finish(event) {
+            if (!isPointerForThisStick(event)) return;
+            event.preventDefault();
+            if (isRight && !stick.shotQueued) {
+                stick.shotQueued = true;
+                queueShot(shotAimForRelease());
+            }
+            releasePointerCapture(event.pointerId);
             resetStick(name);
         }
-        element.addEventListener('pointerdown', start);
-        element.addEventListener('pointermove', update);
-        element.addEventListener('pointerup', end);
-        element.addEventListener('pointercancel', end);
+
+        function shouldStartFromHalf(event) {
+            if (!state.matchActive || event.pointerType !== 'touch') return false;
+            if (event.target.closest?.('button, input, label, fieldset, .hud')) return false;
+            const screen = elements.game.getBoundingClientRect();
+            const midpoint = screen.left + screen.width / 2;
+            return isRight ? event.clientX >= midpoint : event.clientX < midpoint;
+        }
+
+        elements.game.addEventListener('pointerdown', event => { if (shouldStartFromHalf(event)) begin(event); });
+        element.addEventListener('pointerdown', event => { if (event.pointerType !== 'touch') begin(event); });
+        elements.game.addEventListener('pointermove', event => { if (isPointerForThisStick(event)) { event.preventDefault(); update(event); } });
+        window.addEventListener('pointerup', finish, { capture: true });
+        window.addEventListener('pointercancel', finish, { capture: true });
+        elements.game.addEventListener('lostpointercapture', finish);
+        element.addEventListener('contextmenu', event => event.preventDefault());
+        element.addEventListener('selectstart', event => event.preventDefault());
     }
     function resetStick(name) {
         const stick = state[name];
         stick.active = false; stick.pointerId = null; stick.x = 0; stick.y = 0;
+        stick.centerX = 0; stick.centerY = 0; stick.startX = 0; stick.startY = 0; stick.moved = false; stick.shotQueued = false;
         const element = elements[name];
+        element?.classList.remove('is-floating-stick', name === 'rightStick' ? 'right-stick-floating' : 'left-stick-floating');
+        if (element) { element.style.left = ''; element.style.top = ''; element.style.right = ''; element.style.bottom = ''; }
         element?.querySelector('.stick-thumb')?.style.setProperty('transform', 'translate(-50%, -50%)');
     }
+
     function nearestOpponentAim() {
         const me = state.players.find(player => player.id === state.playerId && player.alive !== false);
         if (!me) return state.lastAim;
@@ -605,8 +740,10 @@
         const me = state.players.find(player => player.id === state.playerId);
         if (!app || !me) return;
         const rect = app.canvas.getBoundingClientRect();
-        const screenX = event.clientX - rect.left;
-        const screenY = event.clientY - rect.top;
+        const scaleX = app.screen.width / Math.max(1, rect.width);
+        const scaleY = app.screen.height / Math.max(1, rect.height);
+        const screenX = (event.clientX - rect.left) * scaleX;
+        const screenY = (event.clientY - rect.top) * scaleY;
         const worldX = (screenX - state.render.world.position.x) / state.render.world.scale.x;
         const worldY = (screenY - state.render.world.position.y) / state.render.world.scale.y;
         const aim = normalizeAim({ x: worldX - me.x, y: worldY - me.y });
@@ -689,41 +826,32 @@
     function renderOfficialMapGrid() {
         elements.officialMapGrid.innerHTML = '';
         OFFICIAL_MAPS.forEach(map => {
-            const card = document.createElement('button');
-            card.type = 'button';
-            card.className = `map-choice-card ${selectedMapId() === map.id ? 'is-selected' : ''}`;
-            const canvas = document.createElement('canvas');
-            canvas.width = 220;
-            canvas.height = 140;
-            card.appendChild(canvas);
-            const info = document.createElement('button');
-            info.type = 'button';
-            info.className = 'ghost-button map-info-chip';
-            info.textContent = 'i';
-            info.addEventListener('click', event => { event.stopPropagation(); openMapInfo(map.id); });
-            card.appendChild(info);
-            const title = document.createElement('h3'); title.textContent = map.name; card.appendChild(title);
-            const summary = document.createElement('p'); summary.textContent = map.summary; card.appendChild(summary);
-            card.addEventListener('click', () => selectMap(map.id));
-            elements.officialMapGrid.appendChild(card);
-            drawMiniMap(canvas, map);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'map-choice-card';
+            button.classList.toggle('is-selected', selectedMapId() === map.id);
+            button.innerHTML = `<canvas width="180" height="115" aria-hidden="true"></canvas><strong>${escapeHtml(map.name)}</strong><small>${escapeHtml(map.summary)}</small>`;
+            drawMiniMap(button.querySelector('canvas'), map);
+            button.addEventListener('click', () => selectMap(map.id));
+            elements.officialMapGrid.appendChild(button);
         });
     }
 
     function renderCustomMapList() {
         elements.customMapList.innerHTML = '';
-        if (!state.customMaps.length) return;
-        const heading = document.createElement('p');
-        heading.className = 'eyebrow';
-        heading.textContent = 'Custom maps';
-        elements.customMapList.appendChild(heading);
+        if (state.customMaps.length) {
+            const title = document.createElement('p');
+            title.className = 'eyebrow';
+            title.textContent = '내가 만든 맵';
+            elements.customMapList.appendChild(title);
+        }
         state.customMaps.forEach(map => {
-            const card = document.createElement('button');
-            card.type = 'button';
-            card.className = `map-choice-card custom-map-card ${selectedMapId() === map.id ? 'is-selected' : ''}`;
-            card.innerHTML = `<strong>${escapeHtml(map.name)}</strong><p>${Math.round(map.width / map.tileSize)}x${Math.round(map.height / map.tileSize)} · ${escapeHtml(map.creator || '플레이어')}</p>`;
-            card.addEventListener('click', () => selectMap(map.id));
-            elements.customMapList.appendChild(card);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'custom-map-choice';
+            button.textContent = map.name;
+            button.addEventListener('click', () => selectMap(map.id));
+            elements.customMapList.appendChild(button);
         });
     }
 
@@ -755,13 +883,15 @@
         CHARACTER_CARDS.forEach(card => {
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = `character-choice-card ${selectedCharacter() === card.key ? 'is-selected' : ''}`;
-            button.innerHTML = `<div class="character-choice-avatar character-avatar" style="background: radial-gradient(circle at 35% 24%, #fff, ${card.color} 38%, ${card.accent} 92%)"></div><h3>${card.name}</h3><p>${card.summary}</p>`;
+            button.className = 'character-choice-card';
+            button.classList.toggle('is-selected', selectedCharacter() === card.key);
+            button.style.setProperty('--character-color', card.color);
+            button.style.setProperty('--character-accent', card.accent);
+            button.innerHTML = `<span class="character-choice-avatar"></span><strong>${escapeHtml(card.name)}</strong><small>${escapeHtml(card.summary)}</small>`;
             button.addEventListener('click', () => {
                 elements.characterInputs.forEach(input => { input.checked = input.value === card.key; });
                 localStorage.setItem(CHARACTER_KEY, card.key);
                 renderLobbyCharacter();
-                renderCharacterSelectScreen();
                 setScreen('lobby');
             });
             elements.characterGrid.appendChild(button);
@@ -960,6 +1090,16 @@
         if (event.code === 'Space') { event.preventDefault(); fireUltimate(); }
     });
     window.addEventListener('keyup', event => keys.delete(event.code));
+
+    let lastTouchEndAt = 0;
+    document.addEventListener('gesturestart', event => event.preventDefault(), { passive: false });
+    document.addEventListener('touchend', event => {
+        if (!state.matchActive) return;
+        const now = Date.now();
+        if (now - lastTouchEndAt < 340) event.preventDefault();
+        lastTouchEndAt = now;
+    }, { passive: false });
+
 
     elements.nickname.value = localStorage.getItem(STORAGE_KEY) || '';
     elements.botToggle.checked = localStorage.getItem(BOT_KEY) !== '0';
