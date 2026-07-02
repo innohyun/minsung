@@ -578,19 +578,37 @@
         for (let x = map.tileSize; x < map.width; x += map.tileSize) g.moveTo(x, 0).lineTo(x, map.height).stroke({ width: 1, color: 0x21303f, alpha: 0.14 });
         for (let y = map.tileSize; y < map.height; y += map.tileSize) g.moveTo(0, y).lineTo(map.width, y).stroke({ width: 1, color: 0x21303f, alpha: 0.14 });
         const walls = Array.isArray(map.walls) && map.walls.length ? map.walls.map(wall => ({ x: wall.col * map.tileSize + map.tileSize / 2, y: wall.row * map.tileSize + map.tileSize / 2, w: map.tileSize, h: map.tileSize })) : (map.obstacles || []);
-        walls.forEach(rect => {
-            g.roundRect(rect.x - rect.w / 2, rect.y - rect.h / 2, rect.w, rect.h, 4).fill(0x8a6b3d).stroke({ width: 1, color: 0x3a2813, alpha: 0.42 });
-            g.roundRect(rect.x - rect.w / 2 + 5, rect.y - rect.h / 2 + 5, Math.max(1, rect.w - 10), Math.max(1, rect.h - 10), 3).fill({ color: 0xffffff, alpha: 0.12 });
-        });
-        (map.bushes || []).forEach(bush => {
-            const x = bush.col * map.tileSize;
-            const y = bush.row * map.tileSize;
-            g.rect(x, y, map.tileSize, map.tileSize).fill({ color: 0x0f6f2e, alpha: 0.82 });
-            g.circle(x + map.tileSize * 0.24, y + map.tileSize * 0.3, map.tileSize * 0.24).fill({ color: 0x2fbf5b, alpha: 0.86 });
-            g.circle(x + map.tileSize * 0.58, y + map.tileSize * 0.42, map.tileSize * 0.3).fill({ color: 0x1f8f3a, alpha: 0.82 });
-            g.circle(x + map.tileSize * 0.78, y + map.tileSize * 0.7, map.tileSize * 0.28).fill({ color: 0x145c2b, alpha: 0.84 });
-            g.circle(x + map.tileSize * 0.38, y + map.tileSize * 0.72, map.tileSize * 0.18).fill({ color: 0xffffff, alpha: 0.12 });
-        });
+        walls.forEach(rect => drawIsometricWall(g, rect));
+        (map.bushes || []).forEach(bush => drawIsometricBush(g, bush.col * map.tileSize, bush.row * map.tileSize, map.tileSize));
+    }
+
+    const RIGHT_TOP_LIGHT_SHADOW = { x: -8, y: 10 };
+
+    function drawIsometricWall(g, rect) {
+        const x = rect.x - rect.w / 2;
+        const y = rect.y - rect.h / 2;
+        const lift = Math.max(8, rect.h * 0.28);
+        const radius = Math.max(3, rect.w * 0.12);
+        g.roundRect(x + RIGHT_TOP_LIGHT_SHADOW.x, y + RIGHT_TOP_LIGHT_SHADOW.y, rect.w, rect.h, radius).fill({ color: 0x07110a, alpha: 0.2 });
+        g.rect(x, y + rect.h - lift, rect.w, lift).fill(0x5b3d1f);
+        g.rect(x, y - lift, rect.w * 0.18, rect.h + lift).fill(0x6e4c26);
+        g.roundRect(x, y - lift, rect.w, rect.h, radius).fill(0xa98248).stroke({ width: 1.5, color: 0x3a2813, alpha: 0.48 });
+        g.roundRect(x + rect.w * 0.13, y - lift + rect.h * 0.12, rect.w * 0.7, rect.h * 0.22, radius * 0.8).fill({ color: 0xf3d18c, alpha: 0.22 });
+        g.roundRect(x + rect.w * 0.58, y - lift + rect.h * 0.08, rect.w * 0.3, rect.h * 0.55, radius * 0.7).fill({ color: 0xffe0a0, alpha: 0.12 });
+    }
+
+    function drawIsometricBush(g, x, y, size) {
+        const shadowX = x + size * 0.42 + RIGHT_TOP_LIGHT_SHADOW.x * 0.9;
+        const shadowY = y + size * 0.7 + RIGHT_TOP_LIGHT_SHADOW.y * 0.8;
+        g.ellipse(shadowX, shadowY, size * 0.52, size * 0.22).fill({ color: 0x06100a, alpha: 0.22 });
+        g.circle(x + size * 0.34, y + size * 0.58, size * 0.31).fill({ color: 0x0d5f28, alpha: 0.92 });
+        g.circle(x + size * 0.58, y + size * 0.6, size * 0.34).fill({ color: 0x137933, alpha: 0.92 });
+        g.circle(x + size * 0.78, y + size * 0.5, size * 0.25).fill({ color: 0x0f6f2e, alpha: 0.9 });
+        g.circle(x + size * 0.28, y + size * 0.36, size * 0.26).fill({ color: 0x1f9a43, alpha: 0.94 });
+        g.circle(x + size * 0.52, y + size * 0.32, size * 0.33).fill({ color: 0x27b34d, alpha: 0.94 });
+        g.circle(x + size * 0.72, y + size * 0.34, size * 0.25).fill({ color: 0x45d46d, alpha: 0.9 });
+        g.circle(x + size * 0.66, y + size * 0.22, size * 0.18).fill({ color: 0xb7ff92, alpha: 0.22 });
+        g.circle(x + size * 0.84, y + size * 0.28, size * 0.12).fill({ color: 0xffffff, alpha: 0.16 });
     }
 
     function drawEffectParticles(deltaMS) {
@@ -777,14 +795,31 @@
     function drawWalkingLegs(graphic, radius, accent, walkCycle, moving) {
         const stride = moving ? Math.sin(walkCycle) : 0;
         const lift = moving ? Math.abs(Math.cos(walkCycle)) : 0;
-        const footA = radius * (0.72 + stride * 0.18);
-        const footB = radius * (0.72 - stride * 0.18);
-        const sideA = -radius * 0.48;
-        const sideB = radius * 0.48;
-        graphic.ellipse(footA, sideA, radius * 0.42, radius * (0.2 + lift * 0.06)).fill({ color: accent, alpha: 0.92 });
-        graphic.ellipse(footB, sideB, radius * 0.42, radius * (0.2 + (1 - lift) * 0.06)).fill({ color: accent, alpha: 0.92 });
-        graphic.ellipse(radius * 0.26, sideA * 0.76, radius * 0.24, radius * 0.18).fill({ color: 0x0b130d, alpha: 0.22 });
-        graphic.ellipse(radius * 0.26, sideB * 0.76, radius * 0.24, radius * 0.18).fill({ color: 0x0b130d, alpha: 0.22 });
+        const nearFootX = radius * (-0.14 + stride * 0.22);
+        const farFootX = radius * (0.42 - stride * 0.16);
+        const footY = radius * 0.92;
+        graphic.roundRect(farFootX - radius * 0.18, footY - radius * 0.58, radius * 0.36, radius * 0.72, radius * 0.12).fill({ color: accent, alpha: 0.72 });
+        graphic.roundRect(nearFootX - radius * 0.2, footY - radius * 0.64 - lift * radius * 0.08, radius * 0.4, radius * 0.82, radius * 0.12).fill({ color: accent, alpha: 0.96 });
+        graphic.ellipse(farFootX + radius * 0.08, footY + radius * 0.12, radius * 0.34, radius * 0.16).fill({ color: 0x0b130d, alpha: 0.24 });
+        graphic.ellipse(nearFootX - radius * 0.02, footY + radius * 0.17, radius * 0.42, radius * 0.17).fill({ color: 0x0b130d, alpha: 0.3 });
+    }
+
+    function drawSideViewCharacter(graphic, radius, color, accent, character, walkCycle, moving) {
+        const lean = moving ? Math.sin(walkCycle) * radius * 0.05 : 0;
+        drawWalkingLegs(graphic, radius, accent, walkCycle, moving);
+        graphic.ellipse(0, radius * 0.08 + lean, radius * 0.78, radius * 0.95).fill({ color: 0x06100a, alpha: 0.18 });
+        graphic.roundRect(-radius * 0.62, -radius * 0.64 + lean, radius * 1.3, radius * 1.55, radius * 0.44).fill(color);
+        graphic.roundRect(radius * 0.2, -radius * 0.58 + lean, radius * 0.48, radius * 1.36, radius * 0.28).fill({ color: accent, alpha: 0.18 });
+        graphic.ellipse(-radius * 0.28, -radius * 0.46 + lean, radius * 0.42, radius * 0.24).fill({ color: 0xffffff, alpha: character === 'slime' ? 0.3 : 0.22 });
+        graphic.circle(radius * 0.06, -radius * 1.02 + lean, radius * 0.64).fill(color);
+        graphic.circle(radius * 0.28, -radius * 1.16 + lean, radius * 0.34).fill({ color: 0xffffff, alpha: 0.16 });
+        graphic.circle(radius * 0.26, -radius * 1.02 + lean, radius * 0.16).fill(0xfffdf8);
+        graphic.circle(radius * 0.33, -radius * 1.01 + lean, radius * 0.07).fill(0x141a12);
+        graphic.roundRect(radius * 0.4, -radius * 0.24 + lean, radius * 0.76, radius * 0.28, radius * 0.14).fill(accent);
+        graphic.circle(radius * 1.16, -radius * 0.1 + lean, radius * 0.16).fill({ color: 0xffffff, alpha: 0.26 });
+        if (character === 'slime') {
+            graphic.ellipse(-radius * 0.1, -radius * 1.28 + lean, radius * 0.42, radius * 0.16).fill({ color: 0xb7ff92, alpha: 0.28 });
+        }
     }
 
     function updatePlayerGraphic(entry, player, deltaMS) {
@@ -809,24 +844,12 @@
         const ratio = Math.max(0, Math.min(1, health / maxHealth));
         entry.node.alpha = player.alive ? (player.id === state.playerId && isPlayerMostlyInsideBush(state.map, player) ? 0.48 : 1) : 0.36;
         entry.shadow.clear();
-        entry.shadow.ellipse(0, radius * 0.7, radius * (1.28 + (moving ? 0.05 : 0)), radius * 0.42).fill({ color: 0x06100a, alpha: player.alive ? 0.28 : 0.16 });
+        entry.shadow.ellipse(RIGHT_TOP_LIGHT_SHADOW.x * 0.85, radius * 0.86 + RIGHT_TOP_LIGHT_SHADOW.y * 0.55, radius * (1.12 + (moving ? 0.06 : 0)), radius * 0.36).fill({ color: 0x06100a, alpha: player.alive ? 0.3 : 0.16 });
         entry.body.clear();
         entry.body.rotation = angle;
         entry.body.position.set(0, bob);
-        if (player.id === state.playerId) entry.body.circle(0, 0, radius + 8).stroke({ width: 3, color: 0xd7f252, alpha: 0.9 });
-        drawWalkingLegs(entry.body, radius, accent, entry.walkTime, moving);
-        entry.body.ellipse(0, 0, radius * 1.08, player.character === 'slime' ? radius * 0.82 : radius * 0.98).fill({ color: 0x06100a, alpha: 0.18 });
-        entry.body.ellipse(-radius * 0.05, -radius * 0.04, radius * 1.05, player.character === 'slime' ? radius * 0.78 : radius * 0.92).fill(color);
-        entry.body.ellipse(-radius * 0.22, -radius * 0.24, radius * 0.58, radius * 0.28).fill({ color: 0xffffff, alpha: player.character === 'slime' ? 0.28 : 0.2 });
-        entry.body.ellipse(radius * 0.38, radius * 0.18, radius * 0.34, radius * 0.56).fill({ color: accent, alpha: 0.22 });
-        if (player.character === 'slime') entry.body.ellipse(radius * 0.02, -radius * 0.18, radius * 0.54, radius * 0.22).fill({ color: 0xffffff, alpha: 0.26 });
-        entry.body.moveTo(radius * 0.04, -radius * 0.86).lineTo(radius * 0.5, -radius * 1.38).lineTo(radius * 0.66, -radius * 0.56).fill(accent);
-        entry.body.moveTo(radius * 0.04, radius * 0.86).lineTo(radius * 0.5, radius * 1.38).lineTo(radius * 0.66, radius * 0.56).fill(accent);
-        entry.body.circle(radius * 0.24, -radius * 0.3, radius * 0.2).fill(0xfffdf8);
-        entry.body.circle(radius * 0.24, radius * 0.3, radius * 0.2).fill(0xfffdf8);
-        entry.body.circle(radius * 0.32, -radius * 0.3, radius * 0.08).fill(0x141a12);
-        entry.body.circle(radius * 0.32, radius * 0.3, radius * 0.08).fill(0x141a12);
-        entry.body.moveTo(radius * 0.28, radius * 0.04).lineTo(radius * 0.72, radius * 0.04).stroke({ width: Math.max(2, radius * 0.11), color: accent, cap: 'round' });
+        if (player.id === state.playerId) entry.body.ellipse(0, radius * 0.02, radius + 10, radius * 1.5).stroke({ width: 3, color: 0xd7f252, alpha: 0.82 });
+        drawSideViewCharacter(entry.body, radius, color, accent, player.character, entry.walkTime, moving);
 
         const nameText = player.nickname || 'Monster';
         const nameW = Math.min(radius * 5.64, nameText.length * 7 + radius * 0.82);

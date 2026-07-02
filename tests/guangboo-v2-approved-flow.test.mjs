@@ -82,16 +82,27 @@ test('v2 right stick does not auto-lock aim while dragging', () => {
     assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| state\.lastAim/);
     assert.match(clientSource, /const localEntry = state\.render\.players\.get\(me\.id\)/);
     assert.match(clientSource, /const originX = localEntry\?\.x \?\? me\.x/);
-    assert.match(htmlSource, /20260702-v2-3d-player-walk/);
+    assert.match(htmlSource, /20260702-v2-isometric-light/);
 });
 
-test('v2 players render as body characters with shadow and walking animation', () => {
+test('v2 players render as side-view body characters with upper-right light shadows', () => {
+    assert.match(clientSource, /const RIGHT_TOP_LIGHT_SHADOW = \{ x: -8, y: 10 \}/);
     assert.match(clientSource, /const shadow = new PIXI\.Graphics\(\)/);
     assert.match(clientSource, /node\.addChild\(shadow, body, hud\)/);
+    assert.match(clientSource, /function drawSideViewCharacter/);
     assert.match(clientSource, /function drawWalkingLegs/);
     assert.match(clientSource, /entry\.walkTime = moving \?/);
-    assert.match(clientSource, /entry\.body\.position\.set\(0, bob\)/);
-    assert.match(clientSource, /entry\.shadow\.ellipse/);
+    assert.match(clientSource, /drawSideViewCharacter\(entry\.body, radius, color, accent, player\.character/);
+    assert.match(clientSource, /entry\.shadow\.ellipse\(RIGHT_TOP_LIGHT_SHADOW\.x \* 0\.85/);
+});
+
+test('v2 map walls and bushes render as isometric 2.5D objects', () => {
+    assert.match(clientSource, /function drawIsometricWall/);
+    assert.match(clientSource, /function drawIsometricBush/);
+    assert.match(clientSource, /walls\.forEach\(rect => drawIsometricWall\(g, rect\)\)/);
+    assert.match(clientSource, /drawIsometricBush\(g, bush\.col \* map\.tileSize/);
+    assert.match(clientSource, /const lift = Math\.max\(8, rect\.h \* 0\.28\)/);
+    assert.match(clientSource, /RIGHT_TOP_LIGHT_SHADOW\.x/);
 });
 
 test('v2 map updates and bush hiding are realtime and bush graphics fill tiles', () => {
@@ -104,7 +115,8 @@ test('v2 map updates and bush hiding are realtime and bush graphics fill tiles',
     assert.match(clientSource, /player\.id === state\.playerId && isPlayerMostlyInsideBush\(state\.map, player\) \? 0\.48 : 1/);
     assert.match(clientSource, /function drawCanvasBush/);
     assert.match(clientSource, /ctx\.fillRect\(x, y, size, size\)/);
-    assert.match(clientSource, /g\.rect\(x, y, map\.tileSize, map\.tileSize\)\.fill/);
+    assert.match(clientSource, /function drawIsometricBush/);
+    assert.match(clientSource, /drawIsometricBush\(g, bush\.col \* map\.tileSize/);
     assert.match(clientSource, /function deleteOfficialMap/);
     assert.match(clientSource, /visibleOfficialMaps\(\)\.forEach\(map =>/);
 });
