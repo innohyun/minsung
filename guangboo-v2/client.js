@@ -578,8 +578,22 @@
         for (let x = map.tileSize; x < map.width; x += map.tileSize) g.moveTo(x, 0).lineTo(x, map.height).stroke({ width: 1, color: 0x21303f, alpha: 0.14 });
         for (let y = map.tileSize; y < map.height; y += map.tileSize) g.moveTo(0, y).lineTo(map.width, y).stroke({ width: 1, color: 0x21303f, alpha: 0.14 });
         const wallTiles = Array.isArray(map.walls) && map.walls.length ? map.walls : [];
+        const wallKeys = new Set(wallTiles.map(wall => `${wall.col},${wall.row}`));
         if (wallTiles.length) {
-            groupConnectedWallTiles(wallTiles).forEach(group => drawIsometricWallGroup(g, group, map.tileSize));
+            wallTiles.forEach(wall => drawIsometricWall(g, {
+                x: wall.col * map.tileSize,
+                y: wall.row * map.tileSize,
+                w: map.tileSize,
+                h: map.tileSize,
+                col: wall.col,
+                row: wall.row,
+                connected: {
+                    left: wallKeys.has(`${wall.col - 1},${wall.row}`),
+                    right: wallKeys.has(`${wall.col + 1},${wall.row}`),
+                    up: wallKeys.has(`${wall.col},${wall.row - 1}`),
+                    down: wallKeys.has(`${wall.col},${wall.row + 1}`)
+                }
+            }));
         } else {
             (map.obstacles || []).forEach(rect => drawIsometricWall(g, { x: rect.x - rect.w / 2, y: rect.y - rect.h / 2, w: rect.w, h: rect.h, connected: {} }));
         }
@@ -588,102 +602,22 @@
 
     const RIGHT_TOP_LIGHT_SHADOW = { x: -8, y: 10 };
 
-    function groupConnectedWallTiles(wallTiles) {
-        const byKey = new Map(wallTiles.map(wall => [`${wall.col},${wall.row}`, wall]));
-        const visited = new Set();
-        const groups = [];
-        byKey.forEach((start, startKey) => {
-            if (visited.has(startKey)) return;
-            const queue = [start];
-            const group = [];
-            visited.add(startKey);
-            while (queue.length) {
-                const wall = queue.shift();
-                group.push(wall);
-                [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dc, dr]) => {
-                    const key = `${wall.col + dc},${wall.row + dr}`;
-                    if (!byKey.has(key) || visited.has(key)) return;
-                    visited.add(key);
-                    queue.push(byKey.get(key));
-                });
-            }
-            groups.push(group);
-        });
-        return groups;
-    }
-
-    function wallRowSegments(group) {
-        const rows = new Map();
-        group.forEach(wall => {
-            if (!rows.has(wall.row)) rows.set(wall.row, []);
-            rows.get(wall.row).push(wall.col);
-        });
-        return [...rows.entries()].sort((a, b) => a[0] - b[0]).flatMap(([row, cols]) => {
-            const sorted = [...new Set(cols)].sort((a, b) => a - b);
-            const segments = [];
-            let start = sorted[0];
-            let end = sorted[0];
-            for (let i = 1; i < sorted.length; i += 1) {
-                if (sorted[i] === end + 1) {
-                    end = sorted[i];
-                } else {
-                    segments.push({ row, start, end });
-                    start = sorted[i];
-                    end = sorted[i];
-                }
-            }
-            segments.push({ row, start, end });
-            return segments;
-        });
-    }
-
-    function drawIsometricWallGroup(g, group, tileSize) {
-        const wallKeys = new Set(group.map(wall => `${wall.col},${wall.row}`));
-        const edge = Math.max(1, tileSize * 0.04);
-        const radius = Math.max(3, tileSize * 0.12);
-        const hasNeighbor = (col, row) => wallKeys.has(`${col},${row}`);
-        const segments = wallRowSegments(group);
-
-        // Draw one shared shadow for the connected group, not one strong shadow per tile.
-        segments.forEach(segment => {
-            const x = segment.start * tileSize;
-            const y = segment.row * tileSize;
-            const w = (segment.end - segment.start + 1) * tileSize;
-            g.roundRect(x + RIGHT_TOP_LIGHT_SHADOW.x, y + RIGHT_TOP_LIGHT_SHADOW.y, w, tileSize, radius).fill({ color: 0x07110a, alpha: 0.16 });
-        });
-
-        // Fill connected row strips so attached walls read as one set instead of separate cubes.
-        segments.forEach(segment => {
-            const x = segment.start * tileSize;
-            const y = segment.row * tileSize;
-            const w = (segment.end - segment.start + 1) * tileSize;
-            g.rect(x, y, w, tileSize).fill(0xa98248);
-            g.rect(x + edge, y + tileSize * 0.58, w - edge * 2, tileSize * 0.38).fill({ color: 0x6f4b25, alpha: 0.62 });
-            g.roundRect(x + tileSize * 0.12, y + tileSize * 0.12, Math.max(tileSize * 0.44, w * 0.58), tileSize * 0.2, radius * 0.55).fill({ color: 0xf3d18c, alpha: 0.14 });
-        });
-
-        group.forEach(wall => {
-            const x = wall.col * tileSize;
-            const y = wall.row * tileSize;
-            if (hasNeighbor(wall.col + 1, wall.row)) g.moveTo(x + tileSize, y + tileSize * 0.12).lineTo(x + tileSize, y + tileSize * 0.88).stroke({ width: 1, color: 0x3a2813, alpha: 0.07 });
-            if (hasNeighbor(wall.col, wall.row + 1)) g.moveTo(x + tileSize * 0.12, y + tileSize).lineTo(x + tileSize * 0.88, y + tileSize).stroke({ width: 1, color: 0x3a2813, alpha: 0.06 });
-            if (!hasNeighbor(wall.col, wall.row - 1)) g.moveTo(x + edge, y).lineTo(x + tileSize - edge, y).stroke({ width: 1.3, color: 0xf1c982, alpha: 0.32 });
-            if (!hasNeighbor(wall.col - 1, wall.row)) g.moveTo(x, y + edge).lineTo(x, y + tileSize - edge).stroke({ width: 1.4, color: 0x3a2813, alpha: 0.32 });
-            if (!hasNeighbor(wall.col + 1, wall.row)) g.moveTo(x + tileSize, y + edge).lineTo(x + tileSize, y + tileSize - edge).stroke({ width: 1.4, color: 0xf1c982, alpha: 0.2 });
-            if (!hasNeighbor(wall.col, wall.row + 1)) g.moveTo(x + edge, y + tileSize).lineTo(x + tileSize - edge, y + tileSize).stroke({ width: 1.8, color: 0x3a2813, alpha: 0.44 });
-        });
-    }
-
     function drawIsometricWall(g, rect) {
         const x = rect.x;
         const y = rect.y;
         const radius = Math.max(3, rect.w * 0.12);
-        g.roundRect(x + RIGHT_TOP_LIGHT_SHADOW.x, y + RIGHT_TOP_LIGHT_SHADOW.y, rect.w, rect.h, radius).fill({ color: 0x07110a, alpha: 0.18 });
+        const connected = rect.connected || {};
+        const shadowAlpha = (!connected.left || !connected.down) ? 0.18 : 0.06;
+        g.roundRect(x + RIGHT_TOP_LIGHT_SHADOW.x, y + RIGHT_TOP_LIGHT_SHADOW.y, rect.w, rect.h, radius).fill({ color: 0x07110a, alpha: shadowAlpha });
         g.roundRect(x, y, rect.w, rect.h, radius).fill(0xa98248);
         g.roundRect(x + 1, y + rect.h * 0.58, rect.w - 2, rect.h * 0.4, radius * 0.65).fill({ color: 0x6f4b25, alpha: 0.64 });
         g.roundRect(x + rect.w * 0.14, y + rect.h * 0.12, rect.w * 0.54, rect.h * 0.22, radius * 0.65).fill({ color: 0xf3d18c, alpha: 0.18 });
         g.roundRect(x + rect.w * 0.58, y + rect.h * 0.1, rect.w * 0.26, rect.h * 0.52, radius * 0.55).fill({ color: 0xffe0a0, alpha: 0.08 });
         g.roundRect(x + 0.5, y + 0.5, rect.w - 1, rect.h - 1, radius).stroke({ width: 1.2, color: 0x3a2813, alpha: 0.28 });
+        if (connected.left) g.moveTo(x, y + radius).lineTo(x, y + rect.h - radius).stroke({ width: 1, color: 0x3a2813, alpha: 0.16 });
+        if (connected.up) g.moveTo(x + radius, y).lineTo(x + rect.w - radius, y).stroke({ width: 1, color: 0x3a2813, alpha: 0.14 });
+        if (!connected.down) g.moveTo(x + radius, y + rect.h).lineTo(x + rect.w - radius, y + rect.h).stroke({ width: 1.6, color: 0x3a2813, alpha: 0.42 });
+        if (!connected.right) g.moveTo(x + rect.w, y + radius).lineTo(x + rect.w, y + rect.h - radius).stroke({ width: 1.2, color: 0xf1c982, alpha: 0.22 });
     }
 
     function drawIsometricBush(g, x, y, size) {

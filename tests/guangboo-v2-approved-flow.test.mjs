@@ -82,7 +82,7 @@ test('v2 right stick does not auto-lock aim while dragging', () => {
     assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| state\.lastAim/);
     assert.match(clientSource, /const localEntry = state\.render\.players\.get\(me\.id\)/);
     assert.match(clientSource, /const originX = localEntry\?\.x \?\? me\.x/);
-    assert.match(htmlSource, /20260702-v2-grouped-walls/);
+    assert.match(htmlSource, /20260702-v2-blue-cube-walls/);
 });
 
 test('v2 players render as side-view body characters with upper-right light shadows', () => {
@@ -98,15 +98,14 @@ test('v2 players render as side-view body characters with upper-right light shad
     assert.match(clientSource, /entry\.shadow\.ellipse\(RIGHT_TOP_LIGHT_SHADOW\.x \* 0\.85/);
 });
 
-test('v2 map walls and bushes render as grouped isometric 2.5D objects', () => {
-    assert.match(htmlSource, /20260702-v2-grouped-walls/);
-    assert.match(clientSource, /function groupConnectedWallTiles/);
-    assert.match(clientSource, /function drawIsometricWallGroup/);
-    assert.match(clientSource, /groupConnectedWallTiles\(wallTiles\)\.forEach\(group => drawIsometricWallGroup/);
-    assert.match(clientSource, /const wallKeys = new Set\(group\.map/);
-    assert.match(clientSource, /Fill connected row strips so attached walls read as one set/);
-    assert.match(clientSource, /alpha: 0\.07/);
+test('v2 map walls and bushes render as isometric 2.5D objects', () => {
+    assert.match(clientSource, /function drawIsometricWall/);
     assert.match(clientSource, /function drawIsometricBush/);
+    assert.match(clientSource, /const wallKeys = new Set/);
+    assert.match(clientSource, /left: wallKeys\.has/);
+    assert.match(clientSource, /const shadowAlpha = \(!connected\.left \|\| !connected\.down\) \? 0\.18 : 0\.06/);
+    assert.match(clientSource, /g\.roundRect\(x, y, rect\.w, rect\.h, radius\)\.fill\(0xa98248\)/);
+    assert.match(clientSource, /y \+ rect\.h \* 0\.58/);
     assert.match(clientSource, /drawIsometricBush\(g, bush\.col \* map\.tileSize/);
     assert.match(clientSource, /RIGHT_TOP_LIGHT_SHADOW\.x/);
 });
