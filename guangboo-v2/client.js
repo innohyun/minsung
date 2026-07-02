@@ -577,24 +577,53 @@
         g.roundRect(0, 0, map.width, map.height, 12).fill(0xeef3df).stroke({ width: 3, color: 0x314935, alpha: 0.45 });
         for (let x = map.tileSize; x < map.width; x += map.tileSize) g.moveTo(x, 0).lineTo(x, map.height).stroke({ width: 1, color: 0x21303f, alpha: 0.14 });
         for (let y = map.tileSize; y < map.height; y += map.tileSize) g.moveTo(0, y).lineTo(map.width, y).stroke({ width: 1, color: 0x21303f, alpha: 0.14 });
-        const walls = Array.isArray(map.walls) && map.walls.length ? map.walls.map(wall => ({ x: wall.col * map.tileSize + map.tileSize / 2, y: wall.row * map.tileSize + map.tileSize / 2, w: map.tileSize, h: map.tileSize })) : (map.obstacles || []);
-        walls.forEach(rect => drawIsometricWall(g, rect));
+        const wallTiles = Array.isArray(map.walls) && map.walls.length ? map.walls : [];
+        const wallKeys = new Set(wallTiles.map(wall => `${wall.col},${wall.row}`));
+        if (wallTiles.length) {
+            wallTiles.forEach(wall => drawIsometricWall(g, {
+                x: wall.col * map.tileSize,
+                y: wall.row * map.tileSize,
+                w: map.tileSize,
+                h: map.tileSize,
+                col: wall.col,
+                row: wall.row,
+                connected: {
+                    left: wallKeys.has(`${wall.col - 1},${wall.row}`),
+                    right: wallKeys.has(`${wall.col + 1},${wall.row}`),
+                    up: wallKeys.has(`${wall.col},${wall.row - 1}`),
+                    down: wallKeys.has(`${wall.col},${wall.row + 1}`)
+                }
+            }));
+        } else {
+            (map.obstacles || []).forEach(rect => drawIsometricWall(g, { x: rect.x - rect.w / 2, y: rect.y - rect.h / 2, w: rect.w, h: rect.h, connected: {} }));
+        }
         (map.bushes || []).forEach(bush => drawIsometricBush(g, bush.col * map.tileSize, bush.row * map.tileSize, map.tileSize));
     }
 
     const RIGHT_TOP_LIGHT_SHADOW = { x: -8, y: 10 };
 
     function drawIsometricWall(g, rect) {
-        const x = rect.x - rect.w / 2;
-        const y = rect.y - rect.h / 2;
+        const x = rect.x;
+        const y = rect.y;
         const lift = Math.max(8, rect.h * 0.28);
         const radius = Math.max(3, rect.w * 0.12);
-        g.roundRect(x + RIGHT_TOP_LIGHT_SHADOW.x, y + RIGHT_TOP_LIGHT_SHADOW.y, rect.w, rect.h, radius).fill({ color: 0x07110a, alpha: 0.2 });
-        g.rect(x, y + rect.h - lift, rect.w, lift).fill(0x5b3d1f);
-        g.rect(x, y - lift, rect.w * 0.18, rect.h + lift).fill(0x6e4c26);
-        g.roundRect(x, y - lift, rect.w, rect.h, radius).fill(0xa98248).stroke({ width: 1.5, color: 0x3a2813, alpha: 0.48 });
-        g.roundRect(x + rect.w * 0.13, y - lift + rect.h * 0.12, rect.w * 0.7, rect.h * 0.22, radius * 0.8).fill({ color: 0xf3d18c, alpha: 0.22 });
-        g.roundRect(x + rect.w * 0.58, y - lift + rect.h * 0.08, rect.w * 0.3, rect.h * 0.55, radius * 0.7).fill({ color: 0xffe0a0, alpha: 0.12 });
+        const connected = rect.connected || {};
+        if (!connected.left || !connected.down) {
+            g.roundRect(x + RIGHT_TOP_LIGHT_SHADOW.x, y + RIGHT_TOP_LIGHT_SHADOW.y, rect.w, rect.h, radius).fill({ color: 0x07110a, alpha: 0.18 });
+        }
+        if (!connected.down) g.rect(x, y + rect.h - lift, rect.w, lift).fill(0x5b3d1f);
+        if (!connected.left) g.rect(x, y - lift, rect.w * 0.18, rect.h + lift).fill(0x6e4c26);
+        g.roundRect(x, y - lift, rect.w, rect.h, radius).fill(0xa98248);
+        if (!connected.left) g.moveTo(x, y - lift + radius).lineTo(x, y + rect.h - radius).stroke({ width: 1.5, color: 0x3a2813, alpha: 0.42 });
+        if (!connected.right) g.moveTo(x + rect.w, y - lift + radius).lineTo(x + rect.w, y + rect.h - radius).stroke({ width: 1.2, color: 0xf1c982, alpha: 0.24 });
+        if (!connected.up) g.moveTo(x + radius, y - lift).lineTo(x + rect.w - radius, y - lift).stroke({ width: 1.5, color: 0xffe0a0, alpha: 0.32 });
+        if (!connected.down) g.moveTo(x + radius, y + rect.h).lineTo(x + rect.w - radius, y + rect.h).stroke({ width: 1.5, color: 0x3a2813, alpha: 0.45 });
+        if (connected.left || connected.right || connected.up || connected.down) {
+            g.roundRect(x + rect.w * 0.12, y - lift + rect.h * 0.12, rect.w * 0.76, rect.h * 0.18, radius * 0.7).fill({ color: 0xf3d18c, alpha: 0.12 });
+        } else {
+            g.roundRect(x + rect.w * 0.13, y - lift + rect.h * 0.12, rect.w * 0.7, rect.h * 0.22, radius * 0.8).fill({ color: 0xf3d18c, alpha: 0.22 });
+            g.roundRect(x + rect.w * 0.58, y - lift + rect.h * 0.08, rect.w * 0.3, rect.h * 0.55, radius * 0.7).fill({ color: 0xffe0a0, alpha: 0.12 });
+        }
     }
 
     function drawIsometricBush(g, x, y, size) {
@@ -804,8 +833,9 @@
         graphic.ellipse(nearFootX - radius * 0.02, footY + radius * 0.17, radius * 0.42, radius * 0.17).fill({ color: 0x0b130d, alpha: 0.3 });
     }
 
-    function drawSideViewCharacter(graphic, radius, color, accent, character, walkCycle, moving) {
+    function drawSideViewCharacter(graphic, radius, color, accent, character, walkCycle, moving, aimY = 0) {
         const lean = moving ? Math.sin(walkCycle) * radius * 0.05 : 0;
+        const gazeY = Math.max(-1, Math.min(1, aimY)) * radius * 0.16;
         drawWalkingLegs(graphic, radius, accent, walkCycle, moving);
         graphic.ellipse(0, radius * 0.08 + lean, radius * 0.78, radius * 0.95).fill({ color: 0x06100a, alpha: 0.18 });
         graphic.roundRect(-radius * 0.62, -radius * 0.64 + lean, radius * 1.3, radius * 1.55, radius * 0.44).fill(color);
@@ -813,10 +843,10 @@
         graphic.ellipse(-radius * 0.28, -radius * 0.46 + lean, radius * 0.42, radius * 0.24).fill({ color: 0xffffff, alpha: character === 'slime' ? 0.3 : 0.22 });
         graphic.circle(radius * 0.06, -radius * 1.02 + lean, radius * 0.64).fill(color);
         graphic.circle(radius * 0.28, -radius * 1.16 + lean, radius * 0.34).fill({ color: 0xffffff, alpha: 0.16 });
-        graphic.circle(radius * 0.26, -radius * 1.02 + lean, radius * 0.16).fill(0xfffdf8);
-        graphic.circle(radius * 0.33, -radius * 1.01 + lean, radius * 0.07).fill(0x141a12);
-        graphic.roundRect(radius * 0.4, -radius * 0.24 + lean, radius * 0.76, radius * 0.28, radius * 0.14).fill(accent);
-        graphic.circle(radius * 1.16, -radius * 0.1 + lean, radius * 0.16).fill({ color: 0xffffff, alpha: 0.26 });
+        graphic.circle(radius * 0.26, -radius * 1.02 + lean + gazeY, radius * 0.16).fill(0xfffdf8);
+        graphic.circle(radius * 0.33, -radius * 1.01 + lean + gazeY, radius * 0.07).fill(0x141a12);
+        graphic.roundRect(radius * 0.38, -radius * 0.24 + lean + gazeY * 0.65, radius * 0.82, radius * 0.28, radius * 0.14).fill(accent);
+        graphic.circle(radius * 1.2, -radius * 0.1 + lean + gazeY * 0.65, radius * 0.16).fill({ color: 0xffffff, alpha: 0.26 });
         if (character === 'slime') {
             graphic.ellipse(-radius * 0.1, -radius * 1.28 + lean, radius * 0.42, radius * 0.16).fill({ color: 0xb7ff92, alpha: 0.28 });
         }
@@ -836,7 +866,8 @@
         const facingX = player.facingX ?? player.facing?.x ?? player.aimX ?? player.aim?.x ?? 1;
         const facingY = player.facingY ?? player.facing?.y ?? player.aimY ?? player.aim?.y ?? 0;
         const facingLength = Math.hypot(facingX, facingY) || 1;
-        const angle = Math.atan2(facingY / facingLength, facingX / facingLength);
+        const normalizedFacingX = facingX / facingLength;
+        const normalizedFacingY = facingY / facingLength;
         const color = player.character === 'slime' ? 0x7ee65b : parseHex(player.monster?.color, 0x6ee7b7);
         const accent = player.character === 'slime' ? 0x167a34 : parseHex(player.monster?.accent, 0x064e3b);
         const health = Math.max(0, Math.round(Number(player.health) || 0));
@@ -846,10 +877,11 @@
         entry.shadow.clear();
         entry.shadow.ellipse(RIGHT_TOP_LIGHT_SHADOW.x * 0.85, radius * 0.86 + RIGHT_TOP_LIGHT_SHADOW.y * 0.55, radius * (1.12 + (moving ? 0.06 : 0)), radius * 0.36).fill({ color: 0x06100a, alpha: player.alive ? 0.3 : 0.16 });
         entry.body.clear();
-        entry.body.rotation = angle;
+        entry.body.rotation = 0;
+        entry.body.scale.set(normalizedFacingX < -0.12 ? -1 : 1, 1);
         entry.body.position.set(0, bob);
         if (player.id === state.playerId) entry.body.ellipse(0, radius * 0.02, radius + 10, radius * 1.5).stroke({ width: 3, color: 0xd7f252, alpha: 0.82 });
-        drawSideViewCharacter(entry.body, radius, color, accent, player.character, entry.walkTime, moving);
+        drawSideViewCharacter(entry.body, radius, color, accent, player.character, entry.walkTime, moving, normalizedFacingY);
 
         const nameText = player.nickname || 'Monster';
         const nameW = Math.min(radius * 5.64, nameText.length * 7 + radius * 0.82);

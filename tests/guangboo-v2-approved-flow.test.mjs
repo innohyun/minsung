@@ -82,7 +82,7 @@ test('v2 right stick does not auto-lock aim while dragging', () => {
     assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| state\.lastAim/);
     assert.match(clientSource, /const localEntry = state\.render\.players\.get\(me\.id\)/);
     assert.match(clientSource, /const originX = localEntry\?\.x \?\? me\.x/);
-    assert.match(htmlSource, /20260702-v2-isometric-light/);
+    assert.match(htmlSource, /20260702-v2-no-body-rotate-wall-merge/);
 });
 
 test('v2 players render as side-view body characters with upper-right light shadows', () => {
@@ -92,14 +92,19 @@ test('v2 players render as side-view body characters with upper-right light shad
     assert.match(clientSource, /function drawSideViewCharacter/);
     assert.match(clientSource, /function drawWalkingLegs/);
     assert.match(clientSource, /entry\.walkTime = moving \?/);
-    assert.match(clientSource, /drawSideViewCharacter\(entry\.body, radius, color, accent, player\.character/);
+    assert.match(clientSource, /entry\.body\.rotation = 0/);
+    assert.match(clientSource, /entry\.body\.scale\.set\(normalizedFacingX < -0\.12 \? -1 : 1, 1\)/);
+    assert.match(clientSource, /drawSideViewCharacter\(entry\.body, radius, color, accent, player\.character, entry\.walkTime, moving, normalizedFacingY\)/);
     assert.match(clientSource, /entry\.shadow\.ellipse\(RIGHT_TOP_LIGHT_SHADOW\.x \* 0\.85/);
 });
 
 test('v2 map walls and bushes render as isometric 2.5D objects', () => {
     assert.match(clientSource, /function drawIsometricWall/);
     assert.match(clientSource, /function drawIsometricBush/);
-    assert.match(clientSource, /walls\.forEach\(rect => drawIsometricWall\(g, rect\)\)/);
+    assert.match(clientSource, /const wallKeys = new Set/);
+    assert.match(clientSource, /left: wallKeys\.has/);
+    assert.match(clientSource, /if \(!connected\.down\) g\.rect/);
+    assert.match(clientSource, /if \(!connected\.left\) g\.rect/);
     assert.match(clientSource, /drawIsometricBush\(g, bush\.col \* map\.tileSize/);
     assert.match(clientSource, /const lift = Math\.max\(8, rect\.h \* 0\.28\)/);
     assert.match(clientSource, /RIGHT_TOP_LIGHT_SHADOW\.x/);
