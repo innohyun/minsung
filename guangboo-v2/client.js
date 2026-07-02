@@ -605,25 +605,19 @@
     function drawIsometricWall(g, rect) {
         const x = rect.x;
         const y = rect.y;
-        const lift = Math.max(8, rect.h * 0.28);
         const radius = Math.max(3, rect.w * 0.12);
         const connected = rect.connected || {};
-        if (!connected.left || !connected.down) {
-            g.roundRect(x + RIGHT_TOP_LIGHT_SHADOW.x, y + RIGHT_TOP_LIGHT_SHADOW.y, rect.w, rect.h, radius).fill({ color: 0x07110a, alpha: 0.18 });
-        }
-        if (!connected.down) g.rect(x, y + rect.h - lift, rect.w, lift).fill(0x5b3d1f);
-        if (!connected.left) g.rect(x, y - lift, rect.w * 0.18, rect.h + lift).fill(0x6e4c26);
-        g.roundRect(x, y - lift, rect.w, rect.h, radius).fill(0xa98248);
-        if (!connected.left) g.moveTo(x, y - lift + radius).lineTo(x, y + rect.h - radius).stroke({ width: 1.5, color: 0x3a2813, alpha: 0.42 });
-        if (!connected.right) g.moveTo(x + rect.w, y - lift + radius).lineTo(x + rect.w, y + rect.h - radius).stroke({ width: 1.2, color: 0xf1c982, alpha: 0.24 });
-        if (!connected.up) g.moveTo(x + radius, y - lift).lineTo(x + rect.w - radius, y - lift).stroke({ width: 1.5, color: 0xffe0a0, alpha: 0.32 });
-        if (!connected.down) g.moveTo(x + radius, y + rect.h).lineTo(x + rect.w - radius, y + rect.h).stroke({ width: 1.5, color: 0x3a2813, alpha: 0.45 });
-        if (connected.left || connected.right || connected.up || connected.down) {
-            g.roundRect(x + rect.w * 0.12, y - lift + rect.h * 0.12, rect.w * 0.76, rect.h * 0.18, radius * 0.7).fill({ color: 0xf3d18c, alpha: 0.12 });
-        } else {
-            g.roundRect(x + rect.w * 0.13, y - lift + rect.h * 0.12, rect.w * 0.7, rect.h * 0.22, radius * 0.8).fill({ color: 0xf3d18c, alpha: 0.22 });
-            g.roundRect(x + rect.w * 0.58, y - lift + rect.h * 0.08, rect.w * 0.3, rect.h * 0.55, radius * 0.7).fill({ color: 0xffe0a0, alpha: 0.12 });
-        }
+        const shadowAlpha = (!connected.left || !connected.down) ? 0.18 : 0.06;
+        g.roundRect(x + RIGHT_TOP_LIGHT_SHADOW.x, y + RIGHT_TOP_LIGHT_SHADOW.y, rect.w, rect.h, radius).fill({ color: 0x07110a, alpha: shadowAlpha });
+        g.roundRect(x, y, rect.w, rect.h, radius).fill(0xa98248);
+        g.roundRect(x + 1, y + rect.h * 0.58, rect.w - 2, rect.h * 0.4, radius * 0.65).fill({ color: 0x6f4b25, alpha: 0.64 });
+        g.roundRect(x + rect.w * 0.14, y + rect.h * 0.12, rect.w * 0.54, rect.h * 0.22, radius * 0.65).fill({ color: 0xf3d18c, alpha: 0.18 });
+        g.roundRect(x + rect.w * 0.58, y + rect.h * 0.1, rect.w * 0.26, rect.h * 0.52, radius * 0.55).fill({ color: 0xffe0a0, alpha: 0.08 });
+        g.roundRect(x + 0.5, y + 0.5, rect.w - 1, rect.h - 1, radius).stroke({ width: 1.2, color: 0x3a2813, alpha: 0.28 });
+        if (connected.left) g.moveTo(x, y + radius).lineTo(x, y + rect.h - radius).stroke({ width: 1, color: 0x3a2813, alpha: 0.16 });
+        if (connected.up) g.moveTo(x + radius, y).lineTo(x + rect.w - radius, y).stroke({ width: 1, color: 0x3a2813, alpha: 0.14 });
+        if (!connected.down) g.moveTo(x + radius, y + rect.h).lineTo(x + rect.w - radius, y + rect.h).stroke({ width: 1.6, color: 0x3a2813, alpha: 0.42 });
+        if (!connected.right) g.moveTo(x + rect.w, y + radius).lineTo(x + rect.w, y + rect.h - radius).stroke({ width: 1.2, color: 0xf1c982, alpha: 0.22 });
     }
 
     function drawIsometricBush(g, x, y, size) {

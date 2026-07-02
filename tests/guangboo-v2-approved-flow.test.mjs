@@ -82,7 +82,7 @@ test('v2 right stick does not auto-lock aim while dragging', () => {
     assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| state\.lastAim/);
     assert.match(clientSource, /const localEntry = state\.render\.players\.get\(me\.id\)/);
     assert.match(clientSource, /const originX = localEntry\?\.x \?\? me\.x/);
-    assert.match(htmlSource, /20260702-v2-no-body-rotate-wall-merge/);
+    assert.match(htmlSource, /20260702-v2-blue-cube-walls/);
 });
 
 test('v2 players render as side-view body characters with upper-right light shadows', () => {
@@ -103,10 +103,10 @@ test('v2 map walls and bushes render as isometric 2.5D objects', () => {
     assert.match(clientSource, /function drawIsometricBush/);
     assert.match(clientSource, /const wallKeys = new Set/);
     assert.match(clientSource, /left: wallKeys\.has/);
-    assert.match(clientSource, /if \(!connected\.down\) g\.rect/);
-    assert.match(clientSource, /if \(!connected\.left\) g\.rect/);
+    assert.match(clientSource, /const shadowAlpha = \(!connected\.left \|\| !connected\.down\) \? 0\.18 : 0\.06/);
+    assert.match(clientSource, /g\.roundRect\(x, y, rect\.w, rect\.h, radius\)\.fill\(0xa98248\)/);
+    assert.match(clientSource, /y \+ rect\.h \* 0\.58/);
     assert.match(clientSource, /drawIsometricBush\(g, bush\.col \* map\.tileSize/);
-    assert.match(clientSource, /const lift = Math\.max\(8, rect\.h \* 0\.28\)/);
     assert.match(clientSource, /RIGHT_TOP_LIGHT_SHADOW\.x/);
 });
 
