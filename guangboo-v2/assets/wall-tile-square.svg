@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+  <filter id="softShadow" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur in="SourceAlpha" stdDeviation="18" result="blur"/>
+    <feOffset in="blur" dx="-12" dy="18" result="offset"/>
+    <feComponentTransfer><feFuncA type="linear" slope="0.38"/></feComponentTransfer>
+    <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+  <filter id="chipShadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="2" stdDeviation="1.4" flood-color="#1f120b" flood-opacity="0.35"/></filter>
+  <linearGradient id="topGrad" x1="78" y1="58" x2="428" y2="396" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#f0c37b"/>
+    <stop offset="0.34" stop-color="#c8874f"/>
+    <stop offset="0.72" stop-color="#9e5b36"/>
+    <stop offset="1" stop-color="#70402b"/>
+  </linearGradient>
+  <linearGradient id="frontGrad" x1="94" y1="300" x2="428" y2="474" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#8c5134"/>
+    <stop offset="0.48" stop-color="#6c3b2b"/>
+    <stop offset="1" stop-color="#41261f"/>
+  </linearGradient>
+  <linearGradient id="rightGrad" x1="344" y1="136" x2="462" y2="426" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#b07043"/>
+    <stop offset="0.45" stop-color="#79432f"/>
+    <stop offset="1" stop-color="#2e201d"/>
+  </linearGradient>
+  <radialGradient id="rim" cx="28%" cy="18%" r="70%"><stop offset="0" stop-color="#fff3bd" stop-opacity="0.52"/><stop offset="0.48" stop-color="#fff3bd" stop-opacity="0.08"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
+  <pattern id="speckle" width="42" height="42" patternUnits="userSpaceOnUse">
+    <circle cx="8" cy="9" r="1.8" fill="#fff1c7" opacity="0.17"/>
+    <circle cx="28" cy="17" r="1.2" fill="#2b170f" opacity="0.18"/>
+    <circle cx="19" cy="34" r="1.5" fill="#ffd89b" opacity="0.13"/>
+    <path d="M34 33 l5 -2" stroke="#2b170f" stroke-width="1.2" opacity="0.12"/>
+  </pattern>
+  <clipPath id="topClip"><path d="M103 101 Q256 32 409 101 L438 298 Q260 380 75 298 Z"/></clipPath>
+  <clipPath id="frontClip"><path d="M75 298 Q260 380 438 298 L404 424 Q259 484 106 424 Z"/></clipPath>
+  <clipPath id="rightClip"><path d="M409 101 L438 298 L404 424 L373 206 Z"/></clipPath>
+</defs>
+<rect width="512" height="512" fill="none"/>
+<g filter="url(#softShadow)">
+  <ellipse cx="247" cy="415" rx="180" ry="44" fill="#071009" opacity="0.42"/>
+  <path d="M75 298 Q260 380 438 298 L404 424 Q259 484 106 424 Z" fill="url(#frontGrad)"/>
+  <path d="M409 101 L438 298 L404 424 L373 206 Z" fill="url(#rightGrad)"/>
+  <path d="M103 101 Q256 32 409 101 L438 298 Q260 380 75 298 Z" fill="url(#topGrad)"/>
+  <path d="M103 101 Q256 32 409 101 L438 298 Q260 380 75 298 Z" fill="url(#rim)"/>
+  <path d="M103 101 Q256 32 409 101 L438 298 Q260 380 75 298 Z" fill="url(#speckle)" opacity="0.55" clip-path="url(#topClip)"/>
+  <path d="M75 298 Q260 380 438 298 L404 424 Q259 484 106 424 Z" fill="url(#speckle)" opacity="0.38" clip-path="url(#frontClip)"/>
+  <path d="M409 101 L438 298 L404 424 L373 206 Z" fill="url(#speckle)" opacity="0.26" clip-path="url(#rightClip)"/>
+  <!-- top brick/block seams -->
+  <g clip-path="url(#topClip)" opacity="0.75">
+    <path d="M129 137 C210 168 304 168 383 136" stroke="#5b3425" stroke-width="4" opacity="0.32" fill="none"/>
+    <path d="M96 205 C198 249 316 249 421 205" stroke="#5b3425" stroke-width="4" opacity="0.34" fill="none"/>
+    <path d="M82 267 C199 321 326 322 432 267" stroke="#5b3425" stroke-width="4" opacity="0.36" fill="none"/>
+    <path d="M180 71 C171 144 164 219 154 327" stroke="#5b3425" stroke-width="3.3" opacity="0.24" fill="none"/>
+    <path d="M256 44 C255 128 255 233 255 371" stroke="#5b3425" stroke-width="3.8" opacity="0.28" fill="none"/>
+    <path d="M334 72 C344 152 352 235 363 326" stroke="#5b3425" stroke-width="3.3" opacity="0.23" fill="none"/>
+    <path d="M132 134 C211 163 304 164 383 132" stroke="#ffe1a5" stroke-width="1.6" opacity="0.28" fill="none"/>
+    <path d="M180 74 C172 146 165 220 155 326" stroke="#ffe1a5" stroke-width="1.2" opacity="0.2" fill="none"/>
+  </g>
+  <!-- side seams and bevels -->
+  <g clip-path="url(#frontClip)">
+    <path d="M96 337 Q259 410 421 337" stroke="#2b1812" stroke-width="5" opacity="0.25" fill="none"/>
+    <path d="M112 388 Q257 450 405 388" stroke="#1f130f" stroke-width="5" opacity="0.28" fill="none"/>
+    <path d="M177 342 L184 449" stroke="#24140f" stroke-width="4" opacity="0.22"/>
+    <path d="M257 376 L257 480" stroke="#24140f" stroke-width="4" opacity="0.25"/>
+    <path d="M337 341 L328 453" stroke="#24140f" stroke-width="4" opacity="0.22"/>
+    <path d="M101 314 Q259 386 425 314" stroke="#ffc47e" stroke-width="2" opacity="0.18" fill="none"/>
+  </g>
+  <g clip-path="url(#rightClip)">
+    <path d="M417 158 L388 238" stroke="#ffd28b" stroke-width="2" opacity="0.16"/>
+    <path d="M427 248 L394 362" stroke="#1f120e" stroke-width="5" opacity="0.22"/>
+    <path d="M407 109 L373 206 L404 424" stroke="#fff0b9" stroke-width="2" opacity="0.17" fill="none"/>
+  </g>
+  <!-- cracks/chips -->
+  <g filter="url(#chipShadow)">
+    <path d="M229 117 l24 11 l-18 16 l16 20" stroke="#3f261c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.48"/>
+    <path d="M230 116 l22 10 l-17 15" stroke="#ffe0a0" stroke-width="1.4" stroke-linecap="round" fill="none" opacity="0.22"/>
+    <path d="M325 242 q28 11 16 37 q-5 11 15 22" stroke="#3f261c" stroke-width="4.2" stroke-linecap="round" fill="none" opacity="0.42"/>
+    <path d="M163 330 q25 15 12 36 q-8 13 23 24" stroke="#24140f" stroke-width="4.5" stroke-linecap="round" fill="none" opacity="0.34"/>
+    <path d="M137 186 q18 -9 36 2 q-20 13 -41 10 z" fill="#6b3d2a" opacity="0.30"/>
+    <path d="M302 91 q27 -5 45 8 q-22 15 -48 8 z" fill="#fff0b6" opacity="0.15"/>
+    <path d="M392 319 q16 8 16 25 q-19 -5 -26 -20 z" fill="#1e1411" opacity="0.24"/>
+  </g>
+  <!-- outer outline -->
+  <path d="M103 101 Q256 32 409 101 L438 298 L404 424 Q259 484 106 424 L75 298 Z" fill="none" stroke="#271711" stroke-width="8" stroke-linejoin="round" opacity="0.45"/>
+  <path d="M103 101 Q256 32 409 101" fill="none" stroke="#fff0ba" stroke-width="4" stroke-linecap="round" opacity="0.32"/>
+  <path d="M75 298 Q260 380 438 298" fill="none" stroke="#28150e" stroke-width="5" opacity="0.36"/>
+</g>
+</svg>
