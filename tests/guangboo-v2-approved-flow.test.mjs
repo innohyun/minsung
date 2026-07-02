@@ -82,7 +82,16 @@ test('v2 right stick does not auto-lock aim while dragging', () => {
     assert.match(clientSource, /if \(!stick\.moved\) return nearestOpponentAim\(\) \|\| state\.lastAim/);
     assert.match(clientSource, /const localEntry = state\.render\.players\.get\(me\.id\)/);
     assert.match(clientSource, /const originX = localEntry\?\.x \?\? me\.x/);
-    assert.match(htmlSource, /20260701-v2-map-bush-realtime/);
+    assert.match(htmlSource, /20260702-v2-3d-player-walk/);
+});
+
+test('v2 players render as body characters with shadow and walking animation', () => {
+    assert.match(clientSource, /const shadow = new PIXI\.Graphics\(\)/);
+    assert.match(clientSource, /node\.addChild\(shadow, body, hud\)/);
+    assert.match(clientSource, /function drawWalkingLegs/);
+    assert.match(clientSource, /entry\.walkTime = moving \?/);
+    assert.match(clientSource, /entry\.body\.position\.set\(0, bob\)/);
+    assert.match(clientSource, /entry\.shadow\.ellipse/);
 });
 
 test('v2 map updates and bush hiding are realtime and bush graphics fill tiles', () => {
