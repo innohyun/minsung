@@ -263,6 +263,7 @@ function normalizeRequestPath(url) {
     const rawPath = url.pathname === '/' ? '/index.html' : url.pathname;
     if (rawPath === '/mario' || rawPath === '/mario/') return '/mario/index.html';
     if (rawPath === '/guangboo' || rawPath === '/guangboo/') return '/guangboo/index.html';
+    if (rawPath === '/gravity-flip' || rawPath === '/gravity-flip/') return '/gravity-flip/index.html';
     return rawPath;
 }
 

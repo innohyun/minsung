@@ -1,0 +1,4241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0,
+  maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+>
+
+<title>Gravity Flip</title>
+
+<style>
+*{
+  box-sizing:border-box;
+  -webkit-tap-highlight-color:transparent;
+}
+
+html,body{
+  margin:0;
+  width:100%;
+  height:100%;
+  min-height:100%;
+  overflow:hidden;
+  background:#111;
+  touch-action:none;
+  user-select:none;
+}
+
+body{
+  height:100dvh;
+}
+
+canvas{
+  position:fixed;
+  inset:0;
+  display:block;
+  width:100vw;
+  height:100dvh;
+  touch-action:none;
+}
+
+#ui{
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100dvh;
+  pointer-events:none;
+  color:white;
+  font-family:Arial,sans-serif;
+}
+
+#score{
+  position:absolute;
+  top:18px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:38px;
+  font-weight:bold;
+  text-shadow:0 2px 8px black;
+}
+
+#best{
+  position:absolute;
+  top:64px;
+  left:50%;
+  transform:translateX(-50%);
+  font-size:14px;
+  opacity:.8;
+}
+
+#warning{
+  position:fixed;
+  top:105px;
+  left:50%;
+  transform:translateX(-50%);
+  color:#ff4444;
+  font-size:30px;
+  font-weight:bold;
+  text-shadow:0 0 8px #ff0000,0 2px 8px black;
+  display:none;
+  z-index:20;
+}
+
+#message{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  width:90%;
+  text-align:center;
+  font-size:28px;
+  font-weight:bold;
+  text-shadow:0 3px 10px black;
+  pointer-events:none;
+}
+
+#message .sub{
+  display:block;
+  margin-top:12px;
+  font-size:15px;
+  font-weight:normal;
+}
+
+#eventInfo{
+  position:fixed;
+  left:50%;
+  bottom:20px;
+  transform:translateX(-50%);
+  color:white;
+  font:bold 15px Arial;
+  text-shadow:0 2px 6px black;
+  display:none;
+  z-index:30;
+  white-space:nowrap;
+}
+
+#adminButton{
+  position:fixed;
+  top:12px;
+  right:12px;
+  z-index:5000;
+  padding:10px 14px;
+  border:2px solid #555;
+  border-radius:12px;
+  background:rgba(0,0,0,.9);
+  color:#ddd;
+  font-size:14px;
+  font-weight:bold;
+  pointer-events:auto;
+  -webkit-appearance:none;
+  appearance:none;
+}
+
+#adminPanel{
+  position:fixed;
+  top:70px;
+  left:50%;
+  transform:translateX(-50%);
+  width:600px;
+  max-width:calc(100vw - 24px);
+  padding:25px;
+  background:rgba(8,8,8,.98);
+  border:2px solid #555;
+  border-radius:20px;
+  z-index:6000;
+  color:white;
+  box-shadow:0 15px 50px rgba(0,0,0,.8);
+  display:none;
+  pointer-events:auto;
+}
+
+#adminPanel h2{
+  margin:0 0 20px;
+  text-align:center;
+  font-size:26px;
+}
+
+#adminPassword,
+#adminScoreInput{
+  display:block;
+  width:100%;
+  padding:15px;
+  border-radius:12px;
+  border:2px solid #555;
+  background:#222;
+  color:white;
+  outline:none;
+  font-size:20px;
+  text-align:center;
+  user-select:text;
+  -webkit-user-select:text;
+}
+
+#adminPassword:focus,
+#adminScoreInput:focus{
+  border-color:#43d9ff;
+}
+
+.adminConfirm{
+  display:block;
+  width:100%;
+  margin-top:12px;
+  padding:13px;
+  border:0;
+  border-radius:11px;
+  background:#43d9ff;
+  color:#111;
+  font-size:17px;
+  font-weight:bold;
+}
+
+#adminPasswordArea,
+#adminScoreArea{
+  display:none;
+}
+
+#adminInfo{
+  margin-top:12px;
+  min-height:22px;
+  text-align:center;
+  font-size:14px;
+  color:#aaa;
+}
+
+.hint{
+  margin-top:9px;
+  text-align:center;
+  color:#888;
+  font-size:13px;
+}
+
+#adminClose{
+  width:100%;
+  margin-top:16px;
+  padding:13px;
+  border:0;
+  border-radius:11px;
+  background:#333;
+  color:white;
+  font-size:16px;
+}
+
+#screenNoise{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:15;
+  opacity:0;
+  mix-blend-mode:screen;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255,255,255,.035) 0,
+      rgba(255,255,255,.035) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+}
+
+#screenNoise::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0,
+      rgba(255,255,255,.025) 2px,
+      transparent 5px
+    );
+  animation:noiseMove .09s steps(2) infinite;
+}
+
+@keyframes noiseMove{
+  0%{transform:translate(0,0)}
+  25%{transform:translate(-3px,2px)}
+  50%{transform:translate(2px,-2px)}
+  75%{transform:translate(-2px,1px)}
+  100%{transform:translate(3px,0)}
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="ui">
+
+  <div id="score">0</div>
+
+  <div id="best">BEST: 0</div>
+
+  <div id="warning">⚠️ 주의</div>
+
+  <div id="eventInfo"></div>
+
+  <div id="message">
+    GRAVITY FLIP
+    <span class="sub">
+      화면을 터치하거나 스페이스바를 눌러 시작
+    </span>
+  </div>
+
+</div>
+
+<div id="screenNoise"></div>
+
+<button id="adminButton">🔐 관리자</button>
+
+<div id="adminPanel">
+
+  <h2>🔐 관리자 모드</h2>
+
+  <div id="adminPasswordArea">
+
+    <form id="adminPasswordForm">
+
+      <input
+        id="adminPassword"
+        type="password"
+        inputmode="numeric"
+        enterkeyhint="done"
+        maxlength="20"
+        placeholder="비밀번호"
+        autocomplete="off"
+      >
+
+      <button type="submit" class="adminConfirm">
+        확인
+      </button>
+
+    </form>
+
+  </div>
+
+  <div id="adminScoreArea">
+
+    <form id="adminScoreForm">
+
+      <input
+        id="adminScoreInput"
+        type="number"
+        inputmode="numeric"
+        enterkeyhint="done"
+        min="0"
+        max="9999"
+        placeholder="이동할 점수"
+        autocomplete="off"
+      >
+
+      <button type="submit" class="adminConfirm">
+        이동
+      </button>
+
+    </form>
+
+    <div class="hint">
+      점수를 입력하고 완료 또는 이동을 누르세요.
+    </div>
+
+  </div>
+
+  <div id="adminInfo">
+    비밀번호를 입력하세요.
+  </div>
+
+  <button id="adminClose">닫기</button>
+
+</div>
+
+
+<script>
+
+/* =====================================================
+   기본
+===================================================== */
+
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+
+const scoreEl=document.getElementById("score");
+const bestEl=document.getElementById("best");
+const warningEl=document.getElementById("warning");
+const messageEl=document.getElementById("message");
+const eventInfo=document.getElementById("eventInfo");
+const screenNoise=document.getElementById("screenNoise");
+
+
+/* =====================================================
+   관리자
+===================================================== */
+
+const adminButton=document.getElementById("adminButton");
+const adminPanel=document.getElementById("adminPanel");
+const adminPasswordArea=document.getElementById("adminPasswordArea");
+const adminScoreArea=document.getElementById("adminScoreArea");
+const adminPasswordForm=document.getElementById("adminPasswordForm");
+const adminScoreForm=document.getElementById("adminScoreForm");
+const adminPassword=document.getElementById("adminPassword");
+const adminScoreInput=document.getElementById("adminScoreInput");
+const adminInfo=document.getElementById("adminInfo");
+const adminClose=document.getElementById("adminClose");
+
+const ADMIN_PASSWORD="123456789";
+
+let adminMode=false;
+
+
+/* =====================================================
+   게임 변수
+===================================================== */
+
+let W=0;
+let H=0;
+let dpr=1;
+
+let player=null;
+
+let originalPlayerX=0;
+let playerEventX=0;
+
+let obstacles=[];
+let particles=[];
+let rockets=[];
+
+let score=0;
+let bestScore=0;
+
+let speed=5;
+let speedAt30=null;
+
+let spawnTimer=0;
+let spawnInterval=85;
+
+let gravityDirection=1;
+
+let gameState="start";
+let animationId=null;
+
+
+/* =====================================================
+   로켓
+===================================================== */
+
+let rocketMode=false;
+let rocketPhaseTriggered=false;
+
+let rocketWarnings=[];
+let rocketAttackCount=0;
+let rocketSpawnTimer=0;
+
+
+/* =====================================================
+   🔴 추격자 모드
+===================================================== */
+
+let chaserMode=false;
+
+let chasers=[];
+let chaserSupplies=[];
+
+let electricBeams=[];
+
+let chaserDefeated=0;
+
+let chaserElapsed=0;
+let chaserAddTimer=0;
+
+let chaserTargetCount=2;
+
+let chaserSpawnNumber=0;
+
+let nextSupplyWorldX=0;
+
+let playerCentering=false;
+let playerReturning=false;
+
+let screenShake=0;
+
+let globalGlitch=0;
+
+let chaserFinishPending=false;
+
+const MAX_CHASERS=10;
+
+
+/* =====================================================
+   오디오
+===================================================== */
+
+let audioCtx=null;
+let master=null;
+let musicGain=null;
+let musicTimer=null;
+let musicStep=0;
+
+let threatOsc=null;
+let threatGain=null;
+
+
+const normalMelody=[
+  261.63,311.13,392,466.16,
+  392,311.13,261.63,233.08,
+  261.63,349.23,415.30,466.16,
+  415.30,349.23,311.13,261.63
+];
+
+const normalBass=[
+  130.81,130.81,155.56,155.56,
+  116.54,116.54,130.81,130.81
+];
+
+const rocketMelody=[
+  392,466.16,523.25,622.25,
+  523.25,466.16,392,349.23,
+  392,523.25,587.33,698.46,
+  587.33,523.25,466.16,392
+];
+
+const rocketBass=[
+  98,98,116.54,116.54,
+  87.31,87.31,98,98
+];
+
+const chaserMelody=[
+  110,130.81,98,123.47,
+  110,146.83,98,82.41,
+  110,130.81,92.50,110,
+  82.41,98,73.42,82.41
+];
+
+const chaserBass=[
+  55,55,49,49,
+  46.25,46.25,41.20,41.20
+];
+
+
+/* =====================================================
+   오디오
+===================================================== */
+
+function initAudio(){
+
+  if(!audioCtx){
+
+    const AC=
+      window.AudioContext||
+      window.webkitAudioContext;
+
+    if(!AC)return;
+
+    audioCtx=new AC();
+
+    master=audioCtx.createGain();
+    master.gain.value=.65;
+    master.connect(audioCtx.destination);
+
+    musicGain=audioCtx.createGain();
+    musicGain.gain.value=.1;
+    musicGain.connect(master);
+  }
+
+  if(audioCtx.state==="suspended"){
+    audioCtx.resume();
+  }
+
+  if(!musicTimer){
+    startMusic();
+  }
+}
+
+
+function simpleTone(
+  startFreq,
+  endFreq,
+  duration,
+  type,
+  volume
+){
+
+  if(!audioCtx||!master)return;
+
+  const now=audioCtx.currentTime;
+
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+
+  osc.type=type;
+
+  osc.frequency.setValueAtTime(
+    startFreq,
+    now
+  );
+
+  osc.frequency.exponentialRampToValueAtTime(
+    Math.max(1,endFreq),
+    now+duration
+  );
+
+  gain.gain.setValueAtTime(.0001,now);
+
+  gain.gain.exponentialRampToValueAtTime(
+    volume,
+    now+.01
+  );
+
+  gain.gain.exponentialRampToValueAtTime(
+    .0001,
+    now+duration
+  );
+
+  osc.connect(gain);
+  gain.connect(master);
+
+  osc.start(now);
+  osc.stop(now+duration+.02);
+}
+
+
+function flipSound(){
+  simpleTone(240,720,.17,"sine",.20);
+}
+
+
+function deathSound(){
+  simpleTone(440,170,.52,"sine",.16);
+}
+
+
+function warningSound(){
+
+  if(!audioCtx||!master)return;
+
+  const now=audioCtx.currentTime;
+
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+
+  osc.type="square";
+
+  osc.frequency.setValueAtTime(700,now);
+  osc.frequency.setValueAtTime(450,now+.13);
+  osc.frequency.setValueAtTime(700,now+.26);
+
+  gain.gain.setValueAtTime(.0001,now);
+
+  gain.gain.exponentialRampToValueAtTime(.07,now+.015);
+  gain.gain.exponentialRampToValueAtTime(.0001,now+.34);
+
+  osc.connect(gain);
+  gain.connect(master);
+
+  osc.start(now);
+  osc.stop(now+.36);
+}
+
+
+function rocketLaunchSound(){
+  simpleTone(720,180,.72,"triangle",.16);
+}
+
+
+function supplySound(){
+  simpleTone(420,900,.20,"triangle",.12);
+}
+
+
+function chaserSound(){
+  simpleTone(70,35,.8,"sawtooth",.055);
+}
+
+
+function chaserRemoveSound(){
+  simpleTone(900,55,.42,"square",.13);
+}
+
+
+function suctionSound(){
+  simpleTone(55,18,1.15,"sawtooth",.15);
+}
+
+
+function electricSound(){
+  simpleTone(1300,90,.32,"square",.13);
+}
+
+
+/* =====================================================
+   추격자 거리 사운드
+   거리 사운드 제거
+===================================================== */
+
+function updateThreatSound(threat){
+  return;
+}
+
+
+/* =====================================================
+   음악
+===================================================== */
+
+function playMusicTone(f,d,type,volume){
+
+  if(!audioCtx||!musicGain)return;
+
+  const now=audioCtx.currentTime;
+
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+
+  osc.type=type;
+  osc.frequency.value=f;
+
+  gain.gain.setValueAtTime(.0001,now);
+
+  gain.gain.exponentialRampToValueAtTime(
+    volume,
+    now+.012
+  );
+
+  gain.gain.exponentialRampToValueAtTime(
+    .0001,
+    now+d
+  );
+
+  osc.connect(gain);
+  gain.connect(musicGain);
+
+  osc.start(now);
+  osc.stop(now+d+.02);
+}
+
+
+function startMusic(){
+
+  if(musicTimer)return;
+
+  musicStep=0;
+
+  function musicLoop(){
+
+    if(gameState!=="playing"){
+
+      musicTimer=null;
+      return;
+    }
+
+    let interval=170;
+
+    if(rocketMode)interval=125;
+    if(chaserMode)interval=190;
+
+    const melody=
+      chaserMode
+      ?chaserMelody
+      :rocketMode
+      ?rocketMelody
+      :normalMelody;
+
+    const bass=
+      chaserMode
+      ?chaserBass
+      :rocketMode
+      ?rocketBass
+      :normalBass;
+
+    const step=musicStep%16;
+
+    playMusicTone(
+      melody[step],
+      Math.max(.10,interval/1000*.88),
+      "square",
+      chaserMode?.050:
+      rocketMode?.058:
+      .052
+    );
+
+    if(step%2===0){
+
+      playMusicTone(
+        bass[(step/2)%8],
+        Math.max(.18,interval/1000*1.5),
+        "sawtooth",
+        chaserMode?.065:
+        rocketMode?.072:
+        .065
+      );
+    }
+
+    musicStep++;
+
+    musicTimer=setTimeout(
+      musicLoop,
+      interval
+    );
+  }
+
+  musicLoop();
+}
+
+
+/* =====================================================
+   최고 점수
+===================================================== */
+
+try{
+  bestScore=
+    Number(localStorage.getItem("gravityBest"))||0;
+}catch(e){
+  bestScore=0;
+}
+
+bestEl.textContent="BEST: "+bestScore;
+
+
+/* =====================================================
+   화면 크기
+===================================================== */
+
+function getViewportSize(){
+
+  const vv=window.visualViewport;
+
+  return{
+
+    w:Math.round(
+      vv
+      ?vv.width
+      :window.innerWidth
+    ),
+
+    h:Math.round(
+      vv
+      ?vv.height
+      :window.innerHeight
+    )
+  };
+}
+
+
+function resize(){
+
+  const oldW=W;
+  const oldH=H;
+
+  const viewport=getViewportSize();
+
+  dpr=Math.min(
+    window.devicePixelRatio||1,
+    2
+  );
+
+  W=viewport.w;
+  H=viewport.h;
+
+  canvas.width=W*dpr;
+  canvas.height=H*dpr;
+
+  canvas.style.width=W+"px";
+  canvas.style.height=H+"px";
+
+  ctx.setTransform(
+    dpr,0,0,dpr,0,0
+  );
+
+  if(player){
+
+    if(
+      oldW>0&&
+      oldW!==W&&
+      !chaserMode&&
+      player.x!==undefined
+    ){
+
+      player.x=
+        player.x/
+        oldW*
+        W;
+    }
+
+    player.y=Math.max(
+      8,
+      Math.min(
+        H-player.size-8,
+        player.y
+      )
+    );
+
+    if(chaserMode&&!player.hidden){
+
+      playerEventX=
+        W/2-player.size/2;
+
+      if(playerCentering){
+
+        player.x=Math.max(
+          -player.size,
+          Math.min(
+            W,
+            player.x
+          )
+        );
+      }
+    }
+  }
+
+  draw();
+}
+
+
+function restoreViewport(){
+
+  requestAnimationFrame(()=>{
+
+    resize();
+
+    setTimeout(()=>{
+
+      resize();
+
+    },120);
+
+    setTimeout(()=>{
+
+      resize();
+
+    },350);
+
+  });
+}
+
+
+window.addEventListener(
+  "resize",
+  resize
+);
+
+window.addEventListener(
+  "orientationchange",
+  ()=>{
+    setTimeout(resize,80);
+    setTimeout(resize,300);
+  }
+);
+
+if(window.visualViewport){
+
+  window.visualViewport.addEventListener(
+    "resize",
+    resize
+  );
+
+  window.visualViewport.addEventListener(
+    "scroll",
+    resize
+  );
+}
+
+
+/* =====================================================
+   초기화
+===================================================== */
+
+function resetGame(){
+
+  const size=Math.max(
+    18,
+    Math.min(W,H)*.055
+  );
+
+  player={
+    x:W*.22,
+    y:H/2-size/2,
+    size:size,
+    vy:0,
+
+    attackPull:0,
+    hidden:false
+  };
+
+  originalPlayerX=W*.22;
+
+  obstacles=[];
+  particles=[];
+  rockets=[];
+
+  score=0;
+
+  speed=Math.max(4.5,W/190);
+
+  speedAt30=null;
+
+  spawnTimer=0;
+  spawnInterval=85;
+
+  gravityDirection=1;
+
+  rocketMode=false;
+  rocketPhaseTriggered=false;
+
+  rocketWarnings=[];
+  rocketAttackCount=0;
+  rocketSpawnTimer=0;
+
+  chaserMode=false;
+
+  chasers=[];
+  chaserSupplies=[];
+  electricBeams=[];
+
+  chaserDefeated=0;
+  chaserElapsed=0;
+  chaserAddTimer=0;
+  chaserTargetCount=2;
+  chaserSpawnNumber=0;
+
+  nextSupplyWorldX=W*1.2;
+
+  playerCentering=false;
+  playerReturning=false;
+
+  screenShake=0;
+  globalGlitch=0;
+
+  chaserFinishPending=false;
+
+  warningEl.style.display="none";
+  eventInfo.style.display="none";
+  screenNoise.style.opacity=0;
+
+  scoreEl.textContent="0";
+}
+
+
+/* =====================================================
+   시작
+===================================================== */
+
+function startGame(){
+
+  resetGame();
+
+  gameState="playing";
+
+  messageEl.style.display="none";
+
+  initAudio();
+
+  if(animationId===null){
+    animationId=requestAnimationFrame(loop);
+  }
+}
+
+
+/* =====================================================
+   중력
+===================================================== */
+
+function flipGravity(){
+
+  if(
+    gameState==="start"||
+    gameState==="gameover"
+  ){
+
+    startGame();
+    return;
+  }
+
+  if(gameState!=="playing")
+    return;
+
+  if(
+    chaserMode&&
+    player&&
+    player.hidden
+  ){
+    return;
+  }
+
+  if(
+    chaserMode&&
+    chasers.some(c=>c.state==="attack")
+  ){
+    return;
+  }
+
+  gravityDirection*=-1;
+
+  flipSound();
+
+  for(let i=0;i<10;i++){
+
+    particles.push({
+
+      x:player.x+player.size/2,
+      y:player.y+player.size/2,
+
+      vx:(Math.random()-.5)*8,
+      vy:(Math.random()-.5)*8,
+
+      life:25,
+
+      type:"flip"
+    });
+  }
+}
+
+
+/* =====================================================
+   장애물
+===================================================== */
+
+function spawnObstacle(){
+
+  const gap=Math.max(
+    H*.23,
+    H*.38-score*1.5
+  );
+
+  const minTop=H*.08;
+
+  const maxTop=Math.max(
+    minTop,
+    H-gap-H*.08
+  );
+
+  const topHeight=
+    minTop+
+    Math.random()*
+    Math.max(
+      0,
+      maxTop-minTop
+    );
+
+  obstacles.push({
+
+    x:W+50,
+
+    width:Math.max(
+      30,
+      W*.055
+    ),
+
+    topHeight:topHeight,
+
+    bottomY:topHeight+gap,
+
+    counted:false
+  });
+}
+
+
+function collide(a,b){
+
+  return(
+    a.x<b.x+b.width&&
+    a.x+a.width>b.x&&
+    a.y<b.y+b.height&&
+    a.y+a.height>b.y
+  );
+}
+
+
+/* =====================================================
+   로켓
+===================================================== */
+
+function startRocketPhase(){
+
+  if(rocketPhaseTriggered)return;
+
+  rocketPhaseTriggered=true;
+  rocketMode=true;
+
+  rocketAttackCount=0;
+  rocketSpawnTimer=0;
+  rocketWarnings=[];
+
+  obstacles=[];
+
+  warningEl.textContent="⚠️ 로켓 공격";
+  warningEl.style.display="block";
+
+  musicStep=0;
+
+  createRocketWarning();
+}
+
+
+function createRocketWarning(){
+
+  if(
+    !rocketMode||
+    gameState!=="playing"||
+    rocketAttackCount+rocketWarnings.length>=40
+  )return;
+
+  let y;
+  let tries=0;
+
+  do{
+
+    y=H*.12+Math.random()*H*.76;
+
+    tries++;
+
+  }while(
+    rocketWarnings.some(
+      w=>Math.abs(y-w.y)<H*.12
+    )&&tries<30
+  );
+
+  rocketWarnings.push({
+    y:y,
+    start:performance.now(),
+    duration:3000
+  });
+
+  warningSound();
+}
+
+
+function launchRocket(w){
+
+  const index=rocketWarnings.indexOf(w);
+
+  if(index!==-1){
+    rocketWarnings.splice(index,1);
+  }
+
+  rockets.push({
+    x:W+90,
+    y:w.y,
+    speed:6.5,
+    radius:Math.max(14,player.size*.65)
+  });
+
+  rocketAttackCount++;
+
+  rocketLaunchSound();
+}
+
+
+function updateRocketPhase(){
+
+  if(!rocketMode)return;
+
+  rocketSpawnTimer++;
+
+  if(
+    rocketSpawnTimer>=30&&
+    rocketAttackCount+rocketWarnings.length<40
+  ){
+
+    rocketSpawnTimer=0;
+    createRocketWarning();
+  }
+
+  const now=performance.now();
+
+  for(
+    let i=rocketWarnings.length-1;
+    i>=0;
+    i--
+  ){
+
+    const w=rocketWarnings[i];
+
+    if(now-w.start>=w.duration){
+      launchRocket(w);
+    }
+  }
+
+  if(
+    rocketAttackCount>=40&&
+    rocketWarnings.length===0&&
+    rockets.length===0
+  ){
+
+    rocketMode=false;
+
+    warningEl.style.display="none";
+
+    speed=speedAt30;
+
+    spawnTimer=spawnInterval;
+  }
+}
+
+
+function updateRockets(){
+
+  for(
+    let i=rockets.length-1;
+    i>=0;
+    i--
+  ){
+
+    const r=rockets[i];
+
+    r.x-=r.speed;
+
+    const px=player.x+player.size/2;
+    const py=player.y+player.size/2;
+
+    const distance=Math.hypot(
+      px-r.x,
+      py-r.y
+    );
+
+    if(
+      distance<
+      r.radius+player.size*.45
+    ){
+
+      gameOver();
+      return;
+    }
+
+    if(r.x<-120){
+      rockets.splice(i,1);
+    }
+  }
+}
+
+
+function drawRocketWarning(w){
+
+  const elapsed=performance.now()-w.start;
+
+  const progress=Math.min(
+    1,
+    elapsed/w.duration
+  );
+
+  let alpha=.24;
+
+  let width=Math.max(
+    1.5,
+    player.size*.55
+  );
+
+  if(progress>.66){
+
+    const fade=
+      1-(progress-.66)/.34;
+
+    alpha=.24*Math.max(0,fade);
+
+    width=Math.max(
+      1.2,
+      player.size*.55*fade
+    );
+  }
+
+  ctx.save();
+
+  ctx.strokeStyle=
+    `rgba(255,40,40,${alpha})`;
+
+  ctx.lineWidth=width;
+
+  ctx.beginPath();
+
+  ctx.moveTo(0,w.y);
+  ctx.lineTo(W,w.y);
+
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+
+function drawRocket(r){
+
+  ctx.save();
+
+  ctx.translate(r.x,r.y);
+  ctx.rotate(-Math.PI/2);
+
+  const s=Math.max(
+    .75,
+    player.size/28
+  );
+
+  ctx.fillStyle="#ff9d22";
+
+  ctx.beginPath();
+  ctx.moveTo(-8*s,25*s);
+  ctx.lineTo(0,43*s);
+  ctx.lineTo(8*s,25*s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle="#ffd34d";
+
+  ctx.beginPath();
+  ctx.moveTo(-4*s,25*s);
+  ctx.lineTo(0,36*s);
+  ctx.lineTo(4*s,25*s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle="#ed2939";
+
+  ctx.beginPath();
+  ctx.moveTo(-10*s,8*s);
+  ctx.lineTo(-23*s,25*s);
+  ctx.lineTo(-10*s,23*s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(10*s,8*s);
+  ctx.lineTo(23*s,25*s);
+  ctx.lineTo(10*s,23*s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle="#d5d5d5";
+  ctx.strokeStyle="#080808";
+  ctx.lineWidth=5*s;
+
+  ctx.beginPath();
+
+  ctx.moveTo(0,-25*s);
+
+  ctx.bezierCurveTo(
+    -13*s,-17*s,
+    -14*s,5*s,
+    -10*s,24*s
+  );
+
+  ctx.lineTo(10*s,24*s);
+
+  ctx.bezierCurveTo(
+    14*s,5*s,
+    13*s,-17*s,
+    0,-25*s
+  );
+
+  ctx.closePath();
+
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle="#ed2939";
+
+  ctx.beginPath();
+  ctx.moveTo(0,-25*s);
+  ctx.lineTo(-10*s,-9*s);
+  ctx.lineTo(10*s,-9*s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle="#6bc5df";
+  ctx.strokeStyle="#080808";
+  ctx.lineWidth=4*s;
+
+  ctx.beginPath();
+  ctx.arc(0,-s,6*s,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0,13*s,5*s,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+
+/* =====================================================
+   🔴 추격자 시작
+===================================================== */
+
+function startChaserPhase(){
+
+  if(chaserMode)return;
+
+  chaserMode=true;
+
+  obstacles=[];
+  rockets=[];
+  rocketWarnings=[];
+
+  chaserDefeated=0;
+  chaserElapsed=0;
+  chaserAddTimer=0;
+
+  chaserTargetCount=2;
+  chaserSpawnNumber=0;
+
+  chasers=[];
+  chaserSupplies=[];
+  electricBeams=[];
+
+  originalPlayerX=player.x;
+
+  playerEventX=
+    W/2-player.size/2;
+
+  playerCentering=true;
+  playerReturning=false;
+
+  player.hidden=false;
+  player.attackPull=0;
+
+  nextSupplyWorldX=W*1.15;
+
+  warningEl.textContent="UNKNOWN SIGNAL DETECTED";
+  warningEl.style.display="block";
+
+  eventInfo.style.display="block";
+
+  eventInfo.textContent=
+    "추격자 2 / 2   •   제거 0 / 20";
+
+  screenNoise.style.opacity=.03;
+
+  musicStep=0;
+
+  chaserSound();
+
+  setTimeout(()=>{
+    if(chaserMode){
+      spawnChaser();
+      spawnChaser();
+    }
+  },650);
+
+  setTimeout(()=>{
+    if(chaserMode){
+      spawnChaserSupply(true);
+      spawnChaserSupply(true);
+    }
+  },800);
+}
+
+
+/* =====================================================
+   플레이어 위치
+===================================================== */
+
+function updatePlayerEventPosition(){
+
+  if(!chaserMode)return;
+
+  if(playerCentering){
+
+    const target=playerEventX;
+
+    player.x+=(target-player.x)*.055;
+
+    if(Math.abs(target-player.x)<.35){
+
+      player.x=target;
+      playerCentering=false;
+    }
+  }
+
+  if(playerReturning){
+
+    const target=originalPlayerX;
+
+    player.x+=(target-player.x)*.055;
+
+    if(Math.abs(target-player.x)<.35){
+
+      player.x=target;
+      playerReturning=false;
+    }
+  }
+}
+
+
+/* =====================================================
+   추격자 생성
+===================================================== */
+
+function spawnChaser(){
+
+  if(
+    !chaserMode||
+    chasers.length>=MAX_CHASERS
+  )return;
+
+  const size=Math.max(
+    28,
+    player.size*1.28
+  );
+
+  chaserSpawnNumber++;
+
+  let y=
+    H/2-size/2+
+    (Math.random()-.5)*H*.60;
+
+  y=Math.max(
+    14,
+    Math.min(H-size-14,y)
+  );
+
+  chasers.push({
+
+    x:-size*2-Math.random()*130,
+
+    y:y,
+
+    size:size,
+
+    entry:true,
+
+    speed:.52+Math.random()*.18,
+
+    wobble:Math.random()*Math.PI*2,
+
+    glitch:Math.random()*100,
+
+    age:0,
+
+    state:"entry",
+
+    removing:false,
+
+    removeTimer:0,
+
+    scale:1,
+
+    mouth:0,
+
+    attackTimer:0,
+
+    attackDuration:0,
+
+    pullStartX:0,
+    pullStartY:0
+  });
+}
+
+
+/* =====================================================
+   보급품 월드 배치
+===================================================== */
+
+function spawnChaserSupply(initial=false){
+
+  if(
+    !chaserMode||
+    chaserSupplies.length>=3
+  )return;
+
+  const size=Math.max(
+    22,
+    player.size*.95
+  );
+
+  const gap=
+    initial
+    ?W*.62+Math.random()*W*.33
+    :W*.81+Math.random()*W*.62;
+
+  const x=
+    Math.max(
+      nextSupplyWorldX,
+      W+gap
+    );
+
+  nextSupplyWorldX=x+W*.65;
+
+  let y;
+
+  if(
+    Math.random()<.5
+  ){
+
+    y=
+      H*.14+
+      Math.random()*H*.22;
+
+  }else{
+
+    y=
+      H*.64+
+      Math.random()*H*.22;
+  }
+
+  y=Math.max(
+    14,
+    Math.min(
+      H-size-14,
+      y
+    )
+  );
+
+  chaserSupplies.push({
+
+    x:x,
+
+    y:y,
+
+    size:size,
+
+    pulse:Math.random()*Math.PI*2,
+
+    glitch:Math.random()*100,
+
+    world:true
+  });
+}
+
+
+/* =====================================================
+   추격자 업데이트
+===================================================== */
+
+function updateChasers(){
+
+  if(!chaserMode)return;
+
+  chaserElapsed++;
+  globalGlitch++;
+
+  updatePlayerEventPosition();
+
+  chaserAddTimer++;
+
+  if(
+    chaserAddTimer>=480&&
+    chaserTargetCount<MAX_CHASERS
+  ){
+
+    chaserAddTimer=0;
+    chaserTargetCount++;
+  }
+
+  if(
+    chasers.filter(c=>!c.removing).length<
+    chaserTargetCount
+  ){
+
+    if(chaserAddTimer%75===0){
+      spawnChaser();
+    }
+  }
+
+  if(
+    chaserSupplies.length<2&&
+    chaserElapsed%100===0
+  ){
+
+    spawnChaserSupply(false);
+  }
+
+
+  let nearestThreat=null;
+
+
+  for(
+    let i=chasers.length-1;
+    i>=0;
+    i--
+  ){
+
+    const c=chasers[i];
+
+    c.age++;
+    c.wobble+=.045;
+    c.glitch+=1;
+
+    if(c.removing){
+
+      c.removeTimer--;
+
+      if(c.removeTimer<=0){
+
+        chasers.splice(i,1);
+      }
+
+      continue;
+    }
+
+
+    /*
+     * 공격 중
+     */
+    if(c.state==="attack"){
+
+      updateChaserAttack(c);
+
+      continue;
+    }
+
+
+    const px=
+      player.x+
+      player.size/2;
+
+    const py=
+      player.y+
+      player.size/2;
+
+    const cx=
+      c.x+
+      c.size*c.scale/2;
+
+    const cy=
+      c.y+
+      c.size*c.scale/2;
+
+
+    const dx=px-cx;
+    const dy=py-cy;
+
+    const distance=Math.hypot(dx,dy);
+
+    if(
+      !nearestThreat||
+      distance<nearestThreat.distance
+    ){
+
+      nearestThreat={
+        chaser:c,
+        distance:distance
+      };
+    }
+
+
+    const attackDistance=
+      Math.max(
+        88,
+        player.size*3.25
+      );
+
+
+    if(
+      distance<=attackDistance
+    ){
+
+      startChaserAttack(c);
+
+      continue;
+    }
+
+
+    /*
+     * 처음에는 가로 접근
+     */
+    if(c.state==="entry"){
+
+      c.x+=c.speed;
+
+      if(
+        c.x>
+        player.x-
+        W*.45
+      ){
+
+        c.state="chase";
+      }
+
+      c.y+=
+        Math.sin(c.wobble)*.18;
+    }
+
+
+    /*
+     * 대각선 추적
+     */
+    else if(c.state==="chase"){
+
+      const chaseSpeed=
+        .54+
+        Math.min(
+          .20,
+          chaserElapsed/5000
+        )+
+        Math.min(
+          .10,
+          chaserTargetCount*.012
+        );
+
+      const len=
+        Math.max(
+          1,
+          Math.hypot(dx,dy)
+        );
+
+      c.x+=
+        dx/len*
+        chaseSpeed;
+
+      c.y+=
+        dy/len*
+        chaseSpeed;
+
+      c.y+=
+        Math.sin(c.wobble)*.10;
+    }
+
+
+    c.y=Math.max(
+      10,
+      Math.min(
+        H-c.size*c.scale-10,
+        c.y
+      )
+    );
+  }
+
+
+  /*
+   * 보급품
+   */
+  for(
+    let i=chaserSupplies.length-1;
+    i>=0;
+    i--
+  ){
+
+    const s=chaserSupplies[i];
+
+    s.pulse+=.09;
+    s.glitch++;
+
+    s.x-=speed;
+
+    const playerRect={
+      x:player.x,
+      y:player.y,
+      width:player.size,
+      height:player.size
+    };
+
+    const supplyRect={
+      x:s.x,
+      y:s.y,
+      width:s.size,
+      height:s.size
+    };
+
+    if(
+      !player.hidden&&
+      collide(playerRect,supplyRect)
+    ){
+
+      collectChaserSupply(i);
+      continue;
+    }
+
+    if(
+      s.x+s.size<-80
+    ){
+
+      chaserSupplies.splice(i,1);
+    }
+  }
+
+
+  /*
+   * 전기 빔
+   */
+  for(
+    let i=electricBeams.length-1;
+    i>=0;
+    i--
+  ){
+
+    const b=electricBeams[i];
+
+    b.life--;
+
+    if(b.life<=0){
+
+      electricBeams.splice(i,1);
+    }
+  }
+
+
+  updateThreatSound(nearestThreat);
+
+
+  if(nearestThreat){
+
+    const danger=
+      Math.max(
+        0,
+        Math.min(
+          1,
+          1-nearestThreat.distance/(W*.55)
+        )
+      );
+
+    screenNoise.style.opacity=
+      Math.min(
+        .30,
+        .025+
+        danger*.25+
+        (Math.random()<.10?.08:0)
+      );
+
+    if(danger>.5){
+
+      screenShake=
+        Math.max(
+          screenShake,
+          danger*2.0
+        );
+    }
+
+  }else{
+
+    screenNoise.style.opacity=.025;
+  }
+
+
+  screenShake*=.88;
+
+
+  const activeCount=
+    chasers.filter(c=>!c.removing).length;
+
+  eventInfo.textContent=
+    "추격자 "+
+    activeCount+
+    " / "+
+    chaserTargetCount+
+    "   •   제거 "+
+    chaserDefeated+
+    " / 20";
+
+
+  if(
+    chaserDefeated>=20&&
+    !chaserFinishPending
+  ){
+
+    finishChaserPhase();
+  }
+}
+
+
+/* =====================================================
+   공격 시작
+===================================================== */
+
+function startChaserAttack(c){
+
+  if(
+    c.state==="attack"||
+    c.removing||
+    player.hidden
+  )return;
+
+  for(const other of chasers){
+
+    if(
+      other!==c&&
+      other.state==="attack"
+    ){
+      return;
+    }
+  }
+
+  c.state="attack";
+
+  c.attackTimer=0;
+
+  c.attackDuration=95;
+
+  c.scale=1;
+
+  c.mouth=0;
+
+  c.pullStartX=player.x;
+  c.pullStartY=player.y;
+
+  suctionSound();
+
+  screenShake=3.5;
+
+  warningEl.textContent="⚠️ 위험";
+  warningEl.style.display="block";
+}
+
+
+/* =====================================================
+   추격자의 실제 입 위치
+===================================================== */
+
+function getChaserMouth(c){
+
+  const scale=c.scale||1;
+
+  return{
+
+    x:
+      c.x+
+      c.size/2,
+
+    y:
+      c.y+
+      c.size*.64*scale+
+      c.size*(1-scale)/2
+  };
+}
+
+
+/* =====================================================
+   공격 업데이트
+===================================================== */
+
+function updateChaserAttack(c){
+
+  c.attackTimer++;
+
+  const openProgress=
+    Math.min(
+      1,
+      c.attackTimer/30
+    );
+
+  c.scale=
+    1+
+    openProgress*1.45;
+
+  c.mouth=
+    openProgress;
+
+
+  const mouth=getChaserMouth(c);
+
+  const mouthX=mouth.x;
+  const mouthY=mouth.y;
+
+
+  if(c.attackTimer>20&&!player.hidden){
+
+    const pullProgress=
+      Math.min(
+        1,
+        (c.attackTimer-20)/55
+      );
+
+
+    const eased=
+      1-
+      Math.pow(
+        1-pullProgress,
+        3
+      );
+
+
+    const playerCenterX=
+      player.x+
+      player.size/2;
+
+    const playerCenterY=
+      player.y+
+      player.size/2;
+
+
+    const dx=mouthX-playerCenterX;
+    const dy=mouthY-playerCenterY;
+
+    const distance=
+      Math.hypot(dx,dy);
+
+
+    const pullStrength=
+      .035+
+      eased*.20;
+
+
+    if(eased<.82){
+
+      player.x+=
+        dx*pullStrength;
+
+      player.y+=
+        dy*pullStrength;
+
+    }else{
+
+      player.x=
+        mouthX-
+        player.size/2;
+
+      player.y=
+        mouthY-
+        player.size/2;
+    }
+
+
+    const baseSize=
+      Math.max(
+        18,
+        Math.min(W,H)*.055
+      );
+
+    const playerScale=
+      1-
+      eased*.88;
+
+    player.size=
+      Math.max(
+        2,
+        baseSize*playerScale
+      );
+
+
+    if(Math.random()<.80){
+
+      const px=
+        player.x+
+        player.size/2;
+
+      const py=
+        player.y+
+        player.size/2;
+
+      particles.push({
+
+        x:
+          px+
+          (Math.random()-.5)*30,
+
+        y:
+          py+
+          (Math.random()-.5)*30,
+
+        vx:
+          (mouthX-px)*.045,
+
+        vy:
+          (mouthY-py)*.045,
+
+        life:18,
+
+        type:"suction"
+      });
+    }
+
+
+    screenShake=
+      Math.max(
+        screenShake,
+        2+
+        eased*3
+      );
+
+
+    if(
+      distance<3||
+      eased>=1
+    ){
+
+      player.x=
+        mouthX-
+        player.size/2;
+
+      player.y=
+        mouthY-
+        player.size/2;
+
+      player.hidden=true;
+      player.size=0;
+
+      c.attackTimer=76;
+    }
+  }
+
+
+  if(
+    player.hidden&&
+    c.attackTimer>=76
+  ){
+
+    const closeProgress=
+      Math.min(
+        1,
+        (c.attackTimer-76)/19
+      );
+
+    c.mouth=
+      1-closeProgress;
+
+    c.scale=
+      2.45-
+      closeProgress*.25;
+
+
+    if(closeProgress>=1){
+
+      gameOver();
+
+      return;
+    }
+  }
+}
+
+
+/* =====================================================
+   전기 코어 획득
+===================================================== */
+
+function collectChaserSupply(index){
+
+  const s=chaserSupplies[index];
+
+  if(!s)return;
+
+  let target=null;
+  let nearest=Infinity;
+
+  const sx=s.x+s.size/2;
+  const sy=s.y+s.size/2;
+
+  for(const c of chasers){
+
+    if(c.removing)continue;
+
+    const cx=
+      c.x+
+      c.size*c.scale/2;
+
+    const cy=
+      c.y+
+      c.size*c.scale/2;
+
+    const d=Math.hypot(
+      sx-cx,
+      sy-cy
+    );
+
+    if(d<nearest){
+
+      nearest=d;
+      target=c;
+    }
+  }
+
+
+  if(target){
+
+    electricBeams.push({
+
+      x1:sx,
+      y1:sy,
+
+      target:target,
+
+      life:18,
+      maxLife:18,
+
+      seed:Math.random()*1000
+    });
+
+    target.removing=true;
+    target.removeTimer=22;
+
+    for(let p=0;p<30;p++){
+
+      particles.push({
+
+        x:
+          target.x+
+          target.size/2,
+
+        y:
+          target.y+
+          target.size/2,
+
+        vx:
+          (Math.random()-.5)*10,
+
+        vy:
+          (Math.random()-.5)*10,
+
+        life:
+          25+
+          Math.random()*15,
+
+        type:"electric"
+      });
+    }
+
+    chaserDefeated++;
+
+    electricSound();
+
+    screenShake=
+      Math.max(
+        screenShake,
+        3
+      );
+  }
+
+
+  chaserSupplies.splice(index,1);
+
+  supplySound();
+
+
+  setTimeout(()=>{
+
+    if(
+      chaserMode&&
+      chaserSupplies.length<3
+    ){
+
+      spawnChaserSupply(false);
+    }
+
+  },350);
+}
+
+
+/* =====================================================
+   전기 빔
+===================================================== */
+
+function drawElectricBeam(b){
+
+  if(!b.target)return;
+
+  const c=b.target;
+
+  const tx=
+    c.x+
+    c.size*c.scale/2;
+
+  const ty=
+    c.y+
+    c.size*c.scale*.62;
+
+  const alpha=
+    b.life/b.maxLife;
+
+  ctx.save();
+
+  for(let pass=0;pass<3;pass++){
+
+    ctx.beginPath();
+
+    const segments=9;
+
+    for(let i=0;i<=segments;i++){
+
+      const t=i/segments;
+
+      const x=
+        b.x1+
+        (tx-b.x1)*t;
+
+      const y=
+        b.y1+
+        (ty-b.y1)*t;
+
+      let offset=0;
+
+      if(i!==0&&i!==segments){
+
+        offset=
+          (Math.random()-.5)*
+          25*
+          alpha;
+      }
+
+      if(i===0){
+
+        ctx.moveTo(x,y);
+
+      }else{
+
+        ctx.lineTo(
+          x,
+          y+offset
+        );
+      }
+    }
+
+    ctx.strokeStyle=
+      pass===0
+      ?`rgba(255,230,40,${alpha*.85})`
+      :pass===1
+      ?`rgba(255,255,180,${alpha*.8})`
+      :`rgba(255,190,0,${alpha*.5})`;
+
+    ctx.lineWidth=
+      pass===1
+      ?2.2
+      :4;
+
+    ctx.stroke();
+  }
+
+
+  for(let i=0;i<4;i++){
+
+    const t=.2+Math.random()*.7;
+
+    const x=
+      b.x1+
+      (tx-b.x1)*t;
+
+    const y=
+      b.y1+
+      (ty-b.y1)*t;
+
+    ctx.strokeStyle=
+      `rgba(255,235,50,${alpha*.65})`;
+
+    ctx.lineWidth=1.5;
+
+    ctx.beginPath();
+
+    ctx.moveTo(x,y);
+
+    ctx.lineTo(
+      x+(Math.random()-.5)*35,
+      y+(Math.random()-.5)*35
+    );
+
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+
+/* =====================================================
+   추격자 그리기
+===================================================== */
+
+function drawChaser(c){
+
+  const scale=c.scale||1;
+
+  ctx.save();
+
+  const pcx=
+    player.x+
+    player.size/2;
+
+  const pcy=
+    player.y+
+    player.size/2;
+
+  const ccx=
+    c.x+
+    c.size*scale/2;
+
+  const ccy=
+    c.y+
+    c.size*scale/2;
+
+  const distance=
+    Math.hypot(
+      pcx-ccx,
+      pcy-ccy
+    );
+
+  const danger=
+    Math.max(
+      0,
+      Math.min(
+        1,
+        1-distance/(W*.55)
+      )
+    );
+
+  const glitchAmount=
+    c.removing
+    ?10
+    :1.5+
+      danger*7+
+      (c.state==="attack"?5:0);
+
+  const gx=
+    (Math.random()-.5)*
+    glitchAmount;
+
+  const gy=
+    (Math.random()-.5)*
+    glitchAmount;
+
+
+  ctx.translate(
+    c.x+gx+
+    c.size*(1-scale)/2,
+    c.y+gy+
+    c.size*(1-scale)/2
+  );
+
+  ctx.scale(scale,scale);
+
+
+  if(Math.random()<.65){
+
+    ctx.globalAlpha=
+      .06+
+      danger*.12;
+
+    ctx.fillStyle="#ff1744";
+
+    ctx.fillRect(
+      -glitchAmount,
+      Math.random()*c.size,
+      c.size+glitchAmount*2,
+      Math.max(2,c.size*.07)
+    );
+  }
+
+
+  ctx.globalAlpha=
+    c.removing
+    ?Math.max(.1,c.removeTimer/22)
+    :.12+
+      danger*.20;
+
+  ctx.fillStyle="#ff1744";
+
+  ctx.fillRect(
+    -5,
+    -5,
+    c.size+10,
+    c.size+10
+  );
+
+
+  ctx.globalAlpha=
+    c.removing
+    ?Math.max(.15,c.removeTimer/22)
+    :1;
+
+
+  ctx.fillStyle="#050505";
+
+  ctx.fillRect(
+    0,
+    0,
+    c.size,
+    c.size
+  );
+
+
+  ctx.fillStyle="#210005";
+
+  ctx.fillRect(
+    c.size*.10,
+    c.size*.12,
+    c.size*.80,
+    c.size*.76
+  );
+
+
+  ctx.fillStyle="#ff3030";
+
+  ctx.shadowColor="#ff0000";
+  ctx.shadowBlur=
+    7+
+    danger*14;
+
+  ctx.fillRect(
+    c.size*.20,
+    c.size*.25,
+    c.size*.17,
+    c.size*.11
+  );
+
+  ctx.fillRect(
+    c.size*.63,
+    c.size*.25,
+    c.size*.17,
+    c.size*.11
+  );
+
+  ctx.shadowBlur=0;
+
+
+  if(c.state==="attack"){
+
+    const mouthOpen=c.mouth;
+
+    const mw=
+      c.size*
+      (.32+.19*mouthOpen);
+
+    const mh=
+      c.size*
+      (.035+.30*mouthOpen);
+
+    const mx=c.size*.5;
+    const my=c.size*.64;
+
+
+    ctx.fillStyle="#4a0008";
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      mx-mw*.95,
+      my-mh*.18
+    );
+
+    ctx.lineTo(
+      mx-mw*.72,
+      my-mh*.75
+    );
+
+    ctx.lineTo(
+      mx-mw*.42,
+      my-mh*.40
+    );
+
+    ctx.lineTo(
+      mx-mw*.12,
+      my-mh*.82
+    );
+
+    ctx.lineTo(
+      mx+mw*.18,
+      my-mh*.38
+    );
+
+    ctx.lineTo(
+      mx+mw*.52,
+      my-mh*.78
+    );
+
+    ctx.lineTo(
+      mx+mw*.94,
+      my-mh*.18
+    );
+
+    ctx.lineTo(
+      mx+mw*.78,
+      my+mh*.55
+    );
+
+    ctx.lineTo(
+      mx+mw*.45,
+      my+mh*.30
+    );
+
+    ctx.lineTo(
+      mx+mw*.12,
+      my+mh*.78
+    );
+
+    ctx.lineTo(
+      mx-mw*.20,
+      my+mh*.35
+    );
+
+    ctx.lineTo(
+      mx-mw*.55,
+      my+mh*.72
+    );
+
+    ctx.lineTo(
+      mx-mw*.95,
+      my+mh*.12
+    );
+
+    ctx.closePath();
+
+    ctx.fill();
+
+
+    ctx.fillStyle="#010001";
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      mx-mw,
+      my
+    );
+
+    ctx.lineTo(
+      mx-mw*.72,
+      my-mh*.82
+    );
+
+    ctx.lineTo(
+      mx-mw*.42,
+      my-mh*.48
+    );
+
+    ctx.lineTo(
+      mx-mw*.08,
+      my-mh
+    );
+
+    ctx.lineTo(
+      mx+mw*.27,
+      my-mh*.48
+    );
+
+    ctx.lineTo(
+      mx+mw*.63,
+      my-mh*.78
+    );
+
+    ctx.lineTo(
+      mx+mw,
+      my+mh*.05
+    );
+
+    ctx.lineTo(
+      mx+mw*.65,
+      my+mh*.72
+    );
+
+    ctx.lineTo(
+      mx+mw*.30,
+      my+mh*.40
+    );
+
+    ctx.lineTo(
+      mx-mw*.08,
+      my+mh
+    );
+
+    ctx.lineTo(
+      mx-mw*.40,
+      my+mh*.42
+    );
+
+    ctx.lineTo(
+      mx-mw*.75,
+      my+mh*.68
+    );
+
+    ctx.closePath();
+
+    ctx.fill();
+
+
+    if(mouthOpen>.35){
+
+      ctx.globalAlpha=
+        .35+
+        mouthOpen*.35;
+
+      ctx.fillStyle="#58000d";
+
+      ctx.beginPath();
+
+      ctx.moveTo(
+        mx-mw*.58,
+        my-mh*.10
+      );
+
+      ctx.lineTo(
+        mx-mw*.22,
+        my+mh*.20
+      );
+
+      ctx.lineTo(
+        mx+mw*.12,
+        my-mh*.05
+      );
+
+      ctx.lineTo(
+        mx+mw*.50,
+        my+mh*.18
+      );
+
+      ctx.lineTo(
+        mx+mw*.25,
+        my+mh*.48
+      );
+
+      ctx.lineTo(
+        mx-mw*.30,
+        my+mh*.38
+      );
+
+      ctx.closePath();
+
+      ctx.fill();
+
+      ctx.globalAlpha=1;
+    }
+
+
+    if(mouthOpen>.15){
+
+      const topTeeth=[
+        [-.78,.17,.14],
+        [-.55,.22,.20],
+        [-.31,.13,.12],
+        [-.08,.23,.19],
+        [.17,.14,.14],
+        [.42,.22,.21],
+        [.68,.15,.13]
+      ];
+
+      ctx.fillStyle="#ded6b8";
+
+      for(const tooth of topTeeth){
+
+        const tx=mx+mw*tooth[0];
+        const tw=mw*tooth[1];
+        const th=mh*tooth[2]*4;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+          tx-tw,
+          my-mh*.55
+        );
+
+        ctx.lineTo(
+          tx+tw,
+          my-mh*.48
+        );
+
+        ctx.lineTo(
+          tx+tw*.15,
+          my-mh*.48+th
+        );
+
+        ctx.closePath();
+
+        ctx.fill();
+      }
+
+
+      const bottomTeeth=[
+        [-.67,.15,.16],
+        [-.43,.20,.12],
+        [-.20,.13,.18],
+        [.05,.21,.12],
+        [.31,.15,.19],
+        [.57,.21,.13],
+        [.78,.12,.17]
+      ];
+
+      for(const tooth of bottomTeeth){
+
+        const tx=mx+mw*tooth[0];
+        const tw=mw*tooth[1];
+        const th=mh*tooth[2]*4;
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+          tx-tw,
+          my+mh*.50
+        );
+
+        ctx.lineTo(
+          tx+tw,
+          my+mh*.45
+        );
+
+        ctx.lineTo(
+          tx-tw*.05,
+          my+mh*.45-th
+        );
+
+        ctx.closePath();
+
+        ctx.fill();
+      }
+    }
+
+
+    ctx.strokeStyle="#ff1744";
+
+    ctx.lineWidth=
+      Math.max(
+        1.5,
+        c.size*.025
+      );
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      mx-mw*1.02,
+      my-mh*.05
+    );
+
+    ctx.lineTo(
+      mx-mw*1.22,
+      my-mh*.30
+    );
+
+    ctx.moveTo(
+      mx+mw*1.02,
+      my+mh*.02
+    );
+
+    ctx.lineTo(
+      mx+mw*1.22,
+      my+mh*.28
+    );
+
+    ctx.stroke();
+
+
+  }else{
+
+    ctx.strokeStyle="#ff3030";
+
+    ctx.lineWidth=
+      Math.max(
+        2,
+        c.size*.055
+      );
+
+    ctx.beginPath();
+
+    ctx.moveTo(c.size*.18,c.size*.66);
+    ctx.lineTo(c.size*.34,c.size*.59);
+    ctx.lineTo(c.size*.50,c.size*.67);
+    ctx.lineTo(c.size*.66,c.size*.58);
+    ctx.lineTo(c.size*.83,c.size*.66);
+
+    ctx.stroke();
+  }
+
+
+  for(let i=0;i<4;i++){
+
+    if(Math.random()<.72){
+
+      ctx.globalAlpha=
+        .12+
+        Math.random()*.35+
+        danger*.15;
+
+      ctx.fillStyle=
+        Math.random()<.5
+        ?"white"
+        :"#ff1744";
+
+      ctx.fillRect(
+        (Math.random()-.15)*c.size,
+        Math.random()*c.size,
+        Math.random()*c.size*1.4,
+        Math.max(
+          1,
+          c.size*.025
+        )
+      );
+    }
+  }
+
+
+  if(c.state==="attack"&&c.mouth>.2){
+
+    ctx.globalAlpha=.25;
+
+    ctx.strokeStyle="#ff1744";
+
+    for(let i=0;i<4;i++){
+
+      const yy=
+        c.size*.3+
+        Math.random()*c.size*.45;
+
+      ctx.beginPath();
+
+      ctx.moveTo(
+        c.size*.15,
+        yy
+      );
+
+      ctx.quadraticCurveTo(
+        c.size*.5,
+        c.size*.64,
+        c.size*.5,
+        c.size*.64
+      );
+
+      ctx.stroke();
+    }
+  }
+
+
+  ctx.restore();
+}
+
+
+/* =====================================================
+   전기 코어 그리기
+===================================================== */
+
+function drawChaserSupplies(){
+
+  if(!chaserMode)return;
+
+  for(const s of chaserSupplies){
+
+    const pulse=
+      1+
+      Math.sin(s.pulse)*.10;
+
+    ctx.save();
+
+    ctx.translate(
+      s.x+s.size/2,
+      s.y+s.size/2
+    );
+
+    ctx.scale(
+      pulse,
+      pulse
+    );
+
+
+    ctx.globalAlpha=.13;
+
+    ctx.fillStyle="#ffd900";
+
+    ctx.beginPath();
+
+    ctx.arc(
+      0,
+      0,
+      s.size*1.35,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+
+    ctx.globalAlpha=.55;
+
+    ctx.strokeStyle="#ffd900";
+    ctx.lineWidth=2;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      0,
+      0,
+      s.size*.72,
+      0,
+      Math.PI*2
+    );
+
+    ctx.stroke();
+
+
+    ctx.globalAlpha=1;
+
+    ctx.fillStyle="#111";
+
+    ctx.beginPath();
+
+    ctx.arc(
+      0,
+      0,
+      s.size*.42,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+
+    ctx.fillStyle="#ffe83b";
+
+    ctx.shadowColor="#ffd000";
+    ctx.shadowBlur=15;
+
+    ctx.beginPath();
+
+    ctx.arc(
+      0,
+      0,
+      s.size*.22,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+    ctx.shadowBlur=0;
+
+
+    ctx.strokeStyle="#fff36b";
+    ctx.lineWidth=2;
+
+    for(let i=0;i<4;i++){
+
+      const a=
+        i*Math.PI/2+
+        Math.random()*.3;
+
+      const r1=s.size*.40;
+      const r2=s.size*.68;
+
+      ctx.beginPath();
+
+      ctx.moveTo(
+        Math.cos(a)*r1,
+        Math.sin(a)*r1
+      );
+
+      ctx.lineTo(
+        Math.cos(a+.12)*r2,
+        Math.sin(a+.12)*r2
+      );
+
+      ctx.stroke();
+    }
+
+
+    if(Math.random()<.45){
+
+      ctx.globalAlpha=.55;
+
+      ctx.fillStyle=
+        Math.random()<.5
+        ?"white"
+        :"#ffd900";
+
+      ctx.fillRect(
+        -s.size*.75,
+        (Math.random()-.5)*s.size,
+        s.size*1.5,
+        2
+      );
+    }
+
+
+    ctx.restore();
+  }
+}
+
+
+/* =====================================================
+   파티클
+===================================================== */
+
+function updateParticles(){
+
+  for(
+    let i=particles.length-1;
+    i>=0;
+    i--
+  ){
+
+    const p=particles[i];
+
+    if(p.type==="suction"){
+
+      p.x+=p.vx;
+      p.y+=p.vy;
+
+      p.vx*=.96;
+      p.vy*=.96;
+
+    }else{
+
+      p.x+=p.vx;
+      p.y+=p.vy;
+
+      p.vx*=.97;
+      p.vy*=.97;
+    }
+
+    p.life--;
+
+    if(p.life<=0){
+
+      particles.splice(i,1);
+    }
+  }
+}
+
+
+function drawParticles(){
+
+  for(const p of particles){
+
+    ctx.globalAlpha=
+      Math.max(
+        0,
+        p.life/40
+      );
+
+    if(p.type==="electric"){
+
+      ctx.fillStyle="#ffe51b";
+
+    }else if(p.type==="suction"){
+
+      ctx.fillStyle="#ff405f";
+
+    }else{
+
+      ctx.fillStyle="#7cf7ff";
+    }
+
+    ctx.beginPath();
+
+    ctx.arc(
+      p.x,
+      p.y,
+      p.type==="electric"?2.5:3,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+  }
+
+  ctx.globalAlpha=1;
+}
+
+
+/* =====================================================
+   추격자 종료
+===================================================== */
+
+function finishChaserPhase(){
+
+  if(
+    !chaserMode||
+    chaserFinishPending
+  )return;
+
+  chaserFinishPending=true;
+
+  chaserMode=false;
+
+  updateThreatSound(null);
+
+  chasers=[];
+  chaserSupplies=[];
+  electricBeams=[];
+
+  screenNoise.style.opacity=0;
+
+  warningEl.style.display="none";
+  eventInfo.style.display="none";
+
+  messageEl.innerHTML=`
+    🔴 CHASE CLEAR
+    <span class="sub">
+      추격자 20명 제거!
+    </span>
+  `;
+
+  messageEl.style.display="block";
+
+  player.hidden=false;
+
+  player.size=Math.max(
+    18,
+    Math.min(W,H)*.055
+  );
+
+  playerReturning=true;
+  playerCentering=false;
+
+  setTimeout(()=>{
+
+    if(gameState!=="playing")return;
+
+    messageEl.style.display="none";
+
+    speed=speedAt30;
+
+    spawnTimer=spawnInterval;
+
+    chaserFinishPending=false;
+
+  },1400);
+}
+
+
+/* =====================================================
+   게임 오버
+===================================================== */
+
+function gameOver(){
+
+  if(gameState!=="playing")return;
+
+  gameState="gameover";
+
+  updateThreatSound(null);
+
+  deathSound();
+
+  warningEl.style.display="none";
+  eventInfo.style.display="none";
+  screenNoise.style.opacity=0;
+
+  if(score>bestScore){
+
+    bestScore=score;
+
+    try{
+
+      localStorage.setItem(
+        "gravityBest",
+        bestScore
+      );
+
+    }catch(e){}
+
+    bestEl.textContent=
+      "BEST: "+bestScore;
+  }
+
+  messageEl.innerHTML=`
+
+    GAME OVER
+
+    <span class="sub">
+
+      점수: ${score}<br>
+
+      화면을 터치하거나
+      스페이스바를 눌러 다시 시작
+
+    </span>
+
+  `;
+
+  messageEl.style.display="block";
+}
+
+
+/* =====================================================
+   게임 업데이트
+===================================================== */
+
+function update(){
+
+  if(gameState!=="playing")
+    return;
+
+
+  if(score<30){
+
+    speed+=.0025;
+
+  }else{
+
+    speed=speedAt30;
+  }
+
+
+  const beingSucked=
+    chaserMode&&
+    chasers.some(c=>c.state==="attack");
+
+
+  if(!beingSucked){
+
+    player.vy+=
+      .45*
+      gravityDirection;
+
+    player.vy*=.94;
+
+    player.y+=player.vy;
+  }
+
+
+  if(
+    !player.hidden&&
+    !beingSucked&&
+    (
+      player.y<=8||
+      player.y+player.size>=H-8
+    )
+  ){
+
+    gameOver();
+    return;
+  }
+
+
+  if(
+    !rocketMode&&
+    !chaserMode
+  ){
+
+    spawnTimer++;
+
+    const interval=
+      Math.max(
+        50,
+        spawnInterval-score*.3
+      );
+
+    if(spawnTimer>=interval){
+
+      spawnTimer=0;
+
+      spawnObstacle();
+    }
+  }
+
+
+  const playerRect={
+
+    x:player.x,
+    y:player.y,
+
+    width:player.size,
+    height:player.size
+  };
+
+
+  if(!rocketMode&&!chaserMode){
+
+    for(
+      let i=obstacles.length-1;
+      i>=0;
+      i--
+    ){
+
+      const o=obstacles[i];
+
+      o.x-=speed;
+
+      const topRect={
+        x:o.x,
+        y:0,
+        width:o.width,
+        height:o.topHeight
+      };
+
+      const bottomRect={
+        x:o.x,
+        y:o.bottomY,
+        width:o.width,
+        height:H-o.bottomY
+      };
+
+      if(
+        collide(playerRect,topRect)||
+        collide(playerRect,bottomRect)
+      ){
+
+        gameOver();
+        return;
+      }
+
+      if(
+        !o.counted&&
+        o.x+o.width<player.x
+      ){
+
+        o.counted=true;
+
+        score++;
+
+        scoreEl.textContent=score;
+
+        if(score===30){
+
+          speedAt30=speed;
+
+          startRocketPhase();
+
+          return;
+        }
+
+        if(
+          score===50&&
+          !rocketMode
+        ){
+
+          startChaserPhase();
+
+          return;
+        }
+      }
+
+      if(o.x+o.width<-50){
+
+        obstacles.splice(i,1);
+      }
+    }
+  }
+
+
+  if(rocketMode){
+
+    updateRocketPhase();
+    updateRockets();
+
+    if(gameState!=="playing")
+      return;
+  }
+
+
+  if(chaserMode){
+
+    updateChasers();
+
+    if(gameState!=="playing")
+      return;
+  }
+
+
+  updateParticles();
+}
+
+
+/* =====================================================
+   그리기
+===================================================== */
+
+function draw(){
+
+  ctx.clearRect(
+    0,
+    0,
+    W,
+    H
+  );
+
+
+  ctx.save();
+
+  if(screenShake>0){
+
+    ctx.translate(
+      (Math.random()-.5)*screenShake,
+      (Math.random()-.5)*screenShake
+    );
+  }
+
+
+  ctx.fillStyle="#111";
+
+  ctx.fillRect(
+    0,
+    0,
+    W,
+    H
+  );
+
+
+  let danger=0;
+
+  if(chaserMode){
+
+    let nearest=Infinity;
+
+    for(const c of chasers){
+
+      if(c.removing)continue;
+
+      const d=Math.hypot(
+        player.x+player.size/2-
+        (c.x+c.size*c.scale/2),
+
+        player.y+player.size/2-
+        (c.y+c.size*c.scale/2)
+      );
+
+      nearest=Math.min(nearest,d);
+    }
+
+    danger=
+      Math.max(
+        0,
+        Math.min(
+          1,
+          1-nearest/(W*.55)
+        )
+      );
+  }
+
+
+  ctx.strokeStyle=
+    danger>.5
+    ?"rgba(45,20,25,.75)"
+    :"#222";
+
+  ctx.lineWidth=1;
+
+  for(let x=0;x<W;x+=45){
+
+    ctx.beginPath();
+
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,H);
+
+    ctx.stroke();
+  }
+
+  for(let y=0;y<H;y+=45){
+
+    ctx.beginPath();
+
+    ctx.moveTo(0,y);
+    ctx.lineTo(W,y);
+
+    ctx.stroke();
+  }
+
+
+  ctx.fillStyle="#333";
+
+  ctx.fillRect(
+    0,
+    0,
+    W,
+    8
+  );
+
+  ctx.fillRect(
+    0,
+    H-8,
+    W,
+    8
+  );
+
+
+  for(const o of obstacles){
+
+    ctx.fillStyle="#ff3b3b";
+
+    ctx.fillRect(
+      o.x,
+      0,
+      o.width,
+      o.topHeight
+    );
+
+    ctx.fillRect(
+      o.x,
+      o.bottomY,
+      o.width,
+      H-o.bottomY
+    );
+  }
+
+
+  if(rocketMode){
+
+    for(const w of rocketWarnings){
+
+      drawRocketWarning(w);
+    }
+  }
+
+
+  if(chaserMode){
+
+    for(const b of electricBeams){
+
+      drawElectricBeam(b);
+    }
+
+    for(const c of chasers){
+
+      drawChaser(c);
+    }
+
+    drawChaserSupplies();
+  }
+
+
+  drawParticles();
+
+
+  for(const r of rockets){
+
+    drawRocket(r);
+  }
+
+
+  if(
+    player&&
+    !player.hidden
+  ){
+
+    ctx.fillStyle="#43d9ff";
+
+    ctx.fillRect(
+      player.x,
+      player.y,
+      player.size,
+      player.size
+    );
+
+
+    ctx.fillStyle="#111";
+
+    ctx.beginPath();
+
+    ctx.arc(
+      player.x+player.size*.31,
+      player.y+player.size*.35,
+      player.size*.075,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+    ctx.beginPath();
+
+    ctx.arc(
+      player.x+player.size*.71,
+      player.y+player.size*.37,
+      player.size*.075,
+      0,
+      Math.PI*2
+    );
+
+    ctx.fill();
+
+
+    ctx.strokeStyle="#111";
+
+    ctx.lineWidth=
+      Math.max(
+        1.5,
+        player.size*.045
+      );
+
+    ctx.lineCap="round";
+    ctx.lineJoin="round";
+
+    ctx.beginPath();
+
+    ctx.moveTo(
+      player.x+player.size*.31,
+      player.y+player.size*.68
+    );
+
+    ctx.lineTo(
+      player.x+player.size*.47,
+      player.y+player.size*.72
+    );
+
+    ctx.lineTo(
+      player.x+player.size*.66,
+      player.y+player.size*.65
+    );
+
+    ctx.stroke();
+  }
+
+
+  if(chaserMode){
+
+    for(const c of chasers){
+
+      if(c.state==="attack"){
+
+        drawChaser(c);
+      }
+    }
+  }
+
+
+  if(
+    chaserMode&&
+    player.hidden
+  ){
+
+    ctx.fillStyle="rgba(0,0,0,.12)";
+
+    ctx.fillRect(
+      0,
+      0,
+      W,
+      H
+    );
+  }
+
+
+  ctx.restore();
+
+
+  if(
+    chaserMode&&
+    danger>.35
+  ){
+
+    const g=
+      ctx.createRadialGradient(
+        W/2,
+        H/2,
+        Math.min(W,H)*.20,
+        W/2,
+        H/2,
+        Math.max(W,H)*.70
+      );
+
+    g.addColorStop(
+      0,
+      "rgba(0,0,0,0)"
+    );
+
+    g.addColorStop(
+      1,
+      `rgba(0,0,0,${danger*.48})`
+    );
+
+    ctx.fillStyle=g;
+
+    ctx.fillRect(
+      0,
+      0,
+      W,
+      H
+    );
+  }
+}
+
+
+/* =====================================================
+   루프
+===================================================== */
+
+function loop(){
+
+  update();
+  draw();
+
+  if(gameState==="playing"){
+
+    animationId=
+      requestAnimationFrame(loop);
+
+  }else{
+
+    animationId=null;
+  }
+}
+
+
+/* =====================================================
+   관리자
+===================================================== */
+
+function openAdmin(){
+
+  adminPanel.style.display="block";
+
+  adminMode=false;
+
+  adminPasswordArea.style.display="block";
+  adminScoreArea.style.display="none";
+
+  adminPassword.value="";
+  adminScoreInput.value="";
+
+  adminInfo.textContent=
+    "비밀번호를 입력하세요.";
+
+  setTimeout(()=>{
+
+    adminPassword.focus();
+
+    restoreViewport();
+
+  },100);
+}
+
+
+function checkAdminPassword(){
+
+  const value=
+    String(adminPassword.value).trim();
+
+  if(value===ADMIN_PASSWORD){
+
+    adminMode=true;
+
+    adminPasswordArea.style.display="none";
+    adminScoreArea.style.display="block";
+
+    adminInfo.textContent=
+      "✅ 관리자 모드 활성화";
+
+    setTimeout(()=>{
+
+      adminScoreInput.focus();
+
+      restoreViewport();
+
+    },100);
+
+  }else{
+
+    adminInfo.textContent=
+      "❌ 비밀번호가 틀렸습니다.";
+
+    adminPassword.value="";
+
+    setTimeout(()=>{
+      adminPassword.focus();
+    },50);
+  }
+}
+
+
+/* =====================================================
+   관리자 점수 이동
+===================================================== */
+
+function adminJump(target){
+
+  target=Math.floor(Number(target));
+
+  if(
+    !Number.isFinite(target)||
+    target<0
+  ){
+
+    adminInfo.textContent=
+      "❌ 올바른 점수를 입력하세요.";
+
+    return;
+  }
+
+  target=Math.min(target,9999);
+
+  resetGame();
+
+  gameState="playing";
+
+  messageEl.style.display="none";
+
+  initAudio();
+
+
+  if(target<30){
+
+    score=target;
+
+    scoreEl.textContent=score;
+
+    speed=
+      Math.max(4.5,W/190)+
+      target*.0025;
+
+    adminInfo.textContent=
+      "✅ "+target+
+      "점으로 이동했습니다.";
+  }
+
+
+  else if(target<50){
+
+    score=target;
+
+    scoreEl.textContent=score;
+
+    speedAt30=
+      Math.max(4.5,W/190)+
+      30*.0025;
+
+    speed=speedAt30;
+
+    rocketPhaseTriggered=false;
+    rocketMode=false;
+
+    rocketAttackCount=0;
+    rocketWarnings=[];
+    rockets=[];
+    obstacles=[];
+
+    startRocketPhase();
+
+    adminInfo.textContent=
+      "🚀 "+target+
+      "점 로켓 모드로 이동했습니다.";
+  }
+
+
+  else{
+
+    score=target;
+
+    scoreEl.textContent=score;
+
+    speedAt30=
+      Math.max(4.5,W/190)+
+      30*.0025;
+
+    speed=speedAt30;
+
+    rocketMode=false;
+    rocketPhaseTriggered=true;
+
+    rocketWarnings=[];
+    rockets=[];
+    obstacles=[];
+
+    startChaserPhase();
+
+    adminInfo.textContent=
+      "🔴 "+target+
+      "점 추격자 모드로 이동했습니다.";
+  }
+
+
+  if(animationId===null){
+
+    animationId=
+      requestAnimationFrame(loop);
+  }
+}
+
+
+/* =====================================================
+   관리자 버튼
+===================================================== */
+
+adminButton.addEventListener(
+  "pointerdown",
+  function(e){
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    openAdmin();
+  }
+);
+
+
+adminPasswordForm.addEventListener(
+  "submit",
+  function(e){
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    checkAdminPassword();
+  }
+);
+
+
+adminScoreForm.addEventListener(
+  "submit",
+  function(e){
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    if(!adminMode)return;
+
+    const value=adminScoreInput.value;
+
+    if(value==="")return;
+
+    adminJump(value);
+
+    adminScoreInput.value="";
+  }
+);
+
+
+adminClose.addEventListener(
+  "pointerdown",
+  function(e){
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    adminPanel.style.display="none";
+
+    adminMode=false;
+
+    adminPassword.blur();
+    adminScoreInput.blur();
+
+    restoreViewport();
+  }
+);
+
+
+/* =====================================================
+   게임 입력
+===================================================== */
+
+function handleGameInput(e){
+
+  if(
+    e.target===adminButton||
+    adminPanel.contains(e.target)
+  ){
+    return;
+  }
+
+  e.preventDefault();
+
+  initAudio();
+
+  flipGravity();
+}
+
+
+window.addEventListener(
+  "pointerdown",
+  handleGameInput,
+  {
+    passive:false
+  }
+);
+
+
+/* =====================================================
+   스페이스
+===================================================== */
+
+window.addEventListener(
+  "keydown",
+  function(e){
+
+    if(e.code==="Space"){
+
+      if(
+        document.activeElement===adminPassword||
+        document.activeElement===adminScoreInput
+      ){
+        return;
+      }
+
+      e.preventDefault();
+
+      initAudio();
+
+      flipGravity();
+    }
+  }
+);
+
+
+/* =====================================================
+   시작
+===================================================== */
+
+resize();
+
+resetGame();
+
+draw();
+
+</script>
+
+</body>
+</html>

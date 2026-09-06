@@ -605,6 +605,45 @@
             background: rgba(255, 255, 255, 0.34);
         }
 
+        .art-gravity {
+            background:
+                repeating-linear-gradient(
+                    0deg,
+                    rgba(255, 255, 255, 0.07) 0,
+                    rgba(255, 255, 255, 0.07) 1px,
+                    transparent 1px,
+                    transparent 18px
+                ),
+                linear-gradient(135deg, #111827, #450a0a);
+        }
+
+        .art-gravity::before {
+            content: "";
+            position: absolute;
+            left: 36px;
+            top: 34px;
+            width: 46px;
+            height: 46px;
+            border-radius: 10px;
+            background: #43d9ff;
+            box-shadow:
+                88px 58px 0 -8px #ef4444,
+                116px 18px 0 -16px #facc15,
+                0 84px 0 -20px rgba(67, 217, 255, 0.5);
+        }
+
+        .art-gravity::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 50%;
+            height: 5px;
+            background: rgba(248, 113, 113, 0.72);
+            box-shadow: 0 0 18px rgba(239, 68, 68, 0.7);
+            transform: translateY(-50%);
+        }
+
         .art-mario {
             background:
                 linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0)),
@@ -830,6 +869,15 @@
                             <span class="file-chip">guangboo/index.html</span>
                             <strong>Guangboo</strong>
                             <span>괴물들이 겨루는 모바일 우선 생존 대전</span>
+                        </div>
+                    </a>
+
+                    <a class="app-card" href="gravity-flip/index.html" data-guest-readonly>
+                        <div class="card-art art-gravity" aria-hidden="true"></div>
+                        <div class="card-copy">
+                            <span class="file-chip">gravity-flip/index.html</span>
+                            <strong>Gravity Flip</strong>
+                            <span>터치 또는 스페이스바로 중력을 바꾸는 생존 게임</span>
                         </div>
                     </a>
 
