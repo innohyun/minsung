@@ -41,7 +41,7 @@ test('gravity flip caps visible chasers at three by screen overlap', () => {
 
 test('gravity flip registers and draws the red tentacle chaser asset', () => {
     assert.match(html, /const NIGHTMARE_CHASER_ASSET=/);
-    assert.match(html, /red-tentacle-chaser-v2-asset\.png/);
+    assert.match(html, /reference-style-red-tentacle-chaser-asset\.png/);
     assert.match(html, /const nightmareChaserImg=new Image\(\)/);
     assert.match(html, /nightmareChaserImg\.src=NIGHTMARE_CHASER_ASSET/);
     assert.match(html, /ctx\.drawImage\(\s*nightmareChaserImg/);
