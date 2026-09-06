@@ -468,6 +468,20 @@ const MAX_CHASERS=10;
 
 
 /* =====================================================
+   🌑 암흑 이벤트
+===================================================== */
+
+let darkEventMode=false;
+let darkEventPhase=0;
+let darkPassedCount=0;
+let darkSpawnTimer=0;
+let darkLightTimer=0;
+let darkInterludeTimer=0;
+let darkMonster=null;
+let darkSoundTimer=0;
+
+
+/* =====================================================
    오디오
 ===================================================== */
 
@@ -479,6 +493,7 @@ let musicStep=0;
 
 let threatOsc=null;
 let threatGain=null;
+let threatPulseTimer=0;
 
 
 const normalMelody=[
@@ -670,11 +685,107 @@ function electricSound(){
 
 /* =====================================================
    추격자 거리 사운드
-   거리 사운드 제거
 ===================================================== */
 
+function stopThreatSound(){
+
+  if(threatGain){
+
+    try{
+      threatGain.gain.cancelScheduledValues(audioCtx.currentTime);
+      threatGain.gain.setTargetAtTime(0,audioCtx.currentTime,.05);
+    }catch(e){}
+  }
+}
+
+
 function updateThreatSound(threat){
-  return;
+
+  if(!audioCtx||!master){
+    return;
+  }
+
+  if(
+    !threat||
+    gameState!=="playing"
+  ){
+    stopThreatSound();
+    return;
+  }
+
+  if(!threatOsc){
+
+    threatOsc=audioCtx.createOscillator();
+    threatGain=audioCtx.createGain();
+
+    threatOsc.type="sawtooth";
+    threatOsc.frequency.value=45;
+    threatGain.gain.value=0;
+
+    threatOsc.connect(threatGain);
+    threatGain.connect(master);
+    threatOsc.start();
+  }
+
+  const now=audioCtx.currentTime;
+
+  const distance=
+    Math.max(1,threat.distance||W);
+
+  const danger=
+    Math.max(
+      0,
+      Math.min(
+        1,
+        1-distance/(W*.62)
+      )
+    );
+
+  const panicPulse=
+    Math.sin(
+      performance.now()/
+      Math.max(60,220-danger*155)
+    )*.5+.5;
+
+  const freq=
+    42+
+    danger*118+
+    panicPulse*danger*28;
+
+  const volume=
+    .008+
+    danger*.082+
+    panicPulse*danger*.025;
+
+  threatOsc.frequency.setTargetAtTime(
+    freq,
+    now,
+    .045
+  );
+
+  threatGain.gain.setTargetAtTime(
+    volume,
+    now,
+    .055
+  );
+
+  threatPulseTimer++;
+
+  if(
+    danger>.62&&
+    threatPulseTimer>Math.max(8,24-danger*15)
+  ){
+
+    threatPulseTimer=0;
+
+    simpleTone(
+      160+danger*240,
+      65,
+      .12,
+      "square",
+      .025+danger*.035
+    );
+  }
 }
 
 
@@ -732,16 +843,17 @@ function startMusic(){
 
     if(rocketMode)interval=125;
     if(chaserMode)interval=190;
+    if(darkEventMode)interval=230;
 
     const melody=
-      chaserMode
+      (chaserMode||darkEventMode)
       ?chaserMelody
       :rocketMode
       ?rocketMelody
       :normalMelody;
 
     const bass=
-      chaserMode
+      (chaserMode||darkEventMode)
       ?chaserBass
       :rocketMode
       ?rocketBass
@@ -753,6 +865,7 @@ function startMusic(){
       melody[step],
       Math.max(.10,interval/1000*.88),
       "square",
+      darkEventMode?.035:
       chaserMode?.050:
       rocketMode?.058:
       .052
@@ -764,6 +877,7 @@ function startMusic(){
         bass[(step/2)%8],
         Math.max(.18,interval/1000*1.5),
         "sawtooth",
+        darkEventMode?.055:
         chaserMode?.065:
         rocketMode?.072:
         .065
@@ -1007,6 +1121,16 @@ function resetGame(){
 
   chaserFinishPending=false;
 
+  darkEventMode=false;
+  darkEventPhase=0;
+  darkPassedCount=0;
+  darkSpawnTimer=0;
+  darkLightTimer=0;
+  darkInterludeTimer=0;
+  darkMonster=null;
+  darkSoundTimer=0;
+  stopThreatSound();
+
   warningEl.style.display="none";
   eventInfo.style.display="none";
   screenNoise.style.opacity=0;
@@ -1071,6 +1195,23 @@ function flipGravity(){
   gravityDirection*=-1;
 
   flipSound();
+
+  if(darkEventMode){
+    darkLightTimer=
+      darkEventPhase===1
+      ?95
+      :darkEventPhase===3
+      ?45
+      :70;
+
+    simpleTone(
+      850,
+      280,
+      .28,
+      "triangle",
+      .12
+    );
+  }
 
   for(let i=0;i<10;i++){
 
@@ -1518,6 +1659,7 @@ function startChaserPhase(){
     if(chaserMode){
       spawnChaserSupply(true);
       spawnChaserSupply(true);
+      spawnChaserSupply(true);
     }
   },800);
 }
@@ -1632,7 +1774,7 @@ function spawnChaserSupply(initial=false){
 
   if(
     !chaserMode||
-    chaserSupplies.length>=3
+    chaserSupplies.length>=4
   )return;
 
   const size=Math.max(
@@ -1642,8 +1784,8 @@ function spawnChaserSupply(initial=false){
 
   const gap=
     initial
-    ?W*.62+Math.random()*W*.33
-    :W*.81+Math.random()*W*.62;
+    ?W*.42+Math.random()*W*.25
+    :W*.50+Math.random()*W*.45;
 
   const x=
     Math.max(
@@ -1651,7 +1793,7 @@ function spawnChaserSupply(initial=false){
       W+gap
     );
 
-  nextSupplyWorldX=x+W*.65;
+  nextSupplyWorldX=x+W*.42;
 
   let y;
 
@@ -1730,8 +1872,8 @@ function updateChasers(){
   }
 
   if(
-    chaserSupplies.length<2&&
-    chaserElapsed%100===0
+    chaserSupplies.length<3&&
+    chaserElapsed%60===0
   ){
 
     spawnChaserSupply(false);
@@ -3276,6 +3418,10 @@ function drawParticles(){
 
       ctx.fillStyle="#ffe51b";
 
+    }else if(p.type==="darkShard"){
+
+      ctx.fillStyle="#ff3030";
+
     }else if(p.type==="suction"){
 
       ctx.fillStyle="#ff405f";
@@ -3290,7 +3436,7 @@ function drawParticles(){
     ctx.arc(
       p.x,
       p.y,
-      p.type==="electric"?2.5:3,
+      p.type==="electric"?2.5:p.type==="darkShard"?3.5:3,
       0,
       Math.PI*2
     );
@@ -3299,6 +3445,654 @@ function drawParticles(){
   }
 
   ctx.globalAlpha=1;
+}
+
+
+
+/* =====================================================
+   🌑 암흑 이벤트
+===================================================== */
+
+function startDarkEvent(){
+
+  darkEventMode=true;
+  darkEventPhase=1;
+  darkPassedCount=0;
+  darkSpawnTimer=0;
+  darkLightTimer=110;
+  darkInterludeTimer=0;
+  darkSoundTimer=0;
+
+  obstacles=[];
+  rockets=[];
+  rocketWarnings=[];
+
+  const size=Math.max(48,player.size*2.9);
+
+  darkMonster={
+    x:-size*1.55,
+    y:H/2-size/2,
+    size:size,
+    wobble:0,
+    phase:1,
+    stunned:0
+  };
+
+  player.hidden=false;
+  player.size=Math.max(18,Math.min(W,H)*.055);
+  player.x=originalPlayerX;
+  player.vy=0;
+
+  warningEl.textContent="DARKNESS BREATHES";
+  warningEl.style.display="block";
+
+  eventInfo.style.display="block";
+  eventInfo.textContent="어둠 속 기둥 0 / 20   •   반전하면 잠깐 보입니다";
+
+  screenNoise.style.opacity=.18;
+  musicStep=0;
+
+  simpleTone(55,22,1.2,"sawtooth",.12);
+}
+
+
+function startDarkInterlude(){
+
+  stopThreatSound();
+
+  darkEventPhase=2;
+  darkInterludeTimer=0;
+  darkLightTimer=0;
+  darkSpawnTimer=0;
+  darkMonster=null;
+  obstacles=[];
+
+  warningEl.textContent="...";
+  warningEl.style.display="block";
+
+  eventInfo.textContent="등불만 남았습니다   •   뒤에서 소리가 들립니다";
+
+  simpleTone(35,18,1.6,"sawtooth",.14);
+}
+
+
+function startDarkMutatedPhase(){
+
+  darkEventPhase=3;
+  darkSpawnTimer=0;
+  darkLightTimer=35;
+
+  const size=Math.max(72,player.size*3.7);
+
+  darkMonster={
+    x:-size*1.15,
+    y:H/2-size/2,
+    size:size,
+    wobble:0,
+    phase:3,
+    stunned:0
+  };
+
+  warningEl.textContent="IT CHANGED";
+  warningEl.style.display="block";
+
+  eventInfo.textContent="낡은 기둥 "+darkPassedCount+" / 20   •   화면이 흔들립니다";
+
+  simpleTone(80,24,1.0,"sawtooth",.18);
+}
+
+
+function finishDarkEvent(){
+
+  darkEventMode=false;
+  darkEventPhase=0;
+  darkMonster=null;
+  obstacles=[];
+
+  stopThreatSound();
+
+  warningEl.style.display="none";
+  eventInfo.style.display="none";
+  screenNoise.style.opacity=0;
+
+  messageEl.innerHTML=`
+    🌑 NIGHTMARE CLEAR
+    <span class="sub">
+      어둠의 기둥 20개 통과!
+    </span>
+  `;
+
+  messageEl.style.display="block";
+
+  setTimeout(()=>{
+
+    if(gameState!=="playing")return;
+
+    messageEl.style.display="none";
+    speed=speedAt30;
+    spawnTimer=spawnInterval;
+
+  },1500);
+}
+
+
+function spawnDarkObstacle(){
+
+  if(!darkEventMode||darkEventPhase===2)return;
+
+  const gap=Math.max(H*.28,H*.42-darkPassedCount*1.6);
+  const minTop=H*.08;
+  const maxTop=Math.max(minTop,H-gap-H*.08);
+  const topHeight=minTop+Math.random()*Math.max(0,maxTop-minTop);
+
+  obstacles.push({
+    x:W+60,
+    width:Math.max(34,W*.06),
+    topHeight:topHeight,
+    bottomY:topHeight+gap,
+    counted:false,
+    dark:true,
+    cracked:darkEventPhase===3,
+    seed:Math.random()*1000
+  });
+}
+
+
+function darkObstacleSpeed(){
+
+  const base=speedAt30||Math.max(4.5,W/190);
+
+  return Math.max(
+    2.35,
+    base*(darkEventPhase===3?.55:.48)
+  );
+}
+
+
+function shatterDarkObstacle(o){
+
+  const cx=o.x+o.width/2;
+
+  for(let i=0;i<34;i++){
+
+    const fromTop=
+      Math.random()<.5;
+
+    const y=
+      fromTop
+      ?Math.random()*o.topHeight
+      :o.bottomY+Math.random()*(H-o.bottomY);
+
+    particles.push({
+      x:cx+(Math.random()-.5)*o.width,
+      y:y,
+      vx:(Math.random()-.5)*12,
+      vy:(Math.random()-.5)*12,
+      life:24+Math.random()*18,
+      type:"darkShard"
+    });
+  }
+
+  simpleTone(190,42,.35,"square",.14);
+  screenShake=Math.max(screenShake,4.5);
+}
+
+
+function updateDarkMonster(){
+
+  if(!darkMonster)return;
+
+  const m=darkMonster;
+
+  m.wobble+=.07;
+
+  if(m.stunned>0){
+    m.stunned--;
+    return;
+  }
+
+  const px=player.x+player.size/2;
+  const py=player.y+player.size/2;
+  const mx=m.x+m.size/2;
+  const my=m.y+m.size/2;
+
+  const dx=px-mx;
+  const dy=py-my;
+  const len=Math.max(1,Math.hypot(dx,dy));
+
+  const canMove=
+    darkEventPhase===3||
+    darkLightTimer<=0;
+
+  if(canMove){
+
+    const moveSpeed=
+      darkEventPhase===3
+      ?1.02
+      :1.85;
+
+    m.x+=dx/len*moveSpeed;
+    m.y+=dy/len*moveSpeed;
+
+    if(darkEventPhase===1){
+      m.x+=.55;
+    }
+  }
+
+  m.y+=Math.sin(m.wobble)*.24;
+
+  m.y=Math.max(
+    10,
+    Math.min(H-m.size-10,m.y)
+  );
+
+  const monsterRect={
+    x:m.x+m.size*.18,
+    y:m.y+m.size*.15,
+    width:m.size*.64,
+    height:m.size*.70
+  };
+
+  const playerRect={
+    x:player.x,
+    y:player.y,
+    width:player.size,
+    height:player.size
+  };
+
+  if(collide(monsterRect,playerRect)){
+    gameOver();
+    return;
+  }
+
+  for(let i=obstacles.length-1;i>=0;i--){
+
+    const o=obstacles[i];
+
+    const topRect={
+      x:o.x,
+      y:0,
+      width:o.width,
+      height:o.topHeight
+    };
+
+    const bottomRect={
+      x:o.x,
+      y:o.bottomY,
+      width:o.width,
+      height:H-o.bottomY
+    };
+
+    if(collide(monsterRect,topRect)||collide(monsterRect,bottomRect)){
+
+      shatterDarkObstacle(o);
+      obstacles.splice(i,1);
+      m.x-=Math.max(18,o.width*.55);
+      m.stunned=darkEventPhase===3?10:18;
+    }
+  }
+}
+
+
+function updateDarkEvent(){
+
+  if(!darkEventMode)return;
+
+  globalGlitch++;
+  darkSoundTimer++;
+
+  if(darkLightTimer>0){
+    darkLightTimer--;
+  }
+
+  if(darkEventPhase===2){
+
+    darkInterludeTimer++;
+    screenNoise.style.opacity=.12+(Math.random()<.15?.08:0);
+
+    if(darkSoundTimer>42){
+      darkSoundTimer=0;
+      simpleTone(
+        70+Math.random()*35,
+        18,
+        .75,
+        "sawtooth",
+        .10
+      );
+    }
+
+    if(darkInterludeTimer>260){
+      startDarkMutatedPhase();
+    }
+
+    updateParticles();
+    return;
+  }
+
+  darkSpawnTimer++;
+
+  const spawnEvery=
+    darkEventPhase===3
+    ?98
+    :112;
+
+  if(darkSpawnTimer>=spawnEvery){
+    darkSpawnTimer=0;
+    spawnDarkObstacle();
+  }
+
+  const playerRect={
+    x:player.x,
+    y:player.y,
+    width:player.size,
+    height:player.size
+  };
+
+  for(let i=obstacles.length-1;i>=0;i--){
+
+    const o=obstacles[i];
+
+    o.x-=darkObstacleSpeed();
+
+    const topRect={
+      x:o.x,
+      y:0,
+      width:o.width,
+      height:o.topHeight
+    };
+
+    const bottomRect={
+      x:o.x,
+      y:o.bottomY,
+      width:o.width,
+      height:H-o.bottomY
+    };
+
+    if(
+      collide(playerRect,topRect)||
+      collide(playerRect,bottomRect)
+    ){
+      gameOver();
+      return;
+    }
+
+    if(!o.counted&&o.x+o.width<player.x){
+
+      o.counted=true;
+      darkPassedCount++;
+      score++;
+      scoreEl.textContent=score;
+
+      if(darkPassedCount===10){
+        startDarkInterlude();
+        return;
+      }
+
+      if(darkPassedCount>=20){
+        finishDarkEvent();
+        return;
+      }
+    }
+
+    if(o.x+o.width<-70){
+      obstacles.splice(i,1);
+    }
+  }
+
+  updateDarkMonster();
+
+  if(darkEventPhase===3&&darkMonster){
+    screenShake=Math.max(
+      screenShake,
+      1.5+Math.random()*2.2
+    );
+  }
+
+  if(darkMonster){
+
+    const px=player.x+player.size/2;
+    const py=player.y+player.size/2;
+    const mx=darkMonster.x+darkMonster.size/2;
+    const my=darkMonster.y+darkMonster.size/2;
+    const distance=Math.hypot(px-mx,py-my);
+
+    updateThreatSound({distance:distance});
+
+  }else{
+
+    updateThreatSound(null);
+  }
+
+  screenNoise.style.opacity=
+    darkEventPhase===3
+    ?.22+(Math.random()<.18?.10:0)
+    :.16+(darkLightTimer<=0?.12:0);
+
+  eventInfo.textContent=
+    darkEventPhase===3
+    ?"낡은 기둥 "+darkPassedCount+" / 20   •   흔들림을 버티세요"
+    :"어둠 속 기둥 "+darkPassedCount+" / 20   •   반전하면 잠깐 보입니다";
+
+  updateParticles();
+}
+
+
+function drawDarkObstacle(o){
+
+  ctx.fillStyle=
+    o.cracked
+    ?"#9f2020"
+    :"#ff3b3b";
+
+  ctx.fillRect(o.x,0,o.width,o.topHeight);
+  ctx.fillRect(o.x,o.bottomY,o.width,H-o.bottomY);
+
+  if(o.cracked){
+
+    ctx.strokeStyle="rgba(30,0,0,.85)";
+    ctx.lineWidth=2;
+
+    for(let i=0;i<5;i++){
+
+      const y1=(i*.19+.08)*o.topHeight;
+
+      ctx.beginPath();
+      ctx.moveTo(o.x+o.width*.20,y1);
+      ctx.lineTo(o.x+o.width*.72,y1+18+Math.sin(o.seed+i)*18);
+      ctx.lineTo(o.x+o.width*.45,y1+42+Math.cos(o.seed+i)*18);
+      ctx.stroke();
+
+      const bh=o.bottomY+(i*.17+.08)*(H-o.bottomY);
+
+      ctx.beginPath();
+      ctx.moveTo(o.x+o.width*.75,bh);
+      ctx.lineTo(o.x+o.width*.25,bh+20+Math.cos(o.seed+i)*16);
+      ctx.lineTo(o.x+o.width*.58,bh+44+Math.sin(o.seed+i)*16);
+      ctx.stroke();
+    }
+  }
+}
+
+
+function drawNightmareMonster(m){
+
+  if(!m)return;
+
+  const mutated=m.phase===3;
+  const s=m.size;
+  const x=m.x;
+  const y=m.y;
+  const pulse=Math.sin(m.wobble)*.08;
+
+  ctx.save();
+
+  ctx.translate(
+    x+(Math.random()-.5)*(mutated?7:3),
+    y+(Math.random()-.5)*(mutated?7:3)
+  );
+
+  ctx.globalAlpha=mutated?1:.88;
+
+  ctx.fillStyle="#050005";
+
+  ctx.beginPath();
+  ctx.ellipse(s*.50,s*.54,s*.36,s*.43+pulse*s,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.ellipse(s*.50,s*.32,s*.34,s*.27,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(s*.22,s*.22);
+  ctx.lineTo(s*.12,-s*.08);
+  ctx.lineTo(s*.38,s*.18);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(s*.64,s*.18);
+  ctx.lineTo(s*.88,-s*.10);
+  ctx.lineTo(s*.78,s*.24);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle="#050005";
+  ctx.lineWidth=s*.12;
+  ctx.lineCap="round";
+
+  ctx.beginPath();
+  ctx.moveTo(s*.25,s*.52);
+  ctx.lineTo(-s*.08,s*.72);
+  ctx.moveTo(s*.75,s*.52);
+  ctx.lineTo(s*1.08,s*.75);
+  ctx.stroke();
+
+  ctx.shadowColor="#ff1744";
+  ctx.shadowBlur=mutated?22:12;
+  ctx.fillStyle="#ff2b45";
+
+  const eyes=mutated
+    ?[[.28,.28],[.50,.24],[.72,.29],[.40,.39],[.61,.40],[.50,.33]]
+    :[[.34,.31],[.66,.31]];
+
+  for(const e of eyes){
+    ctx.beginPath();
+    ctx.ellipse(s*e[0],s*e[1],s*.055,s*.025,0,0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.shadowBlur=0;
+
+  ctx.fillStyle="#010001";
+  ctx.beginPath();
+  ctx.ellipse(s*.50,s*.55,s*(mutated?.22:.16),s*(mutated?.075:.040),0,0,Math.PI*2);
+  ctx.fill();
+
+  if(mutated){
+
+    ctx.fillStyle="#d9d0ad";
+
+    for(let i=0;i<8;i++){
+      const tx=s*(.30+i*.058);
+      ctx.beginPath();
+      ctx.moveTo(tx,s*.50);
+      ctx.lineTo(tx+s*.025,s*.57);
+      ctx.lineTo(tx+s*.050,s*.50);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.strokeStyle="rgba(255,40,58,.45)";
+    ctx.lineWidth=2;
+
+    for(let i=0;i<5;i++){
+      ctx.beginPath();
+      ctx.moveTo(s*.05,s*(.15+i*.14));
+      ctx.lineTo(s*.95,s*(.18+i*.14)+Math.sin(m.wobble+i)*10);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+
+function drawDarknessOverlay(){
+
+  if(!darkEventMode)return;
+
+  ctx.save();
+
+  if(darkEventPhase===1){
+
+    const light=darkLightTimer/95;
+    const alpha=Math.max(.38,.92-light*.55);
+
+    ctx.fillStyle=`rgba(0,0,0,${alpha})`;
+    ctx.fillRect(0,0,W,H);
+
+    if(light>0){
+
+      const r=Math.min(W,H)*(.22+light*.48);
+      const g=ctx.createRadialGradient(
+        player.x+player.size/2,
+        player.y+player.size/2,
+        Math.min(W,H)*.04,
+        player.x+player.size/2,
+        player.y+player.size/2,
+        r
+      );
+
+      g.addColorStop(0,`rgba(255,235,170,${.42*light})`);
+      g.addColorStop(.48,`rgba(120,210,255,${.18*light})`);
+      g.addColorStop(1,"rgba(0,0,0,0)");
+
+      ctx.fillStyle=g;
+      ctx.fillRect(0,0,W,H);
+    }
+  }
+
+  else if(darkEventPhase===2){
+
+    ctx.fillStyle="rgba(0,0,0,.94)";
+    ctx.fillRect(0,0,W,H);
+
+    const g=ctx.createRadialGradient(
+      player.x+player.size/2,
+      player.y+player.size/2,
+      Math.min(W,H)*.03,
+      player.x+player.size/2,
+      player.y+player.size/2,
+      Math.min(W,H)*.25
+    );
+
+    g.addColorStop(0,"rgba(255,218,120,.70)");
+    g.addColorStop(.38,"rgba(255,185,70,.18)");
+    g.addColorStop(1,"rgba(0,0,0,0)");
+
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  else if(darkEventPhase===3){
+
+    ctx.fillStyle="rgba(18,0,4,.34)";
+    ctx.fillRect(0,0,W,H);
+
+    const g=ctx.createRadialGradient(
+      W*.50,H*.50,Math.min(W,H)*.18,
+      W*.50,H*.50,Math.max(W,H)*.72
+    );
+
+    g.addColorStop(0,"rgba(0,0,0,0)");
+    g.addColorStop(1,"rgba(0,0,0,.54)");
+
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W,H);
+  }
+
+  ctx.restore();
 }
 
 
@@ -3353,13 +4147,11 @@ function finishChaserPhase(){
 
     messageEl.style.display="none";
 
-    speed=speedAt30;
-
-    spawnTimer=spawnInterval;
-
     chaserFinishPending=false;
 
-  },1400);
+    startDarkEvent();
+
+  },1200);
 }
 
 
@@ -3374,6 +4166,10 @@ function gameOver(){
   gameState="gameover";
 
   updateThreatSound(null);
+
+  darkEventMode=false;
+  darkEventPhase=0;
+  darkMonster=null;
 
   deathSound();
 
@@ -3470,7 +4266,8 @@ function update(){
 
   if(
     !rocketMode&&
-    !chaserMode
+    !chaserMode&&
+    !darkEventMode
   ){
 
     spawnTimer++;
@@ -3500,7 +4297,7 @@ function update(){
   };
 
 
-  if(!rocketMode&&!chaserMode){
+  if(!rocketMode&&!chaserMode&&!darkEventMode){
 
     for(
       let i=obstacles.length-1;
@@ -3590,6 +4387,17 @@ function update(){
 
     if(gameState!=="playing")
       return;
+  }
+
+
+  if(darkEventMode){
+
+    updateDarkEvent();
+
+    if(gameState!=="playing")
+      return;
+
+    return;
   }
 
 
@@ -3710,22 +4518,7 @@ function draw(){
 
 
   for(const o of obstacles){
-
-    ctx.fillStyle="#ff3b3b";
-
-    ctx.fillRect(
-      o.x,
-      0,
-      o.width,
-      o.topHeight
-    );
-
-    ctx.fillRect(
-      o.x,
-      o.bottomY,
-      o.width,
-      H-o.bottomY
-    );
+    drawDarkObstacle(o);
   }
 
 
@@ -3735,6 +4528,11 @@ function draw(){
 
       drawRocketWarning(w);
     }
+  }
+
+
+  if(darkEventMode){
+    drawNightmareMonster(darkMonster);
   }
 
 
@@ -3866,6 +4664,8 @@ function draw(){
 
 
   ctx.restore();
+
+  drawDarknessOverlay();
 
 
   if(
@@ -4085,11 +4885,28 @@ function adminJump(target){
     rockets=[];
     obstacles=[];
 
-    startChaserPhase();
+    if(target>=70){
 
-    adminInfo.textContent=
-      "🔴 "+target+
-      "점 추격자 모드로 이동했습니다.";
+      startDarkEvent();
+
+      darkPassedCount=Math.min(19,target-70);
+
+      if(darkPassedCount>=10){
+        startDarkMutatedPhase();
+      }
+
+      adminInfo.textContent=
+        "🌑 "+target+
+        "점 암흑 이벤트로 이동했습니다.";
+
+    }else{
+
+      startChaserPhase();
+
+      adminInfo.textContent=
+        "🔴 "+target+
+        "점 추격자 모드로 이동했습니다.";
+    }
   }
 
 
