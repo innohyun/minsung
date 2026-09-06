@@ -368,6 +368,12 @@ const messageEl=document.getElementById("message");
 const eventInfo=document.getElementById("eventInfo");
 const screenNoise=document.getElementById("screenNoise");
 
+const NIGHTMARE_CHASER_ASSET=
+  "../assets/gravity-flip-hq-concepts/reference-style-red-tentacle-chaser-asset.png";
+
+const nightmareChaserImg=new Image();
+nightmareChaserImg.src=NIGHTMARE_CHASER_ASSET;
+
 
 /* =====================================================
    관리자
@@ -2750,6 +2756,47 @@ function drawChaser(c){
 
   ctx.scale(scale,scale);
 
+  if(
+    nightmareChaserImg.complete&&
+    nightmareChaserImg.naturalWidth>0
+  ){
+
+    ctx.globalAlpha=
+      c.removing
+      ?Math.max(.12,c.removeTimer/22)
+      :.90;
+
+    ctx.shadowColor="#ff1744";
+    ctx.shadowBlur=8+danger*18;
+
+    ctx.drawImage(
+      nightmareChaserImg,
+      -c.size*2.35,
+      -c.size*.58,
+      c.size*4.65,
+      c.size*2.79
+    );
+
+    ctx.shadowBlur=0;
+
+    if(Math.random()<.75){
+
+      ctx.globalAlpha=.18+danger*.22;
+      ctx.fillStyle="#ff1744";
+
+      ctx.fillRect(
+        -c.size*2.1,
+        Math.random()*c.size*1.15,
+        c.size*(1.1+Math.random()*2.8),
+        Math.max(1.5,c.size*.05)
+      );
+    }
+
+    ctx.restore();
+
+    return;
+  }
+
 
   if(Math.random()<.65){
 
@@ -3951,6 +3998,52 @@ function drawNightmareMonster(m){
   const x=m.x;
   const y=m.y;
   const pulse=Math.sin(m.wobble)*.08;
+
+  if(
+    nightmareChaserImg.complete&&
+    nightmareChaserImg.naturalWidth>0
+  ){
+
+    ctx.save();
+
+    ctx.translate(
+      x+(Math.random()-.5)*(mutated?10:4),
+      y+(Math.random()-.5)*(mutated?10:4)
+    );
+
+    ctx.globalAlpha=mutated?1:.88;
+    ctx.shadowColor="#ff1744";
+    ctx.shadowBlur=mutated?24:14;
+
+    ctx.drawImage(
+      nightmareChaserImg,
+      -s*(mutated?1.52:1.30),
+      -s*(mutated?.22:.12),
+      s*(mutated?3.25:2.65),
+      s*(mutated?1.95:1.59)
+    );
+
+    ctx.shadowBlur=0;
+
+    if(mutated){
+
+      ctx.globalAlpha=.22;
+      ctx.fillStyle="#ff1744";
+
+      for(let i=0;i<5;i++){
+        ctx.fillRect(
+          -s*1.45+Math.random()*s*3.0,
+          Math.random()*s*1.2,
+          s*(.18+Math.random()*.55),
+          Math.max(2,s*.035)
+        );
+      }
+    }
+
+    ctx.restore();
+
+    return;
+  }
 
   ctx.save();
 

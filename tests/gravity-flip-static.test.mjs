@@ -39,6 +39,14 @@ test('gravity flip caps visible chasers at three by screen overlap', () => {
     assert.match(html, /화면 추격자/);
 });
 
+test('gravity flip registers and draws the red tentacle chaser asset', () => {
+    assert.match(html, /const NIGHTMARE_CHASER_ASSET=/);
+    assert.match(html, /reference-style-red-tentacle-chaser-asset\.png/);
+    assert.match(html, /const nightmareChaserImg=new Image\(\)/);
+    assert.match(html, /nightmareChaserImg\.src=NIGHTMARE_CHASER_ASSET/);
+    assert.match(html, /ctx\.drawImage\(\s*nightmareChaserImg/);
+});
+
 test('gravity flip keeps an admin shortcut for testing the darkness event', () => {
     assert.match(html, /if\(target>=70\)/);
     assert.match(html, /점 암흑 이벤트로 이동했습니다/);
