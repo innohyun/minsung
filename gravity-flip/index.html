@@ -464,7 +464,9 @@ let globalGlitch=0;
 
 let chaserFinishPending=false;
 
-const MAX_CHASERS=3;
+const VISIBLE_CHASER_LIMIT=3;
+const MAX_PENDING_CHASERS=1;
+const MAX_CHASERS=8;
 
 
 /* =====================================================
@@ -1710,11 +1712,41 @@ function updatePlayerEventPosition(){
    추격자 생성
 ===================================================== */
 
+function isChaserVisible(c){
+
+  const scale=c.scale||1;
+  const size=c.size*scale;
+
+  return(
+    c.x+size>0&&
+    c.x<W&&
+    c.y+size>0&&
+    c.y<H
+  );
+}
+
+
+function getVisibleChaserCount(){
+
+  return chasers.filter(isChaserVisible).length;
+}
+
+
+function getPendingChaserCount(){
+
+  return chasers.filter(
+    c=>!c.removing&&!isChaserVisible(c)
+  ).length;
+}
+
+
 function spawnChaser(){
 
   if(
     !chaserMode||
-    chasers.length>=MAX_CHASERS
+    chasers.length>=MAX_CHASERS||
+    getVisibleChaserCount()>=VISIBLE_CHASER_LIMIT||
+    getPendingChaserCount()>=MAX_PENDING_CHASERS
   )return;
 
   const size=Math.max(
@@ -1857,19 +1889,10 @@ function updateChasers(){
 
   chaserAddTimer++;
 
-  if(
-    chaserAddTimer>=480&&
-    chaserTargetCount<MAX_CHASERS
-  ){
+  const visibleChaserCount=
+    getVisibleChaserCount();
 
-    chaserAddTimer=0;
-    chaserTargetCount++;
-  }
-
-  if(
-    chasers.filter(c=>!c.removing).length<
-    chaserTargetCount
-  ){
+  if(visibleChaserCount<VISIBLE_CHASER_LIMIT){
 
     if(chaserAddTimer%75===0){
       spawnChaser();
@@ -2150,13 +2173,13 @@ function updateChasers(){
 
 
   const activeCount=
-    chasers.filter(c=>!c.removing).length;
+    getVisibleChaserCount();
 
   eventInfo.textContent=
-    "추격자 "+
+    "화면 추격자 "+
     activeCount+
     " / "+
-    chaserTargetCount+
+    VISIBLE_CHASER_LIMIT+
     "   •   제거 "+
     chaserDefeated+
     " / 20";

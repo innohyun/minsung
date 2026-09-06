@@ -28,10 +28,15 @@ test('gravity flip implements the three-phase darkness event after chaser clear'
     assert.match(html, /shatterDarkObstacle\(o\)/);
 });
 
-test('gravity flip caps visible chasers at three', () => {
-    assert.match(html, /const MAX_CHASERS=3/);
-    assert.match(html, /chasers\.length>=MAX_CHASERS/);
-    assert.match(html, /chaserTargetCount<MAX_CHASERS/);
+test('gravity flip caps visible chasers at three by screen overlap', () => {
+    assert.match(html, /const VISIBLE_CHASER_LIMIT=3/);
+    assert.match(html, /function isChaserVisible\(c\)/);
+    assert.match(html, /c\.x\+size>0&&\s*c\.x<W&&\s*c\.y\+size>0&&\s*c\.y<H/);
+    assert.match(html, /function getVisibleChaserCount\(\)/);
+    assert.match(html, /getVisibleChaserCount\(\)>=VISIBLE_CHASER_LIMIT/);
+    assert.match(html, /visibleChaserCount<VISIBLE_CHASER_LIMIT/);
+    assert.match(html, /MAX_PENDING_CHASERS=1/);
+    assert.match(html, /화면 추격자/);
 });
 
 test('gravity flip keeps an admin shortcut for testing the darkness event', () => {
