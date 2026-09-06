@@ -8,9 +8,10 @@ test('gravity flip has distance-based chaser threat sound and increased supplies
     assert.match(html, /function updateThreatSound\(threat\)/);
     assert.match(html, /threatOsc=audioCtx\.createOscillator\(\)/);
     assert.match(html, /danger\*118/);
-    assert.match(html, /chaserSupplies\.length>=4/);
-    assert.match(html, /chaserSupplies\.length<3&&\s*chaserElapsed%60===0/);
-    assert.match(html, /spawnChaserSupply\(true\);\s*spawnChaserSupply\(true\);\s*spawnChaserSupply\(true\);/);
+    assert.match(html, /chaserSupplies\.length>=7/);
+    assert.match(html, /chaserSupplies\.length<5&&\s*chaserElapsed%25===0/);
+    assert.match(html, /chaserSupplies\.length<6/);
+    assert.match(html, /spawnChaserSupply\(true\);\s*spawnChaserSupply\(true\);\s*spawnChaserSupply\(true\);\s*spawnChaserSupply\(true\);\s*spawnChaserSupply\(true\);/);
 });
 
 test('gravity flip implements the three-phase darkness event after chaser clear', () => {
