@@ -1662,6 +1662,9 @@ function startChaserPhase(){
       spawnChaserSupply(true);
       spawnChaserSupply(true);
       spawnChaserSupply(true);
+      spawnChaserSupply(true);
+      spawnChaserSupply(true);
+      spawnChaserSupply(true);
     }
   },800);
 }
@@ -1776,7 +1779,7 @@ function spawnChaserSupply(initial=false){
 
   if(
     !chaserMode||
-    chaserSupplies.length>=7
+    chaserSupplies.length>=12
   )return;
 
   const size=Math.max(
@@ -1786,8 +1789,8 @@ function spawnChaserSupply(initial=false){
 
   const gap=
     initial
-    ?W*.22+Math.random()*W*.18
-    :W*.26+Math.random()*W*.28;
+    ?W*.10+Math.random()*W*.12
+    :W*.12+Math.random()*W*.16;
 
   const x=
     Math.max(
@@ -1795,7 +1798,7 @@ function spawnChaserSupply(initial=false){
       W+gap
     );
 
-  nextSupplyWorldX=x+W*.22;
+  nextSupplyWorldX=x+W*.10;
 
   let y;
 
@@ -1874,8 +1877,8 @@ function updateChasers(){
   }
 
   if(
-    chaserSupplies.length<5&&
-    chaserElapsed%25===0
+    chaserSupplies.length<9&&
+    chaserElapsed%12===0
   ){
 
     spawnChaserSupply(false);
@@ -2535,7 +2538,7 @@ function collectChaserSupply(index){
 
     if(
       chaserMode&&
-      chaserSupplies.length<6
+      chaserSupplies.length<10
     ){
 
       spawnChaserSupply(false);
