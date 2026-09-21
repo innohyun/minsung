@@ -25,7 +25,7 @@ button { font: inherit; }
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
   left: 50%;
-  width: min(960px, calc(100% - 24px));
+  width: min(1060px, calc(100% - 24px));
   transform: translateX(-50%);
   display: flex;
   align-items: center;
@@ -47,7 +47,7 @@ button { font: inherit; }
   background: radial-gradient(circle at 34% 28%, #fff 0 9%, #ffd86a 10% 25%, #ed8e22 58%, #bd5314 100%);
   box-shadow: inset -4px -5px 8px rgba(108, 44, 8, .2), 0 5px 12px rgba(115, 60, 13, .22);
 }
-.top-actions { display: flex; align-items: center; gap: 7px; }
+.top-actions { display: grid; grid-template-columns: repeat(4, max-content); align-items: center; gap: 7px; flex: 0 0 auto; }
 .action {
   min-height: 42px; padding: 0 13px; border-radius: 11px;
   border: 1px solid rgba(23, 50, 77, .14); background: #fff; color: var(--ink);
@@ -113,11 +113,11 @@ button { font: inherit; }
 .success-panel button { margin-top: 8px; min-height: 43px; padding: 0 18px; border: 0; border-radius: 12px; background: var(--blue); color: #fff; font-weight: 900; cursor: pointer; }
 
 @media (max-width: 720px) {
-  .top-panel { align-items: stretch; }
+  .top-panel { display: grid; grid-template-columns: 1fr; align-items: stretch; gap: 8px; padding: 9px; }
   .title-group p { display: none; }
-  .top-actions { gap: 4px; }
-  .action { min-height: 40px; padding: 0 9px; font-size: .72rem; }
-  .hint { top: 78px; font-size: .7rem; }
+  .top-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; width: 100%; }
+  .action { min-width: 0; min-height: 40px; padding: 0 4px; font-size: clamp(.62rem, 2.7vw, .76rem); white-space: nowrap; }
+  .hint { top: 122px; font-size: .7rem; }
   .tool-dock { grid-template-columns: 1fr; gap: 7px; padding: 8px; }
   .dock-heading, .dock-help { display: none; }
   .tool-list { gap: 5px; }
@@ -127,10 +127,9 @@ button { font: inherit; }
 }
 
 @media (max-width: 430px) {
-  .title-group h1 { max-width: 88px; line-height: 1.05; }
+  .title-group h1 { line-height: 1.05; }
   .mini-ball { width: 28px; height: 28px; }
-  .action { padding: 0 7px; }
-  .action.danger { position: absolute; right: 10px; top: 58px; background: rgba(255,255,255,.92); }
+  .action { padding: 0 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }

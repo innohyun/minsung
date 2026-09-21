@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#dbeafe">
   <title>공 굴리기 연구소</title>
-  <link rel="stylesheet" href="styles.css?v=1">
+  <link rel="stylesheet" href="styles.css?v=2">
 </head>
 <body>
   <main class="game-shell">
@@ -21,8 +21,9 @@
       </div>
       <div class="top-actions">
         <button id="spawnButton" class="action primary" type="button">공 생성</button>
+        <button id="clearButton" class="action danger" type="button">전체 삭제</button>
         <button id="deleteButton" class="action danger" type="button" disabled>선택 삭제</button>
-        <button id="resetButton" class="action" type="button">전체 초기화</button>
+        <button id="resetButton" class="action" type="button">리셋</button>
       </div>
     </header>
 
@@ -65,9 +66,9 @@
       <div class="success-ball" aria-hidden="true">✓</div>
       <strong>골인!</strong>
       <span>공이 바구니에 도착했어요.</span>
-      <button id="againButton" type="button">다시 굴리기</button>
+      <button id="confirmButton" type="button">확인</button>
     </div>
   </main>
-  <script src="game.js?v=1"></script>
+  <script src="game.js?v=2"></script>
 </body>
 </html>

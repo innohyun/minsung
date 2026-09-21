@@ -9,6 +9,11 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {
     assert.match(html, /id="spawnButton"/);
+    assert.match(html, /id="clearButton"[^>]*>전체 삭제</);
+    assert.match(html, /id="deleteButton"[^>]*>선택 삭제</);
+    assert.match(html, /id="resetButton"[^>]*>리셋</);
+    assert.match(html, /id="confirmButton"[^>]*>확인</);
+    assert.doesNotMatch(html, /다시 굴리기/);
     assert.match(html, /data-tool="wood"/);
     assert.match(html, /data-tool="rubber"/);
     assert.match(html, /data-tool="steel"/);
@@ -28,7 +33,36 @@ test('marble builder uses earth gravity, fixed substeps, friction, and disc iner
     assert.match(script, /const FIXED_STEP = 1 \/ 120/);
     assert.match(script, /const BALL_INERTIA = 0\.5 \* BALL_MASS/);
     assert.match(script, /maxFriction = rect\.material\.friction \* normalImpulse/);
+    assert.match(script, /function getImpactRestitution/);
+    assert.match(script, /impactSpeed < 0\.3/);
     assert.match(script, /ball\.omega/);
+});
+
+test('marble builder uses an unbounded world with camera pan and four-times zoom-out', () => {
+    assert.match(script, /const MIN_ZOOM = 0\.25/);
+    assert.match(script, /const MAX_ZOOM = 1/);
+    assert.match(script, /function screenToWorld/);
+    assert.match(script, /function setZoomAt/);
+    assert.match(script, /function beginPinch/);
+    assert.match(script, /activePointers\.size >= 2/);
+    assert.match(script, /cameraDrag = \{/);
+    assert.match(script, /addEventListener\('wheel'/);
+    assert.doesNotMatch(script, /resolveBallRect\(\{ x: view\.width \/ 2/);
+    assert.doesNotMatch(script, /ball\.y > view\.height/);
+});
+
+test('marble builder keeps all four top actions in one responsive row', () => {
+    assert.match(styles, /\.top-actions \{[^}]*grid-template-columns: repeat\(4,/s);
+    assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.top-actions \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+    assert.doesNotMatch(styles, /\.action\.danger \{ position: absolute/);
+});
+
+test('marble builder separates clear, reset, and goal confirmation behavior', () => {
+    assert.match(script, /function clearAll\(\)/);
+    assert.match(script, /function resetGame\(\)/);
+    assert.match(script, /clearButton\.addEventListener\('click', clearAll\)/);
+    assert.match(script, /resetButton\.addEventListener\('click', resetGame\)/);
+    assert.match(script, /confirmButton\.addEventListener\('click',[\s\S]*successPanel\.hidden = true/);
 });
 
 test('marble builder is responsive and touch enabled', () => {

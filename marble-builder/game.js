@@ -4,9 +4,10 @@
   const canvas = document.getElementById('gameCanvas');
   const ctx = canvas.getContext('2d');
   const spawnButton = document.getElementById('spawnButton');
+  const clearButton = document.getElementById('clearButton');
   const deleteButton = document.getElementById('deleteButton');
   const resetButton = document.getElementById('resetButton');
-  const againButton = document.getElementById('againButton');
+  const confirmButton = document.getElementById('confirmButton');
   const successPanel = document.getElementById('successPanel');
   const hint = document.getElementById('hint');
   const toolDock = document.querySelector('.tool-dock');
@@ -18,18 +19,23 @@
   const BALL_RADIUS = 18;
   const BALL_MASS = 0.18;
   const BALL_INERTIA = 0.5 * BALL_MASS * Math.pow(BALL_RADIUS / PIXELS_PER_METER, 2);
+  const MIN_ZOOM = 0.25;
+  const MAX_ZOOM = 1;
+  const DEFAULT_ROD_LENGTH = 180;
   const MATERIALS = {
-    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.38, restitution: 0.08 },
-    rubber: { label: '고무 길', color: '#d9484f', edge: '#8e2630', friction: 0.82, restitution: 0.28 },
-    steel: { label: '금속 길', color: '#aebcc6', edge: '#617381', friction: 0.14, restitution: 0.12 },
-    basket: { friction: 0.48, restitution: 0.06 },
-    ground: { friction: 0.55, restitution: 0.04 }
+    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.38, restitution: 0.18 },
+    rubber: { label: '고무 길', color: '#d9484f', edge: '#8e2630', friction: 0.82, restitution: 0.32 },
+    steel: { label: '금속 길', color: '#aebcc6', edge: '#617381', friction: 0.14, restitution: 0.2 },
+    basket: { friction: 0.48, restitution: 0.14 }
   };
 
-  const view = { width: 0, height: 0, floorY: 0, dpr: 1 };
-  const spawn = { x: 220, y: 145 };
+  const view = { width: 0, height: 0, dockTop: 0, dpr: 1 };
+  const camera = { x: 0, y: 0, zoom: MAX_ZOOM };
+  const spawn = { x: 220, y: 150 };
   const rods = [];
   const goals = [];
+  const activePointers = new Map();
+  let initialized = false;
   let ball = null;
   let selected = null;
   let nextId = 1;
@@ -38,7 +44,13 @@
   let accumulator = 0;
   let placement = null;
   let editDrag = null;
+  let cameraDrag = null;
+  let pinchGesture = null;
   let hintTimer = null;
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
 
   function setHint(message, duration = 2600) {
     hint.textContent = message;
@@ -63,29 +75,45 @@
     canvas.style.width = `${view.width}px`;
     canvas.style.height = `${view.height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    view.dockTop = toolDock.getBoundingClientRect().top;
 
-    const dockTop = toolDock.getBoundingClientRect().top;
-    view.floorY = Math.max(310, dockTop - 18);
-    spawn.x = Math.max(90, Math.min(view.width * 0.23, view.width - 90));
-    spawn.y = view.width < 520 ? 142 : 150;
-
-    rods.forEach(rod => {
-      rod.x = clamp(rod.x, 30, view.width - 30);
-      rod.y = clamp(rod.y, 120, view.floorY - 24);
-    });
-    goals.forEach(goal => {
-      goal.x = clamp(goal.x, goal.width / 2 + 8, view.width - goal.width / 2 - 8);
-      goal.y = clamp(goal.y, 210, view.floorY - 5);
-    });
+    if (!initialized) {
+      spawn.x = Math.max(90, Math.min(view.width * 0.23, view.width - 90));
+      spawn.y = view.width < 520 ? 150 : 158;
+      initialized = true;
+    }
   }
 
-  function clamp(value, min, max) {
-    return Math.max(min, Math.min(max, value));
-  }
-
-  function pointerPosition(event) {
+  function screenPoint(event) {
     const rect = canvas.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+  }
+
+  function screenToWorld(point) {
+    return {
+      x: camera.x + point.x / camera.zoom,
+      y: camera.y + point.y / camera.zoom
+    };
+  }
+
+  function worldToScreen(point) {
+    return {
+      x: (point.x - camera.x) * camera.zoom,
+      y: (point.y - camera.y) * camera.zoom
+    };
+  }
+
+  function setZoomAt(screenAnchor, nextZoom) {
+    const worldAnchor = screenToWorld(screenAnchor);
+    camera.zoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+    camera.x = worldAnchor.x - screenAnchor.x / camera.zoom;
+    camera.y = worldAnchor.y - screenAnchor.y / camera.zoom;
+  }
+
+  function resetCamera() {
+    camera.x = 0;
+    camera.y = 0;
+    camera.zoom = MAX_ZOOM;
   }
 
   function spawnBall() {
@@ -101,7 +129,7 @@
     };
     won = false;
     successPanel.hidden = true;
-    setHint('공이 떨어집니다. 길의 기울기와 마찰을 확인해 보세요.');
+    setHint('공이 떨어집니다. 충돌 속도에 따라 실제처럼 살짝 튕겨요.');
   }
 
   function addRod(type, x, y) {
@@ -109,15 +137,15 @@
       id: nextId++,
       kind: 'rod',
       type,
-      x: clamp(x, 35, view.width - 35),
-      y: clamp(y, 125, view.floorY - 24),
-      length: Math.min(190, Math.max(128, view.width * 0.22)),
+      x,
+      y,
+      length: DEFAULT_ROD_LENGTH,
       thickness: type === 'rubber' ? 17 : 14,
       angle: 0
     };
     rods.push(rod);
     selectEntity(rod);
-    setHint('주황색 끝점을 끌면 각도, 파란색 가운데 점을 끌면 위치가 바뀝니다.');
+    setHint('주황색 끝점은 각도, 파란색 가운데 점은 위치를 바꿉니다.');
     return rod;
   }
 
@@ -125,8 +153,8 @@
     const goal = {
       id: nextId++,
       kind: 'goal',
-      x: clamp(x, 65, view.width - 65),
-      y: clamp(centerY + 42, 215, view.floorY - 5),
+      x,
+      y: centerY + 42,
       width: 126,
       height: 84,
       thickness: 11
@@ -153,7 +181,7 @@
     setHint('선택한 블록을 삭제했습니다.');
   }
 
-  function resetAll() {
+  function clearAll() {
     rods.length = 0;
     goals.length = 0;
     ball = null;
@@ -163,7 +191,22 @@
     won = false;
     successPanel.hidden = true;
     updateDeleteButton();
-    setHint('초기화했습니다. 아래 블록을 끌어서 새 길을 만들어 보세요.', 3200);
+    setHint('공, 길, 골인 바구니를 모두 삭제했습니다.', 3000);
+  }
+
+  function resetGame() {
+    ball = null;
+    selected = null;
+    placement = null;
+    editDrag = null;
+    cameraDrag = null;
+    pinchGesture = null;
+    activePointers.clear();
+    won = false;
+    successPanel.hidden = true;
+    resetCamera();
+    updateDeleteButton();
+    setHint('길과 바구니는 유지하고 공과 화면 위치를 리셋했습니다.', 3200);
   }
 
   function rodEndpoints(rod) {
@@ -181,21 +224,23 @@
     return dx * dx + dy * dy;
   }
 
-  function pointInRod(point, rod, padding = 11) {
+  function pointInRod(point, rod, padding = 11 / camera.zoom) {
     const dx = point.x - rod.x;
     const dy = point.y - rod.y;
     const cos = Math.cos(rod.angle);
     const sin = Math.sin(rod.angle);
     const localX = cos * dx + sin * dy;
     const localY = -sin * dx + cos * dy;
-    return Math.abs(localX) <= rod.length / 2 + padding && Math.abs(localY) <= rod.thickness / 2 + padding;
+    return Math.abs(localX) <= rod.length / 2 + padding
+      && Math.abs(localY) <= rod.thickness / 2 + padding;
   }
 
   function pointInGoal(point, goal) {
-    return point.x >= goal.x - goal.width / 2 - 12
-      && point.x <= goal.x + goal.width / 2 + 12
-      && point.y >= goal.y - goal.height - 12
-      && point.y <= goal.y + 12;
+    const padding = 12 / camera.zoom;
+    return point.x >= goal.x - goal.width / 2 - padding
+      && point.x <= goal.x + goal.width / 2 + padding
+      && point.y >= goal.y - goal.height - padding
+      && point.y <= goal.y + padding;
   }
 
   function findEntity(point) {
@@ -208,10 +253,49 @@
     return null;
   }
 
-  function beginCanvasEdit(event) {
+  function beginPinch() {
+    const points = Array.from(activePointers.values());
+    if (points.length < 2) return;
+    const center = {
+      x: (points[0].x + points[1].x) / 2,
+      y: (points[0].y + points[1].y) / 2
+    };
+    pinchGesture = {
+      distance: Math.max(1, Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y)),
+      zoom: camera.zoom,
+      worldCenter: screenToWorld(center)
+    };
+    editDrag = null;
+    cameraDrag = null;
+  }
+
+  function updatePinch() {
+    if (!pinchGesture || activePointers.size < 2) return;
+    const points = Array.from(activePointers.values()).slice(0, 2);
+    const center = {
+      x: (points[0].x + points[1].x) / 2,
+      y: (points[0].y + points[1].y) / 2
+    };
+    const distance = Math.max(1, Math.hypot(points[1].x - points[0].x, points[1].y - points[0].y));
+    camera.zoom = clamp(pinchGesture.zoom * distance / pinchGesture.distance, MIN_ZOOM, MAX_ZOOM);
+    camera.x = pinchGesture.worldCenter.x - center.x / camera.zoom;
+    camera.y = pinchGesture.worldCenter.y - center.y / camera.zoom;
+  }
+
+  function beginCanvasInteraction(event) {
     if (placement || event.button > 0) return;
-    const point = pointerPosition(event);
-    const handleRadius = event.pointerType === 'touch' ? 24 : 17;
+    const screen = screenPoint(event);
+    activePointers.set(event.pointerId, screen);
+    canvas.setPointerCapture?.(event.pointerId);
+
+    if (activePointers.size >= 2) {
+      beginPinch();
+      event.preventDefault();
+      return;
+    }
+
+    const point = screenToWorld(screen);
+    const handleRadius = (event.pointerType === 'touch' ? 24 : 17) / camera.zoom;
 
     if (selected?.kind === 'rod') {
       const ends = rodEndpoints(selected);
@@ -236,45 +320,65 @@
         editDrag = { pointerId: event.pointerId, mode: 'move', entity, offsetX: point.x - entity.x, offsetY: point.y - entity.y };
       } else if (entity?.kind === 'goal') {
         editDrag = { pointerId: event.pointerId, mode: 'moveGoal', entity, offsetX: point.x - entity.x, offsetY: point.y - entity.y };
+      } else {
+        cameraDrag = {
+          pointerId: event.pointerId,
+          start: screen,
+          cameraX: camera.x,
+          cameraY: camera.y
+        };
       }
-    }
-
-    if (editDrag) {
-      canvas.setPointerCapture?.(event.pointerId);
-      event.preventDefault();
-    }
-  }
-
-  function updateEdit(event) {
-    if (!editDrag || editDrag.pointerId !== event.pointerId) return;
-    const point = pointerPosition(event);
-    const entity = editDrag.entity;
-
-    if (editDrag.mode === 'move') {
-      entity.x = clamp(point.x - editDrag.offsetX, 20, view.width - 20);
-      entity.y = clamp(point.y - editDrag.offsetY, 115, view.floorY - 16);
-    } else if (editDrag.mode === 'moveGoal') {
-      entity.x = clamp(point.x - editDrag.offsetX, entity.width / 2 + 4, view.width - entity.width / 2 - 4);
-      entity.y = clamp(point.y - editDrag.offsetY, entity.height + 112, view.floorY - 5);
-    } else {
-      let dx = point.x - editDrag.fixed.x;
-      let dy = point.y - editDrag.fixed.y;
-      const distance = Math.hypot(dx, dy) || 1;
-      dx = dx / distance * entity.length;
-      dy = dy / distance * entity.length;
-      const moving = { x: editDrag.fixed.x + dx, y: editDrag.fixed.y + dy };
-      entity.x = (moving.x + editDrag.fixed.x) / 2;
-      entity.y = (moving.y + editDrag.fixed.y) / 2;
-      entity.angle = editDrag.mode === 'end'
-        ? Math.atan2(dy, dx)
-        : Math.atan2(-dy, -dx);
     }
     event.preventDefault();
   }
 
-  function finishEdit(event) {
-    if (!editDrag || editDrag.pointerId !== event.pointerId) return;
-    editDrag = null;
+  function updateCanvasInteraction(event) {
+    if (!activePointers.has(event.pointerId)) return;
+    const screen = screenPoint(event);
+    activePointers.set(event.pointerId, screen);
+
+    if (pinchGesture) {
+      updatePinch();
+      event.preventDefault();
+      return;
+    }
+
+    if (editDrag?.pointerId === event.pointerId) {
+      const point = screenToWorld(screen);
+      const entity = editDrag.entity;
+      if (editDrag.mode === 'move' || editDrag.mode === 'moveGoal') {
+        entity.x = point.x - editDrag.offsetX;
+        entity.y = point.y - editDrag.offsetY;
+      } else {
+        let dx = point.x - editDrag.fixed.x;
+        let dy = point.y - editDrag.fixed.y;
+        const distance = Math.hypot(dx, dy) || 1;
+        dx = dx / distance * entity.length;
+        dy = dy / distance * entity.length;
+        const moving = { x: editDrag.fixed.x + dx, y: editDrag.fixed.y + dy };
+        entity.x = (moving.x + editDrag.fixed.x) / 2;
+        entity.y = (moving.y + editDrag.fixed.y) / 2;
+        entity.angle = editDrag.mode === 'end'
+          ? Math.atan2(dy, dx)
+          : Math.atan2(-dy, -dx);
+      }
+      event.preventDefault();
+      return;
+    }
+
+    if (cameraDrag?.pointerId === event.pointerId) {
+      camera.x = cameraDrag.cameraX - (screen.x - cameraDrag.start.x) / camera.zoom;
+      camera.y = cameraDrag.cameraY - (screen.y - cameraDrag.start.y) / camera.zoom;
+      event.preventDefault();
+    }
+  }
+
+  function finishCanvasInteraction(event) {
+    if (!activePointers.has(event.pointerId)) return;
+    activePointers.delete(event.pointerId);
+    if (editDrag?.pointerId === event.pointerId) editDrag = null;
+    if (cameraDrag?.pointerId === event.pointerId) cameraDrag = null;
+    if (pinchGesture && activePointers.size < 2) pinchGesture = null;
     event.preventDefault();
   }
 
@@ -304,9 +408,11 @@
     if (!placement || placement.pointerId !== event.pointerId) return;
     const current = placement;
     placement = null;
-    const point = pointerPosition(event);
-    const valid = point.x >= 8 && point.x <= view.width - 8 && point.y >= 105 && point.y < view.floorY - 5;
+    const screen = screenPoint(event);
+    const valid = screen.x >= 8 && screen.x <= view.width - 8
+      && screen.y >= 105 && screen.y < view.dockTop - 5;
     if (valid) {
+      const point = screenToWorld(screen);
       if (current.tool === 'goal') addGoal(point.x, point.y);
       else addRod(current.tool, point.x, point.y);
     } else {
@@ -322,6 +428,13 @@
       { x: goal.x - goal.width / 2 + t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, material: MATERIALS.basket },
       { x: goal.x + goal.width / 2 - t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, material: MATERIALS.basket }
     ];
+  }
+
+  function getImpactRestitution(material, normalSpeed) {
+    const impactSpeed = Math.abs(normalSpeed);
+    if (impactSpeed < 0.3) return 0;
+    const speedFactor = clamp((impactSpeed - 0.3) / 2.7, 0, 1);
+    return material.restitution * (0.4 + speedFactor * 0.6);
   }
 
   function resolveBallRect(rect) {
@@ -375,7 +488,7 @@
     const inverseMass = 1 / ball.mass;
     const inverseInertia = 1 / BALL_INERTIA;
     const crossN = rx * ny - ry * nx;
-    const restitution = rect.material.restitution;
+    const restitution = getImpactRestitution(rect.material, normalSpeed);
     const normalImpulse = -(1 + restitution) * normalSpeed
       / (inverseMass + crossN * crossN * inverseInertia);
     const normalIx = nx * normalImpulse;
@@ -422,10 +535,6 @@
     }));
     goals.forEach(goal => basketRects(goal).forEach(resolveBallRect));
 
-    resolveBallRect({ x: view.width / 2, y: view.floorY + 45, width: view.width + 160, height: 90, angle: 0, material: MATERIALS.ground });
-    resolveBallRect({ x: -35, y: view.floorY / 2, width: 70, height: view.floorY + 200, angle: 0, material: MATERIALS.ground });
-    resolveBallRect({ x: view.width + 35, y: view.floorY / 2, width: 70, height: view.floorY + 200, angle: 0, material: MATERIALS.ground });
-
     for (const goal of goals) {
       const innerHalf = goal.width / 2 - goal.thickness - ball.radius * 0.45;
       const insideX = Math.abs(ball.x - goal.x) < innerHalf;
@@ -441,11 +550,6 @@
         break;
       }
     }
-
-    if (ball.y > view.height + 300) {
-      ball = null;
-      setHint('공이 화면 밖으로 나갔어요. 공 생성 버튼으로 다시 시작하세요.');
-    }
   }
 
   function roundedRectPath(context, x, y, width, height, radius) {
@@ -454,45 +558,45 @@
     context.roundRect(x, y, width, height, r);
   }
 
+  function applyWorldTransform() {
+    ctx.translate(-camera.x * camera.zoom, -camera.y * camera.zoom);
+    ctx.scale(camera.zoom, camera.zoom);
+  }
+
   function drawBackground() {
-    const gradient = ctx.createLinearGradient(0, 0, 0, view.floorY);
+    const gradient = ctx.createLinearGradient(0, 0, 0, view.height);
     gradient.addColorStop(0, '#cfe9fa');
-    gradient.addColorStop(0.64, '#eaf5f4');
+    gradient.addColorStop(0.68, '#eaf5f4');
     gradient.addColorStop(1, '#f6f2dd');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, view.width, view.height);
 
-    ctx.fillStyle = 'rgba(255,255,255,.7)';
-    ctx.beginPath();
-    ctx.arc(view.width * 0.82, 145, 48, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = 'rgba(91, 151, 139, .16)';
-    ctx.beginPath();
-    ctx.moveTo(0, view.floorY);
-    ctx.lineTo(0, view.floorY - 110);
-    ctx.quadraticCurveTo(view.width * .2, view.floorY - 210, view.width * .42, view.floorY - 80);
-    ctx.quadraticCurveTo(view.width * .67, view.floorY - 240, view.width, view.floorY - 95);
-    ctx.lineTo(view.width, view.floorY);
-    ctx.closePath();
-    ctx.fill();
-
+    const topLeft = screenToWorld({ x: 0, y: 0 });
+    const bottomRight = screenToWorld({ x: view.width, y: view.height });
     const grid = PIXELS_PER_METER;
-    ctx.strokeStyle = 'rgba(28, 73, 101, .07)';
-    ctx.lineWidth = 1;
+    const startX = Math.floor(topLeft.x / grid) * grid;
+    const startY = Math.floor(topLeft.y / grid) * grid;
+
+    ctx.save();
+    applyWorldTransform();
+    ctx.strokeStyle = 'rgba(28, 73, 101, .09)';
+    ctx.lineWidth = 1 / camera.zoom;
     ctx.beginPath();
-    for (let x = 0; x <= view.width; x += grid) {
-      ctx.moveTo(x, 108); ctx.lineTo(x, view.floorY);
+    for (let x = startX; x <= bottomRight.x + grid; x += grid) {
+      ctx.moveTo(x, topLeft.y - grid);
+      ctx.lineTo(x, bottomRight.y + grid);
     }
-    for (let y = 108; y <= view.floorY; y += grid) {
-      ctx.moveTo(0, y); ctx.lineTo(view.width, y);
+    for (let y = startY; y <= bottomRight.y + grid; y += grid) {
+      ctx.moveTo(topLeft.x - grid, y);
+      ctx.lineTo(bottomRight.x + grid, y);
     }
     ctx.stroke();
+    ctx.restore();
 
-    ctx.fillStyle = '#7aa05f';
-    ctx.fillRect(0, view.floorY, view.width, 7);
-    ctx.fillStyle = '#9a7853';
-    ctx.fillRect(0, view.floorY + 7, view.width, view.height - view.floorY);
+    ctx.fillStyle = 'rgba(23, 50, 77, .68)';
+    ctx.font = '700 11px "Avenir Next", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`화면 ${Math.round(camera.zoom * 100)}%`, view.width - 15, view.dockTop - 12);
   }
 
   function drawSpawn() {
@@ -503,7 +607,8 @@
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
     ctx.arc(spawn.x, spawn.y, BALL_RADIUS + 5, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
+    ctx.fill();
+    ctx.stroke();
     ctx.setLineDash([]);
     ctx.beginPath();
     ctx.moveTo(spawn.x, spawn.y - 46);
@@ -565,7 +670,10 @@
     ctx.strokeStyle = 'rgba(125, 70, 18, .45)';
     ctx.lineWidth = 2;
     for (let x = left + 24; x < left + goal.width; x += 24) {
-      ctx.beginPath(); ctx.moveTo(x, top + 8); ctx.lineTo(x, goal.y - 5); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, top + 8);
+      ctx.lineTo(x, goal.y - 5);
+      ctx.stroke();
     }
     ctx.font = '800 11px "Avenir Next", sans-serif';
     ctx.textAlign = 'center';
@@ -599,7 +707,9 @@
   function drawHandle(x, y, color) {
     ctx.setLineDash([]);
     ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(x, y, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.arc(x, y, 10, 0, Math.PI * 2);
+    ctx.fill();
     ctx.strokeStyle = color;
     ctx.lineWidth = 4;
     ctx.stroke();
@@ -619,21 +729,25 @@
     gradient.addColorStop(.7, '#ed8b24');
     gradient.addColorStop(1, '#b54b13');
     ctx.fillStyle = gradient;
-    ctx.beginPath(); ctx.arc(0, 0, ball.radius, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, ball.radius, 0, Math.PI * 2);
+    ctx.fill();
     ctx.shadowColor = 'transparent';
     ctx.strokeStyle = 'rgba(117, 51, 11, .55)';
     ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(0, 0, ball.radius - 1, -.7, .7); ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, 0, ball.radius - 1, -.7, .7);
+    ctx.stroke();
     ctx.restore();
   }
 
   function drawPlacementGhost() {
     if (!placement) return;
-    const point = { x: placement.x, y: placement.y };
+    const point = screenToWorld({ x: placement.x, y: placement.y });
     if (placement.tool === 'goal') {
       drawBasket({ x: point.x, y: point.y + 42, width: 126, height: 84, thickness: 11 }, .48);
     } else {
-      drawRod({ x: point.x, y: point.y, length: Math.min(190, Math.max(128, view.width * .22)), thickness: placement.tool === 'rubber' ? 17 : 14, angle: 0, type: placement.tool }, .5);
+      drawRod({ x: point.x, y: point.y, length: DEFAULT_ROD_LENGTH, thickness: placement.tool === 'rubber' ? 17 : 14, angle: 0, type: placement.tool }, .5);
     }
   }
 
@@ -641,12 +755,15 @@
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     ctx.clearRect(0, 0, view.width, view.height);
     drawBackground();
+    ctx.save();
+    applyWorldTransform();
     drawSpawn();
     rods.forEach(rod => drawRod(rod));
     goals.forEach(goal => drawBasket(goal));
     drawBall();
     drawSelection();
     drawPlacementGhost();
+    ctx.restore();
   }
 
   function frame(time) {
@@ -664,22 +781,28 @@
   toolCards.forEach(card => card.addEventListener('pointerdown', beginPlacement));
   window.addEventListener('pointermove', event => {
     updatePlacement(event);
-    updateEdit(event);
+    updateCanvasInteraction(event);
   }, { passive: false });
   window.addEventListener('pointerup', event => {
     finishPlacement(event);
-    finishEdit(event);
+    finishCanvasInteraction(event);
   }, { passive: false });
   window.addEventListener('pointercancel', event => {
     if (placement?.pointerId === event.pointerId) placement = null;
-    if (editDrag?.pointerId === event.pointerId) editDrag = null;
+    finishCanvasInteraction(event);
   });
-  canvas.addEventListener('pointerdown', beginCanvasEdit, { passive: false });
+  canvas.addEventListener('pointerdown', beginCanvasInteraction, { passive: false });
+  canvas.addEventListener('wheel', event => {
+    event.preventDefault();
+    const direction = event.deltaY > 0 ? 0.88 : 1.12;
+    setZoomAt(screenPoint(event), camera.zoom * direction);
+  }, { passive: false });
   window.addEventListener('resize', resize);
   spawnButton.addEventListener('click', spawnBall);
+  clearButton.addEventListener('click', clearAll);
   deleteButton.addEventListener('click', deleteSelected);
-  resetButton.addEventListener('click', resetAll);
-  againButton.addEventListener('click', spawnBall);
+  resetButton.addEventListener('click', resetGame);
+  confirmButton.addEventListener('click', () => { successPanel.hidden = true; });
   window.addEventListener('keydown', event => {
     if ((event.key === 'Delete' || event.key === 'Backspace') && selected) deleteSelected();
     if (event.code === 'Space') {
@@ -689,22 +812,34 @@
   });
 
   window.__marbleBuilderDebug = {
-    constants: { PIXELS_PER_METER, EARTH_GRAVITY, FIXED_STEP, BALL_MASS, BALL_INERTIA },
+    constants: {
+      PIXELS_PER_METER,
+      EARTH_GRAVITY,
+      FIXED_STEP,
+      BALL_MASS,
+      BALL_INERTIA,
+      MIN_ZOOM,
+      MAX_ZOOM
+    },
     getState: () => ({
       rodCount: rods.length,
       goalCount: goals.length,
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null } : null,
-      rods: rods.map(rod => ({ id: rod.id, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle })),
+      rods: rods.map(rod => ({ id: rod.id, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, thickness: rod.thickness })),
+      goals: goals.map(goal => ({ id: goal.id, x: goal.x, y: goal.y })),
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, omega: ball.omega } : null,
       won,
       spawn: { ...spawn },
-      floorY: view.floorY
+      camera: { ...camera }
     }),
     addRod,
     addGoal,
     spawnBall,
-    resetAll
+    clearAll,
+    resetGame,
+    setZoomAt,
+    getImpactRestitution: (type, speed) => getImpactRestitution(MATERIALS[type], speed)
   };
 
   resize();
