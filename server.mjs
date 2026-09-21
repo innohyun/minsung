@@ -264,6 +264,7 @@ function normalizeRequestPath(url) {
     if (rawPath === '/mario' || rawPath === '/mario/') return '/mario/index.html';
     if (rawPath === '/guangboo' || rawPath === '/guangboo/') return '/guangboo/index.html';
     if (rawPath === '/gravity-flip' || rawPath === '/gravity-flip/') return '/gravity-flip/index.html';
+    if (rawPath === '/marble-builder' || rawPath === '/marble-builder/') return '/marble-builder/index.html';
     return rawPath;
 }
 

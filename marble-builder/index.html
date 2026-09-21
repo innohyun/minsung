@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#dbeafe">
+  <title>공 굴리기 연구소</title>
+  <link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+  <main class="game-shell">
+    <canvas id="gameCanvas" aria-label="공 굴리기 게임 화면"></canvas>
+
+    <header class="top-panel">
+      <div class="title-group">
+        <span class="mini-ball" aria-hidden="true"></span>
+        <div>
+          <h1>공 굴리기 연구소</h1>
+          <p>지구 중력 9.81m/s² · 실제 마찰과 회전 관성</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button id="spawnButton" class="action primary" type="button">공 생성</button>
+        <button id="deleteButton" class="action danger" type="button" disabled>선택 삭제</button>
+        <button id="resetButton" class="action" type="button">전체 초기화</button>
+      </div>
+    </header>
+
+    <aside id="hint" class="hint" role="status">아래 블록을 끌어서 화면에 놓아 보세요.</aside>
+
+    <section class="tool-dock" aria-label="설치할 블록 목록">
+      <div class="dock-heading">
+        <strong>블록 창</strong>
+        <span>끌어서 배치</span>
+      </div>
+      <div class="tool-list">
+        <button class="tool-card" type="button" data-tool="wood">
+          <span class="tool-icon road wood"></span>
+          <span>나무 길</span>
+          <small>보통 마찰</small>
+        </button>
+        <button class="tool-card" type="button" data-tool="rubber">
+          <span class="tool-icon road rubber"></span>
+          <span>고무 길</span>
+          <small>강한 마찰</small>
+        </button>
+        <button class="tool-card" type="button" data-tool="steel">
+          <span class="tool-icon road steel"></span>
+          <span>금속 길</span>
+          <small>약한 마찰</small>
+        </button>
+        <button class="tool-card goal-card" type="button" data-tool="goal">
+          <span class="tool-icon basket"><i></i></span>
+          <span>골인 바구니</span>
+          <small>공의 도착점</small>
+        </button>
+      </div>
+      <div class="dock-help">
+        <span><b class="dot endpoint"></b>양 끝점: 각도</span>
+        <span><b class="dot center"></b>가운데: 이동</span>
+      </div>
+    </section>
+
+    <div id="successPanel" class="success-panel" hidden>
+      <div class="success-ball" aria-hidden="true">✓</div>
+      <strong>골인!</strong>
+      <span>공이 바구니에 도착했어요.</span>
+      <button id="againButton" type="button">다시 굴리기</button>
+    </div>
+  </main>
+  <script src="game.js?v=1"></script>
+</body>
+</html>
