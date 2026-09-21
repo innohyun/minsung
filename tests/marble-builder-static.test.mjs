@@ -7,6 +7,10 @@ const html = readFileSync(new URL('../marble-builder/index.html', import.meta.ur
 const script = readFileSync(new URL('../marble-builder/game.js', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.url), 'utf8');
 
+test('marble builder uses the current cache-busted game script', () => {
+    assert.match(html, /game\.js\?v=4/);
+});
+
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {
     assert.match(html, /id="spawnButton"/);
     assert.match(html, /id="clearButton"[^>]*>전체 삭제</);
