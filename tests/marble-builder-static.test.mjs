@@ -33,6 +33,13 @@ test('marble builder uses earth gravity, fixed substeps, friction, and disc iner
     assert.match(script, /const FIXED_STEP = 1 \/ 120/);
     assert.match(script, /const BALL_INERTIA = 0\.5 \* BALL_MASS/);
     assert.match(script, /maxFriction = rect\.material\.friction \* normalImpulse/);
+    assert.match(script, /rollingResistance:/);
+    assert.match(script, /function applyRollingResistance/);
+    assert.match(script, /EARTH_GRAVITY \* contact\.resistance \* dt/);
+    assert.match(script, /const gravityAlongTangent = EARTH_GRAVITY \* ty/);
+    assert.match(script, /const movingDownhill = tangentSpeed \* gravityAlongTangent > 0/);
+    assert.match(script, /Math\.abs\(gravityAlongTangent\) \* dt \* 0\.85/);
+    assert.match(script, /const nearlyLevel = Math\.abs\(ty\) < 0\.005/);
     assert.match(script, /function getImpactRestitution/);
     assert.match(script, /impactSpeed < 0\.3/);
     assert.match(script, /ball\.omega/);
@@ -63,6 +70,15 @@ test('marble builder separates clear, reset, and goal confirmation behavior', ()
     assert.match(script, /clearButton\.addEventListener\('click', clearAll\)/);
     assert.match(script, /resetButton\.addEventListener\('click', resetGame\)/);
     assert.match(script, /confirmButton\.addEventListener\('click',[\s\S]*successPanel\.hidden = true/);
+    const resetBody = script.match(/function resetGame\(\) \{([\s\S]*?)\n  \}/)?.[1] || '';
+    assert.doesNotMatch(resetBody, /resetCamera\(\)/);
+});
+
+test('marble builder waits one second after basket entry before success', () => {
+    assert.match(script, /const GOAL_SUCCESS_DELAY = 1/);
+    assert.match(script, /goalEnteredAt = performance\.now\(\)/);
+    assert.match(script, /\(performance\.now\(\) - goalEnteredAt\) \/ 1000/);
+    assert.match(script, /goalHoldTime >= GOAL_SUCCESS_DELAY/);
 });
 
 test('marble builder is responsive and touch enabled', () => {

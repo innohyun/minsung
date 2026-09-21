@@ -22,11 +22,12 @@
   const MIN_ZOOM = 0.25;
   const MAX_ZOOM = 1;
   const DEFAULT_ROD_LENGTH = 180;
+  const GOAL_SUCCESS_DELAY = 1;
   const MATERIALS = {
-    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.38, restitution: 0.18 },
-    rubber: { label: '고무 길', color: '#d9484f', edge: '#8e2630', friction: 0.82, restitution: 0.32 },
-    steel: { label: '금속 길', color: '#aebcc6', edge: '#617381', friction: 0.14, restitution: 0.2 },
-    basket: { friction: 0.48, restitution: 0.14 }
+    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.38, restitution: 0.18, rollingResistance: 0.04 },
+    rubber: { label: '고무 길', color: '#d9484f', edge: '#8e2630', friction: 0.82, restitution: 0.32, rollingResistance: 0.075 },
+    steel: { label: '금속 길', color: '#aebcc6', edge: '#617381', friction: 0.14, restitution: 0.2, rollingResistance: 0.022 },
+    basket: { friction: 0.48, restitution: 0.14, rollingResistance: 0.055 }
   };
 
   const view = { width: 0, height: 0, dockTop: 0, dpr: 1 };
@@ -40,6 +41,9 @@
   let selected = null;
   let nextId = 1;
   let won = false;
+  let goalHoldTime = 0;
+  let goalEnteredAt = null;
+  const supportContacts = [];
   let lastTime = performance.now();
   let accumulator = 0;
   let placement = null;
@@ -110,12 +114,6 @@
     camera.y = worldAnchor.y - screenAnchor.y / camera.zoom;
   }
 
-  function resetCamera() {
-    camera.x = 0;
-    camera.y = 0;
-    camera.zoom = MAX_ZOOM;
-  }
-
   function spawnBall() {
     ball = {
       x: spawn.x,
@@ -128,6 +126,8 @@
       mass: BALL_MASS
     };
     won = false;
+    goalHoldTime = 0;
+    goalEnteredAt = null;
     successPanel.hidden = true;
     setHint('공이 떨어집니다. 충돌 속도에 따라 실제처럼 살짝 튕겨요.');
   }
@@ -189,6 +189,8 @@
     placement = null;
     editDrag = null;
     won = false;
+    goalHoldTime = 0;
+    goalEnteredAt = null;
     successPanel.hidden = true;
     updateDeleteButton();
     setHint('공, 길, 골인 바구니를 모두 삭제했습니다.', 3000);
@@ -203,10 +205,11 @@
     pinchGesture = null;
     activePointers.clear();
     won = false;
+    goalHoldTime = 0;
+    goalEnteredAt = null;
     successPanel.hidden = true;
-    resetCamera();
     updateDeleteButton();
-    setHint('길과 바구니는 유지하고 공과 화면 위치를 리셋했습니다.', 3200);
+    setHint('길, 바구니, 화면 위치는 유지하고 공만 리셋했습니다.', 3200);
   }
 
   function rodEndpoints(rod) {
@@ -473,6 +476,9 @@
 
     const nx = cos * nxLocal - sin * nyLocal;
     const ny = sin * nxLocal + cos * nyLocal;
+    if (ny < -0.15 && rect.material.rollingResistance) {
+      supportContacts.push({ nx, ny, resistance: rect.material.rollingResistance });
+    }
     const penetration = ball.radius - distance;
     ball.x += nx * Math.max(0, penetration + 0.02);
     ball.y += ny * Math.max(0, penetration + 0.02);
@@ -514,6 +520,31 @@
     ball.omega += (rx * tangentIy - ry * tangentIx) * inverseInertia;
   }
 
+  function applyRollingResistance(dt) {
+    if (!ball) return;
+    for (const contact of supportContacts) {
+      const tx = -contact.ny;
+      const ty = contact.nx;
+      const tangentSpeed = ball.vx * tx + ball.vy * ty;
+      const gravityAlongTangent = EARTH_GRAVITY * ty;
+      let maxSlowdown = EARTH_GRAVITY * contact.resistance * dt;
+      const movingDownhill = tangentSpeed * gravityAlongTangent > 0;
+      if (movingDownhill && Math.abs(gravityAlongTangent) > 0.001) {
+        maxSlowdown = Math.min(maxSlowdown, Math.abs(gravityAlongTangent) * dt * 0.85);
+      }
+      const slowdown = clamp(tangentSpeed, -maxSlowdown, maxSlowdown);
+      ball.vx -= tx * slowdown;
+      ball.vy -= ty * slowdown;
+      ball.omega *= Math.exp(-contact.resistance * 12 * dt);
+
+      const nearlyLevel = Math.abs(ty) < 0.005;
+      if (nearlyLevel && Math.abs(tangentSpeed) < 0.025 && Math.abs(ball.omega) < 0.2) {
+        ball.vx -= tx * (ball.vx * tx + ball.vy * ty);
+        ball.omega = 0;
+      }
+    }
+  }
+
   function physicsStep(dt) {
     if (!ball || won || editDrag) return;
     ball.vy += EARTH_GRAVITY * dt;
@@ -525,6 +556,7 @@
     ball.y += ball.vy * PIXELS_PER_METER * dt;
     ball.angle += ball.omega * dt;
 
+    supportContacts.length = 0;
     rods.forEach(rod => resolveBallRect({
       x: rod.x,
       y: rod.y,
@@ -534,21 +566,28 @@
       material: MATERIALS[rod.type]
     }));
     goals.forEach(goal => basketRects(goal).forEach(resolveBallRect));
+    applyRollingResistance(dt);
 
-    for (const goal of goals) {
+    const insideGoal = goals.some(goal => {
       const innerHalf = goal.width / 2 - goal.thickness - ball.radius * 0.45;
       const insideX = Math.abs(ball.x - goal.x) < innerHalf;
       const insideY = ball.y > goal.y - goal.height + ball.radius * 0.25
         && ball.y < goal.y - goal.thickness - ball.radius * 0.1;
-      if (insideX && insideY) {
-        won = true;
-        ball.vx = 0;
-        ball.vy = 0;
-        ball.omega = 0;
-        successPanel.hidden = false;
-        setHint('골인 성공!', 1800);
-        break;
-      }
+      return insideX && insideY;
+    });
+
+    if (insideGoal && goalEnteredAt === null) goalEnteredAt = performance.now();
+    if (goalEnteredAt !== null) {
+      goalHoldTime = (performance.now() - goalEnteredAt) / 1000;
+    }
+
+    if (goalHoldTime >= GOAL_SUCCESS_DELAY) {
+      won = true;
+      ball.vx = 0;
+      ball.vy = 0;
+      ball.omega = 0;
+      successPanel.hidden = false;
+      setHint('골인 성공!', 1800);
     }
   }
 
@@ -819,7 +858,8 @@
       BALL_MASS,
       BALL_INERTIA,
       MIN_ZOOM,
-      MAX_ZOOM
+      MAX_ZOOM,
+      GOAL_SUCCESS_DELAY
     },
     getState: () => ({
       rodCount: rods.length,
@@ -830,6 +870,7 @@
       goals: goals.map(goal => ({ id: goal.id, x: goal.x, y: goal.y })),
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, omega: ball.omega } : null,
       won,
+      goalHoldTime,
       spawn: { ...spawn },
       camera: { ...camera }
     }),
@@ -839,6 +880,12 @@
     clearAll,
     resetGame,
     setZoomAt,
+    setBallVelocity: (vx, vy) => {
+      if (ball) {
+        ball.vx = vx;
+        ball.vy = vy;
+      }
+    },
     getImpactRestitution: (type, speed) => getImpactRestitution(MATERIALS[type], speed)
   };
 
