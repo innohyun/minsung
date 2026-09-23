@@ -695,33 +695,19 @@
       card,
       startX: event.clientX,
       startY: event.clientY,
-      dragging: event.pointerType !== 'touch',
+      dragging: true,
       x: event.clientX,
       y: event.clientY
     };
     selected = null;
     updateDeleteButton();
-    if (placement.dragging) {
-      card.setPointerCapture?.(event.pointerId);
-      event.preventDefault();
-      setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
-    }
+    card.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+    setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
   }
 
   function updatePlacement(event) {
     if (!placement || placement.pointerId !== event.pointerId) return;
-    if (!placement.dragging) {
-      const dx = event.clientX - placement.startX;
-      const dy = event.clientY - placement.startY;
-      if (Math.abs(dx) < 9 && Math.abs(dy) < 9) return;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        placement = null;
-        return;
-      }
-      placement.dragging = true;
-      placement.card?.setPointerCapture?.(event.pointerId);
-      setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
-    }
     placement.x = event.clientX;
     placement.y = event.clientY;
     event.preventDefault();

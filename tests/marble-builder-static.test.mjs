@@ -8,8 +8,8 @@ const script = readFileSync(new URL('../marble-builder/game.js', import.meta.url
 const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.url), 'utf8');
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=7/);
-    assert.match(html, /styles\.css\?v=6/);
+    assert.match(html, /game\.js\?v=8/);
+    assert.match(html, /styles\.css\?v=7/);
 });
 
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {
@@ -94,8 +94,9 @@ test('marble builder is responsive and touch enabled', () => {
     assert.match(html, /viewport-fit=cover/);
     assert.match(styles, /\.app-dialog input[^}]*font-size: 16px/);
     assert.match(styles, /height: 100dvh/);
-    assert.match(styles, /body\.is-editor \.tool-list[^}]*overflow-x: auto[^}]*touch-action: pan-x/s);
-    assert.match(script, /Math\.abs\(dx\) > Math\.abs\(dy\)/);
+    assert.match(styles, /body\.is-editor \.tool-list[^}]*grid-template-columns: repeat\(5,minmax\(0,1fr\)\)[^}]*touch-action: none/s);
+    assert.match(styles, /body\.is-editor \.tool-dock[^}]*width: 100%[^}]*bottom: 0/s);
+    assert.match(script, /dragging: true/);
     assert.match(script, /screen\.y >= view\.playTop \+ 5/);
     assert.match(script, /view\.width \/ Math\.max\(1, rect\.width\)/);
     assert.match(script, /camera\.zoom = MAX_ZOOM/);
