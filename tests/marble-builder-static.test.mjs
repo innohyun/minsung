@@ -8,7 +8,8 @@ const script = readFileSync(new URL('../marble-builder/game.js', import.meta.url
 const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.url), 'utf8');
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=4/);
+    assert.match(html, /game\.js\?v=7/);
+    assert.match(html, /styles\.css\?v=6/);
 });
 
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {
@@ -62,8 +63,8 @@ test('marble builder uses an unbounded world with camera pan and four-times zoom
     assert.doesNotMatch(script, /ball\.y > view\.height/);
 });
 
-test('marble builder keeps all four top actions in one responsive row', () => {
-    assert.match(styles, /\.top-actions \{[^}]*grid-template-columns: repeat\(4,/s);
+test('marble builder keeps its gameplay actions responsive', () => {
+    assert.match(styles, /\.top-actions \{[^}]*grid-template-columns: repeat\(6,/s);
     assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.top-actions \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
     assert.doesNotMatch(styles, /\.action\.danger \{ position: absolute/);
 });
@@ -90,6 +91,48 @@ test('marble builder is responsive and touch enabled', () => {
     assert.match(styles, /@media \(max-width: 720px\)/);
     assert.match(script, /addEventListener\('pointerdown'/);
     assert.match(script, /pointerType === 'touch'/);
+    assert.match(html, /viewport-fit=cover/);
+    assert.match(styles, /\.app-dialog input[^}]*font-size: 16px/);
+    assert.match(styles, /height: 100dvh/);
+    assert.match(styles, /body\.is-editor \.tool-list[^}]*overflow-x: auto[^}]*touch-action: pan-x/s);
+    assert.match(script, /Math\.abs\(dx\) > Math\.abs\(dy\)/);
+    assert.match(script, /screen\.y >= view\.playTop \+ 5/);
+    assert.match(script, /view\.width \/ Math\.max\(1, rect\.width\)/);
+    assert.match(script, /camera\.zoom = MAX_ZOOM/);
+});
+
+test('marble builder keeps free mode and adds home, stage progression, and speed controls', () => {
+    assert.match(html, /id="homeScreen"/);
+    assert.match(html, /id="homeButton"/);
+    assert.match(html, /id="freeModeButton"[^>]*[\s\S]*자유 모드/);
+    assert.match(html, /id="stageModeButton"/);
+    assert.match(html, /data-speed="0\.5"/);
+    assert.match(script, /function startFreeMode/);
+    assert.match(script, /function loadStage/);
+    assert.match(script, /const allRodsTouched = rods\.length > 0/);
+    assert.match(script, /unlockedStage = Math\.max\(unlockedStage, currentStage\.number \+ 1\)/);
+    assert.match(script, /accumulator \+= elapsed \* gameSpeed/);
+});
+
+test('developer mode gates stage creation, editing, and confirmed deletion', () => {
+    assert.match(html, /id="developerButton"/);
+    assert.match(html, /id="mapMakerButton"[^>]*hidden/);
+    assert.match(html, /data-tool="fixed"/);
+    assert.match(html, /정말 삭제하시겠습니까/);
+    assert.match(script, /const DEVELOPER_PASSWORD = '12345@'/);
+    assert.match(script, /developerPassword\.value !== DEVELOPER_PASSWORD/);
+    assert.match(script, /function saveEditedStage/);
+    assert.match(script, /edit\.textContent = '수정'/);
+    assert.match(script, /remove\.textContent = '삭제'/);
+    assert.match(script, /mode: 'rotateFixed'/);
+    assert.match(script, /appMode === 'stage' && selected\.fixed/);
+});
+
+test('basket has no decorative inner lines and uses tighter collision geometry', () => {
+    assert.doesNotMatch(styles, /tool-icon\.basket::before/);
+    assert.doesNotMatch(script, /for \(let x = left \+ 24/);
+    assert.match(script, /const collisionInset = 3/);
+    assert.match(script, /ball\.radius - \(rect\.collisionInset \|\| 0\)/);
 });
 
 test('serves the marble builder short route publicly', async () => {

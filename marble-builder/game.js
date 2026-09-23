@@ -11,7 +11,33 @@
   const successPanel = document.getElementById('successPanel');
   const hint = document.getElementById('hint');
   const toolDock = document.querySelector('.tool-dock');
+  const topPanel = document.querySelector('.top-panel');
   const toolCards = Array.from(document.querySelectorAll('.tool-card'));
+  const homeScreen = document.getElementById('homeScreen');
+  const stageScreen = document.getElementById('stageScreen');
+  const stageList = document.getElementById('stageList');
+  const homeButton = document.getElementById('homeButton');
+  const freeModeButton = document.getElementById('freeModeButton');
+  const stageModeButton = document.getElementById('stageModeButton');
+  const developerButton = document.getElementById('developerButton');
+  const mapMakerButton = document.getElementById('mapMakerButton');
+  const developerDialog = document.getElementById('developerDialog');
+  const developerForm = document.getElementById('developerForm');
+  const developerPassword = document.getElementById('developerPassword');
+  const developerError = document.getElementById('developerError');
+  const stageSetupDialog = document.getElementById('stageSetupDialog');
+  const stageSetupForm = document.getElementById('stageSetupForm');
+  const deleteStageDialog = document.getElementById('deleteStageDialog');
+  const confirmDeleteStageButton = document.getElementById('confirmDeleteStageButton');
+  const saveStageButton = document.getElementById('saveStageButton');
+  const cancelEditorButton = document.getElementById('cancelEditorButton');
+  const gameTitle = document.getElementById('gameTitle');
+  const gameSubtitle = document.getElementById('gameSubtitle');
+  const successTitle = document.getElementById('successTitle');
+  const successMessage = document.getElementById('successMessage');
+  const stageProgressText = document.getElementById('stageProgressText');
+  const speedButtons = Array.from(document.querySelectorAll('[data-speed]'));
+  const toolCountLabels = Array.from(document.querySelectorAll('[data-count-for]'));
 
   const PIXELS_PER_METER = 100;
   const EARTH_GRAVITY = 9.81;
@@ -23,14 +49,37 @@
   const MAX_ZOOM = 1;
   const DEFAULT_ROD_LENGTH = 180;
   const GOAL_SUCCESS_DELAY = 1;
+  const DEVELOPER_PASSWORD = '12345@';
+  const STAGES_STORAGE_KEY = 'marble-builder-stages-v1';
+  const PROGRESS_STORAGE_KEY = 'marble-builder-progress-v1';
+  const DEVELOPER_STORAGE_KEY = 'marble-builder-developer-v1';
+  const SPEED_STORAGE_KEY = 'marble-builder-speed-v1';
+  const DEFAULT_STAGES = [
+    {
+      id: 'stage-1', number: 1, name: '첫 번째 굴리기', limits: { wood: 1, rubber: 1, steel: 0 },
+      spawn: { x: 190, y: 155 },
+      rods: [{ type: 'fixed', x: 430, y: 330, length: 180, thickness: 14, angle: 0.12, fixed: true }],
+      goals: [{ x: 700, y: 500, width: 126, height: 84, thickness: 11 }]
+    },
+    {
+      id: 'stage-2', number: 2, name: '두 갈래 길', limits: { wood: 1, rubber: 1, steel: 1 },
+      spawn: { x: 170, y: 145 },
+      rods: [
+        { type: 'fixed', x: 370, y: 285, length: 180, thickness: 14, angle: 0.28, fixed: true },
+        { type: 'fixed', x: 610, y: 420, length: 180, thickness: 14, angle: -0.18, fixed: true }
+      ],
+      goals: [{ x: 820, y: 555, width: 126, height: 84, thickness: 11 }]
+    }
+  ];
   const MATERIALS = {
     wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.38, restitution: 0.18, rollingResistance: 0.04 },
     rubber: { label: '고무 길', color: '#d9484f', edge: '#8e2630', friction: 0.82, restitution: 0.32, rollingResistance: 0.075 },
     steel: { label: '금속 길', color: '#aebcc6', edge: '#617381', friction: 0.14, restitution: 0.2, rollingResistance: 0.022 },
+    fixed: { label: '고정 스틱', color: '#8b6ac5', edge: '#533585', friction: 0.42, restitution: 0.16, rollingResistance: 0.045 },
     basket: { friction: 0.48, restitution: 0.14, rollingResistance: 0.055 }
   };
 
-  const view = { width: 0, height: 0, dockTop: 0, dpr: 1 };
+  const view = { width: 0, height: 0, dockTop: 0, playTop: 0, dpr: 1 };
   const camera = { x: 0, y: 0, zoom: MAX_ZOOM };
   const spawn = { x: 220, y: 150 };
   const rods = [];
@@ -51,6 +100,40 @@
   let cameraDrag = null;
   let pinchGesture = null;
   let hintTimer = null;
+  let appMode = 'home';
+  let currentStage = null;
+  let editorStageId = null;
+  let pendingDeleteStageId = null;
+  let stages = [];
+  let unlockedStage = 1;
+  let developerEnabled = false;
+  let gameSpeed = 1;
+  const touchedRodIds = new Set();
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function readStoredJson(key, fallback) {
+    try {
+      const value = JSON.parse(localStorage.getItem(key));
+      return value ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function loadPersistentState() {
+    stages = readStoredJson(STAGES_STORAGE_KEY, clone(DEFAULT_STAGES));
+    if (!Array.isArray(stages) || stages.length === 0) stages = clone(DEFAULT_STAGES);
+    unlockedStage = Math.max(1, Number(localStorage.getItem(PROGRESS_STORAGE_KEY)) || 1);
+    developerEnabled = localStorage.getItem(DEVELOPER_STORAGE_KEY) === 'true';
+    gameSpeed = clamp(Number(localStorage.getItem(SPEED_STORAGE_KEY)) || 1, 0.5, 1.5);
+  }
+
+  function persistStages() {
+    localStorage.setItem(STAGES_STORAGE_KEY, JSON.stringify(stages));
+  }
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -65,8 +148,189 @@
     }
   }
 
+  function setAppMode(mode) {
+    appMode = mode;
+    document.body.className = `is-${mode}`;
+    homeScreen.hidden = mode !== 'home';
+    stageScreen.hidden = mode !== 'stage-list';
+    saveStageButton.hidden = mode !== 'editor';
+    cancelEditorButton.hidden = mode !== 'editor';
+    clearButton.hidden = mode === 'stage';
+    gameTitle.textContent = mode === 'editor' ? '스테이지 만들기' : mode === 'stage' ? `${currentStage?.number || ''}스테이지` : '공 굴리기 연구소';
+    gameSubtitle.textContent = mode === 'stage' ? '모든 스틱을 통과한 뒤 바구니에 넣으세요.' : mode === 'editor' ? '고정 스틱은 플레이 화면에서 회전만 할 수 있어요.' : '지구 중력 9.81m/s² · 실제 마찰과 회전 관성';
+    requestAnimationFrame(resize);
+  }
+
+  function clearWorldState() {
+    rods.length = 0;
+    goals.length = 0;
+    ball = null;
+    selected = null;
+    placement = null;
+    editDrag = null;
+    won = false;
+    goalHoldTime = 0;
+    goalEnteredAt = null;
+    touchedRodIds.clear();
+    successPanel.hidden = true;
+    updateDeleteButton();
+  }
+
+  function showHome() {
+    clearWorldState();
+    currentStage = null;
+    editorStageId = null;
+    developerButton.classList.toggle('active', developerEnabled);
+    developerButton.textContent = developerEnabled ? '개발자 모드 적용됨' : '개발자 모드';
+    mapMakerButton.hidden = !developerEnabled;
+    stageProgressText.textContent = `${unlockedStage}스테이지까지 도전 가능`;
+    speedButtons.forEach(button => button.classList.toggle('active', Number(button.dataset.speed) === gameSpeed));
+    setAppMode('home');
+  }
+
+  function renderStageList() {
+    stageList.replaceChildren();
+    const ordered = [...stages].sort((a, b) => a.number - b.number);
+    ordered.forEach(stage => {
+      const locked = !developerEnabled && stage.number > unlockedStage;
+      const item = document.createElement('article');
+      item.className = `stage-item${locked ? ' locked' : ''}`;
+      const title = document.createElement('h3');
+      title.textContent = `${stage.number}스테이지`;
+      const detail = document.createElement('p');
+      detail.textContent = `나무 ${stage.limits.wood} · 고무 ${stage.limits.rubber} · 금속 ${stage.limits.steel} · 고정 ${stage.rods.filter(rod => rod.fixed).length}`;
+      const play = document.createElement('button');
+      play.className = 'stage-play';
+      play.type = 'button';
+      play.disabled = locked;
+      play.textContent = locked ? '잠김' : '플레이';
+      play.addEventListener('click', () => loadStage(stage.id));
+      item.append(title, detail, play);
+      if (developerEnabled) {
+        const admin = document.createElement('div');
+        admin.className = 'stage-admin';
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.textContent = '수정';
+        edit.addEventListener('click', () => startEditor(stage));
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'delete-stage';
+        remove.textContent = '삭제';
+        remove.addEventListener('click', () => {
+          pendingDeleteStageId = stage.id;
+          deleteStageDialog.showModal();
+        });
+        admin.append(edit, remove);
+        item.append(admin);
+      }
+      stageList.append(item);
+    });
+  }
+
+  function showStageList() {
+    clearWorldState();
+    renderStageList();
+    setAppMode('stage-list');
+  }
+
+  function hydrateStage(stage) {
+    clearWorldState();
+    spawn.x = stage.spawn?.x ?? 220;
+    spawn.y = stage.spawn?.y ?? 150;
+    (stage.rods || []).forEach(source => rods.push({ ...clone(source), id: nextId++, kind: 'rod', touched: false }));
+    (stage.goals || []).forEach(source => goals.push({ ...clone(source), id: nextId++, kind: 'goal' }));
+    updateToolAvailability();
+  }
+
+  function loadStage(stageId) {
+    const stage = stages.find(item => item.id === stageId);
+    if (!stage) return;
+    currentStage = clone(stage);
+    editorStageId = null;
+    hydrateStage(currentStage);
+    successTitle.textContent = '스테이지 성공!';
+    successMessage.textContent = '모든 스틱을 지나 바구니에 도착했어요.';
+    setAppMode('stage');
+    updateToolAvailability();
+    setHint('모든 스틱에 공을 닿게 한 뒤 바구니에 넣으세요.', 3600);
+  }
+
+  function startFreeMode() {
+    currentStage = null;
+    editorStageId = null;
+    clearWorldState();
+    successTitle.textContent = '골인!';
+    successMessage.textContent = '공이 바구니에 도착했어요.';
+    updateToolAvailability();
+    setAppMode('free');
+    setHint('자유 모드: 개수 제한 없이 길을 만들 수 있어요.', 3200);
+  }
+
+  function startEditor(stage = null, setup = null) {
+    const source = stage || {
+      id: `stage-${Date.now()}`,
+      number: setup.number,
+      name: `${setup.number}스테이지`,
+      limits: setup.limits,
+      spawn: { x: spawn.x, y: spawn.y },
+      rods: [], goals: []
+    };
+    currentStage = clone(source);
+    editorStageId = stage?.id || null;
+    camera.x = 0;
+    camera.y = 0;
+    camera.zoom = MAX_ZOOM;
+    hydrateStage(currentStage);
+    setAppMode('editor');
+    updateToolAvailability();
+    setHint('도구를 위로 끌어 배치하고 확인을 누르세요.', 3000);
+  }
+
+  function saveEditedStage() {
+    if (goals.length === 0) {
+      setHint('골인 바구니를 한 개 이상 배치해 주세요.', 3200);
+      return;
+    }
+    if (rods.length === 0) {
+      setHint('스틱을 한 개 이상 배치해 주세요.', 3200);
+      return;
+    }
+    const saved = {
+      ...currentStage,
+      number: Number(currentStage.number),
+      spawn: { x: spawn.x, y: spawn.y },
+      rods: rods.map(({ id, kind, touched, ...rod }) => ({ ...rod })),
+      goals: goals.map(({ id, kind, ...goal }) => ({ ...goal }))
+    };
+    const duplicate = stages.find(item => item.number === saved.number && item.id !== editorStageId);
+    if (duplicate) {
+      setHint('같은 스테이지 번호가 이미 있습니다.', 3200);
+      return;
+    }
+    const existingIndex = stages.findIndex(item => item.id === editorStageId);
+    if (existingIndex >= 0) stages[existingIndex] = saved;
+    else stages.push(saved);
+    persistStages();
+    showStageList();
+  }
+
+  function placedCount(type) {
+    return rods.filter(rod => !rod.fixed && rod.type === type).length;
+  }
+
+  function updateToolAvailability() {
+    toolCountLabels.forEach(label => {
+      const type = label.dataset.countFor;
+      const limit = currentStage?.limits?.[type];
+      label.textContent = appMode === 'stage' && Number.isFinite(limit) ? `${placedCount(type)} / ${limit}` : '';
+      const card = document.querySelector(`.tool-card[data-tool="${type}"]`);
+      if (card) card.disabled = appMode === 'stage' && placedCount(type) >= limit;
+    });
+  }
+
   function updateDeleteButton() {
-    deleteButton.disabled = !selected;
+    deleteButton.disabled = !selected || (appMode === 'stage' && selected?.fixed);
   }
 
   function resize() {
@@ -80,6 +344,7 @@
     canvas.style.height = `${view.height}px`;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     view.dockTop = toolDock.getBoundingClientRect().top;
+    view.playTop = topPanel.getBoundingClientRect().bottom;
 
     if (!initialized) {
       spawn.x = Math.max(90, Math.min(view.width * 0.23, view.width - 90));
@@ -88,9 +353,16 @@
     }
   }
 
-  function screenPoint(event) {
+  function clientToCanvasPoint(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
-    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    return {
+      x: (clientX - rect.left) * (view.width / Math.max(1, rect.width)),
+      y: (clientY - rect.top) * (view.height / Math.max(1, rect.height))
+    };
+  }
+
+  function screenPoint(event) {
+    return clientToCanvasPoint(event.clientX, event.clientY);
   }
 
   function screenToWorld(point) {
@@ -128,11 +400,20 @@
     won = false;
     goalHoldTime = 0;
     goalEnteredAt = null;
+    touchedRodIds.clear();
+    rods.forEach(rod => { rod.touched = false; });
     successPanel.hidden = true;
     setHint('공이 떨어집니다. 충돌 속도에 따라 실제처럼 살짝 튕겨요.');
   }
 
   function addRod(type, x, y) {
+    if (appMode === 'stage') {
+      const limit = currentStage?.limits?.[type] ?? 0;
+      if (placedCount(type) >= limit) {
+        setHint(`${MATERIALS[type].label}은 더 놓을 수 없습니다.`);
+        return null;
+      }
+    }
     const rod = {
       id: nextId++,
       kind: 'rod',
@@ -141,10 +422,13 @@
       y,
       length: DEFAULT_ROD_LENGTH,
       thickness: type === 'rubber' ? 17 : 14,
-      angle: 0
+      angle: 0,
+      fixed: type === 'fixed',
+      touched: false
     };
     rods.push(rod);
     selectEntity(rod);
+    updateToolAvailability();
     setHint('주황색 끝점은 각도, 파란색 가운데 점은 위치를 바꿉니다.');
     return rod;
   }
@@ -172,12 +456,17 @@
 
   function deleteSelected() {
     if (!selected) return;
+    if (appMode === 'stage' && selected.fixed) {
+      setHint('고정 스틱은 삭제하거나 옮길 수 없습니다.');
+      return;
+    }
     const list = selected.kind === 'rod' ? rods : goals;
     const index = list.indexOf(selected);
     if (index >= 0) list.splice(index, 1);
     selected = null;
     editDrag = null;
     updateDeleteButton();
+    updateToolAvailability();
     setHint('선택한 블록을 삭제했습니다.');
   }
 
@@ -191,8 +480,10 @@
     won = false;
     goalHoldTime = 0;
     goalEnteredAt = null;
+    touchedRodIds.clear();
     successPanel.hidden = true;
     updateDeleteButton();
+    updateToolAvailability();
     setHint('공, 길, 골인 바구니를 모두 삭제했습니다.', 3000);
   }
 
@@ -207,6 +498,8 @@
     won = false;
     goalHoldTime = 0;
     goalEnteredAt = null;
+    touchedRodIds.clear();
+    rods.forEach(rod => { rod.touched = false; });
     successPanel.hidden = true;
     updateDeleteButton();
     setHint('길, 바구니, 화면 위치는 유지하고 공만 리셋했습니다.', 3200);
@@ -302,14 +595,19 @@
 
     if (selected?.kind === 'rod') {
       const ends = rodEndpoints(selected);
+      const fixedInPlayer = appMode === 'stage' && selected.fixed;
       if (distanceSquared(point, ends.start) <= handleRadius * handleRadius) {
-        editDrag = { pointerId: event.pointerId, mode: 'start', entity: selected, fixed: ends.end };
+        editDrag = fixedInPlayer
+          ? { pointerId: event.pointerId, mode: 'rotateFixed', entity: selected }
+          : { pointerId: event.pointerId, mode: 'start', entity: selected, fixed: ends.end };
       } else if (distanceSquared(point, ends.end) <= handleRadius * handleRadius) {
-        editDrag = { pointerId: event.pointerId, mode: 'end', entity: selected, fixed: ends.start };
-      } else if (distanceSquared(point, selected) <= handleRadius * handleRadius) {
+        editDrag = fixedInPlayer
+          ? { pointerId: event.pointerId, mode: 'rotateFixed', entity: selected }
+          : { pointerId: event.pointerId, mode: 'end', entity: selected, fixed: ends.start };
+      } else if (!fixedInPlayer && distanceSquared(point, selected) <= handleRadius * handleRadius) {
         editDrag = { pointerId: event.pointerId, mode: 'move', entity: selected, offsetX: point.x - selected.x, offsetY: point.y - selected.y };
       }
-    } else if (selected?.kind === 'goal') {
+    } else if (selected?.kind === 'goal' && appMode !== 'stage') {
       const handle = { x: selected.x, y: selected.y - selected.height / 2 };
       if (distanceSquared(point, handle) <= handleRadius * handleRadius) {
         editDrag = { pointerId: event.pointerId, mode: 'moveGoal', entity: selected, offsetX: point.x - selected.x, offsetY: point.y - selected.y };
@@ -319,11 +617,11 @@
     if (!editDrag) {
       const entity = findEntity(point);
       selectEntity(entity);
-      if (entity?.kind === 'rod') {
+      if (entity?.kind === 'rod' && !(appMode === 'stage' && entity.fixed)) {
         editDrag = { pointerId: event.pointerId, mode: 'move', entity, offsetX: point.x - entity.x, offsetY: point.y - entity.y };
-      } else if (entity?.kind === 'goal') {
+      } else if (entity?.kind === 'goal' && appMode !== 'stage') {
         editDrag = { pointerId: event.pointerId, mode: 'moveGoal', entity, offsetX: point.x - entity.x, offsetY: point.y - entity.y };
-      } else {
+      } else if (!entity) {
         cameraDrag = {
           pointerId: event.pointerId,
           start: screen,
@@ -352,6 +650,8 @@
       if (editDrag.mode === 'move' || editDrag.mode === 'moveGoal') {
         entity.x = point.x - editDrag.offsetX;
         entity.y = point.y - editDrag.offsetY;
+      } else if (editDrag.mode === 'rotateFixed') {
+        entity.angle = Math.atan2(point.y - entity.y, point.x - entity.x);
       } else {
         let dx = point.x - editDrag.fixed.x;
         let dy = point.y - editDrag.fixed.y;
@@ -387,21 +687,41 @@
 
   function beginPlacement(event) {
     const card = event.currentTarget;
+    if (card.disabled) return;
     placement = {
       pointerId: event.pointerId,
       tool: card.dataset.tool,
+      pointerType: event.pointerType,
+      card,
+      startX: event.clientX,
+      startY: event.clientY,
+      dragging: event.pointerType !== 'touch',
       x: event.clientX,
       y: event.clientY
     };
     selected = null;
     updateDeleteButton();
-    card.setPointerCapture?.(event.pointerId);
-    event.preventDefault();
-    setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
+    if (placement.dragging) {
+      card.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+      setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
+    }
   }
 
   function updatePlacement(event) {
     if (!placement || placement.pointerId !== event.pointerId) return;
+    if (!placement.dragging) {
+      const dx = event.clientX - placement.startX;
+      const dy = event.clientY - placement.startY;
+      if (Math.abs(dx) < 9 && Math.abs(dy) < 9) return;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        placement = null;
+        return;
+      }
+      placement.dragging = true;
+      placement.card?.setPointerCapture?.(event.pointerId);
+      setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
+    }
     placement.x = event.clientX;
     placement.y = event.clientY;
     event.preventDefault();
@@ -411,9 +731,10 @@
     if (!placement || placement.pointerId !== event.pointerId) return;
     const current = placement;
     placement = null;
+    if (!current.dragging) return;
     const screen = screenPoint(event);
     const valid = screen.x >= 8 && screen.x <= view.width - 8
-      && screen.y >= 105 && screen.y < view.dockTop - 5;
+      && screen.y >= view.playTop + 5 && screen.y < view.dockTop - 5;
     if (valid) {
       const point = screenToWorld(screen);
       if (current.tool === 'goal') addGoal(point.x, point.y);
@@ -426,10 +747,11 @@
 
   function basketRects(goal) {
     const t = goal.thickness;
+    const collisionInset = 3;
     return [
-      { x: goal.x, y: goal.y - t / 2, width: goal.width, height: t, angle: 0, material: MATERIALS.basket },
-      { x: goal.x - goal.width / 2 + t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, material: MATERIALS.basket },
-      { x: goal.x + goal.width / 2 - t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, material: MATERIALS.basket }
+      { x: goal.x, y: goal.y - t / 2, width: goal.width, height: t, angle: 0, collisionInset, material: MATERIALS.basket },
+      { x: goal.x - goal.width / 2 + t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, collisionInset, material: MATERIALS.basket },
+      { x: goal.x + goal.width / 2 - t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, collisionInset, material: MATERIALS.basket }
     ];
   }
 
@@ -441,7 +763,7 @@
   }
 
   function resolveBallRect(rect) {
-    if (!ball) return;
+    if (!ball) return false;
     const cos = Math.cos(rect.angle || 0);
     const sin = Math.sin(rect.angle || 0);
     const dx = ball.x - rect.x;
@@ -456,7 +778,8 @@
     let nyLocal = localY - nearY;
     let distance = Math.hypot(nxLocal, nyLocal);
 
-    if (distance >= ball.radius) return;
+    const collisionRadius = Math.max(1, ball.radius - (rect.collisionInset || 0));
+    if (distance >= collisionRadius) return false;
     if (distance < 0.0001) {
       const gapX = halfW - Math.abs(localX);
       const gapY = halfH - Math.abs(localY);
@@ -479,7 +802,7 @@
     if (ny < -0.15 && rect.material.rollingResistance) {
       supportContacts.push({ nx, ny, resistance: rect.material.rollingResistance });
     }
-    const penetration = ball.radius - distance;
+    const penetration = collisionRadius - distance;
     ball.x += nx * Math.max(0, penetration + 0.02);
     ball.y += ny * Math.max(0, penetration + 0.02);
 
@@ -489,7 +812,7 @@
     const contactVx = ball.vx - ball.omega * ry;
     const contactVy = ball.vy + ball.omega * rx;
     const normalSpeed = contactVx * nx + contactVy * ny;
-    if (normalSpeed >= 0) return;
+    if (normalSpeed >= 0) return true;
 
     const inverseMass = 1 / ball.mass;
     const inverseInertia = 1 / BALL_INERTIA;
@@ -518,6 +841,7 @@
     ball.vx += tangentIx * inverseMass;
     ball.vy += tangentIy * inverseMass;
     ball.omega += (rx * tangentIy - ry * tangentIx) * inverseInertia;
+    return true;
   }
 
   function applyRollingResistance(dt) {
@@ -557,14 +881,20 @@
     ball.angle += ball.omega * dt;
 
     supportContacts.length = 0;
-    rods.forEach(rod => resolveBallRect({
-      x: rod.x,
-      y: rod.y,
-      width: rod.length,
-      height: rod.thickness,
-      angle: rod.angle,
-      material: MATERIALS[rod.type]
-    }));
+    rods.forEach(rod => {
+      const touched = resolveBallRect({
+        x: rod.x,
+        y: rod.y,
+        width: rod.length,
+        height: rod.thickness,
+        angle: rod.angle,
+        material: MATERIALS[rod.type]
+      });
+      if (touched) {
+        rod.touched = true;
+        touchedRodIds.add(rod.id);
+      }
+    });
     goals.forEach(goal => basketRects(goal).forEach(resolveBallRect));
     applyRollingResistance(dt);
 
@@ -576,7 +906,13 @@
       return insideX && insideY;
     });
 
-    if (insideGoal && goalEnteredAt === null) goalEnteredAt = performance.now();
+    const allRodsTouched = rods.length > 0 && rods.every(rod => touchedRodIds.has(rod.id));
+    const stageGoalReady = appMode !== 'stage' || allRodsTouched;
+    if (insideGoal && stageGoalReady && goalEnteredAt === null) goalEnteredAt = performance.now();
+    if ((!insideGoal || !stageGoalReady) && goalEnteredAt !== null) {
+      goalEnteredAt = null;
+      goalHoldTime = 0;
+    }
     if (goalEnteredAt !== null) {
       goalHoldTime = (performance.now() - goalEnteredAt) / 1000;
     }
@@ -587,6 +923,10 @@
       ball.vy = 0;
       ball.omega = 0;
       successPanel.hidden = false;
+      if (appMode === 'stage' && currentStage) {
+        unlockedStage = Math.max(unlockedStage, currentStage.number + 1);
+        localStorage.setItem(PROGRESS_STORAGE_KEY, String(unlockedStage));
+      }
       setHint('골인 성공!', 1800);
     }
   }
@@ -685,6 +1025,17 @@
     ctx.moveTo(-rod.length / 2 + 9, -rod.thickness / 4);
     ctx.lineTo(rod.length / 2 - 9, -rod.thickness / 4);
     ctx.stroke();
+    if (appMode === 'stage' && rod.touched) {
+      ctx.fillStyle = '#2fa66f';
+      ctx.beginPath();
+      ctx.arc(0, -rod.thickness - 9, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('✓', 0, -rod.thickness - 9);
+    }
     ctx.restore();
   }
 
@@ -706,14 +1057,6 @@
     ctx.strokeStyle = '#df9d3f';
     ctx.lineWidth = goal.thickness;
     ctx.stroke();
-    ctx.strokeStyle = 'rgba(125, 70, 18, .45)';
-    ctx.lineWidth = 2;
-    for (let x = left + 24; x < left + goal.width; x += 24) {
-      ctx.beginPath();
-      ctx.moveTo(x, top + 8);
-      ctx.lineTo(x, goal.y - 5);
-      ctx.stroke();
-    }
     ctx.font = '800 11px "Avenir Next", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#88501d';
@@ -735,10 +1078,10 @@
       ctx.stroke();
       drawHandle(ends.start.x, ends.start.y, '#ffaf21');
       drawHandle(ends.end.x, ends.end.y, '#ffaf21');
-      drawHandle(selected.x, selected.y, '#2674d9');
+      if (!(appMode === 'stage' && selected.fixed)) drawHandle(selected.x, selected.y, '#2674d9');
     } else {
       ctx.strokeRect(selected.x - selected.width / 2 - 8, selected.y - selected.height - 8, selected.width + 16, selected.height + 16);
-      drawHandle(selected.x, selected.y - selected.height / 2, '#2674d9');
+      if (appMode !== 'stage') drawHandle(selected.x, selected.y - selected.height / 2, '#2674d9');
     }
     ctx.restore();
   }
@@ -781,8 +1124,8 @@
   }
 
   function drawPlacementGhost() {
-    if (!placement) return;
-    const point = screenToWorld({ x: placement.x, y: placement.y });
+    if (!placement?.dragging) return;
+    const point = screenToWorld(clientToCanvasPoint(placement.x, placement.y));
     if (placement.tool === 'goal') {
       drawBasket({ x: point.x, y: point.y + 42, width: 126, height: 84, thickness: 11 }, .48);
     } else {
@@ -808,7 +1151,7 @@
   function frame(time) {
     const elapsed = Math.min((time - lastTime) / 1000, 0.05);
     lastTime = time;
-    accumulator += elapsed;
+    accumulator += elapsed * gameSpeed;
     while (accumulator >= FIXED_STEP) {
       physicsStep(FIXED_STEP);
       accumulator -= FIXED_STEP;
@@ -841,10 +1184,78 @@
   clearButton.addEventListener('click', clearAll);
   deleteButton.addEventListener('click', deleteSelected);
   resetButton.addEventListener('click', resetGame);
-  confirmButton.addEventListener('click', () => { successPanel.hidden = true; });
+  homeButton.addEventListener('click', showHome);
+  document.querySelector('.stage-home-button').addEventListener('click', showHome);
+  freeModeButton.addEventListener('click', startFreeMode);
+  stageModeButton.addEventListener('click', showStageList);
+  saveStageButton.addEventListener('click', saveEditedStage);
+  cancelEditorButton.addEventListener('click', showStageList);
+  developerButton.addEventListener('click', () => {
+    developerPassword.value = '';
+    developerError.hidden = true;
+    developerDialog.showModal();
+    developerPassword.focus();
+  });
+  developerForm.addEventListener('submit', event => {
+    event.preventDefault();
+    if (developerPassword.value !== DEVELOPER_PASSWORD) {
+      developerError.hidden = false;
+      return;
+    }
+    developerEnabled = true;
+    localStorage.setItem(DEVELOPER_STORAGE_KEY, 'true');
+    developerPassword.blur();
+    developerDialog.close();
+    showHome();
+  });
+  mapMakerButton.addEventListener('click', () => {
+    const maxNumber = stages.reduce((maximum, stage) => Math.max(maximum, Number(stage.number) || 0), 0);
+    document.getElementById('stageNumberInput').value = String(maxNumber + 1);
+    stageSetupDialog.showModal();
+  });
+  stageSetupForm.addEventListener('submit', event => {
+    event.preventDefault();
+    document.activeElement?.blur?.();
+    const number = Math.max(1, Number(document.getElementById('stageNumberInput').value));
+    const limits = {
+      wood: Math.max(0, Number(document.getElementById('woodLimitInput').value)),
+      rubber: Math.max(0, Number(document.getElementById('rubberLimitInput').value)),
+      steel: Math.max(0, Number(document.getElementById('steelLimitInput').value))
+    };
+    if (stages.some(stage => Number(stage.number) === number)) {
+      stageSetupDialog.close();
+      showHome();
+      setHint('같은 스테이지 번호가 이미 있습니다.', 3200);
+      return;
+    }
+    stageSetupDialog.close();
+    startEditor(null, { number, limits });
+  });
+  confirmDeleteStageButton.addEventListener('click', () => {
+    if (pendingDeleteStageId) {
+      stages = stages.filter(stage => stage.id !== pendingDeleteStageId);
+      persistStages();
+    }
+    pendingDeleteStageId = null;
+    deleteStageDialog.close();
+    renderStageList();
+  });
+  document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
+  speedButtons.forEach(button => button.addEventListener('click', () => {
+    gameSpeed = Number(button.dataset.speed);
+    localStorage.setItem(SPEED_STORAGE_KEY, String(gameSpeed));
+    speedButtons.forEach(item => item.classList.toggle('active', item === button));
+  }));
+  confirmButton.addEventListener('click', () => {
+    successPanel.hidden = true;
+    if (appMode !== 'stage' || !currentStage) return;
+    const nextStage = [...stages].sort((a, b) => a.number - b.number).find(stage => stage.number > currentStage.number);
+    if (nextStage) loadStage(nextStage.id);
+    else showStageList();
+  });
   window.addEventListener('keydown', event => {
     if ((event.key === 'Delete' || event.key === 'Backspace') && selected) deleteSelected();
-    if (event.code === 'Space') {
+    if (event.code === 'Space' && ['free', 'stage', 'editor'].includes(appMode)) {
       event.preventDefault();
       spawnBall();
     }
@@ -870,6 +1281,12 @@
       goals: goals.map(goal => ({ id: goal.id, x: goal.x, y: goal.y })),
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, omega: ball.omega } : null,
       won,
+      appMode,
+      developerEnabled,
+      gameSpeed,
+      unlockedStage,
+      touchedRodIds: [...touchedRodIds],
+      stages: clone(stages),
       goalHoldTime,
       spawn: { ...spawn },
       camera: { ...camera }
@@ -880,6 +1297,18 @@
     clearAll,
     resetGame,
     setZoomAt,
+    showHome,
+    showStageList,
+    startFreeMode,
+    loadStage,
+    startEditor,
+    resolveBallRect,
+    setBallPosition: (x, y) => {
+      if (ball) {
+        ball.x = x;
+        ball.y = y;
+      }
+    },
     setBallVelocity: (vx, vy) => {
       if (ball) {
         ball.vx = vx;
@@ -889,7 +1318,9 @@
     getImpactRestitution: (type, speed) => getImpactRestitution(MATERIALS[type], speed)
   };
 
+  loadPersistentState();
   resize();
   updateDeleteButton();
+  showHome();
   requestAnimationFrame(frame);
 })();
