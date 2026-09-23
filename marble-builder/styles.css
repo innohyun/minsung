@@ -190,20 +190,7 @@ body.is-stage .goal-card, body.is-stage .fixed-tool { display: none; }
   .home-hero { margin-top: 68px; gap: 13px; }
   .home-grid { grid-template-columns: 1fr; }
   .home-card, .mode-card { min-height: 104px; padding: 16px; }
-  body.is-editor .top-panel { top: max(6px, env(safe-area-inset-top)); width: calc(100% - 12px); display: grid; grid-template-columns: 1fr; gap: 5px; padding: 6px; overflow: visible; }
-  body.is-editor .title-group { min-height: 38px; }
-  body.is-editor .title-group .mini-ball, body.is-editor .title-group p { display: none; }
-  body.is-editor .title-group h1 { font-size: .9rem; }
-  body.is-editor .icon-button { width: 38px; height: 38px; }
-  body.is-editor .top-actions { grid-template-columns: repeat(3,minmax(0,1fr)); width: 100%; gap: 4px; }
-  body.is-editor .action { min-height: 36px; font-size: .68rem; }
-  body.is-editor .hint { top: calc(max(6px, env(safe-area-inset-top)) + 126px); max-width: calc(100% - 24px); }
-  body.is-editor .tool-dock { left: 0; width: 100%; bottom: 0; transform: none; padding: 6px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); border-radius: 18px 18px 0 0; overflow: hidden; }
-  body.is-editor .tool-list { min-width: 0; width: 100%; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 4px; overflow: hidden; touch-action: none; }
-  body.is-editor .tool-card { min-width: 0; width: 100%; min-height: 76px; padding-inline: 2px; touch-action: none; }
-  body.is-editor .tool-card span:not(.tool-icon) { overflow-wrap: anywhere; font-size: clamp(.58rem,2.7vw,.7rem); line-height: 1.1; }
-  body.is-editor .tool-card small { overflow-wrap: anywhere; font-size: clamp(.48rem,2.15vw,.56rem); line-height: 1.1; }
-  body.is-editor .tool-icon.road { width: min(38px,10vw); }
+  body.is-editor #spawnButton, body.is-editor #resetButton { display: none; }
   .tool-list { min-width: 0; }
   .tool-card { min-width: 62px; }
   .limit-grid { grid-template-columns: 1fr; }
