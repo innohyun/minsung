@@ -81,7 +81,7 @@ button { font: inherit; }
 .dock-heading { display: grid; gap: 2px; min-width: 74px; }
 .dock-heading strong { font-size: .9rem; }
 .dock-heading span, .dock-help { color: var(--muted); font-size: .7rem; }
-.tool-list { display: grid; grid-template-columns: repeat(5, minmax(82px, 1fr)); gap: 8px; }
+.tool-list { min-width: 0; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(82px, 1fr); gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; touch-action: none; }
 .tool-card {
   min-height: 76px; padding: 7px 8px; display: grid; justify-items: center; align-content: center; gap: 3px;
   border: 1px solid rgba(23, 50, 77, .1); border-radius: 13px; background: #f7fbfd; color: var(--ink);
@@ -89,14 +89,16 @@ button { font: inherit; }
 }
 .tool-card:active { cursor: grabbing; transform: translateY(1px); }
 .tool-card small { color: var(--muted); font-size: .62rem; font-weight: 600; }
-.tool-icon.road { width: 50px; height: 9px; border-radius: 5px; transform: rotate(-8deg); box-shadow: 0 3px 4px rgba(23, 50, 77, .15); }
+.tool-icon.road { width: 50px; height: 9px; border-radius: 5px; transform: rotate(var(--tool-angle, -8deg)); box-shadow: 0 3px 4px rgba(23, 50, 77, .15); }
 .tool-icon.wood { background: linear-gradient(#c58b51, #8a552a); }
 .tool-icon.rubber { background: linear-gradient(#e85b55, #ac2f35); }
 .tool-icon.steel { background: linear-gradient(#e7edf1, #8294a3); }
 .tool-icon.basket { position: relative; width: 43px; height: 29px; border: 6px solid #d69536; border-top: 0; border-radius: 0 0 10px 10px; }
-.tool-icon.fixed { background: repeating-linear-gradient(135deg, #7754b8 0 10px, #a98be0 10px 20px); }
 .tool-count { min-height: 1em; color: var(--blue); font-size: .67rem; }
 .tool-card:disabled { opacity: .38; cursor: not-allowed; }
+.tool-card.more-card { min-width: 72px; background: #eaf2f8; font-size: 1.45rem; letter-spacing: .08em; }
+.tool-card .state-badge { min-height: 17px; padding: 2px 6px; border-radius: 999px; background: #e8f2ff; color: #1d65b7; font-size: .55rem; }
+.tool-card .state-badge.fixed { background: #efe5ff; color: #6942a6; }
 .dock-help { display: grid; gap: 6px; white-space: nowrap; }
 .dot { display: inline-block; width: 10px; height: 10px; margin-right: 4px; border-radius: 50%; vertical-align: -1px; }
 .dot.endpoint { background: #ffaf21; } .dot.center { background: #2674d9; }
@@ -181,9 +183,20 @@ button { font: inherit; }
 .dialog-actions .danger-dialog { background: var(--red); color: #fff; border-color: transparent; }
 .form-error { color: var(--red); font-size: .8rem; font-weight: 800; }
 body.is-home .top-panel, body.is-home .hint, body.is-home .tool-dock, body.is-stage-list .top-panel, body.is-stage-list .hint, body.is-stage-list .tool-dock { display: none; }
-body.is-editor .fixed-tool { display: grid; }
-body.is-stage .goal-card, body.is-stage .fixed-tool { display: none; }
 .save-stage { background: #3a9d70; color: #fff; border-color: transparent; }
+.catalog-dialog { width: min(720px,calc(100% - 24px)); max-height: min(720px,calc(100dvh - 30px)); overflow: hidden; }
+.catalog-shell { padding: 20px; display: grid; gap: 15px; }
+.catalog-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; }
+.catalog-heading h2, .catalog-heading p { margin: 0; }
+.catalog-heading p { margin-top: 4px; color: var(--muted); font-size: .8rem; }
+.catalog-heading button { width: 42px; height: 42px; border: 0; border-radius: 12px; background: #edf3f7; color: var(--ink); font-size: 1.4rem; }
+.catalog-grid { max-height: calc(100dvh - 150px); overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fit,minmax(142px,1fr)); gap: 10px; touch-action: pan-y; }
+.catalog-item { padding: 12px; display: grid; justify-items: center; gap: 8px; border: 1px solid rgba(23,50,77,.12); border-radius: 16px; background: #f7fbfd; }
+.catalog-item strong { font-size: .9rem; }
+.catalog-actions { width: 100%; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; }
+.catalog-actions button { min-height: 38px; border: 1px solid rgba(23,50,77,.14); border-radius: 9px; background: #fff; color: var(--ink); font-size: .7rem; font-weight: 800; }
+.catalog-actions button.fixed-choice { background: #6d4baa; color: #fff; border-color: transparent; }
+.catalog-actions.one-choice { grid-template-columns: 1fr; }
 
 @media (max-width: 720px) {
   .home-screen { place-content: start center; }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="theme-color" content="#dbeafe">
   <title>공 굴리기 연구소</title>
-  <link rel="stylesheet" href="styles.css?v=8">
+  <link rel="stylesheet" href="styles.css?v=9">
 </head>
 <body class="is-home">
   <main class="game-shell">
@@ -58,13 +58,7 @@
 
     <section class="tool-dock" aria-label="설치할 블록 목록">
       <div class="dock-heading"><strong>블록 창</strong><span>끌어서 배치</span></div>
-      <div class="tool-list">
-        <button class="tool-card" type="button" data-tool="wood"><span class="tool-icon road wood"></span><span>나무 길</span><small>보통 마찰</small><b class="tool-count" data-count-for="wood"></b></button>
-        <button class="tool-card" type="button" data-tool="rubber"><span class="tool-icon road rubber"></span><span>고무 길</span><small>강한 마찰</small><b class="tool-count" data-count-for="rubber"></b></button>
-        <button class="tool-card" type="button" data-tool="steel"><span class="tool-icon road steel"></span><span>금속 길</span><small>약한 마찰</small><b class="tool-count" data-count-for="steel"></b></button>
-        <button class="tool-card fixed-tool" type="button" data-tool="fixed" hidden><span class="tool-icon road fixed"></span><span>고정 스틱</span><small>플레이 중 회전만</small></button>
-        <button class="tool-card goal-card" type="button" data-tool="goal"><span class="tool-icon basket"></span><span>골인 바구니</span><small>공의 도착점</small></button>
-      </div>
+      <div id="toolList" class="tool-list"></div>
       <div class="dock-help"><span><b class="dot endpoint"></b>양 끝점: 각도</span><span><b class="dot center"></b>가운데: 이동</span></div>
     </section>
 
@@ -72,10 +66,12 @@
 
     <dialog id="developerDialog" class="app-dialog"><form method="dialog" id="developerForm"><h2>개발자 모드</h2><p>비밀번호를 입력하세요.</p><input id="developerPassword" type="password" autocomplete="off" aria-label="개발자 비밀번호" required><p id="developerError" class="form-error" hidden>비밀번호가 맞지 않습니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button class="primary-dialog" type="submit">확인</button></div></form></dialog>
 
-    <dialog id="stageSetupDialog" class="app-dialog"><form method="dialog" id="stageSetupForm"><h2>새 스테이지 설정</h2><label>스테이지 번호<input id="stageNumberInput" type="number" min="1" required></label><div class="limit-grid"><label>나무 스틱<input id="woodLimitInput" type="number" min="0" value="1" required></label><label>고무 스틱<input id="rubberLimitInput" type="number" min="0" value="1" required></label><label>금속 스틱<input id="steelLimitInput" type="number" min="0" value="1" required></label></div><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button class="primary-dialog" type="submit">맵 만들기 시작</button></div></form></dialog>
+    <dialog id="stageSetupDialog" class="app-dialog"><form method="dialog" id="stageSetupForm"><h2>새 스테이지 설정</h2><label>스테이지 번호<input id="stageNumberInput" type="number" min="1" required></label><p>블록 개수와 각도는 맵 만들기에서 배치한 내용으로 정해집니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button class="primary-dialog" type="submit">맵 만들기 시작</button></div></form></dialog>
+
+    <dialog id="blockCatalogDialog" class="app-dialog catalog-dialog"><div class="catalog-shell"><div class="catalog-heading"><div><h2>모든 블록</h2><p>블록을 고르고 맵으로 끌어 놓으세요.</p></div><button id="closeCatalogButton" type="button" aria-label="블록 목록 닫기">×</button></div><div id="blockCatalogGrid" class="catalog-grid"></div></div></dialog>
 
     <dialog id="deleteStageDialog" class="app-dialog"><form method="dialog"><h2>정말 삭제하시겠습니까?</h2><p>삭제한 스테이지는 되돌릴 수 없습니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button id="confirmDeleteStageButton" class="danger-dialog" type="button">삭제</button></div></form></dialog>
   </main>
-  <script src="game.js?v=9"></script>
+  <script src="game.js?v=10"></script>
 </body>
 </html>

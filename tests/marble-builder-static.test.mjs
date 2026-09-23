@@ -8,8 +8,8 @@ const script = readFileSync(new URL('../marble-builder/game.js', import.meta.url
 const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.url), 'utf8');
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=9/);
-    assert.match(html, /styles\.css\?v=8/);
+    assert.match(html, /game\.js\?v=10/);
+    assert.match(html, /styles\.css\?v=9/);
 });
 
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {
@@ -19,17 +19,18 @@ test('marble builder exposes spawn controls, draggable roads, and a basket goal'
     assert.match(html, /id="resetButton"[^>]*>리셋</);
     assert.match(html, /id="confirmButton"[^>]*>확인</);
     assert.doesNotMatch(html, /다시 굴리기/);
-    assert.match(html, /data-tool="wood"/);
-    assert.match(html, /data-tool="rubber"/);
-    assert.match(html, /data-tool="steel"/);
-    assert.match(html, /data-tool="goal"/);
-    assert.match(html, /골인 바구니/);
+    assert.match(script, /const BLOCK_CATALOG = \[/);
+    assert.match(script, /type: 'wood'/);
+    assert.match(script, /type: 'rubber'/);
+    assert.match(script, /type: 'steel'/);
+    assert.match(script, /type: 'goal'/);
+    assert.match(script, /label: '골인 바구니'/);
     assert.match(script, /function beginPlacement/);
     assert.match(script, /function addGoal/);
     assert.match(script, /function rodEndpoints/);
-    assert.match(script, /mode: 'start'/);
-    assert.match(script, /mode: 'end'/);
-    assert.match(script, /mode: 'move'/);
+    assert.match(script, /'start'/);
+    assert.match(script, /'end'/);
+    assert.match(script, /'move'/);
 });
 
 test('marble builder uses earth gravity, fixed substeps, friction, and disc inertia', () => {
@@ -97,7 +98,8 @@ test('marble builder is responsive and touch enabled', () => {
     assert.doesNotMatch(styles, /body\.is-editor \.top-panel/);
     assert.doesNotMatch(styles, /body\.is-editor \.tool-dock/);
     assert.match(styles, /body\.is-editor #spawnButton, body\.is-editor #resetButton \{ display: none; \}/);
-    assert.match(script, /dragging: true/);
+    assert.match(script, /mode: event\.pointerType === 'touch' \? 'pending' : 'drag'/);
+    assert.match(script, /toolList\.scrollLeft -= event\.clientX - placement\.lastX/);
     assert.match(script, /screen\.y >= view\.playTop \+ 5/);
     assert.match(script, /view\.width \/ Math\.max\(1, rect\.width\)/);
     assert.match(script, /camera\.zoom = MAX_ZOOM/);
@@ -112,6 +114,8 @@ test('marble builder keeps free mode and adds home, stage progression, and speed
     assert.match(script, /function startFreeMode/);
     assert.match(script, /function loadStage/);
     assert.match(script, /const allRodsTouched = rods\.length > 0/);
+    assert.match(script, /const allSuppliesUsed = stageSupplies\.length === 0/);
+    assert.match(script, /allSuppliesUsed && allRodsTouched/);
     assert.match(script, /unlockedStage = Math\.max\(unlockedStage, currentStage\.number \+ 1\)/);
     assert.match(script, /accumulator \+= elapsed \* gameSpeed/);
 });
@@ -119,15 +123,39 @@ test('marble builder keeps free mode and adds home, stage progression, and speed
 test('developer mode gates stage creation, editing, and confirmed deletion', () => {
     assert.match(html, /id="developerButton"/);
     assert.match(html, /id="mapMakerButton"[^>]*hidden/);
-    assert.match(html, /data-tool="fixed"/);
+    assert.doesNotMatch(html, /data-tool="fixed"/);
+    assert.doesNotMatch(script, /fixed: \{ label: '고정 스틱'/);
+    assert.match(html, /id="blockCatalogDialog"/);
+    assert.match(script, /fixed\.textContent = '고정'/);
     assert.match(html, /정말 삭제하시겠습니까/);
     assert.match(script, /const DEVELOPER_PASSWORD = '12345@'/);
     assert.match(script, /developerPassword\.value !== DEVELOPER_PASSWORD/);
     assert.match(script, /function saveEditedStage/);
     assert.match(script, /edit\.textContent = '수정'/);
     assert.match(script, /remove\.textContent = '삭제'/);
-    assert.match(script, /mode: 'rotateFixed'/);
+    assert.match(script, /'rotateFixed'/);
     assert.match(script, /appMode === 'stage' && selected\.fixed/);
+    assert.match(script, /fixedBlocks/);
+    assert.match(script, /supplyBlocks/);
+    assert.match(script, /angleLocked: appMode === 'stage'/);
+    assert.match(script, /appMode === 'editor' && !rod\.fixed \? 0\.42 : 1/);
+});
+
+test('block inventory scrolls, keeps eight recent tools, and stage setup only asks for a number', () => {
+    assert.match(html, /id="toolList" class="tool-list"/);
+    assert.match(styles, /\.tool-list[^}]*overflow-x: auto[^}]*touch-action: none/s);
+    assert.match(script, /const MAX_RECENT_TOOLS = 8/);
+    assert.match(script, /className = 'tool-card more-card'/);
+    assert.match(script, /recentTools = \[key, \.\.\.recentTools/);
+    assert.match(html, /id="stageNumberInput"/);
+    assert.doesNotMatch(html, /id="woodLimitInput"|id="rubberLimitInput"|id="steelLimitInput"/);
+});
+
+test('basket overlap is rejected for new and moved blocks', () => {
+    assert.match(script, /function rodOverlapsAnyGoal/);
+    assert.match(script, /function goalOverlapsAnyRod/);
+    assert.match(script, /골인 바구니와 블록은 겹칠 수 없습니다/);
+    assert.match(script, /Object\.assign\(editDrag\.entity, editDrag\.original\)/);
 });
 
 test('basket has no decorative inner lines and uses tighter collision geometry', () => {
