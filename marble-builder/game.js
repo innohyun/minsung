@@ -68,7 +68,7 @@
 
 
   const PIXELS_PER_METER = 100;
-  const EARTH_GRAVITY = 9.81;
+  const EARTH_GRAVITY = 54.8;
   const FIXED_STEP = 1 / 120;
   const BALL_RADIUS = 18;
   const BALL_MASS = 0.18;
@@ -169,6 +169,10 @@
   let audioLimiter = null;
   let rollingAudio = null;
   let rollingNoiseBuffer = null;
+  let recordedRollingAudio = null;
+  let rollingReferenceBuffer = null;
+  let woodImpactBuffers = [];
+  let materialAudioPromise = null;
   let lastImpactSoundAt = 0;
   const undoStack = [];
   const redoStack = [];
@@ -187,6 +191,10 @@
     wood: '/assets/marble-builder/platforms/wood.png?v=2',
     slime: '/assets/marble-builder/platforms/slime.png?v=2',
     electric: '/assets/marble-builder/platforms/electric.png'
+  };
+  const MATERIAL_AUDIO_URLS = {
+    rolling: '/assets/marble-builder/audio/marble-roll-reference.wav?v=1',
+    woodImpacts: [1, 2, 3].map(index => `/assets/marble-builder/audio/wood-hit-${index}.wav?v=1`)
   };
 
   const platformImages = Object.fromEntries(Object.entries(PLATFORM_ASSET_URLS).map(([type, url]) => {
@@ -484,6 +492,7 @@
       audioMaster = audioContext.createGain();
       audioMaster.gain.value = 1.6;
       audioMaster.connect(audioCompressor).connect(audioLimiter).connect(audioContext.destination);
+      loadMaterialAudio(audioContext);
     }
     if (audioContext.state === 'suspended' || audioContext.state === 'interrupted') {
       audioContext.resume().catch(() => {});
@@ -504,6 +513,42 @@
     return buffer;
   }
 
+  function loadMaterialAudio(audio) {
+    if (materialAudioPromise) return materialAudioPromise;
+    const decode = async url => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Audio load failed: ${response.status}`);
+      return audio.decodeAudioData(await response.arrayBuffer());
+    };
+    materialAudioPromise = Promise.all([
+      decode(MATERIAL_AUDIO_URLS.rolling),
+      ...MATERIAL_AUDIO_URLS.woodImpacts.map(decode)
+    ]).then(([rolling, ...impacts]) => {
+      rollingReferenceBuffer = rolling;
+      woodImpactBuffers = impacts;
+      return true;
+    }).catch(() => false);
+    return materialAudioPromise;
+  }
+
+  function playRecordedWoodImpact(audio, start, speed, volume) {
+    if (!woodImpactBuffers.length) return false;
+    const source = audio.createBufferSource();
+    const filter = audio.createBiquadFilter();
+    const gain = audio.createGain();
+    source.buffer = woodImpactBuffers[Math.floor(Math.random() * woodImpactBuffers.length)];
+    source.playbackRate.value = clamp(.94 + Math.random() * .1 + Math.min(.06, speed * .006), .92, 1.1);
+    filter.type = 'lowpass';
+    filter.frequency.value = 4200;
+    filter.Q.value = .35;
+    gain.gain.setValueAtTime(Math.min(.52, volume * 1.08), start);
+    gain.gain.exponentialRampToValueAtTime(.0001, start + .24);
+    source.connect(filter).connect(gain).connect(audioMaster);
+    source.start(start);
+    source.stop(start + .26);
+    return true;
+  }
+
   function playImpactSound(type, speed) {
     const audio = ensureAudio();
     const now = performance.now();
@@ -512,6 +557,8 @@
     const slime = type === 'slime';
     const start = audio.currentTime;
     const volume = Math.min(.44, .085 + speed * .035);
+
+    if (type === 'wood' && playRecordedWoodImpact(audio, start, speed, volume)) return;
 
     if (slime) {
       const osc = audio.createOscillator();
@@ -575,8 +622,35 @@
       if (rollingAudio && audio.currentTime - rollingAudio.lastContactAt > .12) {
         rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .08);
       }
+      if (recordedRollingAudio && audio.currentTime - recordedRollingAudio.lastContactAt > .12) {
+        recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .08);
+      }
       return;
     }
+    const useRecordedRolling = Boolean(rollingReferenceBuffer && (type === 'wood' || type === 'basket'));
+    if (useRecordedRolling) {
+      if (rollingAudio) rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
+      if (!recordedRollingAudio) {
+        const source = audio.createBufferSource();
+        const filter = audio.createBiquadFilter();
+        const gain = audio.createGain();
+        source.buffer = rollingReferenceBuffer;
+        source.loop = true;
+        filter.type = 'lowpass';
+        filter.frequency.value = 3600;
+        filter.Q.value = .4;
+        gain.gain.value = .0001;
+        source.connect(filter).connect(gain).connect(audioMaster);
+        source.start();
+        recordedRollingAudio = { source, filter, gain, lastContactAt: audio.currentTime };
+      }
+      recordedRollingAudio.lastContactAt = audio.currentTime;
+      recordedRollingAudio.source.playbackRate.setTargetAtTime(clamp(.72 + speed * .055, .72, 1.65), audio.currentTime, .05);
+      recordedRollingAudio.filter.frequency.setTargetAtTime(1500 + Math.min(2600, speed * 180), audio.currentTime, .06);
+      recordedRollingAudio.gain.gain.setTargetAtTime(Math.min(.18, .018 + speed * .018), audio.currentTime, .045);
+      return;
+    }
+    if (recordedRollingAudio) recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
     if (!rollingAudio) {
       rollingNoiseBuffer ||= makeSoftNoiseBuffer(audio, 1.8, .94);
       const noise = audio.createBufferSource();
@@ -849,7 +923,7 @@
     followButton.textContent = followBall ? '따라가기 끄기' : '공 따라가기';
     followButton.setAttribute('aria-pressed', String(followBall));
     gameTitle.textContent = mode === 'editor' ? '스테이지 만들기' : mode === 'stage' ? `${currentStage?.number || ''}스테이지` : '공 굴리기 연구소';
-    gameSubtitle.textContent = mode === 'stage' ? '주어진 블록을 모두 쓰고 모든 블록을 통과하세요.' : mode === 'editor' ? '블록을 선택해 고정하거나 플레이어 지급 블록으로 만드세요.' : '지구 중력 9.81m/s² · 실제 마찰과 회전 관성';
+    gameSubtitle.textContent = mode === 'stage' ? '주어진 블록을 모두 쓰고 모든 블록을 통과하세요.' : mode === 'editor' ? '블록을 선택해 고정하거나 플레이어 지급 블록으로 만드세요.' : '영상 기준 중력 54.8m/s² · 실제 마찰과 회전 관성';
     renderToolDock();
     updateDeleteButton();
     requestAnimationFrame(resize);
@@ -3063,7 +3137,10 @@
       limiterThreshold: audioLimiter?.threshold.value ?? null,
       rollingActive: Boolean(rollingAudio),
       rollingToneType: rollingAudio?.tone.type || null,
-      rollingFilterType: rollingAudio?.filter.type || null
+      rollingFilterType: rollingAudio?.filter.type || null,
+      referenceRollingLoaded: Boolean(rollingReferenceBuffer),
+      woodImpactCount: woodImpactBuffers.length,
+      recordedRollingActive: Boolean(recordedRollingAudio)
     }),
     openBlockCatalog,
     rodOverlapsAnyGoal,

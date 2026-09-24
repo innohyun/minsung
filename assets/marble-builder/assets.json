@@ -1,4 +1,18 @@
 {
+  "audio": [
+    {
+      "id": "marble-roll-reference",
+      "runtime": "audio/marble-roll-reference.wav",
+      "source": "approved-video-1",
+      "durationSeconds": 0.42
+    },
+    {
+      "id": "wood-hit-reference",
+      "runtime": ["audio/wood-hit-1.wav", "audio/wood-hit-2.wav", "audio/wood-hit-3.wav"],
+      "source": "approved-video-2",
+      "durationSeconds": 0.252
+    }
+  ],
   "assets": [
     {
       "name": "나무",

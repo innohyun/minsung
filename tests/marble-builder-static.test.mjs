@@ -9,7 +9,7 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=19/);
+    assert.match(html, /game\.js\?v=20/);
     assert.match(html, /styles\.css\?v=14/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
@@ -35,9 +35,9 @@ test('marble builder exposes spawn controls, draggable roads, and a basket goal'
     assert.match(script, /'move'/);
 });
 
-test('marble builder uses earth gravity, fixed substeps, friction, and disc inertia', () => {
+test('marble builder uses video-matched gravity, fixed substeps, friction, and disc inertia', () => {
     assert.match(script, /const PIXELS_PER_METER = 100/);
-    assert.match(script, /const EARTH_GRAVITY = 9\.81/);
+    assert.match(script, /const EARTH_GRAVITY = 54\.8/);
     assert.match(script, /const FIXED_STEP = 1 \/ 120/);
     assert.match(script, /const BALL_INERTIA = 0\.5 \* BALL_MASS/);
     assert.match(script, /maxFriction = rect\.material\.friction \* normalImpulse/);
@@ -51,6 +51,16 @@ test('marble builder uses earth gravity, fixed substeps, friction, and disc iner
     assert.match(script, /function getImpactRestitution/);
     assert.match(script, /impactSpeed < 0\.3/);
     assert.match(script, /ball\.omega/);
+});
+
+test('marble builder uses the approved recording for wood audio without replacing electric audio', () => {
+    assert.match(script, /marble-roll-reference\.wav\?v=1/);
+    assert.match(script, /wood-hit-\$\{index\}\.wav\?v=1/);
+    assert.match(script, /type === 'wood' && playRecordedWoodImpact/);
+    assert.match(script, /type === 'wood' \|\| type === 'basket'/);
+    assert.match(script, /const electric = type === 'electric'/);
+    assert.match(script, /electric \? 126 : 82/);
+    assert.equal(assetManifest.audio.length, 2);
 });
 
 test('marble builder uses an unbounded world with camera pan and four-times zoom-out', () => {
