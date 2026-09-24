@@ -8,13 +8,14 @@ const script = readFileSync(new URL('../marble-builder/game.js', import.meta.url
 const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.url), 'utf8');
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=10/);
-    assert.match(html, /styles\.css\?v=9/);
+    assert.match(html, /game\.js\?v=13/);
+    assert.match(html, /styles\.css\?v=12/);
+    assert.match(html, /rel="icon" href="data:,"/);
 });
 
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {
     assert.match(html, /id="spawnButton"/);
-    assert.match(html, /id="clearButton"[^>]*>전체 삭제</);
+    assert.doesNotMatch(html, /id="clearButton"|전체 삭제/);
     assert.match(html, /id="deleteButton"[^>]*>선택 삭제</);
     assert.match(html, /id="resetButton"[^>]*>리셋</);
     assert.match(html, /id="confirmButton"[^>]*>확인</);
@@ -65,15 +66,14 @@ test('marble builder uses an unbounded world with camera pan and four-times zoom
 });
 
 test('marble builder keeps its gameplay actions responsive', () => {
-    assert.match(styles, /\.top-actions \{[^}]*grid-template-columns: repeat\(6,/s);
-    assert.match(styles, /@media \(max-width: 720px\)[\s\S]*\.top-actions \{ grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/);
+    assert.match(styles, /\.top-actions \{[^}]*display: flex[^}]*overflow-x: auto/s);
     assert.doesNotMatch(styles, /\.action\.danger \{ position: absolute/);
 });
 
-test('marble builder separates clear, reset, and goal confirmation behavior', () => {
+test('marble builder removes clear-all while preserving reset and goal confirmation behavior', () => {
     assert.match(script, /function clearAll\(\)/);
     assert.match(script, /function resetGame\(\)/);
-    assert.match(script, /clearButton\.addEventListener\('click', clearAll\)/);
+    assert.doesNotMatch(script, /clearButton\.addEventListener/);
     assert.match(script, /resetButton\.addEventListener\('click', resetGame\)/);
     assert.match(script, /confirmButton\.addEventListener\('click',[\s\S]*successPanel\.hidden = true/);
     const resetBody = script.match(/function resetGame\(\) \{([\s\S]*?)\n  \}/)?.[1] || '';
@@ -95,6 +95,10 @@ test('marble builder is responsive and touch enabled', () => {
     assert.match(html, /viewport-fit=cover/);
     assert.match(styles, /\.app-dialog input[^}]*font-size: 16px/);
     assert.match(styles, /height: 100dvh/);
+    assert.match(styles, /#gameCanvas \{ position: absolute; inset: 0;[^}]*width: 100%; height: 100%/);
+    assert.match(script, /const rect = canvas\.getBoundingClientRect\(\)/);
+    assert.doesNotMatch(script, /canvas\.style\.height/);
+    assert.match(script, /new ResizeObserver\(resize\)\.observe\(gameShell\)/);
     assert.doesNotMatch(styles, /body\.is-editor \.top-panel/);
     assert.doesNotMatch(styles, /body\.is-editor \.tool-dock/);
     assert.match(styles, /body\.is-editor #spawnButton, body\.is-editor #resetButton \{ display: none; \}/);
@@ -105,19 +109,20 @@ test('marble builder is responsive and touch enabled', () => {
     assert.match(script, /camera\.zoom = MAX_ZOOM/);
 });
 
-test('marble builder keeps free mode and adds home, stage progression, and speed controls', () => {
+test('marble builder keeps free mode and adds home and stage progression at fixed speed', () => {
     assert.match(html, /id="homeScreen"/);
     assert.match(html, /id="homeButton"/);
     assert.match(html, /id="freeModeButton"[^>]*[\s\S]*자유 모드/);
     assert.match(html, /id="stageModeButton"/);
-    assert.match(html, /data-speed="0\.5"/);
+    assert.doesNotMatch(html, /data-speed=/);
     assert.match(script, /function startFreeMode/);
     assert.match(script, /function loadStage/);
     assert.match(script, /const allRodsTouched = rods\.length > 0/);
     assert.match(script, /const allSuppliesUsed = stageSupplies\.length === 0/);
     assert.match(script, /allSuppliesUsed && allRodsTouched/);
     assert.match(script, /unlockedStage = Math\.max\(unlockedStage, currentStage\.number \+ 1\)/);
-    assert.match(script, /accumulator \+= elapsed \* gameSpeed/);
+    assert.match(script, /accumulator \+= elapsed;/);
+    assert.doesNotMatch(script, /gameSpeed|SPEED_STORAGE_KEY/);
 });
 
 test('developer mode gates stage creation, editing, and confirmed deletion', () => {
@@ -126,7 +131,10 @@ test('developer mode gates stage creation, editing, and confirmed deletion', () 
     assert.doesNotMatch(html, /data-tool="fixed"/);
     assert.doesNotMatch(script, /fixed: \{ label: '고정 스틱'/);
     assert.match(html, /id="blockCatalogDialog"/);
-    assert.match(script, /fixed\.textContent = '고정'/);
+    assert.match(html, /id="toggleFixedButton"[^>]*>고정</);
+    assert.match(script, /function toggleSelectedFixed/);
+    assert.match(script, /selected\.fixed = !selected\.fixed/);
+    assert.doesNotMatch(script, /className = 'fixed-choice'/);
     assert.match(html, /정말 삭제하시겠습니까/);
     assert.match(script, /const DEVELOPER_PASSWORD = '12345@'/);
     assert.match(script, /developerPassword\.value !== DEVELOPER_PASSWORD/);
@@ -134,11 +142,19 @@ test('developer mode gates stage creation, editing, and confirmed deletion', () 
     assert.match(script, /edit\.textContent = '수정'/);
     assert.match(script, /remove\.textContent = '삭제'/);
     assert.match(script, /'rotateFixed'/);
+    assert.match(script, /appMode === 'editor' && selected\.fixed/);
     assert.match(script, /appMode === 'stage' && selected\.fixed/);
     assert.match(script, /fixedBlocks/);
     assert.match(script, /supplyBlocks/);
     assert.match(script, /angleLocked: appMode === 'stage'/);
     assert.match(script, /appMode === 'editor' && !rod\.fixed \? 0\.42 : 1/);
+});
+
+test('default stage one is removed without deleting user-created stage one', () => {
+    assert.doesNotMatch(script, /id: 'stage-1', number: 1/);
+    assert.match(script, /stages\.filter\(stage => stage\.id !== 'stage-1'\)/);
+    assert.match(script, /const firstStageNumber = stages\.reduce/);
+    assert.match(script, /unlockedStage = Math\.max\(Number\.isFinite\(firstStageNumber\)/);
 });
 
 test('block inventory scrolls, keeps eight recent tools, and stage setup only asks for a number', () => {
@@ -151,6 +167,32 @@ test('block inventory scrolls, keeps eight recent tools, and stage setup only as
     assert.doesNotMatch(html, /id="woodLimitInput"|id="rubberLimitInput"|id="steelLimitInput"/);
 });
 
+test('marble builder supports creations, follow camera, mandatory sound, special materials, and history', () => {
+    assert.match(html, /id="creationsList"/);
+    assert.match(html, /id="saveMapButton"/);
+    assert.match(html, /id="followButton"/);
+    assert.doesNotMatch(html, /id="soundButton"/);
+    assert.match(html, /id="undoButton"/);
+    assert.match(html, /id="redoButton"/);
+    assert.match(script, /const CREATIONS_STORAGE_KEY = 'marble-builder-creations-v1'/);
+    assert.match(script, /function saveCreation/);
+    assert.match(script, /function undoLastAction/);
+    assert.match(script, /toolSettings: clone\(toolSettings\)/);
+    assert.match(script, /if \(snapshot\.toolSettings\)/);
+    assert.match(script, /if \(apply && sizingMode\?\.preview\) \{\s*pushUndo\(\)/);
+    assert.match(script, /followBall && ball/);
+    assert.match(script, /type: 'slime'/);
+    assert.match(script, /reboundSpeed\(fallDistanceMeters, 2 \/ 3\)/);
+    assert.match(script, /reboundSpeed\(fallDistanceMeters, 4 \/ 3\)/);
+    assert.match(script, /ball\.fallPeakY = ball\.y/);
+    assert.match(script, /type: 'electric'/);
+    assert.match(script, /type: 'antigravity'/);
+    assert.match(script, /function playImpactSound/);
+    assert.match(script, /function updateRollingSound/);
+    assert.match(styles, /\.tool-icon\.road[^}]*border-radius: 0/);
+    assert.match(script, /ctx\.rect\(-rod\.length \/ 2/);
+});
+
 test('basket overlap is rejected for new and moved blocks', () => {
     assert.match(script, /function rodOverlapsAnyGoal/);
     assert.match(script, /function goalOverlapsAnyRod/);
@@ -158,10 +200,11 @@ test('basket overlap is rejected for new and moved blocks', () => {
     assert.match(script, /Object\.assign\(editDrag\.entity, editDrag\.original\)/);
 });
 
-test('basket has no decorative inner lines and uses tighter collision geometry', () => {
+test('basket has no decorative inner lines and uses exact wall collision geometry', () => {
     assert.doesNotMatch(styles, /tool-icon\.basket::before/);
     assert.doesNotMatch(script, /for \(let x = left \+ 24/);
-    assert.match(script, /const collisionInset = 3/);
+    assert.doesNotMatch(script, /const collisionInset = 3/);
+    assert.match(script, /function basketRects/);
     assert.match(script, /ball\.radius - \(rect\.collisionInset \|\| 0\)/);
 });
 
