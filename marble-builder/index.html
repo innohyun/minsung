@@ -6,7 +6,10 @@
   <meta name="theme-color" content="#dbeafe">
   <title>공 굴리기 연구소</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="preload" as="image" href="/assets/marble-builder/platforms/wood.png">
+  <link rel="preload" as="image" href="/assets/marble-builder/platforms/slime.png">
+  <link rel="preload" as="image" href="/assets/marble-builder/platforms/electric.png">
+  <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body class="is-home">
   <main class="game-shell">
@@ -53,6 +56,9 @@
         <button id="deleteButton" class="action danger" type="button" disabled>선택 삭제</button>
         <button id="toggleFixedButton" class="action fixed-toggle" type="button" hidden disabled>고정</button>
         <button id="resetButton" class="action" type="button">리셋</button>
+        <button id="combineElectricButton" class="action electric-action" type="button" hidden>결합</button>
+        <button id="detachElectricButton" class="action electric-action" type="button" hidden>해제</button>
+        <button id="convertElectricButton" class="action electric-action" type="button" hidden>변환</button>
 
         <button id="saveMapButton" class="action save-map" type="button" hidden>맵 저장</button>
         <button id="followButton" class="action" type="button" hidden>공 따라가기</button>
@@ -94,6 +100,6 @@
 
     <dialog id="deleteStageDialog" class="app-dialog"><form method="dialog"><h2>정말 삭제하시겠습니까?</h2><p>삭제한 스테이지는 되돌릴 수 없습니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button id="confirmDeleteStageButton" class="danger-dialog" type="button">삭제</button></div></form></dialog>
   </main>
-  <script src="game.js?v=15"></script>
+  <script src="game.js?v=16"></script>
 </body>
 </html>

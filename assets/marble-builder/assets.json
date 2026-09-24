@@ -1,0 +1,37 @@
+{
+  "assets": [
+    {
+      "name": "나무",
+      "id": "wood",
+      "source": "platforms/wood-source.png",
+      "runtime": "platforms/wood.png",
+      "size": [
+        1024,
+        165
+      ],
+      "alpha": true
+    },
+    {
+      "name": "슬라임",
+      "id": "slime",
+      "source": "platforms/slime-source.png",
+      "runtime": "platforms/slime.png",
+      "size": [
+        1024,
+        121
+      ],
+      "alpha": true
+    },
+    {
+      "name": "전기",
+      "id": "electric",
+      "source": "platforms/electric-source.png",
+      "runtime": "platforms/electric.png",
+      "size": [
+        1024,
+        150
+      ],
+      "alpha": true
+    }
+  ]
+}

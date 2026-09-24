@@ -60,6 +60,7 @@ button { font: inherit; }
 .action:disabled { opacity: .42; cursor: default; }
 
 .fixed-toggle { background: #6d4baa; color: #fff; border-color: transparent; }
+.electric-action { background: #dff9ff; color: #075985; border-color: #67d9f4; font-weight: 900; }
 .action:focus-visible, .tool-card:focus-visible, .success-panel button:focus-visible { outline: 3px solid rgba(38, 116, 217, .35); outline-offset: 2px; }
 
 .hint {
@@ -94,11 +95,9 @@ button { font: inherit; }
 .tool-card:active { cursor: grabbing; transform: translateY(1px); }
 .tool-card small { color: var(--muted); font-size: .62rem; font-weight: 600; }
 .tool-icon.road { width: 50px; height: 9px; border-radius: 0; transform: rotate(var(--tool-angle, -8deg)); box-shadow: 0 3px 4px rgba(23, 50, 77, .15); }
-.tool-icon.wood { background: linear-gradient(#c58b51, #8a552a); }
-.tool-icon.rubber { background: linear-gradient(#e85b55, #ac2f35); }
-.tool-icon.steel { background: linear-gradient(#e7edf1, #8294a3); }
-.tool-icon.slime { background: linear-gradient(#8bea73, #36a94f); box-shadow: inset 0 2px rgba(255,255,255,.45), 0 3px 4px rgba(23,50,77,.15); }
-.tool-icon.electric { background: linear-gradient(#66e8ff, #2d77e8); box-shadow: inset 0 2px rgba(255,255,255,.55), 0 0 8px rgba(46,205,255,.6); }
+.tool-icon.wood { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/wood.png'); }
+.tool-icon.slime { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/slime.png'); box-shadow: 0 3px 4px rgba(23,50,77,.15); }
+.tool-icon.electric { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/electric.png'); box-shadow: 0 0 8px rgba(46,205,255,.6); }
 .tool-icon.antigravity { width: 48px; height: 28px; border: 2px dashed #6c5ce7; background: rgba(137,116,255,.25); }
 .tool-icon.basket { position: relative; width: 43px; height: 29px; border: 6px solid #d69536; border-top: 0; border-radius: 0 0 10px 10px; }
 .tool-count { min-height: 1em; color: var(--blue); font-size: .67rem; }

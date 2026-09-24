@@ -6,10 +6,11 @@ import { createMinsungServer } from '../server.mjs';
 const html = readFileSync(new URL('../marble-builder/index.html', import.meta.url), 'utf8');
 const script = readFileSync(new URL('../marble-builder/game.js', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.url), 'utf8');
+const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=15/);
-    assert.match(html, /styles\.css\?v=13/);
+    assert.match(html, /game\.js\?v=16/);
+    assert.match(html, /styles\.css\?v=14/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
@@ -22,8 +23,8 @@ test('marble builder exposes spawn controls, draggable roads, and a basket goal'
     assert.doesNotMatch(html, /다시 굴리기/);
     assert.match(script, /const BLOCK_CATALOG = \[/);
     assert.match(script, /type: 'wood'/);
-    assert.match(script, /type: 'rubber'/);
-    assert.match(script, /type: 'steel'/);
+    const catalog = script.match(/const BLOCK_CATALOG = \[([\s\S]*?)\n  \];/)?.[1] || '';
+    assert.doesNotMatch(catalog, /type: 'rubber'|type: 'steel'/);
     assert.match(script, /type: 'goal'/);
     assert.match(script, /label: '골인 바구니'/);
     assert.match(script, /function beginPlacement/);
@@ -184,9 +185,12 @@ test('marble builder supports creations, follow camera, mandatory sound, special
     assert.match(script, /followBall && ball/);
     assert.match(script, /type: 'slime'/);
     assert.match(script, /reboundSpeed\(fallDistanceMeters, 2 \/ 3\)/);
-    assert.match(script, /reboundSpeed\(fallDistanceMeters, 4 \/ 3\)/);
-    assert.match(script, /normalSpeed <= -1\.2/);
-    assert.match(script, /Math\.max\(8\.5, Math\.abs\(along\) \+ 3\.5\)/);
+    assert.match(script, /const ELECTRIC_ATTACH_ANGLE = Math\.PI \/ 6/);
+    assert.match(script, /const ELECTRIC_SPEED_MULTIPLIER = 4 \/ 3/);
+    assert.match(script, /angleFromSurface <= ELECTRIC_ATTACH_ANGLE/);
+    assert.match(script, /incomingVx - 2 \* dot \* nx/);
+    assert.match(script, /function updateElectricRide/);
+    assert.match(script, /ride\.speed = Math\.min\(ELECTRIC_MAX_SPEED/);
     assert.match(script, /rect\.source\.electricPulse = 0\.45/);
     assert.match(script, /rod\.electricPulse > 0/);
     assert.match(script, /ball\.fallPeakY = ball\.y/);
@@ -200,14 +204,17 @@ test('marble builder supports creations, follow camera, mandatory sound, special
     assert.match(script, /tone\.type = 'sine'/);
     assert.doesNotMatch(script, /rollingAudio\.osc\.type|osc\.type = slime \? 'sine'/);
     assert.match(styles, /\.tool-icon\.road[^}]*border-radius: 0/);
-    assert.match(script, /ctx\.rect\(-rod\.length \/ 2/);
+    assert.match(script, /function drawPlatformAsset/);
+    assert.match(script, /platformImages\[rod\.type\]/);
+    assert.match(script, /audioCompressor = audioContext\.createDynamicsCompressor/);
+    assert.match(script, /audio\.currentTime - rollingAudio\.lastContactAt > \.12/);
 });
 
 test('basket overlap is rejected for new and moved blocks', () => {
     assert.match(script, /function rodOverlapsAnyGoal/);
     assert.match(script, /function goalOverlapsAnyRod/);
     assert.match(script, /골인 바구니와 블록은 겹칠 수 없습니다/);
-    assert.match(script, /Object\.assign\(editDrag\.entity, editDrag\.original\)/);
+    assert.match(script, /restoreWorld\(editDrag\.beforeSnapshot\)/);
 });
 
 test('basket has no decorative inner lines and uses exact wall collision geometry', () => {
@@ -217,6 +224,36 @@ test('basket has no decorative inner lines and uses exact wall collision geometr
     assert.match(script, /function basketRects/);
     assert.match(script, /const t = goal\.thickness \+ 4/);
     assert.match(script, /ball\.radius - \(rect\.collisionInset \|\| 0\)/);
+    assert.match(script, /basketRects\(goal\)\.forEach\(rect =>/);
+});
+
+test('marble builder registers and uses the named flat material assets', () => {
+    assert.deepEqual(assetManifest.assets.map(asset => asset.name), ['나무', '슬라임', '전기']);
+    for (const asset of assetManifest.assets) {
+        assert.equal(asset.alpha, true);
+        assert.match(asset.runtime, /^platforms\/(wood|slime|electric)\.png$/);
+    }
+    assert.match(html, /assets\/marble-builder\/platforms\/wood\.png/);
+    assert.match(html, /assets\/marble-builder\/platforms\/slime\.png/);
+    assert.match(html, /assets\/marble-builder\/platforms\/electric\.png/);
+    assert.match(styles, /url\('\/assets\/marble-builder\/platforms\/wood\.png'\)/);
+    assert.match(script, /const PLATFORM_ASSET_URLS = \{/);
+});
+
+test('electric platforms support corner joints, group editing, and persistent attached tracks', () => {
+    assert.match(html, /id="combineElectricButton"[^>]*>결합</);
+    assert.match(html, /id="detachElectricButton"[^>]*>해제</);
+    assert.match(html, /id="convertElectricButton"[^>]*>변환</);
+    assert.match(script, /const ELECTRIC_MIN_JOINT_ANGLE = Math\.PI \/ 2/);
+    assert.match(script, /function combineSelectedElectric/);
+    assert.match(script, /function detachSelectedElectricLink/);
+    assert.match(script, /function convertSelectedElectricLink/);
+    assert.match(script, /function moveElectricJoint/);
+    assert.match(script, /function connectedRodUids/);
+    assert.match(script, /electricLinks: clone\(electricLinks\)/);
+    assert.match(script, /ball\.electricRide = \{/);
+    assert.match(script, /ride\.direction = nextEndpoint\.end === 'start' \? 1 : -1/);
+    assert.match(script, /drawElectricJoints\(\)/);
 });
 
 test('serves the marble builder short route publicly', async () => {
