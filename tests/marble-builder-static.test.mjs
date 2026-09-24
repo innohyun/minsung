@@ -8,8 +8,8 @@ const script = readFileSync(new URL('../marble-builder/game.js', import.meta.url
 const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.url), 'utf8');
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=13/);
-    assert.match(html, /styles\.css\?v=12/);
+    assert.match(html, /game\.js\?v=15/);
+    assert.match(html, /styles\.css\?v=13/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
@@ -174,6 +174,7 @@ test('marble builder supports creations, follow camera, mandatory sound, special
     assert.doesNotMatch(html, /id="soundButton"/);
     assert.match(html, /id="undoButton"/);
     assert.match(html, /id="redoButton"/);
+    assert.match(html, /class="dock-side"[\s\S]*id="undoButton"[\s\S]*id="redoButton"/);
     assert.match(script, /const CREATIONS_STORAGE_KEY = 'marble-builder-creations-v1'/);
     assert.match(script, /function saveCreation/);
     assert.match(script, /function undoLastAction/);
@@ -184,11 +185,20 @@ test('marble builder supports creations, follow camera, mandatory sound, special
     assert.match(script, /type: 'slime'/);
     assert.match(script, /reboundSpeed\(fallDistanceMeters, 2 \/ 3\)/);
     assert.match(script, /reboundSpeed\(fallDistanceMeters, 4 \/ 3\)/);
+    assert.match(script, /normalSpeed <= -1\.2/);
+    assert.match(script, /Math\.max\(8\.5, Math\.abs\(along\) \+ 3\.5\)/);
+    assert.match(script, /rect\.source\.electricPulse = 0\.45/);
+    assert.match(script, /rod\.electricPulse > 0/);
     assert.match(script, /ball\.fallPeakY = ball\.y/);
     assert.match(script, /type: 'electric'/);
     assert.match(script, /type: 'antigravity'/);
     assert.match(script, /function playImpactSound/);
     assert.match(script, /function updateRollingSound/);
+    assert.match(script, /function makeSoftNoiseBuffer/);
+    assert.match(script, /knockFilter\.type = 'lowpass'/);
+    assert.match(script, /body\.type = 'sine'/);
+    assert.match(script, /tone\.type = 'sine'/);
+    assert.doesNotMatch(script, /rollingAudio\.osc\.type|osc\.type = slime \? 'sine'/);
     assert.match(styles, /\.tool-icon\.road[^}]*border-radius: 0/);
     assert.match(script, /ctx\.rect\(-rod\.length \/ 2/);
 });
@@ -205,6 +215,7 @@ test('basket has no decorative inner lines and uses exact wall collision geometr
     assert.doesNotMatch(script, /for \(let x = left \+ 24/);
     assert.doesNotMatch(script, /const collisionInset = 3/);
     assert.match(script, /function basketRects/);
+    assert.match(script, /const t = goal\.thickness \+ 4/);
     assert.match(script, /ball\.radius - \(rect\.collisionInset \|\| 0\)/);
 });
 

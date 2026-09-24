@@ -155,6 +155,7 @@
   let followBall = false;
   let audioContext = null;
   let rollingAudio = null;
+  let rollingNoiseBuffer = null;
   let lastImpactSoundAt = 0;
   const undoStack = [];
   const redoStack = [];
@@ -399,43 +400,120 @@
     return audioContext;
   }
 
+  function makeSoftNoiseBuffer(audio, duration, smoothing = 0.88) {
+    const frameCount = Math.ceil(audio.sampleRate * duration);
+    const buffer = audio.createBuffer(1, frameCount, audio.sampleRate);
+    const channel = buffer.getChannelData(0);
+    let previous = 0;
+    for (let index = 0; index < frameCount; index += 1) {
+      const raw = Math.random() * 2 - 1;
+      previous = previous * smoothing + raw * (1 - smoothing);
+      channel[index] = previous;
+    }
+    return buffer;
+  }
+
   function playImpactSound(type, speed) {
     const audio = ensureAudio();
     const now = performance.now();
     if (!audio || now - lastImpactSoundAt < 70 || speed < 0.35) return;
     lastImpactSoundAt = now;
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
     const slime = type === 'slime';
-    const electric = type === 'electric';
-    osc.type = slime ? 'sine' : electric ? 'square' : type === 'steel' ? 'triangle' : 'square';
-    osc.frequency.setValueAtTime(slime ? 115 : electric ? 980 : type === 'steel' ? 720 : type === 'rubber' ? 170 : 310, audio.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(slime ? 72 : electric ? 220 : 120, audio.currentTime + (slime ? .16 : electric ? .13 : .055));
-    gain.gain.setValueAtTime(Math.min(.16, .025 + speed * .018), audio.currentTime);
-    gain.gain.exponentialRampToValueAtTime(.0001, audio.currentTime + (slime ? .18 : .07));
-    osc.connect(gain).connect(audio.destination);
-    osc.start();
-    osc.stop(audio.currentTime + (slime ? .19 : .08));
+    const start = audio.currentTime;
+    const volume = Math.min(.13, .022 + speed * .013);
+
+    if (slime) {
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(115, start);
+      osc.frequency.exponentialRampToValueAtTime(72, start + .16);
+      gain.gain.setValueAtTime(volume, start);
+      gain.gain.exponentialRampToValueAtTime(.0001, start + .18);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(start);
+      osc.stop(start + .19);
+      return;
+    }
+
+    const master = audio.createGain();
+    master.gain.setValueAtTime(.0001, start);
+    master.gain.linearRampToValueAtTime(volume, start + .008);
+    master.gain.exponentialRampToValueAtTime(.0001, start + .2);
+    master.connect(audio.destination);
+
+    const body = audio.createOscillator();
+    const bodyGain = audio.createGain();
+    body.type = 'sine';
+    body.frequency.setValueAtTime(138, start);
+    body.frequency.exponentialRampToValueAtTime(76, start + .18);
+    bodyGain.gain.setValueAtTime(.82, start);
+    bodyGain.gain.exponentialRampToValueAtTime(.0001, start + .2);
+    body.connect(bodyGain).connect(master);
+    body.start(start);
+    body.stop(start + .21);
+
+    const hollow = audio.createOscillator();
+    const hollowGain = audio.createGain();
+    hollow.type = 'sine';
+    hollow.frequency.setValueAtTime(82, start);
+    hollow.frequency.exponentialRampToValueAtTime(58, start + .16);
+    hollowGain.gain.setValueAtTime(.42, start);
+    hollowGain.gain.exponentialRampToValueAtTime(.0001, start + .18);
+    hollow.connect(hollowGain).connect(master);
+    hollow.start(start);
+    hollow.stop(start + .19);
+
+    const knock = audio.createBufferSource();
+    const knockFilter = audio.createBiquadFilter();
+    const knockGain = audio.createGain();
+    knock.buffer = makeSoftNoiseBuffer(audio, .11, .9);
+    knockFilter.type = 'lowpass';
+    knockFilter.frequency.value = 420;
+    knockFilter.Q.value = .55;
+    knockGain.gain.setValueAtTime(.7, start);
+    knockGain.gain.exponentialRampToValueAtTime(.0001, start + .095);
+    knock.connect(knockFilter).connect(knockGain).connect(master);
+    knock.start(start);
+    knock.stop(start + .11);
   }
 
   function updateRollingSound(type, speed) {
-    const audio = ensureAudio();
+    const audio = audioContext;
     if (!audio || speed < .08) {
       if (rollingAudio) rollingAudio.gain.gain.setTargetAtTime(.0001, audioContext.currentTime, .04);
       return;
     }
     if (!rollingAudio) {
-      const osc = audio.createOscillator();
+      rollingNoiseBuffer ||= makeSoftNoiseBuffer(audio, 1.8, .94);
+      const noise = audio.createBufferSource();
+      const filter = audio.createBiquadFilter();
+      const tone = audio.createOscillator();
+      const toneGain = audio.createGain();
       const gain = audio.createGain();
-      osc.type = 'sawtooth';
+      noise.buffer = rollingNoiseBuffer;
+      noise.loop = true;
+      filter.type = 'lowpass';
+      filter.frequency.value = 360;
+      filter.Q.value = .5;
+      tone.type = 'sine';
+      tone.frequency.value = 84;
+      toneGain.gain.value = .16;
       gain.gain.value = .0001;
-      osc.connect(gain).connect(audio.destination);
-      osc.start();
-      rollingAudio = { osc, gain };
+      noise.connect(filter).connect(gain);
+      tone.connect(toneGain).connect(gain);
+      gain.connect(audio.destination);
+      noise.start();
+      tone.start();
+      rollingAudio = { noise, filter, tone, toneGain, gain };
     }
-    rollingAudio.osc.type = type === 'slime' ? 'sine' : type === 'electric' ? 'square' : 'sawtooth';
-    rollingAudio.osc.frequency.setTargetAtTime((type === 'slime' ? 48 : type === 'electric' ? 150 : 72) + Math.min(100, speed * 18), audio.currentTime, .03);
-    rollingAudio.gain.gain.setTargetAtTime(Math.min(type === 'slime' ? .055 : .035, speed * .012), audio.currentTime, .04);
+    const slime = type === 'slime';
+    const rollPitch = (slime ? 58 : 82) + Math.min(150, speed * 11);
+    const filterPitch = (slime ? 220 : 320) + Math.min(480, speed * 30);
+    rollingAudio.tone.frequency.setTargetAtTime(rollPitch, audio.currentTime, .055);
+    rollingAudio.filter.frequency.setTargetAtTime(filterPitch, audio.currentTime, .065);
+    rollingAudio.toneGain.gain.setTargetAtTime(slime ? .08 : .15, audio.currentTime, .06);
+    rollingAudio.gain.gain.setTargetAtTime(Math.min(slime ? .026 : .032, .004 + speed * .0038), audio.currentTime, .06);
   }
 
   function spawnContactParticles(x, y, type, strength = 1) {
@@ -462,6 +540,9 @@
       particle.x += particle.vx * dt;
       particle.y += particle.vy * dt;
     }
+    rods.forEach(rod => {
+      rod.electricPulse = Math.max(0, (rod.electricPulse || 0) - dt);
+    });
   }
 
   function clamp(value, min, max) {
@@ -608,16 +689,26 @@
   }
 
   function beginToolSizing(type) {
-    sizingMode = { type, pointerId: null, start: null, preview: null };
+    placement = null;
+    editDrag = null;
+    cameraDrag = null;
+    pinchGesture = null;
+    activePointers.clear();
+    const settings = toolSettings[type];
+    const width = type === 'antigravity' ? settings.width : settings.length;
+    const height = type === 'antigravity' ? settings.height : settings.thickness;
+    const center = screenToWorld({ x: view.width / 2, y: (view.playTop + view.dockTop) / 2 });
+    sizingMode = { type, pointerId: null, start: null, preview: { x: center.x, y: center.y, width, height } };
     sizeEditorTitle.textContent = `${BLOCK_CATALOG.find(item => item.type === type)?.label || type} 크기 설정`;
     sizeEditorPanel.hidden = false;
     topPanel.hidden = true;
     toolDock.hidden = true;
     hint.hidden = true;
-    confirmSizeButton.disabled = true;
+    confirmSizeButton.disabled = false;
   }
 
   function finishToolSizing(apply) {
+    let appliedLabel = null;
     if (apply && sizingMode?.preview) {
       pushUndo();
       const preview = sizingMode.preview;
@@ -627,15 +718,19 @@
         toolSettings[sizingMode.type] = { length: preview.width, thickness: preview.height };
       }
       rememberTool(sizingMode.type, false);
-      renderToolDock();
-      setHint('설정한 크기를 다음 블록 배치에 적용합니다.');
+      appliedLabel = BLOCK_CATALOG.find(item => item.type === sizingMode.type)?.label || sizingMode.type;
     }
     sizingMode = null;
+    placement = null;
+    activePointers.clear();
     sizeEditorPanel.hidden = true;
     topPanel.hidden = false;
     toolDock.hidden = false;
     hint.hidden = false;
+    renderToolDock();
+    resize();
     requestAnimationFrame(resize);
+    if (appliedLabel) setHint(`${appliedLabel} 크기를 저장했습니다. 이제 블록 창에서 끌어 설치하세요.`);
   }
 
   function setAppMode(mode) {
@@ -1419,7 +1514,7 @@
     };
     selected = null;
     updateDeleteButton();
-    card.setPointerCapture?.(event.pointerId);
+    try { card.setPointerCapture?.(event.pointerId); } catch { /* cancelled or synthetic pointer */ }
     event.preventDefault();
     if (placement.dragging) setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
   }
@@ -1428,8 +1523,11 @@
     if (!placement || placement.pointerId !== event.pointerId) return;
     const dx = event.clientX - placement.startX;
     const dy = event.clientY - placement.startY;
-    if (placement.mode === 'pending' && Math.hypot(dx, dy) >= 9) {
-      placement.mode = Math.abs(dx) > Math.abs(dy) ? 'scroll' : 'drag';
+    if (placement.mode === 'pending' && Math.hypot(dx, dy) >= 10) {
+      const clearlyDraggingUp = dy < -8;
+      const clearlyScrolling = Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy) * 1.35;
+      if (!clearlyDraggingUp && !clearlyScrolling) return;
+      placement.mode = clearlyDraggingUp ? 'drag' : 'scroll';
       placement.dragging = placement.mode === 'drag';
       if (placement.dragging) setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
     }
@@ -1471,7 +1569,7 @@
   }
 
   function basketRects(goal) {
-    const t = goal.thickness;
+    const t = goal.thickness + 4;
     return [
       { x: goal.x, y: goal.y - t / 2, width: goal.width, height: t, angle: 0, material: MATERIALS.basket },
       { x: goal.x - goal.width / 2 + t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, material: MATERIALS.basket },
@@ -1539,73 +1637,71 @@
     const ry = -ny * radiusM;
     const contactVx = ball.vx - ball.omega * ry;
     const contactVy = ball.vy + ball.omega * rx;
-    const normalSpeed = contactVx * nx + contactVy * ny;
-    if ((rect.material.slime || rect.material.electric) && ny < -0.25) {
-      specialContactsThisStep.add(`${rect.material.slime ? 'slime' : 'electric'}:${rect.blockId}`);
-    }
-    if (normalSpeed >= 0) return true;
-    playImpactSound(rect.blockType || 'wood', Math.abs(normalSpeed));
-
-    const inverseMass = 1 / ball.mass;
-    const inverseInertia = 1 / BALL_INERTIA;
-    const crossN = rx * ny - ry * nx;
-    const restitution = getImpactRestitution(rect.material, normalSpeed);
-    const normalImpulse = -(1 + restitution) * normalSpeed
-      / (inverseMass + crossN * crossN * inverseInertia);
-    const normalIx = nx * normalImpulse;
-    const normalIy = ny * normalImpulse;
-    ball.vx += normalIx * inverseMass;
-    ball.vy += normalIy * inverseMass;
-    ball.omega += (rx * normalIy - ry * normalIx) * inverseInertia;
-
-    const tx = -ny;
-    const ty = nx;
-    const tangentVx = ball.vx - ball.omega * ry;
-    const tangentVy = ball.vy + ball.omega * rx;
-    const tangentSpeed = tangentVx * tx + tangentVy * ty;
-    const crossT = rx * ty - ry * tx;
-    let tangentImpulse = -tangentSpeed
-      / (inverseMass + crossT * crossT * inverseInertia);
-    const maxFriction = rect.material.friction * normalImpulse;
-    tangentImpulse = clamp(tangentImpulse, -maxFriction, maxFriction);
-    const tangentIx = tx * tangentImpulse;
-    const tangentIy = ty * tangentImpulse;
-    ball.vx += tangentIx * inverseMass;
-    ball.vy += tangentIy * inverseMass;
-    ball.omega += (rx * tangentIy - ry * tangentIx) * inverseInertia;
     const specialType = rect.material.slime ? 'slime' : rect.material.electric ? 'electric' : null;
-    if (specialType && ny < -0.25) {
-      const contactKey = `${specialType}:${rect.blockId}`;
-      specialContactsThisStep.add(contactKey);
-      const isFreshContact = !ball.specialContacts.includes(contactKey);
-      if (isFreshContact) {
-        const fallDistanceMeters = Math.max(0, (ball.y - (ball.fallPeakY ?? ball.y)) / PIXELS_PER_METER);
-        if (specialType === 'slime' && fallDistanceMeters >= 0.025) {
-          const targetNormalSpeed = reboundSpeed(fallDistanceMeters, 2 / 3);
+    const contactKey = specialType && ny < -0.25 ? `${specialType}:${rect.blockId}` : null;
+    const isFreshContact = Boolean(contactKey && !ball.specialContacts.includes(contactKey));
+    if (contactKey) specialContactsThisStep.add(contactKey);
+
+    const normalSpeed = contactVx * nx + contactVy * ny;
+    if (normalSpeed < 0) {
+      playImpactSound(rect.blockType || 'wood', Math.abs(normalSpeed));
+      const inverseMass = 1 / ball.mass;
+      const inverseInertia = 1 / BALL_INERTIA;
+      const crossN = rx * ny - ry * nx;
+      const restitution = getImpactRestitution(rect.material, normalSpeed);
+      const normalImpulse = -(1 + restitution) * normalSpeed
+        / (inverseMass + crossN * crossN * inverseInertia);
+      const normalIx = nx * normalImpulse;
+      const normalIy = ny * normalImpulse;
+      ball.vx += normalIx * inverseMass;
+      ball.vy += normalIy * inverseMass;
+      ball.omega += (rx * normalIy - ry * normalIx) * inverseInertia;
+
+      const tx = -ny;
+      const ty = nx;
+      const tangentVx = ball.vx - ball.omega * ry;
+      const tangentVy = ball.vy + ball.omega * rx;
+      const tangentSpeed = tangentVx * tx + tangentVy * ty;
+      const crossT = rx * ty - ry * tx;
+      let tangentImpulse = -tangentSpeed / (inverseMass + crossT * crossT * inverseInertia);
+      const maxFriction = rect.material.friction * normalImpulse;
+      tangentImpulse = clamp(tangentImpulse, -maxFriction, maxFriction);
+      const tangentIx = tx * tangentImpulse;
+      const tangentIy = ty * tangentImpulse;
+      ball.vx += tangentIx * inverseMass;
+      ball.vy += tangentIy * inverseMass;
+      ball.omega += (rx * tangentIy - ry * tangentIx) * inverseInertia;
+    }
+
+    if (contactKey && isFreshContact) {
+      const fallDistanceMeters = Math.max(0, (ball.y - (ball.fallPeakY ?? ball.y)) / PIXELS_PER_METER);
+      if (specialType === 'slime' && normalSpeed < 0 && fallDistanceMeters >= 0.025) {
+        const targetNormalSpeed = reboundSpeed(fallDistanceMeters, 2 / 3);
+        const outgoingNormalSpeed = ball.vx * nx + ball.vy * ny;
+        const boost = Math.max(0, targetNormalSpeed - outgoingNormalSpeed);
+        ball.vx += nx * boost;
+        ball.vy += ny * boost;
+        ball.fallPeakY = ball.y;
+        spawnContactParticles(ball.x - nx * ball.radius, ball.y - ny * ball.radius, 'slime', Math.abs(normalSpeed));
+      } else if (specialType === 'electric') {
+        if (fallDistanceMeters >= 0.08 && normalSpeed <= -1.2) {
+          const targetNormalSpeed = reboundSpeed(fallDistanceMeters, 4 / 3);
           const outgoingNormalSpeed = ball.vx * nx + ball.vy * ny;
           const boost = Math.max(0, targetNormalSpeed - outgoingNormalSpeed);
           ball.vx += nx * boost;
           ball.vy += ny * boost;
           ball.fallPeakY = ball.y;
-          spawnContactParticles(ball.x - nx * ball.radius, ball.y - ny * ball.radius, 'slime', Math.abs(normalSpeed));
-        } else if (specialType === 'electric') {
-          if (fallDistanceMeters >= 0.25 && Math.abs(normalSpeed) >= 1) {
-            const targetNormalSpeed = reboundSpeed(fallDistanceMeters, 4 / 3);
-            const outgoingNormalSpeed = ball.vx * nx + ball.vy * ny;
-            const boost = Math.max(0, targetNormalSpeed - outgoingNormalSpeed);
-            ball.vx += nx * boost;
-            ball.vy += ny * boost;
-            ball.fallPeakY = ball.y;
-          } else {
-            const tx = -ny;
-            const ty = nx;
-            const along = ball.vx * tx + ball.vy * ty;
-            const direction = Math.abs(along) > .15 ? Math.sign(along) : 1;
-            ball.vx += tx * (direction * 7 - along);
-            ball.vy += ty * (direction * 7 - along) + ny * .8;
-          }
-          spawnContactParticles(ball.x - nx * ball.radius, ball.y - ny * ball.radius, 'electric', Math.abs(normalSpeed) + 2);
+        } else {
+          const tx = -ny;
+          const ty = nx;
+          const along = ball.vx * tx + ball.vy * ty;
+          const direction = Math.abs(along) > .15 ? Math.sign(along) : 1;
+          const targetSpeed = direction * Math.max(8.5, Math.abs(along) + 3.5);
+          ball.vx += tx * (targetSpeed - along);
+          ball.vy += ty * (targetSpeed - along) + ny * 1.35;
         }
+        if (rect.source) rect.source.electricPulse = 0.45;
+        spawnContactParticles(ball.x - nx * ball.radius, ball.y - ny * ball.radius, 'electric', Math.abs(normalSpeed) + 2);
       }
     }
     return true;
@@ -1674,7 +1770,8 @@
         angle: rod.angle,
         material: MATERIALS[rod.type],
         blockType: rod.type,
-        blockId: rod.id
+        blockId: rod.id,
+        source: rod
       });
       if (touched) {
         rod.touched = true;
@@ -1824,6 +1921,27 @@
         ctx.lineTo(x + 10, 3);
       }
       ctx.stroke();
+      if (rod.electricPulse > 0) {
+        const pulse = clamp(rod.electricPulse / 0.45, 0, 1);
+        ctx.globalAlpha = alpha * pulse;
+        ctx.shadowColor = '#73efff';
+        ctx.shadowBlur = 22;
+        ctx.strokeStyle = '#eaffff';
+        ctx.lineWidth = 4;
+        ctx.strokeRect(-rod.length / 2 - 5, -rod.thickness / 2 - 5, rod.length + 10, rod.thickness + 10);
+        ctx.lineWidth = 2.5;
+        for (let bolt = -1; bolt <= 1; bolt += 1) {
+          const centerX = bolt * rod.length * 0.28;
+          ctx.beginPath();
+          ctx.moveTo(centerX - 11, -rod.thickness / 2 - 8);
+          ctx.lineTo(centerX - 3, -rod.thickness / 2 - 18 - pulse * 8);
+          ctx.lineTo(centerX + 2, -rod.thickness / 2 - 10);
+          ctx.lineTo(centerX + 12, -rod.thickness / 2 - 23 - pulse * 5);
+          ctx.stroke();
+        }
+        ctx.shadowColor = 'transparent';
+        ctx.globalAlpha = alpha;
+      }
     }
     if (appMode === 'stage' && rod.touched) {
       ctx.fillStyle = '#2fa66f';
@@ -2195,10 +2313,12 @@
     getState: () => ({
       rodCount: rods.length,
       goalCount: goals.length,
+      fieldCount: fields.length,
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
-      rods: rods.map(rod => ({ id: rod.id, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, thickness: rod.thickness, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId })),
+      rods: rods.map(rod => ({ id: rod.id, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId })),
       goals: goals.map(goal => ({ id: goal.id, x: goal.x, y: goal.y })),
+      fields: fields.map(field => ({ id: field.id, x: field.x, y: field.y, width: field.width, height: field.height, direction: field.direction })),
       supplies: clone(stageSupplies),
       recentTools: [...recentTools],
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, omega: ball.omega, fallPeakY: ball.fallPeakY } : null,
@@ -2240,6 +2360,14 @@
     saveCreation,
     physicsStep,
     reboundSpeed,
+    playImpactSound,
+    updateRollingSound,
+    getAudioState: () => ({
+      contextState: audioContext?.state || 'none',
+      rollingActive: Boolean(rollingAudio),
+      rollingToneType: rollingAudio?.tone.type || null,
+      rollingFilterType: rollingAudio?.filter.type || null
+    }),
     openBlockCatalog,
     rodOverlapsAnyGoal,
     goalOverlapsAnyRod,
