@@ -9,7 +9,7 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=16/);
+    assert.match(html, /game\.js\?v=17/);
     assert.match(html, /styles\.css\?v=14/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
@@ -221,10 +221,13 @@ test('basket has no decorative inner lines and uses exact wall collision geometr
     assert.doesNotMatch(styles, /tool-icon\.basket::before/);
     assert.doesNotMatch(script, /for \(let x = left \+ 24/);
     assert.doesNotMatch(script, /const collisionInset = 3/);
-    assert.match(script, /function basketRects/);
-    assert.match(script, /const t = goal\.thickness \+ 4/);
-    assert.match(script, /ball\.radius - \(rect\.collisionInset \|\| 0\)/);
-    assert.match(script, /basketRects\(goal\)\.forEach\(rect =>/);
+    assert.match(script, /function basketSegments/);
+    assert.match(script, /const thickness = goal\.thickness \+ 4/);
+    assert.match(script, /function resolveBallBasketSegment/);
+    assert.match(script, /const collisionDistance = ball\.radius \+ segment\.thickness \/ 2/);
+    assert.match(script, /goals\.forEach\(goal => basketSegments\(goal\)\.forEach\(resolveBallBasketSegment\)\)/);
+    assert.match(script, /ctx\.lineCap = 'round'/);
+    assert.match(script, /function pointInsideBasket/);
 });
 
 test('marble builder registers and uses the named flat material assets', () => {

@@ -1182,7 +1182,7 @@
 
   function rodOverlapsGoal(rod, goal) {
     const rodPolygon = orientedRectCorners({ x: rod.x, y: rod.y, width: rod.length, height: rod.thickness, angle: rod.angle });
-    return basketRects(goal).some(wall => polygonsOverlap(rodPolygon, orientedRectCorners(wall)));
+    return basketSegments(goal).some(wall => polygonsOverlap(rodPolygon, orientedRectCorners(basketSegmentBounds(wall))));
   }
 
   function rodOverlapsAnyGoal(rod) {
@@ -1917,13 +1917,37 @@
     event.preventDefault();
   }
 
-  function basketRects(goal) {
-    const t = goal.thickness + 4;
+  function basketSegments(goal) {
+    const thickness = goal.thickness + 4;
+    const radius = thickness / 2;
+    const left = goal.x - goal.width / 2;
+    const right = goal.x + goal.width / 2;
+    const top = goal.y - goal.height;
+    const bottom = goal.y;
     return [
-      { x: goal.x, y: goal.y - t / 2, width: goal.width, height: t, angle: 0, material: MATERIALS.basket },
-      { x: goal.x - goal.width / 2 + t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, material: MATERIALS.basket },
-      { x: goal.x + goal.width / 2 - t / 2, y: goal.y - goal.height / 2, width: t, height: goal.height, angle: 0, material: MATERIALS.basket }
+      { x1: left + radius, y1: top + radius, x2: left + radius, y2: bottom - radius, thickness, material: MATERIALS.basket, name: 'left' },
+      { x1: right - radius, y1: top + radius, x2: right - radius, y2: bottom - radius, thickness, material: MATERIALS.basket, name: 'right' },
+      { x1: left + radius, y1: bottom - radius, x2: right - radius, y2: bottom - radius, thickness, material: MATERIALS.basket, name: 'bottom' }
     ];
+  }
+
+  function basketSegmentBounds(segment) {
+    return {
+      x: (segment.x1 + segment.x2) / 2,
+      y: (segment.y1 + segment.y2) / 2,
+      width: Math.abs(segment.x2 - segment.x1) + segment.thickness,
+      height: Math.abs(segment.y2 - segment.y1) + segment.thickness,
+      angle: 0
+    };
+  }
+
+  function pointInsideBasket(goal, point) {
+    const thickness = goal.thickness + 4;
+    const left = goal.x - goal.width / 2 + thickness;
+    const right = goal.x + goal.width / 2 - thickness;
+    const top = goal.y - goal.height;
+    const bottom = goal.y - thickness;
+    return point.x > left && point.x < right && point.y > top && point.y < bottom;
   }
 
   function getImpactRestitution(material, normalSpeed) {
@@ -2122,6 +2146,80 @@
     return true;
   }
 
+  function resolveBallBasketSegment(segment) {
+    if (!ball) return false;
+    const segmentX = segment.x2 - segment.x1;
+    const segmentY = segment.y2 - segment.y1;
+    const lengthSquared = segmentX * segmentX + segmentY * segmentY;
+    const along = lengthSquared > 0
+      ? clamp(((ball.x - segment.x1) * segmentX + (ball.y - segment.y1) * segmentY) / lengthSquared, 0, 1)
+      : 0;
+    const closestX = segment.x1 + segmentX * along;
+    const closestY = segment.y1 + segmentY * along;
+    let nx = ball.x - closestX;
+    let ny = ball.y - closestY;
+    let distance = Math.hypot(nx, ny);
+    const collisionDistance = ball.radius + segment.thickness / 2;
+    if (distance >= collisionDistance) return false;
+    if (distance < .0001) {
+      if (Math.abs(segmentX) >= Math.abs(segmentY)) {
+        nx = 0;
+        ny = ball.y <= closestY ? -1 : 1;
+      } else {
+        nx = ball.x <= closestX ? -1 : 1;
+        ny = 0;
+      }
+      distance = 0;
+    } else {
+      nx /= distance;
+      ny /= distance;
+    }
+
+    const penetration = collisionDistance - distance;
+    ball.x += nx * (penetration + .02);
+    ball.y += ny * (penetration + .02);
+    if (ny < -.15 && segment.material.rollingResistance) {
+      supportContacts.push({ nx, ny, resistance: segment.material.rollingResistance, type: 'basket' });
+    }
+
+    const radiusM = ball.radius / PIXELS_PER_METER;
+    const rx = -nx * radiusM;
+    const ry = -ny * radiusM;
+    const contactVx = ball.vx - ball.omega * ry;
+    const contactVy = ball.vy + ball.omega * rx;
+    const normalSpeed = contactVx * nx + contactVy * ny;
+    if (normalSpeed < 0) {
+      playImpactSound('wood', Math.abs(normalSpeed));
+      const inverseMass = 1 / ball.mass;
+      const inverseInertia = 1 / BALL_INERTIA;
+      const crossN = rx * ny - ry * nx;
+      const restitution = getImpactRestitution(segment.material, normalSpeed);
+      const normalImpulse = -(1 + restitution) * normalSpeed
+        / (inverseMass + crossN * crossN * inverseInertia);
+      const normalIx = nx * normalImpulse;
+      const normalIy = ny * normalImpulse;
+      ball.vx += normalIx * inverseMass;
+      ball.vy += normalIy * inverseMass;
+      ball.omega += (rx * normalIy - ry * normalIx) * inverseInertia;
+
+      const tx = -ny;
+      const ty = nx;
+      const tangentVx = ball.vx - ball.omega * ry;
+      const tangentVy = ball.vy + ball.omega * rx;
+      const tangentSpeed = tangentVx * tx + tangentVy * ty;
+      const crossT = rx * ty - ry * tx;
+      let tangentImpulse = -tangentSpeed / (inverseMass + crossT * crossT * inverseInertia);
+      const maxFriction = segment.material.friction * normalImpulse;
+      tangentImpulse = clamp(tangentImpulse, -maxFriction, maxFriction);
+      const tangentIx = tx * tangentImpulse;
+      const tangentIy = ty * tangentImpulse;
+      ball.vx += tangentIx * inverseMass;
+      ball.vy += tangentIy * inverseMass;
+      ball.omega += (rx * tangentIy - ry * tangentIx) * inverseInertia;
+    }
+    return true;
+  }
+
   function applyRollingResistance(dt) {
     if (!ball) return;
     let rollingType = null;
@@ -2194,18 +2292,11 @@
         touchedRodIds.add(rod.id);
       }
     });
-    goals.forEach(goal => basketRects(goal).forEach(resolveBallRect));
+    goals.forEach(goal => basketSegments(goal).forEach(resolveBallBasketSegment));
     applyRollingResistance(dt);
     ball.specialContacts = [...specialContactsThisStep];
 
-    const insideGoal = goals.some(goal => {
-      const wallThickness = goal.thickness + 4;
-      const innerHalf = goal.width / 2 - wallThickness - ball.radius * .2;
-      const insideX = Math.abs(ball.x - goal.x) < innerHalf;
-      const insideY = ball.y > goal.y - goal.height + ball.radius * .2
-        && ball.y < goal.y - wallThickness - ball.radius * .2;
-      return insideX && insideY;
-    });
+    const insideGoal = goals.some(goal => pointInsideBasket(goal, ball));
 
     const allRodsTouched = rods.length > 0 && rods.every(rod => touchedRodIds.has(rod.id));
     const allSuppliesUsed = stageSupplies.length === 0 || stageSupplies.every(item => item.used);
@@ -2375,15 +2466,26 @@
   }
 
   function drawBasket(goal, alpha = 1) {
+    const segments = basketSegments(goal);
+    const traceSegments = () => {
+      ctx.beginPath();
+      segments.forEach(segment => {
+        ctx.moveTo(segment.x1, segment.y1);
+        ctx.lineTo(segment.x2, segment.y2);
+      });
+    };
     ctx.save();
     ctx.globalAlpha = alpha;
-    basketRects(goal).forEach(rect => {
-      ctx.fillStyle = '#9a5e20';
-      ctx.fillRect(rect.x - rect.width / 2, rect.y - rect.height / 2, rect.width, rect.height);
-      const inset = Math.min(2, rect.width / 5, rect.height / 5);
-      ctx.fillStyle = '#df9d3f';
-      ctx.fillRect(rect.x - rect.width / 2 + inset, rect.y - rect.height / 2 + inset, rect.width - inset * 2, rect.height - inset * 2);
-    });
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    traceSegments();
+    ctx.strokeStyle = '#8b501c';
+    ctx.lineWidth = segments[0].thickness;
+    ctx.stroke();
+    traceSegments();
+    ctx.strokeStyle = '#d89235';
+    ctx.lineWidth = Math.max(3, segments[0].thickness - 4);
+    ctx.stroke();
     ctx.font = '800 11px "Avenir Next", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#88501d';
@@ -2844,6 +2946,9 @@
     rodOverlapsAnyGoal,
     goalOverlapsAnyRod,
     resolveBallRect,
+    basketSegments,
+    pointInsideBasket,
+    resolveBallBasketSegment,
     setBallPosition: (x, y) => {
       if (ball) {
         ball.x = x;
