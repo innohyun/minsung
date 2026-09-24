@@ -9,7 +9,7 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=17/);
+    assert.match(html, /game\.js\?v=19/);
     assert.match(html, /styles\.css\?v=14/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
@@ -239,8 +239,39 @@ test('marble builder registers and uses the named flat material assets', () => {
     assert.match(html, /assets\/marble-builder\/platforms\/wood\.png/);
     assert.match(html, /assets\/marble-builder\/platforms\/slime\.png/);
     assert.match(html, /assets\/marble-builder\/platforms\/electric\.png/);
-    assert.match(styles, /url\('\/assets\/marble-builder\/platforms\/wood\.png'\)/);
+    assert.match(styles, /url\('\/assets\/marble-builder\/platforms\/wood\.png\?v=2'\)/);
     assert.match(script, /const PLATFORM_ASSET_URLS = \{/);
+    assert.match(script, /const PLATFORM_SOURCE_INSETS = \{/);
+    assert.match(script, /const MATERIAL_REPEAT_LAYOUT = \{/);
+    assert.match(script, /function drawRepeatedMaterial/);
+    assert.match(script, /mirrorAlternateRows: true/);
+    assert.match(script, /layout\.mirrorAlternateRows && row % 2 === 1/);
+    assert.match(script, /ctx\.scale\(-1, 1\)/);
+    assert.match(script, /for \(let x = left; x < right; x \+= layout\.tileWidth\)/);
+    assert.doesNotMatch(script, /function drawIrregularMaterialPattern/);
+    assert.doesNotMatch(script, /drawLargeMaterialAtlas/);
+    assert.doesNotMatch(html, /-atlas\.png/);
+    assert.match(script, /ctx\.fillRect\(-rod\.length \/ 2, -rod\.thickness \/ 2, rod\.length, rod\.thickness\)/);
+});
+
+test('block sizing preserves wood and slime texture proportions and locks electric thickness', () => {
+    assert.match(script, /const ELECTRIC_PLATFORM_THICKNESS = 20/);
+    assert.match(script, /sizingMode\.type === 'electric'[\s\S]*ELECTRIC_PLATFORM_THICKNESS/);
+    assert.match(script, /toolSettings\.electric = \{ length: preview\.width, thickness: ELECTRIC_PLATFORM_THICKNESS \}/);
+    assert.match(script, /function normalizedRodThickness/);
+    assert.match(script, /normalizeRodType\(type\) === 'electric'/);
+});
+
+test('rotated special platforms use their local top face and loud limited audio', () => {
+    assert.match(script, /nyLocal < -0\.25/);
+    assert.doesNotMatch(script, /specialType && ny < -0\.25/);
+    assert.match(script, /specialType === 'slime' \|\| \(specialType === 'electric' && nyLocal < -0\.25\)/);
+    assert.match(script, /const fallHeightRebound = ny < -0\.5 && incomingVy > 0/);
+    assert.match(script, /incomingNormalSpeed \* Math\.sqrt\(2 \/ 3\)/);
+    assert.match(script, /audioLimiter = audioContext\.createDynamicsCompressor/);
+    assert.match(script, /audioMaster\.gain\.value = 1\.6/);
+    assert.match(script, /const volume = Math\.min\(\.44, \.085 \+ speed \* \.035\)/);
+    assert.match(script, /const maximumVolume = slime \? \.12 : electric \? \.17 : \.15/);
 });
 
 test('electric platforms support corner joints, group editing, and persistent attached tracks', () => {

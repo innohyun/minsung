@@ -62,6 +62,7 @@
   const directionButtons = Array.from(document.querySelectorAll('[data-gravity-direction]'));
   const sizeEditorPanel = document.getElementById('sizeEditorPanel');
   const sizeEditorTitle = document.getElementById('sizeEditorTitle');
+  const sizeEditorHelp = sizeEditorPanel.querySelector('span');
   const cancelSizeButton = document.getElementById('cancelSizeButton');
   const confirmSizeButton = document.getElementById('confirmSizeButton');
 
@@ -75,6 +76,7 @@
   const MIN_ZOOM = 0.25;
   const MAX_ZOOM = 1;
   const DEFAULT_ROD_LENGTH = 180;
+  const ELECTRIC_PLATFORM_THICKNESS = 20;
   const GOAL_SUCCESS_DELAY = 1;
   const ELECTRIC_ATTACH_ANGLE = Math.PI / 6;
   const ELECTRIC_SPEED_MULTIPLIER = 4 / 3;
@@ -164,6 +166,7 @@
   let audioContext = null;
   let audioMaster = null;
   let audioCompressor = null;
+  let audioLimiter = null;
   let rollingAudio = null;
   let rollingNoiseBuffer = null;
   let lastImpactSoundAt = 0;
@@ -177,20 +180,22 @@
     wood: { length: 180, thickness: 14 },
 
     slime: { length: 180, thickness: 18 },
-    electric: { length: 180, thickness: 20 },
+    electric: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     antigravity: { width: 220, height: 160, direction: 'up' }
   };
   const PLATFORM_ASSET_URLS = {
-    wood: '/assets/marble-builder/platforms/wood.png',
-    slime: '/assets/marble-builder/platforms/slime.png',
+    wood: '/assets/marble-builder/platforms/wood.png?v=2',
+    slime: '/assets/marble-builder/platforms/slime.png?v=2',
     electric: '/assets/marble-builder/platforms/electric.png'
   };
+
   const platformImages = Object.fromEntries(Object.entries(PLATFORM_ASSET_URLS).map(([type, url]) => {
     const image = new Image();
     image.decoding = 'async';
     image.src = url;
     return [type, image];
   }));
+
   const touchedRodIds = new Set();
 
   function clone(value) {
@@ -199,6 +204,17 @@
 
   function normalizeRodType(type) {
     return type === 'rubber' || type === 'steel' || type === 'fixed' ? 'wood' : type;
+  }
+
+  function normalizedRodThickness(type, thickness) {
+    return normalizeRodType(type) === 'electric'
+      ? ELECTRIC_PLATFORM_THICKNESS
+      : Number(thickness) || toolSettings[normalizeRodType(type)]?.thickness || 14;
+  }
+
+  function normalizeRodRecord(rod) {
+    const type = normalizeRodType(rod.type);
+    return { ...rod, type, thickness: normalizedRodThickness(type, rod.thickness) };
   }
 
   function makeRodUid() {
@@ -218,8 +234,7 @@
     const normalized = clone(stage);
     const legacyRods = Array.isArray(normalized.rods) ? normalized.rods : [];
     normalized.fixedBlocks = (normalized.fixedBlocks || legacyRods.filter(rod => rod.fixed)).map(rod => ({
-      ...rod,
-      type: normalizeRodType(rod.type),
+      ...normalizeRodRecord(rod),
       uid: rod.uid || makeRodUid(),
       fixed: true
     }));
@@ -232,8 +247,7 @@
       length: rod.length,
       thickness: rod.thickness
     }))).map((block, index) => ({
-      ...block,
-      type: normalizeRodType(block.type),
+      ...normalizeRodRecord(block),
       uid: block.uid || makeRodUid(),
       supplyId: block.supplyId || `${normalized.id}-supply-${index}`
     }));
@@ -280,7 +294,10 @@
     developerEnabled = localStorage.getItem(DEVELOPER_STORAGE_KEY) === 'true';
 
     const storedCreations = readStoredJson(CREATIONS_STORAGE_KEY, []);
-    creations = Array.isArray(storedCreations) ? storedCreations : [];
+    creations = Array.isArray(storedCreations) ? storedCreations.map(creation => ({
+      ...creation,
+      rods: Array.isArray(creation.rods) ? creation.rods.map(normalizeRodRecord) : []
+    })) : [];
 
   }
 
@@ -318,7 +335,7 @@
   }
 
   function restoreWorld(snapshot) {
-    rods.splice(0, rods.length, ...clone(snapshot.rods));
+    rods.splice(0, rods.length, ...clone(snapshot.rods).map(normalizeRodRecord));
     goals.splice(0, goals.length, ...clone(snapshot.goals));
     fields.splice(0, fields.length, ...clone(snapshot.fields || []));
     electricLinks.splice(0, electricLinks.length, ...clone(snapshot.electricLinks || []));
@@ -328,6 +345,7 @@
       Object.entries(snapshot.toolSettings).forEach(([type, settings]) => {
         toolSettings[type] = clone(settings);
       });
+      toolSettings.electric.thickness = ELECTRIC_PLATFORM_THICKNESS;
     }
     selected = null;
     selectedElectricLinkId = null;
@@ -400,8 +418,7 @@
     clearWorldState();
     activeCreationId = id;
     rods.push(...clone(creation.rods).map(rod => ({
-      ...rod,
-      type: normalizeRodType(rod.type),
+      ...normalizeRodRecord(rod),
       uid: rod.uid || makeRodUid(),
       id: nextId++,
       kind: 'rod',
@@ -453,16 +470,24 @@
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       audioCompressor = audioContext.createDynamicsCompressor();
-      audioCompressor.threshold.value = -16;
-      audioCompressor.knee.value = 18;
-      audioCompressor.ratio.value = 5;
+      audioCompressor.threshold.value = -12;
+      audioCompressor.knee.value = 12;
+      audioCompressor.ratio.value = 4;
       audioCompressor.attack.value = .004;
       audioCompressor.release.value = .18;
+      audioLimiter = audioContext.createDynamicsCompressor();
+      audioLimiter.threshold.value = -3;
+      audioLimiter.knee.value = 0;
+      audioLimiter.ratio.value = 20;
+      audioLimiter.attack.value = .001;
+      audioLimiter.release.value = .08;
       audioMaster = audioContext.createGain();
-      audioMaster.gain.value = 1.24;
-      audioMaster.connect(audioCompressor).connect(audioContext.destination);
+      audioMaster.gain.value = 1.6;
+      audioMaster.connect(audioCompressor).connect(audioLimiter).connect(audioContext.destination);
     }
-    if (audioContext.state === 'suspended') audioContext.resume();
+    if (audioContext.state === 'suspended' || audioContext.state === 'interrupted') {
+      audioContext.resume().catch(() => {});
+    }
     return audioContext;
   }
 
@@ -482,11 +507,11 @@
   function playImpactSound(type, speed) {
     const audio = ensureAudio();
     const now = performance.now();
-    if (!audio || now - lastImpactSoundAt < 70 || speed < 0.35) return;
+    if (!audio || now - lastImpactSoundAt < 40 || speed < 0.12) return;
     lastImpactSoundAt = now;
     const slime = type === 'slime';
     const start = audio.currentTime;
-    const volume = Math.min(.19, .034 + speed * .018);
+    const volume = Math.min(.44, .085 + speed * .035);
 
     if (slime) {
       const osc = audio.createOscillator();
@@ -577,12 +602,14 @@
     }
     rollingAudio.lastContactAt = audio.currentTime;
     const slime = type === 'slime';
-    const rollPitch = (slime ? 58 : 82) + Math.min(150, speed * 11);
-    const filterPitch = (slime ? 220 : 320) + Math.min(480, speed * 30);
+    const electric = type === 'electric';
+    const rollPitch = (slime ? 58 : electric ? 126 : 82) + Math.min(180, speed * (electric ? 16 : 11));
+    const filterPitch = (slime ? 220 : electric ? 640 : 320) + Math.min(720, speed * (electric ? 42 : 30));
     rollingAudio.tone.frequency.setTargetAtTime(rollPitch, audio.currentTime, .055);
     rollingAudio.filter.frequency.setTargetAtTime(filterPitch, audio.currentTime, .065);
-    rollingAudio.toneGain.gain.setTargetAtTime(slime ? .08 : .15, audio.currentTime, .06);
-    rollingAudio.gain.gain.setTargetAtTime(Math.min(slime ? .044 : .054, .008 + speed * .0062), audio.currentTime, .06);
+    rollingAudio.toneGain.gain.setTargetAtTime(slime ? .13 : electric ? .24 : .2, audio.currentTime, .06);
+    const maximumVolume = slime ? .12 : electric ? .17 : .15;
+    rollingAudio.gain.gain.setTargetAtTime(Math.min(maximumVolume, .025 + speed * .015), audio.currentTime, .045);
   }
 
   function spawnContactParticles(x, y, type, strength = 1) {
@@ -769,6 +796,9 @@
     const center = screenToWorld({ x: view.width / 2, y: (view.playTop + view.dockTop) / 2 });
     sizingMode = { type, pointerId: null, start: null, preview: { x: center.x, y: center.y, width, height } };
     sizeEditorTitle.textContent = `${BLOCK_CATALOG.find(item => item.type === type)?.label || type} 크기 설정`;
+    sizeEditorHelp.textContent = type === 'electric'
+      ? '가로로 드래그해 길이를 정하세요. 전기 장판 두께는 고정됩니다.'
+      : '화면에서 대각선으로 드래그해 직사각형을 만드세요.';
     sizeEditorPanel.hidden = false;
     topPanel.hidden = true;
     toolDock.hidden = true;
@@ -783,6 +813,8 @@
       const preview = sizingMode.preview;
       if (sizingMode.type === 'antigravity') {
         toolSettings.antigravity = { width: preview.width, height: preview.height, direction: pendingGravityDirection };
+      } else if (sizingMode.type === 'electric') {
+        toolSettings.electric = { length: preview.width, thickness: ELECTRIC_PLATFORM_THICKNESS };
       } else {
         toolSettings[sizingMode.type] = { length: preview.width, thickness: preview.height };
       }
@@ -919,8 +951,7 @@
     spawn.x = stage.spawn?.x ?? 220;
     spawn.y = stage.spawn?.y ?? 150;
     (stage.fixedBlocks || []).forEach(source => rods.push({
-      ...clone(source),
-      type: normalizeRodType(source.type),
+      ...normalizeRodRecord(clone(source)),
       uid: source.uid || makeRodUid(),
       fixed: true,
       id: nextId++,
@@ -934,7 +965,7 @@
         x: source.editorX ?? 220 + index * 45,
         y: source.editorY ?? 430 + (index % 2) * 70,
         length: source.length || DEFAULT_ROD_LENGTH,
-        thickness: source.thickness || toolSettings[normalizeRodType(source.type)]?.thickness || 14,
+        thickness: normalizedRodThickness(source.type, source.thickness),
         angle: source.angle || 0,
         fixed: false,
         supplyId: source.supplyId,
@@ -943,7 +974,7 @@
         touched: false
       }));
     } else {
-      stageSupplies = (stage.supplyBlocks || []).map(source => ({ ...clone(source), used: false }));
+      stageSupplies = (stage.supplyBlocks || []).map(source => ({ ...normalizeRodRecord(clone(source)), used: false }));
     }
     (stage.goals || []).forEach(source => goals.push({ ...clone(source), id: nextId++, kind: 'goal' }));
     (stage.fields || []).forEach(source => fields.push({ ...clone(source), id: nextId++, kind: 'field' }));
@@ -1202,7 +1233,7 @@
       x,
       y,
       length: options.length || DEFAULT_ROD_LENGTH,
-      thickness: options.thickness || toolSettings[normalizeRodType(type)]?.thickness || 14,
+      thickness: normalizedRodThickness(type, options.thickness),
       angle: Number.isFinite(options.angle) ? options.angle : 0,
       fixed: Boolean(options.fixed),
       supplyId: options.supplyId || null,
@@ -1745,7 +1776,9 @@
     if (sizingMode?.pointerId === event.pointerId) {
       const point = screenToWorld(screenPoint(event));
       const width = clamp(Math.abs(point.x - sizingMode.start.x), 40, 600);
-      const height = clamp(Math.abs(point.y - sizingMode.start.y), 12, 420);
+      const height = sizingMode.type === 'electric'
+        ? ELECTRIC_PLATFORM_THICKNESS
+        : clamp(Math.abs(point.y - sizingMode.start.y), 12, 420);
       sizingMode.preview = { x: (point.x + sizingMode.start.x) / 2, y: (point.y + sizingMode.start.y) / 2, width, height };
       confirmSizeButton.disabled = false;
       event.preventDefault();
@@ -2069,7 +2102,8 @@
     const contactVx = ball.vx - ball.omega * ry;
     const contactVy = ball.vy + ball.omega * rx;
     const specialType = rect.material.slime ? 'slime' : rect.material.electric ? 'electric' : null;
-    const contactKey = specialType && ny < -0.25 ? `${specialType}:${rect.blockId}` : null;
+    const specialSurface = specialType === 'slime' || (specialType === 'electric' && nyLocal < -0.25);
+    const contactKey = specialSurface ? `${specialType}:${rect.blockId}` : null;
     const isFreshContact = Boolean(contactKey && !ball.specialContacts.includes(contactKey));
     if (contactKey) specialContactsThisStep.add(contactKey);
 
@@ -2108,8 +2142,15 @@
 
     if (contactKey && isFreshContact) {
       const fallDistanceMeters = Math.max(0, (ball.y - (ball.fallPeakY ?? ball.y)) / PIXELS_PER_METER);
-      if (specialType === 'slime' && normalSpeed < 0 && fallDistanceMeters >= 0.025) {
-        const targetNormalSpeed = reboundSpeed(fallDistanceMeters, 2 / 3);
+      if (specialType === 'slime' && normalSpeed < 0) {
+        const incomingNormalSpeed = Math.max(0, -(incomingVx * nx + incomingVy * ny));
+        const fallHeightRebound = ny < -0.5 && incomingVy > 0
+          ? reboundSpeed(fallDistanceMeters, 2 / 3)
+          : 0;
+        const targetNormalSpeed = Math.max(
+          fallHeightRebound,
+          incomingNormalSpeed * Math.sqrt(2 / 3)
+        );
         const outgoingNormalSpeed = ball.vx * nx + ball.vy * ny;
         const boost = Math.max(0, targetNormalSpeed - outgoingNormalSpeed);
         ball.vx += nx * boost;
@@ -2396,15 +2437,86 @@
     ctx.restore();
   }
 
-  function drawPlatformAsset(image, width, height) {
+  const PLATFORM_SOURCE_INSETS = {
+    wood: { left: 6, top: 6, right: 6, bottom: 6 },
+    slime: { left: 6, top: 6, right: 6, bottom: 6 },
+    electric: { left: 3, top: 3, right: 3, bottom: 3 }
+  };
+
+  const MATERIAL_REPEAT_LAYOUT = {
+    wood: {
+      sourceX: 17, sourceY: 20, sourceWidth: 1317, sourceHeight: 158,
+      tileWidth: 176, tileHeight: 176 * 158 / 1317, mirrorAlternateRows: false
+    },
+    slime: {
+      sourceX: 15, sourceY: 15, sourceWidth: 1359, sourceHeight: 112,
+      tileWidth: 176, tileHeight: 176 * 112 / 1359, mirrorAlternateRows: true
+    }
+  };
+
+  function drawRepeatedMaterial(image, width, height, type) {
     if (!image?.complete || !image.naturalWidth) return false;
-    const sourceCap = Math.min(image.naturalWidth * .16, image.naturalHeight * 1.35);
+    const layout = MATERIAL_REPEAT_LAYOUT[type];
+    if (!layout) return false;
+    const borderInset = 2;
+    const left = -width / 2 + borderInset;
+    const top = -height / 2 + borderInset;
+    const right = width / 2 - borderInset;
+    const bottom = height / 2 - borderInset;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
+    ctx.clip();
+    let row = 0;
+    for (let y = top; y < bottom; y += layout.tileHeight, row += 1) {
+      const mirrored = layout.mirrorAlternateRows && row % 2 === 1;
+      for (let x = left; x < right; x += layout.tileWidth) {
+        if (mirrored) {
+          ctx.save();
+          ctx.translate(x + layout.tileWidth / 2, y + layout.tileHeight / 2);
+          ctx.scale(-1, 1);
+          ctx.drawImage(
+            image,
+            layout.sourceX, layout.sourceY, layout.sourceWidth, layout.sourceHeight,
+            -layout.tileWidth / 2, -layout.tileHeight / 2, layout.tileWidth, layout.tileHeight
+          );
+          ctx.restore();
+        } else {
+          ctx.drawImage(
+            image,
+            layout.sourceX, layout.sourceY, layout.sourceWidth, layout.sourceHeight,
+            x, y, layout.tileWidth, layout.tileHeight
+          );
+        }
+      }
+    }
+    ctx.restore();
+    return true;
+  }
+
+  function drawPlatformAsset(image, width, height, type) {
+    if (type === 'wood' || type === 'slime') {
+      return drawRepeatedMaterial(image, width, height, type);
+    }
+    if (!image?.complete || !image.naturalWidth) return false;
+    const inset = PLATFORM_SOURCE_INSETS[type] || { left: 0, top: 0, right: 0, bottom: 0 };
+    const sourceX = inset.left;
+    const sourceY = inset.top;
+    const sourceWidth = image.naturalWidth - inset.left - inset.right;
+    const sourceHeight = image.naturalHeight - inset.top - inset.bottom;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(-width / 2, -height / 2, width, height);
+    ctx.clip();
+
+    const sourceCap = Math.min(sourceWidth * .16, sourceHeight * 1.35);
     const targetCap = Math.min(width / 3, Math.max(height * 1.15, 12));
-    const centerSourceWidth = Math.max(1, image.naturalWidth - sourceCap * 2);
+    const centerSourceWidth = Math.max(1, sourceWidth - sourceCap * 2);
     const centerTargetWidth = Math.max(1, width - targetCap * 2);
-    ctx.drawImage(image, 0, 0, sourceCap, image.naturalHeight, -width / 2, -height / 2, targetCap, height);
-    ctx.drawImage(image, sourceCap, 0, centerSourceWidth, image.naturalHeight, -width / 2 + targetCap, -height / 2, centerTargetWidth, height);
-    ctx.drawImage(image, image.naturalWidth - sourceCap, 0, sourceCap, image.naturalHeight, width / 2 - targetCap, -height / 2, targetCap, height);
+    ctx.drawImage(image, sourceX, sourceY, sourceCap, sourceHeight, -width / 2, -height / 2, targetCap, height);
+    ctx.drawImage(image, sourceX + sourceCap, sourceY, centerSourceWidth, sourceHeight, -width / 2 + targetCap, -height / 2, centerTargetWidth, height);
+    ctx.drawImage(image, sourceX + sourceWidth - sourceCap, sourceY, sourceCap, sourceHeight, width / 2 - targetCap, -height / 2, targetCap, height);
+    ctx.restore();
     return true;
   }
 
@@ -2417,17 +2529,19 @@
     ctx.shadowColor = 'rgba(23, 50, 77, .18)';
     ctx.shadowBlur = 8;
     ctx.shadowOffsetY = 5;
-    const imageDrawn = drawPlatformAsset(platformImages[rod.type], rod.length, rod.thickness);
-    if (!imageDrawn) {
-      ctx.beginPath();
-      ctx.rect(-rod.length / 2, -rod.thickness / 2, rod.length, rod.thickness);
-      ctx.fillStyle = material.color;
-      ctx.fill();
-      ctx.strokeStyle = material.edge;
-      ctx.lineWidth = 2;
-      ctx.stroke();
-    }
+    ctx.fillStyle = material.color;
+    ctx.fillRect(-rod.length / 2, -rod.thickness / 2, rod.length, rod.thickness);
     ctx.shadowColor = 'transparent';
+    drawPlatformAsset(platformImages[rod.type], rod.length, rod.thickness, rod.type);
+    ctx.strokeStyle = material.edge;
+    ctx.lineWidth = 4;
+    const borderInset = ctx.lineWidth / 2;
+    ctx.strokeRect(
+      -rod.length / 2 + borderInset,
+      -rod.thickness / 2 + borderInset,
+      Math.max(0, rod.length - ctx.lineWidth),
+      Math.max(0, rod.thickness - ctx.lineWidth)
+    );
     if (rod.type === 'electric') {
       if (rod.electricPulse > 0) {
         const pulse = clamp(rod.electricPulse / 0.45, 0, 1);
@@ -2820,7 +2934,12 @@
   });
   document.querySelectorAll('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
 
-  window.addEventListener('pointerdown', ensureAudio, { passive: true, capture: true });
+  const activateAudioFromGesture = () => {
+    const audio = ensureAudio();
+    if (audio.state !== 'running') audio.resume().catch(() => {});
+  };
+  window.addEventListener('pointerdown', activateAudioFromGesture, { passive: true, capture: true });
+  window.addEventListener('keydown', activateAudioFromGesture, { passive: true, capture: true });
   gameShell.addEventListener('contextmenu', event => event.preventDefault());
   gameShell.addEventListener('dragstart', event => event.preventDefault());
 
@@ -2854,6 +2973,7 @@
       MIN_ZOOM,
       MAX_ZOOM,
       GOAL_SUCCESS_DELAY,
+      ELECTRIC_PLATFORM_THICKNESS,
       ELECTRIC_ATTACH_ANGLE,
       ELECTRIC_SPEED_MULTIPLIER,
       ELECTRIC_MIN_JOINT_ANGLE
@@ -2938,6 +3058,9 @@
     updateRollingSound,
     getAudioState: () => ({
       contextState: audioContext?.state || 'none',
+      masterGain: audioMaster?.gain.value || 0,
+      limiterActive: Boolean(audioLimiter),
+      limiterThreshold: audioLimiter?.threshold.value ?? null,
       rollingActive: Boolean(rollingAudio),
       rollingToneType: rollingAudio?.tone.type || null,
       rollingFilterType: rollingAudio?.filter.type || null

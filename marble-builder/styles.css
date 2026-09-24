@@ -95,8 +95,8 @@ button { font: inherit; }
 .tool-card:active { cursor: grabbing; transform: translateY(1px); }
 .tool-card small { color: var(--muted); font-size: .62rem; font-weight: 600; }
 .tool-icon.road { width: 50px; height: 9px; border-radius: 0; transform: rotate(var(--tool-angle, -8deg)); box-shadow: 0 3px 4px rgba(23, 50, 77, .15); }
-.tool-icon.wood { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/wood.png'); }
-.tool-icon.slime { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/slime.png'); box-shadow: 0 3px 4px rgba(23,50,77,.15); }
+.tool-icon.wood { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/wood.png?v=2'); }
+.tool-icon.slime { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/slime.png?v=2'); box-shadow: 0 3px 4px rgba(23,50,77,.15); }
 .tool-icon.electric { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/electric.png'); box-shadow: 0 0 8px rgba(46,205,255,.6); }
 .tool-icon.antigravity { width: 48px; height: 28px; border: 2px dashed #6c5ce7; background: rgba(137,116,255,.25); }
 .tool-icon.basket { position: relative; width: 43px; height: 29px; border: 6px solid #d69536; border-top: 0; border-radius: 0 0 10px 10px; }

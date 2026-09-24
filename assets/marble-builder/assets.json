@@ -5,9 +5,10 @@
       "id": "wood",
       "source": "platforms/wood-source.png",
       "runtime": "platforms/wood.png",
+
       "size": [
-        1024,
-        165
+        1351,
+        198
       ],
       "alpha": true
     },
@@ -16,9 +17,10 @@
       "id": "slime",
       "source": "platforms/slime-source.png",
       "runtime": "platforms/slime.png",
+
       "size": [
-        1024,
-        121
+        1389,
+        142
       ],
       "alpha": true
     },
