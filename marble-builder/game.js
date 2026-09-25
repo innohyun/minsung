@@ -86,6 +86,9 @@
   const FIXED_STEP = 1 / 120;
   const BALL_RADIUS = 18;
   const BALL_MASS = 0.18;
+  const SWING_MOUTH = 64;
+  const SWING_MAGNET_MASS = 0.65;
+  const SWING_ROD_MASS = 0.12;
   const BALL_INERTIA = 0.5 * BALL_MASS * Math.pow(BALL_RADIUS / PIXELS_PER_METER, 2);
   const MIN_ZOOM = 0.25;
   const MAX_ZOOM = 1;
@@ -233,8 +236,8 @@
     return [type, image];
   }));
   const swingImages = Object.fromEntries(Object.entries({
-    magnet: '/assets/marble-builder/swing/swing-magnet.png?v=1',
-    weight: '/assets/marble-builder/swing/swing-weight.png?v=1'
+    magnet: '/assets/marble-builder/swing/swing-magnet.png?v=2',
+    weight: '/assets/marble-builder/swing/swing-weight.png?v=2'
   }).map(([part, url]) => {
     const image = new Image();
     image.decoding = 'async';
@@ -265,7 +268,9 @@
 
   function normalizeRodRecord(rod) {
     const type = normalizeRodType(rod.type);
-    return { ...rod, type, thickness: normalizedRodThickness(type, rod.thickness) };
+    return { ...rod, type, thickness: normalizedRodThickness(type, rod.thickness),
+      ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
+        swingStarted: false, swingOmega: 0 } : {}) };
   }
 
   function makeRodUid() {
@@ -513,7 +518,8 @@
     Object.assign(camera, creation.camera || { x: 0, y: 0, zoom: MAX_ZOOM });
     setAppMode('free');
     freeModeDirty = false;
-    setHint(`“${creation.name}” 작품을 불러왔습니다.`);
+    setHint(swingConflictsInWorld() ? '이전 저장 맵의 블록이 스윙 점선 범위와 겹쳐요. 옮긴 뒤 저장해 주세요.'
+      : `“${creation.name}” 작품을 불러왔습니다.`);
   }
 
   function openSaveCreation() {
@@ -525,11 +531,17 @@
   }
 
   function saveCreation(name) {
+    if (swingConflictsInWorld()) {
+      setHint('스윙 점선 범위와 겹친 블록을 옮긴 후 저장해 주세요.', 4200);
+      return false;
+    }
     const now = Date.now();
     const saved = {
       id: activeCreationId || `creation-${now}`,
       name: name.trim() || `내 작품 ${creations.length + 1}`,
-      rods: rods.map(({ id, kind, touched, fixed, supplyId, angleLocked, ...rod }) => ({ ...rod })),
+      rods: rods.map(({ id, kind, touched, fixed, supplyId, angleLocked, swingOmega, swingStarted, ...rod }) => ({
+        ...rod, angle: rod.type === 'swing' ? (rod.startAngle ?? rod.angle) : rod.angle
+      })),
       goals: goals.map(({ id, kind, ...goal }) => ({ ...goal })),
       fields: fields.map(({ id, kind, ...field }) => ({ ...field })),
       electricLinks: clone(electricLinks),
@@ -544,6 +556,7 @@
     persistCreations();
     freeModeDirty = false;
     setHint(`“${saved.name}” 작품을 저장했습니다.`);
+    return true;
   }
 
   function ensureAudio() {
@@ -1246,6 +1259,7 @@
         length: source.length || DEFAULT_ROD_LENGTH,
         thickness: normalizedRodThickness(source.type, source.thickness),
         angle: source.angle || 0,
+        ...(source.type === 'swing' ? { startAngle: Number.isFinite(source.startAngle) ? source.startAngle : (source.angle || 0), swingOmega: 0, swingStarted: false } : {}),
         fixed: false,
         supplyId: source.supplyId,
         id: nextId++,
@@ -1253,12 +1267,16 @@
         touched: false
       }));
     } else {
+      // A fixed swing belongs in the world, not in the player's supply dock.
+      (stage.fixedBlocks || []).filter(source => source.type === 'swing').forEach(source => rods.push({
+        ...normalizeRodRecord(clone(source)), id: nextId++, kind: 'rod', fixed: true, touched: false
+      }));
       stageSupplies = [...(stage.fixedBlocks || []).map((source, index) => ({
         ...normalizeRodRecord(clone(source)),
         supplyId: source.supplyId || `${stage.id}-fixed-${index}`,
         editorX: source.x, editorY: source.y,
         used: false
-      })), ...(stage.supplyBlocks || []).map(source => ({ ...normalizeRodRecord(clone(source)), used: false }))];
+      })).filter(source => source.type !== 'swing'), ...(stage.supplyBlocks || []).map(source => ({ ...normalizeRodRecord(clone(source)), used: false }))];
     }
     (stage.goals || []).forEach(source => goals.push({ ...clone(source), id: nextId++, kind: 'goal' }));
     (stage.fields || []).forEach(source => fields.push({ ...clone(source), id: nextId++, kind: 'field' }));
@@ -1275,7 +1293,8 @@
     successTitle.textContent = '스테이지 성공!';
     successMessage.textContent = '모든 블록을 사용하고 통과해 바구니에 도착했어요.';
     setAppMode('stage');
-    setHint('주어진 블록을 모두 사용하고, 모든 블록에 공을 닿게 하세요.', 3600);
+    setHint(swingConflictsInWorld() ? '이전 스테이지 맵의 블록이 스윙 점선 범위와 겹칩니다. 맵 만들기에서 위치를 수정해 주세요.'
+      : '주어진 블록을 모두 사용하고, 모든 블록에 공을 닿게 하세요.', 3600);
   }
 
   function startFreeMode() {
@@ -1318,10 +1337,15 @@
     camera.zoom = MAX_ZOOM;
     hydrateStage(currentStage, 'editor');
     setAppMode('editor');
-    setHint('고정 블록은 불투명, 플레이어 지급 블록은 반투명으로 표시됩니다.', 3400);
+    setHint(swingConflictsInWorld() ? '저장된 맵이 스윙 점선 범위와 겹칩니다. 겹친 블록을 옮겨 주세요.'
+      : '고정 블록은 불투명, 플레이어 지급 블록은 반투명으로 표시됩니다.', 3400);
   }
 
   function saveEditedStage() {
+    if (swingConflictsInWorld()) {
+      setHint('스윙 점선 범위와 겹친 블록을 옮긴 후 저장해 주세요.', 4200);
+      return;
+    }
     if (goals.length === 0) {
       setHint('골인 바구니를 한 개 이상 배치해 주세요.', 3200);
       return;
@@ -1330,11 +1354,13 @@
       setHint('블록을 한 개 이상 배치해 주세요.', 3200);
       return;
     }
-    const fixedBlocks = rods.filter(rod => rod.fixed).map(({ id, kind, touched, supplyId, ...rod }) => ({ ...rod, fixed: true }));
+    const fixedBlocks = rods.filter(rod => rod.fixed).map(({ id, kind, touched, supplyId, swingOmega, swingStarted, ...rod }) => ({
+      ...rod, angle: rod.type === 'swing' ? (rod.startAngle ?? rod.angle) : rod.angle, fixed: true
+    }));
     const supplyBlocks = rods.filter(rod => !rod.fixed).map((rod, index) => ({
       supplyId: rod.supplyId || `${currentStage.id}-supply-${Date.now()}-${index}`,
       type: rod.type,
-      angle: rod.angle,
+      angle: rod.type === 'swing' ? (rod.startAngle ?? rod.angle) : rod.angle,
       editorX: rod.x,
       editorY: rod.y,
       length: rod.length,
@@ -1384,6 +1410,11 @@
     if (appMode !== 'editor' || selected?.kind !== 'rod') return;
     pushUndo();
     selected.fixed = !selected.fixed;
+    if (selected.type === 'swing') {
+      selected.startAngle = selected.angle;
+      selected.swingOmega = 0;
+      selected.swingStarted = !selected.fixed;
+    }
     selected.angleLocked = false;
     selected.supplyId = null;
     updateDeleteButton();
@@ -1458,6 +1489,7 @@
           : '전기 발판 꼭짓점이 바깥쪽이거나 떨어져 있어요. 결합을 고쳐 주세요.', 4700);
       return false;
     }
+    resetSwingState();
     ball = {
       x: spawn.x,
       y: spawn.y,
@@ -1487,6 +1519,38 @@
     const halfWidth = cos * rod.length / 2 + sin * rod.thickness / 2;
     const halfHeight = sin * rod.length / 2 + cos * rod.thickness / 2;
     return { left: rod.x - halfWidth, right: rod.x + halfWidth, top: rod.y - halfHeight, bottom: rod.y + halfHeight };
+  }
+
+  // The dotted disk is the entire swept volume, including the weight and magnet.
+  function swingRadius(rod) { return rod.length + SWING_MOUTH + BALL_RADIUS + 4; }
+
+  function circleTouchesRect(circle, radius, rect) {
+    const dx = circle.x - rect.x; const dy = circle.y - rect.y;
+    const cos = Math.cos(rect.angle || 0); const sin = Math.sin(rect.angle || 0);
+    const localX = cos * dx + sin * dy; const localY = -sin * dx + cos * dy;
+    const outsideX = Math.max(0, Math.abs(localX) - rect.width / 2);
+    const outsideY = Math.max(0, Math.abs(localY) - rect.height / 2);
+    return outsideX * outsideX + outsideY * outsideY < radius * radius;
+  }
+
+  function swingPlacementConflict(candidate, ignore = candidate) {
+    const swings = rods.filter(rod => rod.type === 'swing' && rod !== ignore);
+    if (candidate.type === 'swing') {
+      const radius = swingRadius(candidate);
+      return swings.some(rod => Math.hypot(rod.x - candidate.x, rod.y - candidate.y) < swingRadius(rod) + radius)
+        || rods.some(rod => rod !== ignore && rod.type !== 'swing'
+          && circleTouchesRect(candidate, radius, { ...rod, width: rod.length, height: rod.thickness }))
+        || fields.some(field => circleTouchesRect(candidate, radius, field))
+        || goals.some(goal => circleTouchesRect(candidate, radius, { x: goal.x, y: goal.y - goal.height / 2, width: goal.width, height: goal.height }));
+    }
+    if (candidate.kind === 'rod') return swings.some(rod => circleTouchesRect(rod, swingRadius(rod), { ...candidate, width: candidate.length, height: candidate.thickness }));
+    if (candidate.kind === 'field') return swings.some(rod => circleTouchesRect(rod, swingRadius(rod), candidate));
+    if (candidate.kind === 'goal') return swings.some(rod => circleTouchesRect(rod, swingRadius(rod), { x: candidate.x, y: candidate.y - candidate.height / 2, width: candidate.width, height: candidate.height }));
+    return false;
+  }
+
+  function swingConflictsInWorld() {
+    return rods.some(rod => rod.type === 'swing' && swingPlacementConflict(rod));
   }
 
   function goalBounds(goal) {
@@ -1523,6 +1587,7 @@
   }
 
   function rodOverlapsGoal(rod, goal) {
+    if (rod.type === 'swing') return false;
     const rodPolygon = orientedRectCorners({ x: rod.x, y: rod.y, width: rod.length, height: rod.thickness, angle: rod.angle });
     return basketSegments(goal).some(wall => polygonsOverlap(rodPolygon, orientedRectCorners(basketSegmentBounds(wall))));
   }
@@ -1546,13 +1611,18 @@
       length: options.length || DEFAULT_ROD_LENGTH,
       thickness: normalizedRodThickness(type, options.thickness),
       angle: Number.isFinite(options.angle) ? options.angle : 0,
+      ...(type === 'swing' ? { startAngle: Number.isFinite(options.angle) ? options.angle : 0, swingOmega: 0, swingStarted: false } : {}),
       fixed: Boolean(options.fixed),
       supplyId: options.supplyId || null,
       angleLocked: appMode === 'stage' && !options.fixed,
       touched: false
     };
-    if (type !== 'swing' && rodOverlapsAnyGoal(rod)) {
+    if (rodOverlapsAnyGoal(rod)) {
       setHint('골인 바구니와 블록은 겹칠 수 없습니다.');
+      return null;
+    }
+    if (swingPlacementConflict(rod)) {
+      setHint('점선으로 표시된 스윙 회전 범위에는 다른 블록을 놓을 수 없어요.', 3500);
       return null;
     }
     pushUndo();
@@ -1565,7 +1635,8 @@
     }
     selectEntity(rod);
     updateToolAvailability();
-    setHint(appMode === 'stage' ? '저장된 각도로 배치했습니다. 위치만 바꿀 수 있어요.' : '주황색 끝점은 각도, 파란색 가운데 점은 위치를 바꿉니다.');
+    setHint(type === 'swing' ? '점선 원은 회전 범위입니다. 끝점은 작대기 길이, 자석 쪽은 시작 각도, 축은 위치를 바꿉니다.'
+      : appMode === 'stage' ? '저장된 각도로 배치했습니다. 위치만 바꿀 수 있어요.' : '주황색 끝점은 각도, 파란색 가운데 점은 위치를 바꿉니다.');
     return rod;
   }
 
@@ -1583,7 +1654,7 @@
       height: 84,
       thickness: 11
     };
-    if (goalOverlapsAnyRod(goal)) {
+    if (goalOverlapsAnyRod(goal) || swingPlacementConflict(goal)) {
       setHint('골인 바구니와 블록은 겹칠 수 없습니다.');
       return null;
     }
@@ -1607,6 +1678,10 @@
       height: options.height || toolSettings.antigravity.height,
       direction: options.direction || toolSettings.antigravity.direction || 'up'
     };
+    if (swingPlacementConflict(field)) {
+      setHint('스윙 점선 범위에는 반중력 블록을 놓을 수 없어요.');
+      return null;
+    }
     pushUndo();
     fields.push(field);
     rememberTool('antigravity');
@@ -1636,6 +1711,7 @@
     pushUndo();
     const list = selected.kind === 'rod' ? rods : selected.kind === 'field' ? fields : goals;
     if (selected.kind === 'rod') {
+      if (selected.type === 'swing') releaseSwingBall(selected);
       electricLinks.splice(0, electricLinks.length, ...electricLinks.filter(link => link.a.rodUid !== selected.uid && link.b.rodUid !== selected.uid));
     }
     const index = list.indexOf(selected);
@@ -1674,6 +1750,7 @@
   }
 
   function resetGame() {
+    resetSwingState();
     ball = null;
     selected = null;
     placement = null;
@@ -1692,7 +1769,7 @@
   }
 
   function rodEndpoints(rod) {
-    if (rod.type === 'swing') return { start: { x: rod.x, y: rod.y }, end: { x: rod.x, y: rod.y + rod.length } };
+    if (rod.type === 'swing') return { start: { x: rod.x, y: rod.y }, end: swingPoint(rod, -rod.length) };
     const halfX = Math.cos(rod.angle) * rod.length / 2;
     const halfY = Math.sin(rod.angle) * rod.length / 2;
     return {
@@ -1955,8 +2032,13 @@
   }
 
   function pointInRod(point, rod, padding = 11 / camera.zoom) {
-    if (rod.type === 'swing') return Math.abs(point.x - rod.x) <= padding + 38
-      && point.y >= rod.y - 47 - padding && point.y <= rod.y + rod.length + 28 + padding;
+    if (rod.type === 'swing') {
+      const dx = point.x - rod.x; const dy = point.y - rod.y;
+      const localX = Math.cos(rod.angle) * dx + Math.sin(rod.angle) * dy;
+      const localY = -Math.sin(rod.angle) * dx + Math.cos(rod.angle) * dy;
+      return localY >= -rod.length - SWING_MOUTH - padding && localY <= 16 + padding
+        && Math.abs(localX) <= (localY < -rod.length ? 40 : 14) + padding;
+    }
     const dx = point.x - rod.x;
     const dy = point.y - rod.y;
     const cos = Math.cos(rod.angle);
@@ -2062,6 +2144,13 @@
     const point = screenToWorld(screen);
     const handleRadius = (event.pointerType === 'touch' ? 24 : 17) / camera.zoom;
 
+    const attachedPivot = ball?.attachedSwingUid && rods.find(rod => rod.uid === ball.attachedSwingUid
+      && distanceSquared(point, rod) <= handleRadius * handleRadius);
+    if (attachedPivot && releaseSwingBall(attachedPivot)) {
+      event.preventDefault();
+      return;
+    }
+
     if (appMode !== 'stage') {
       const joint = findElectricLinkAt(point, handleRadius);
       if (joint) {
@@ -2079,6 +2168,8 @@
       if (selected.type === 'swing') {
         if (appMode !== 'stage' && distanceSquared(point, ends.end) <= handleRadius * handleRadius) {
           editDrag = makeEditDrag(event.pointerId, 'swingLength', selected);
+        } else if (appMode !== 'stage' && distanceSquared(point, swingPoint(selected, -(selected.length + 38))) <= (handleRadius + 20) ** 2) {
+          editDrag = makeEditDrag(event.pointerId, 'swingAngle', selected);
         } else if (appMode !== 'stage' && distanceSquared(point, ends.start) <= handleRadius * handleRadius) {
           editDrag = makeEditDrag(event.pointerId, 'move', selected, { offsetX: point.x - selected.x, offsetY: point.y - selected.y });
         }
@@ -2177,7 +2268,13 @@
           entity.y = nextY;
         }
       } else if (editDrag.mode === 'swingLength') {
-        entity.length = clamp(point.y - entity.y, 65, 480);
+        entity.length = clamp((point.x - entity.x) * Math.sin(entity.angle)
+          - (point.y - entity.y) * Math.cos(entity.angle), 65, 480);
+      } else if (editDrag.mode === 'swingAngle') {
+        entity.angle = Math.atan2(point.x - entity.x, entity.y - point.y);
+        entity.startAngle = entity.angle;
+        entity.swingOmega = 0;
+        entity.swingStarted = !entity.fixed;
       } else if (editDrag.mode === 'rotateFixed') {
         entity.angle = Math.atan2(point.y - entity.y, point.x - entity.x);
       } else {
@@ -2213,14 +2310,15 @@
     if (!activePointers.has(event.pointerId)) return;
     activePointers.delete(event.pointerId);
     if (editDrag?.pointerId === event.pointerId) {
-      const blocked = editDrag.entity.kind === 'field' || editDrag.entity.type === 'swing' ? false : editDrag.entity.kind === 'goal'
+      const blockedGoal = editDrag.entity.kind === 'field' || editDrag.entity.type === 'swing' ? false : editDrag.entity.kind === 'goal'
         ? goalOverlapsAnyRod(editDrag.entity)
         : editDrag.groupOriginal || editDrag.mode === 'joint'
           ? rods.some(rod => rodOverlapsAnyGoal(rod))
           : rodOverlapsAnyGoal(editDrag.entity);
+      const blocked = blockedGoal || swingConflictsInWorld();
       if (blocked) {
         restoreWorld(editDrag.beforeSnapshot);
-        setHint('골인 바구니와 블록은 겹칠 수 없습니다.');
+        setHint(blockedGoal ? '골인 바구니와 블록은 겹칠 수 없습니다.' : '스윙 점선 회전 범위에는 다른 블록을 놓을 수 없어요.', 3400);
       } else {
         const changed = JSON.stringify(captureWorld()) !== JSON.stringify(editDrag.beforeSnapshot);
         if (changed) pushUndo(editDrag.beforeSnapshot);
@@ -2694,8 +2792,128 @@
     updateRollingSound(rollingType, rollingSpeed, ball.omega);
   }
 
+  function swingPoint(rod, distance) {
+    const angle = rod.angle || 0;
+    return { x: rod.x - distance * Math.sin(angle), y: rod.y + distance * Math.cos(angle) };
+  }
+
+  function swingInertia(rod, attachedMass = 0) {
+    const length = rod.length / PIXELS_PER_METER;
+    const mouthArm = (rod.length + SWING_MOUTH) / PIXELS_PER_METER;
+    return SWING_MAGNET_MASS * length * length
+      + SWING_ROD_MASS * length * length / 3 + attachedMass * mouthArm * mouthArm;
+  }
+
+  function resetSwingState() {
+    rods.filter(rod => rod.type === 'swing').forEach(rod => {
+      rod.angle = Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0);
+      rod.swingOmega = 0;
+      rod.swingStarted = !rod.fixed;
+    });
+  }
+
+  function releaseSwingBall(rod) {
+    if (!ball || ball.attachedSwingUid !== rod.uid) return false;
+    const mouth = swingPoint(rod, -(rod.length + SWING_MOUTH));
+    const speed = (rod.swingOmega || 0) * (rod.length + SWING_MOUTH) / PIXELS_PER_METER;
+    // Velocity at the magnet, not at the distant weight or the pivot.
+    ball.x = mouth.x; ball.y = mouth.y;
+    ball.vx = speed * Math.cos(rod.angle);
+    ball.vy = speed * Math.sin(rod.angle);
+    ball.attachedSwingUid = null;
+    ball.swingDetachUid = rod.uid;
+    ball.swingDetachTime = 0.35;
+    ball.fallPeakY = ball.y;
+    setHint('자석에서 공을 놓았습니다. 스윙 속도를 이어받아 날아갑니다.', 2500);
+    return true;
+  }
+
+  function advanceSwings(dt) {
+    for (const rod of rods) {
+      if (rod.type !== 'swing' || !rod.swingStarted) continue;
+      const attachedMass = ball?.attachedSwingUid === rod.uid ? ball.mass : 0;
+      const moment = swingInertia(rod, attachedMass);
+      const torque = (SWING_MAGNET_MASS * rod.length / PIXELS_PER_METER
+        + SWING_ROD_MASS * rod.length / (2 * PIXELS_PER_METER)
+        + attachedMass * (rod.length + SWING_MOUTH) / PIXELS_PER_METER) * activeGravity() * Math.sin(rod.angle);
+      rod.swingOmega = clamp((rod.swingOmega || 0) + torque / moment * dt, -9, 9) * Math.exp(-0.18 * dt);
+      rod.angle += rod.swingOmega * dt;
+    }
+  }
+
+  function resolveSwingContact(rod) {
+    if (!ball || ball.attachedSwingUid) return false;
+    const mouth = swingPoint(rod, -(rod.length + SWING_MOUTH));
+    const dx = ball.x - mouth.x; const dy = ball.y - mouth.y;
+    const localY = -Math.sin(rod.angle) * (ball.x - rod.x) + Math.cos(rod.angle) * (ball.y - rod.y);
+    const canAttach = ball.swingDetachUid !== rod.uid || ball.swingDetachTime <= 0
+      && Math.hypot(dx, dy) > ball.radius + 18;
+    if (canAttach && localY < -rod.length - SWING_MOUTH + 22 && Math.hypot(dx, dy) <= ball.radius + 7) {
+      const rx = (mouth.x - rod.x) / PIXELS_PER_METER;
+      const ry = (mouth.y - rod.y) / PIXELS_PER_METER;
+      rod.swingOmega = clamp(((rod.swingOmega || 0) * swingInertia(rod) + ball.mass * (rx * ball.vy - ry * ball.vx))
+        / swingInertia(rod, ball.mass), -9, 9);
+      rod.swingStarted = true;
+      ball.attachedSwingUid = rod.uid;
+      ball.x = mouth.x; ball.y = mouth.y;
+      ball.vx = 0; ball.vy = 0;
+      rod.touched = true; touchedRodIds.add(rod.id);
+      setHint('공이 자석에 붙었어요. 중심축을 터치하면 놓습니다.', 2800);
+      return true;
+    }
+    const magnet = swingPoint(rod, -rod.length);
+    const end = magnet;
+    const vx = end.x - rod.x; const vy = end.y - rod.y;
+    const along = clamp(((ball.x - rod.x) * vx + (ball.y - rod.y) * vy) / (rod.length * rod.length), 0, 1);
+    const shaft = { x: rod.x + along * vx, y: rod.y + along * vy };
+    const contacts = [{ point: magnet, radius: 19 }, { point: shaft, radius: 4 }, { point: rod, radius: 13 }];
+    for (const { point, radius } of contacts) {
+      let nx = ball.x - point.x; let ny = ball.y - point.y;
+      const distance = Math.hypot(nx, ny);
+      if (distance >= ball.radius + radius) continue;
+      if (distance > 0.0001) { nx /= distance; ny /= distance; }
+      else { nx = 1; ny = 0; }
+      ball.x += nx * (ball.radius + radius - distance + 0.02);
+      ball.y += ny * (ball.radius + radius - distance + 0.02);
+      const rx = (point.x - rod.x) / PIXELS_PER_METER;
+      const ry = (point.y - rod.y) / PIXELS_PER_METER;
+      const angular = rod.swingOmega || 0;
+      const relativeSpeed = (ball.vx + angular * ry) * nx + (ball.vy - angular * rx) * ny;
+      if (relativeSpeed < -0.08) {
+        const cross = rx * ny - ry * nx;
+        const impulse = -(1 + 0.3) * relativeSpeed / (1 / ball.mass + cross * cross / swingInertia(rod));
+        ball.vx += nx * impulse / ball.mass;
+        ball.vy += ny * impulse / ball.mass;
+        rod.swingOmega = clamp(angular - cross * impulse / swingInertia(rod), -9, 9);
+        rod.swingStarted = true;
+        rod.touched = true; touchedRodIds.add(rod.id);
+      }
+      return true;
+    }
+    return false;
+  }
+
   function physicsStep(dt) {
     if (!ball || won || editDrag) return;
+    advanceSwings(dt);
+    if (ball.attachedSwingUid) {
+      const rod = rods.find(item => item.uid === ball.attachedSwingUid);
+      if (rod) {
+        const mouth = swingPoint(rod, -(rod.length + SWING_MOUTH));
+        ball.x = mouth.x; ball.y = mouth.y;
+        ball.vx = rod.swingOmega * (rod.length + SWING_MOUTH) / PIXELS_PER_METER * Math.cos(rod.angle);
+        ball.vy = rod.swingOmega * (rod.length + SWING_MOUTH) / PIXELS_PER_METER * Math.sin(rod.angle);
+        return;
+      }
+      ball.attachedSwingUid = null;
+    }
+    if (ball.swingDetachUid) {
+      ball.swingDetachTime = Math.max(0, (ball.swingDetachTime || 0) - dt);
+      const old = rods.find(rod => rod.uid === ball.swingDetachUid);
+      if (!old || (ball.swingDetachTime <= 0 && Math.hypot(ball.x - swingPoint(old, -(old.length + SWING_MOUTH)).x, ball.y - swingPoint(old, -(old.length + SWING_MOUTH)).y) > ball.radius + 18)) {
+        ball.swingDetachUid = null;
+      }
+    }
     if (ball.electricRide && updateElectricRide(dt)) return;
     physicsStepCount += 1;
     specialContactsThisStep.clear();
@@ -2720,7 +2938,11 @@
 
     supportContacts.length = 0;
     for (const rod of rods) {
-      if (rod.type === 'swing') continue; // Magnet and pendulum physics are not part of this asset-only slice.
+      if (rod.type === 'swing') {
+        resolveSwingContact(rod);
+        if (ball.attachedSwingUid) break;
+        continue;
+      }
       let touched = false;
       touched = resolveBallRect({
         x: rod.x, y: rod.y, width: rod.length, height: rod.thickness,
@@ -2749,7 +2971,7 @@
     if (appMode === 'editor') return;
     const insideGoal = goals.some(goal => pointInsideBasket(goal, ball));
 
-    const playableRods = rods.filter(rod => rod.type !== 'swing');
+    const playableRods = rods;
     const allRodsTouched = playableRods.length > 0 && playableRods.every(rod => touchedRodIds.has(rod.id));
     const allSuppliesUsed = stageSupplies.length === 0 || stageSupplies.every(item => item.used);
     const stageGoalReady = appMode !== 'stage' || (allSuppliesUsed && allRodsTouched);
@@ -2931,22 +3153,36 @@
     return true;
   }
 
+  function drawSwingSweep(rod, alpha = 1) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = swingPlacementConflict(rod) ? '#e8585d' : 'rgba(42,110,205,.75)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([2, 8]);
+    ctx.beginPath();
+    ctx.arc(rod.x, rod.y, swingRadius(rod), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // The original electric sprite stays intact; cover only a joint's open wedge.
   function drawRod(rod, alpha = 1) {
     if (rod.type === 'swing') {
       ctx.save();
       ctx.globalAlpha = alpha;
+      ctx.translate(rod.x, rod.y);
+      ctx.rotate(rod.angle || 0);
       ctx.strokeStyle = '#62727f';
       ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(rod.x, rod.y);
-      ctx.lineTo(rod.x, rod.y + rod.length + 5);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, -rod.length - 5);
       ctx.stroke();
       if (swingImages.magnet.complete && swingImages.magnet.naturalWidth) {
-        ctx.drawImage(swingImages.magnet, rod.x - 42, rod.y - 47, 84, 54);
+        ctx.drawImage(swingImages.magnet, -42, -rod.length - 53, 84, 59);
       }
       if (swingImages.weight.complete && swingImages.weight.naturalWidth) {
-        ctx.drawImage(swingImages.weight, rod.x - 14, rod.y + rod.length, 27, 31);
+        ctx.drawImage(swingImages.weight, -14, -16, 27, 31);
       }
       ctx.restore();
       return;
@@ -3095,6 +3331,8 @@
         if (appMode !== 'stage') {
           drawHandle(ends.start.x, ends.start.y, '#2674d9');
           drawHandle(ends.end.x, ends.end.y, '#ffaf21');
+          const angleHandle = swingPoint(selected, -(selected.length + 38));
+          drawHandle(angleHandle.x, angleHandle.y, '#a967db');
         }
         ctx.restore();
         return;
@@ -3204,6 +3442,7 @@
         type: placement.tool
       };
       drawRod(preview, appMode === 'editor' && !placement.fixed ? .42 : .65);
+      if (preview.type === 'swing') drawSwingSweep(preview, .72);
     }
   }
 
@@ -3216,6 +3455,7 @@
     drawSpawn();
     fields.forEach(field => drawField(field));
 
+    rods.filter(rod => rod.type === 'swing').forEach(rod => drawSwingSweep(rod, .78));
     rods.forEach(rod => drawRod(rod, appMode === 'editor' && !rod.fixed ? 0.42 : 1));
     drawElectricJoints();
     goals.forEach(goal => drawBasket(goal));
@@ -3229,7 +3469,11 @@
       const bottomRight = screenToWorld({ x: view.width, y: view.height });
       ctx.fillRect(topLeft.x, topLeft.y, bottomRight.x - topLeft.x, bottomRight.y - topLeft.y);
       if (sizingMode.type === 'antigravity') drawField({ ...sizingMode.preview, direction: pendingGravityDirection }, .9);
-      else drawRod({ x: sizingMode.preview.x, y: sizingMode.preview.y, length: sizingMode.preview.width, thickness: sizingMode.preview.height, angle: 0, type: sizingMode.type }, .8);
+      else {
+        const preview = { x: sizingMode.preview.x, y: sizingMode.preview.y, length: sizingMode.preview.width, thickness: sizingMode.preview.height, angle: 0, type: sizingMode.type };
+        if (preview.type === 'swing') drawSwingSweep(preview, .9);
+        drawRod(preview, .8);
+      }
     }
     ctx.restore();
   }
@@ -3438,12 +3682,12 @@
 
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
-      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId })),
+      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted })),
       goals: goals.map(goal => ({ id: goal.id, x: goal.x, y: goal.y })),
       fields: fields.map(field => ({ id: field.id, x: field.x, y: field.y, width: field.width, height: field.height, direction: field.direction })),
       supplies: clone(stageSupplies),
       recentTools: [...recentTools],
-      ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, omega: ball.omega, fallPeakY: ball.fallPeakY, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
+      ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, omega: ball.omega, fallPeakY: ball.fallPeakY, attachedSwingUid: ball.attachedSwingUid || null, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
       won,
       appMode,
       developerEnabled,

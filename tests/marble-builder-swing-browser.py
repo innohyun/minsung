@@ -43,7 +43,7 @@ def exercise(browser, mobile):
     initial = page.evaluate('window.__marbleBuilderDebug.getState().rodCount')
     bb = tool.bounding_box()
     px, py = bb['x'] + bb['width'] / 2, bb['y'] + bb['height'] / 2
-    destx, desty = box['x'] + box['width'] * .52, box['y'] + box['height'] * .35
+    destx, desty = box['x'] + box['width'] * .52, box['y'] + box['height'] * .60
     if mobile:
         touch('touchStart', px, py)
         touch('touchMove', px, py - 14)
@@ -63,7 +63,7 @@ def exercise(browser, mobile):
     assert not errors, errors
     # Deselect and reselect from the actual canvas; this previously blanked the game.
     page.evaluate('window.__marbleBuilderDebug.selectRod(-1)')
-    sx, sy = box['x'] + rod['x'], box['y'] + rod['y'] + 35
+    sx, sy = box['x'] + rod['x'], box['y'] + rod['y'] - 35
     if mobile:
         touch('touchStart', sx, sy)
         touch('touchEnd', sx, sy)
@@ -74,15 +74,15 @@ def exercise(browser, mobile):
     assert selected['rods'][-1]['type'] == 'swing'
     # Only the rod's length is adjusted from its lower handle; pivot and thickness stay unchanged.
     initial_rod = selected['rods'][-1]
-    hx, hy = box['x'] + initial_rod['x'], box['y'] + initial_rod['y'] + initial_rod['length']
+    hx, hy = box['x'] + initial_rod['x'], box['y'] + initial_rod['y'] - initial_rod['length']
     if mobile:
         touch('touchStart', hx, hy)
-        touch('touchMove', hx, hy + 50)
-        touch('touchEnd', hx, hy + 50)
+        touch('touchMove', hx, hy - 50)
+        touch('touchEnd', hx, hy - 50)
     else:
         page.mouse.move(hx, hy)
         page.mouse.down()
-        page.mouse.move(hx, hy + 50, steps=5)
+        page.mouse.move(hx, hy - 50, steps=5)
         page.mouse.up()
     changed = page.evaluate('window.__marbleBuilderDebug.getState().rods.at(-1)')
     assert changed['length'] >= initial_rod['length'] + 40, (initial_rod, changed)

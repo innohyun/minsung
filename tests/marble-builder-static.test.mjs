@@ -9,8 +9,8 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=31/);
-    assert.match(html, /styles\.css\?v=21/);
+    assert.match(html, /game\.js\?v=32/);
+    assert.match(html, /styles\.css\?v=22/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
@@ -25,7 +25,21 @@ test('swing is registered with length-only setup and an isolated selection path'
     assert.match(script, /editDrag\.mode === 'swingLength'/);
     assert.match(script, /swingImages\.magnet\.complete/);
     assert.match(script, /swingImages\.weight\.complete/);
-    assert.match(styles, /swing\/swing\.png\?v=1/);
+    assert.match(styles, /swing\/swing\.png\?v=2/);
+});
+
+test('swing pendulum, magnet release and swept-disk placement share the pivot', () => {
+    assert.match(script, /function swingRadius\(rod\)/);
+    assert.match(script, /function swingPlacementConflict\(candidate/);
+    assert.match(script, /function advanceSwings\(dt\)/);
+    assert.match(script, /function resolveSwingContact\(rod\)/);
+    assert.match(script, /function releaseSwingBall\(rod\)/);
+    assert.match(script, /drawSwingSweep\(rod/);
+    assert.match(script, /if \(attachedPivot && releaseSwingBall\(attachedPivot\)\)/);
+    assert.match(script, /swingPoint\(rod, -\(rod\.length \+ SWING_MOUTH\)\)/);
+    assert.match(script, /drawImage\(swingImages\.magnet, -42, -rod\.length - 53/);
+    assert.match(script, /drawImage\(swingImages\.weight, -14, -16/);
+    assert.match(script, /swingConflictsInWorld\(\)/);
 });
 
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {

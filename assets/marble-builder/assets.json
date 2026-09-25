@@ -55,7 +55,7 @@
       "source": "swing/swing-source.png",
       "runtime": "swing/swing.png",
       "parts": ["swing/swing-magnet.png", "swing/swing-weight.png"],
-      "size": [466, 1280],
+      "size": [466, 1310],
       "alpha": true
     }
   ]
