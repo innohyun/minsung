@@ -9,8 +9,8 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=22/);
-    assert.match(html, /styles\.css\?v=15/);
+    assert.match(html, /game\.js\?v=23/);
+    assert.match(html, /styles\.css\?v=16/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
