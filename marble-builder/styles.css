@@ -280,7 +280,7 @@ body.is-home .top-panel, body.is-home .hint, body.is-home .tool-dock, body.is-st
   .physics-lab-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .physics-lab-actions button { min-height: 40px; padding: 0 7px; font-size: .72rem; }
   body.is-physics-lab .hint { top: 330px; }
-  body.is-editor #spawnButton, body.is-editor #resetButton { display: none; }
+  body.is-editor #resetButton { display: none; }
 
   .tool-list { min-width: 0; }
   .tool-card { min-width: 62px; }

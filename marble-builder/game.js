@@ -78,7 +78,7 @@
 
 
   const PIXELS_PER_METER = 100;
-  const EARTH_GRAVITY = 9.81;
+  const EARTH_GRAVITY = 19.35;
   const FIXED_STEP = 1 / 120;
   const BALL_RADIUS = 18;
   const BALL_MASS = 0.18;
@@ -111,7 +111,7 @@
       id: 'stage-2', number: 2, name: '두 갈래 길',
       spawn: { x: 170, y: 145 },
       fixedBlocks: [
-        { type: 'wood', x: 370, y: 285, length: 180, thickness: 14, angle: 0.28, fixed: true },
+        { type: 'wood', x: 370, y: 285, length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS, angle: 0.28, fixed: true },
         { type: 'electric', x: 610, y: 420, length: 180, thickness: 20, angle: -0.18, fixed: true }
       ],
       supplyBlocks: [
@@ -122,7 +122,7 @@
     }
   ];
   const MATERIALS = {
-    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.38, restitution: 0.08, rollingResistance: 0.04 },
+    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.11, rollingResistance: 0.04 * (0.20 / 0.38) },
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
@@ -203,9 +203,9 @@
   let pendingGravityDirection = 'up';
   let selectedElectricLinkId = null;
   const toolSettings = {
-    wood: { length: 180, thickness: 14 },
+    wood: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
 
-    slime: { length: 180, thickness: 18 },
+    slime: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     electric: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     antigravity: { width: 220, height: 160, direction: 'up' }
   };
@@ -237,9 +237,14 @@
   }
 
   function normalizedRodThickness(type, thickness) {
-    return normalizeRodType(type) === 'electric'
-      ? ELECTRIC_PLATFORM_THICKNESS
-      : Number(thickness) || toolSettings[normalizeRodType(type)]?.thickness || 14;
+    const normalizedType = normalizeRodType(type);
+    if (normalizedType === 'electric') return ELECTRIC_PLATFORM_THICKNESS;
+    const value = Number(thickness);
+    // Old default blocks were thinner. Keep deliberately resized blocks unchanged.
+    if ((normalizedType === 'wood' && value === 14) || (normalizedType === 'slime' && value === 18)) {
+      return ELECTRIC_PLATFORM_THICKNESS;
+    }
+    return value > 0 ? value : toolSettings[normalizedType]?.thickness || ELECTRIC_PLATFORM_THICKNESS;
   }
 
   function normalizeRodRecord(rod) {
@@ -375,7 +380,9 @@
       Object.entries(snapshot.toolSettings).forEach(([type, settings]) => {
         toolSettings[type] = clone(settings);
       });
-      toolSettings.electric.thickness = ELECTRIC_PLATFORM_THICKNESS;
+      for (const type of ['wood', 'slime', 'electric']) {
+        toolSettings[type].thickness = normalizedRodThickness(type, toolSettings[type].thickness);
+      }
     }
     selected = null;
     selectedElectricLinkId = null;
@@ -1030,7 +1037,7 @@
     followButton.textContent = followBall ? '따라가기 끄기' : '공 따라가기';
     followButton.setAttribute('aria-pressed', String(followBall));
     gameTitle.textContent = mode === 'editor' ? '스테이지 만들기' : mode === 'stage' ? `${currentStage?.number || ''}스테이지` : mode === 'physics-lab' ? '물리 계산' : '공 굴리기 연구소';
-    gameSubtitle.textContent = mode === 'stage' ? '주어진 블록을 모두 쓰고 모든 블록을 통과하세요.' : mode === 'editor' ? '블록을 선택해 고정하거나 플레이어 지급 블록으로 만드세요.' : mode === 'physics-lab' ? '' : '영상 기준 중력 9.81m/s² · 실제 마찰과 회전 관성';
+    gameSubtitle.textContent = mode === 'stage' ? '주어진 블록을 모두 쓰고 모든 블록을 통과하세요.' : mode === 'editor' ? '블록을 선택해 고정하거나 플레이어 지급 블록으로 만드세요. 공 생성으로 시험할 수 있어요.' : mode === 'physics-lab' ? '' : '중력 19.35m/s² · 나무 마찰 0.20 · 회전 관성';
     if (mode === 'physics-lab') syncPhysicsLabControls();
     renderToolDock();
     updateDeleteButton();
@@ -2210,6 +2217,30 @@
     return true;
   }
 
+  function adjacentElectricExit(rod, end, side) {
+    // A visually flush, unlinked pair should not act as a reflecting wall.
+    // This is a ride-only handoff; it never creates or saves an editor link.
+    if (side !== 'top') return null;
+    const point = rodCorner(rod, end, side);
+    const matches = [];
+    for (const other of rods) {
+      if (other.uid === rod.uid || other.type !== 'electric') continue;
+      for (const otherEnd of ['start', 'end']) {
+        if (endpointLink(other.uid, otherEnd)) continue;
+        const target = rodCorner(other, otherEnd, 'top');
+        if (distanceSquared(point, target) > 8 * 8) continue;
+        const towardRod = { x: rod.x - point.x, y: rod.y - point.y };
+        const towardOther = { x: other.x - target.x, y: other.y - target.y };
+        const dot = towardRod.x * towardOther.x + towardRod.y * towardOther.y;
+        const length = Math.hypot(towardRod.x, towardRod.y) * Math.hypot(towardOther.x, towardOther.y);
+        if (dot > length * .001) continue; // inside angle must be 90°..180°
+        matches.push({ rodUid: other.uid, end: otherEnd, side: 'top' });
+      }
+    }
+    // Do not invent a branch when several platforms meet at one corner.
+    return matches.length === 1 ? matches[0] : null;
+  }
+
   function updateElectricRide(dt) {
     const ride = ball?.electricRide;
     if (!ride) return false;
@@ -2232,22 +2263,31 @@
       travel -= Math.max(0, available);
       const end = ride.direction > 0 ? 'end' : 'start';
       const link = endpointLink(rod.uid, end);
-      if (!link) {
+      const nextEndpoint = link
+        ? link.a.rodUid === rod.uid ? link.b : link.a
+        : adjacentElectricExit(rod, end, ride.side);
+      if (!nextEndpoint) {
         const cos = Math.cos(rod.angle); const sin = Math.sin(rod.angle);
         ball.vx = cos * ride.direction * ride.speed;
         ball.vy = sin * ride.direction * ride.speed;
         ball.electricRide = null;
-        return false;
+        // Do not collide again in this same step at the track tip: it can reverse the launch.
+        return true;
       }
-      const nextEndpoint = link.a.rodUid === rod.uid ? link.b : link.a;
       const nextRod = rodByUid(nextEndpoint.rodUid);
-      if (!nextRod) { ball.electricRide = null; return false; }
+      if (!nextRod) { ball.electricRide = null; return true; }
       ride.rodUid = nextRod.uid;
       ride.side = nextEndpoint.side;
       ride.direction = nextEndpoint.end === 'start' ? 1 : -1;
       ride.distance = nextEndpoint.end === 'start' ? 0 : nextRod.length;
     }
-    return placeBallOnElectricRide(ride);
+    if (placeBallOnElectricRide(ride)) {
+      ball.angle += ball.omega * dt;
+      updateRollingSound('electric', ride.speed, ball.omega);
+      return true;
+    }
+    ball.electricRide = null;
+    return true;
   }
 
   function resolveBallRect(rect) {
@@ -2540,6 +2580,8 @@
     ball.specialContacts = [...specialContactsThisStep];
     finishImpactSoundContacts();
 
+    // Editor drops are previews, not playable stage wins or progress updates.
+    if (appMode === 'editor') return;
     const insideGoal = goals.some(goal => pointInsideBasket(goal, ball));
 
     const allRodsTouched = rods.length > 0 && rods.every(rod => touchedRodIds.has(rod.id));

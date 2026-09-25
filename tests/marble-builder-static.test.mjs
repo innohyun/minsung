@@ -9,8 +9,8 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=23/);
-    assert.match(html, /styles\.css\?v=16/);
+    assert.match(html, /game\.js\?v=24/);
+    assert.match(html, /styles\.css\?v=17/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
@@ -37,7 +37,7 @@ test('marble builder exposes spawn controls, draggable roads, and a basket goal'
 
 test('marble builder uses video-matched gravity, fixed substeps, friction, and disc inertia', () => {
     assert.match(script, /const PIXELS_PER_METER = 100/);
-    assert.match(script, /const EARTH_GRAVITY = 9\.81/);
+    assert.match(script, /const EARTH_GRAVITY = 19\.35/);
     assert.match(script, /const FIXED_STEP = 1 \/ 120/);
     assert.match(script, /const BALL_INERTIA = 0\.5 \* BALL_MASS/);
     assert.match(script, /maxFriction = rect\.material\.friction \* normalImpulse/);
@@ -80,7 +80,7 @@ test('marble builder sounds only distinct impacts and suppresses resting contact
     assert.match(script, /playImpactSoundForContact\(impactContactKey/);
     assert.match(script, /finishImpactSoundContacts\(\)/);
     assert.doesNotMatch(script, /if \(normalSpeed < 0\) \{\s*playImpactSound\(rect\.blockType/);
-    assert.match(script, /wood: \{[^\n]*restitution: 0\.08/);
+    assert.match(script, /wood: \{[^\n]*friction: 0\.20, restitution: 0\.11/);
 });
 
 test('marble builder uses an unbounded world with camera pan and four-times zoom-out', () => {
@@ -132,7 +132,8 @@ test('marble builder is responsive and touch enabled', () => {
     assert.match(script, /new ResizeObserver\(resize\)\.observe\(gameShell\)/);
     assert.doesNotMatch(styles, /body\.is-editor \.top-panel/);
     assert.doesNotMatch(styles, /body\.is-editor \.tool-dock/);
-    assert.match(styles, /body\.is-editor #spawnButton, body\.is-editor #resetButton \{ display: none; \}/);
+    assert.doesNotMatch(styles, /body\.is-editor #spawnButton[^}]*display: none/);
+    assert.match(styles, /body\.is-editor #resetButton \{ display: none; \}/);
     assert.match(script, /mode: event\.pointerType === 'touch' \? 'pending' : 'drag'/);
     assert.match(script, /toolList\.scrollLeft -= event\.clientX - placement\.lastX/);
     assert.match(script, /screen\.y >= view\.playTop \+ 5/);
@@ -306,10 +307,14 @@ test('marble builder registers and uses the named flat material assets', () => {
 
 test('block sizing preserves wood and slime texture proportions and locks electric thickness', () => {
     assert.match(script, /const ELECTRIC_PLATFORM_THICKNESS = 20/);
+    assert.match(script, /wood: \{ length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS \}/);
+    assert.match(script, /slime: \{ length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS \}/);
+    assert.match(script, /normalizedType === 'wood' && value === 14/);
+    assert.match(script, /normalizedType === 'slime' && value === 18/);
     assert.match(script, /sizingMode\.type === 'electric'[\s\S]*ELECTRIC_PLATFORM_THICKNESS/);
     assert.match(script, /toolSettings\.electric = \{ length: preview\.width, thickness: ELECTRIC_PLATFORM_THICKNESS \}/);
     assert.match(script, /function normalizedRodThickness/);
-    assert.match(script, /normalizeRodType\(type\) === 'electric'/);
+    assert.match(script, /normalizedType === 'electric'/);
 });
 
 test('rotated special platforms use their local top face and loud limited audio', () => {
@@ -337,7 +342,17 @@ test('electric platforms support corner joints, group editing, and persistent at
     assert.match(script, /electricLinks: clone\(electricLinks\)/);
     assert.match(script, /ball\.electricRide = \{/);
     assert.match(script, /ride\.direction = nextEndpoint\.end === 'start' \? 1 : -1/);
+    assert.match(script, /function adjacentElectricExit\(rod, end, side\)/);
+    assert.match(script, /return matches\.length === 1 \? matches\[0\] : null/);
+    assert.match(script, /ball\.electricRide = null;\s*\/\/ Do not collide again in this same step at the track tip/);
     assert.match(script, /drawElectricJoints\(\)/);
+});
+
+test('editor drops a preview ball without saving it or awarding a stage win', () => {
+    assert.match(script, /spawnButton\.addEventListener\('click', spawnBall\)/);
+    assert.match(script, /if \(appMode === 'editor'\) return;\s*const insideGoal/);
+    const saved = script.match(/function saveEditedStage\(\) \{([\s\S]*?)\n  \}/)?.[1] || '';
+    assert.doesNotMatch(saved, /\bball\b/);
 });
 
 test('serves the marble builder short route publicly', async () => {

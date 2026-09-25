@@ -10,7 +10,7 @@
   <link rel="preload" as="image" href="/assets/marble-builder/platforms/slime.png?v=2">
   <link rel="preload" as="image" href="/assets/marble-builder/platforms/electric.png">
 
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
 </head>
 <body class="is-home">
   <main class="game-shell">
@@ -53,7 +53,7 @@
       <div class="title-group">
         <button id="homeButton" class="icon-button" type="button" aria-label="홈으로 이동">⌂</button>
         <span class="mini-ball" aria-hidden="true"></span>
-        <div><h1 id="gameTitle">공 굴리기 연구소</h1><p id="gameSubtitle">영상 기준 중력 9.81m/s² · 실제 마찰과 회전 관성</p></div>
+        <div><h1 id="gameTitle">공 굴리기 연구소</h1><p id="gameSubtitle">중력 19.35m/s² · 나무 마찰 0.20 · 회전 관성</p></div>
       </div>
       <div class="top-actions">
         <button id="spawnButton" class="action primary" type="button">공 생성</button>
@@ -74,12 +74,12 @@
 
     <section id="physicsLabPanel" class="physics-lab-panel" aria-label="물리 계산 설정" hidden>
       <div class="physics-control">
-        <label for="gravityRange">중력 <output id="gravityReadout" for="gravityRange gravityInput">9.81m/s²</output></label>
-        <div><input id="gravityRange" type="range" min="5" max="30" step="0.01" value="9.81"><input id="gravityInput" type="number" min="5" max="30" step="0.01" value="9.81" inputmode="decimal" aria-label="중력 수치"></div>
+        <label for="gravityRange">중력 <output id="gravityReadout" for="gravityRange gravityInput">19.35m/s²</output></label>
+        <div><input id="gravityRange" type="range" min="5" max="30" step="0.01" value="19.35"><input id="gravityInput" type="number" min="5" max="30" step="0.01" value="19.35" inputmode="decimal" aria-label="중력 수치"></div>
       </div>
       <div class="physics-control">
-        <label for="woodFrictionRange">나무 마찰 <output id="woodFrictionReadout" for="woodFrictionRange woodFrictionInput">0.38</output></label>
-        <div><input id="woodFrictionRange" type="range" min="0" max="1" step="0.01" value="0.38"><input id="woodFrictionInput" type="number" min="0" max="1" step="0.01" value="0.38" inputmode="decimal" aria-label="나무 마찰 수치"></div>
+        <label for="woodFrictionRange">나무 마찰 <output id="woodFrictionReadout" for="woodFrictionRange woodFrictionInput">0.20</output></label>
+        <div><input id="woodFrictionRange" type="range" min="0" max="1" step="0.01" value="0.20"><input id="woodFrictionInput" type="number" min="0" max="1" step="0.01" value="0.20" inputmode="decimal" aria-label="나무 마찰 수치"></div>
       </div>
       <div class="physics-lab-actions">
         <button id="physicsLabRespawnButton" type="button">공 다시 놓기</button>
@@ -119,6 +119,6 @@
 
     <dialog id="deleteStageDialog" class="app-dialog"><form method="dialog"><h2>정말 삭제하시겠습니까?</h2><p>삭제한 스테이지는 되돌릴 수 없습니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button id="confirmDeleteStageButton" class="danger-dialog" type="button">삭제</button></div></form></dialog>
   </main>
-  <script src="game.js?v=23"></script>
+  <script src="game.js?v=24"></script>
 </body>
 </html>
