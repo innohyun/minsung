@@ -68,7 +68,7 @@
 
 
   const PIXELS_PER_METER = 100;
-  const EARTH_GRAVITY = 54.8;
+  const EARTH_GRAVITY = 9.81;
   const FIXED_STEP = 1 / 120;
   const BALL_RADIUS = 18;
   const BALL_MASS = 0.18;
@@ -84,6 +84,8 @@
   const ELECTRIC_MAX_SPEED = 18;
   const ELECTRIC_CONNECT_DISTANCE = 34;
   const ELECTRIC_MIN_JOINT_ANGLE = Math.PI / 2;
+  const IMPACT_SOUND_MIN_SPEED = 0.65;
+  const IMPACT_SOUND_REARM_STEPS = 12;
   const DEVELOPER_PASSWORD = '12345@';
   const STAGES_STORAGE_KEY = 'marble-builder-stages-v1';
   const PROGRESS_STORAGE_KEY = 'marble-builder-progress-v1';
@@ -110,7 +112,7 @@
     }
   ];
   const MATERIALS = {
-    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.38, restitution: 0.18, rollingResistance: 0.04 },
+    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.38, restitution: 0.08, rollingResistance: 0.04 },
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
@@ -134,6 +136,8 @@
   const particles = [];
   const electricLinks = [];
   const specialContactsThisStep = new Set();
+  const soundedImpactContacts = new Set();
+  const impactContactLastSeenStep = new Map();
   const activePointers = new Map();
   let initialized = false;
   let ball = null;
@@ -170,10 +174,13 @@
   let rollingAudio = null;
   let rollingNoiseBuffer = null;
   let recordedRollingAudio = null;
+  let recordedRollingSourceStarts = 0;
   let rollingReferenceBuffer = null;
   let woodImpactBuffers = [];
   let materialAudioPromise = null;
   let lastImpactSoundAt = 0;
+  let impactSoundCount = 0;
+  let physicsStepCount = 0;
   const undoStack = [];
   const redoStack = [];
   let freeModeDirty = false;
@@ -549,11 +556,33 @@
     return true;
   }
 
+  function resetImpactSoundContacts() {
+    soundedImpactContacts.clear();
+    impactContactLastSeenStep.clear();
+  }
+
+  function playImpactSoundForContact(contactKey, type, speed) {
+    impactContactLastSeenStep.set(contactKey, physicsStepCount);
+    if (speed < IMPACT_SOUND_MIN_SPEED || soundedImpactContacts.has(contactKey)) return;
+    soundedImpactContacts.add(contactKey);
+    playImpactSound(type, speed);
+  }
+
+  function finishImpactSoundContacts() {
+    for (const [contactKey, lastSeen] of impactContactLastSeenStep) {
+      if (physicsStepCount - lastSeen > IMPACT_SOUND_REARM_STEPS) {
+        soundedImpactContacts.delete(contactKey);
+        impactContactLastSeenStep.delete(contactKey);
+      }
+    }
+  }
+
   function playImpactSound(type, speed) {
     const audio = ensureAudio();
     const now = performance.now();
     if (!audio || now - lastImpactSoundAt < 40 || speed < 0.12) return;
     lastImpactSoundAt = now;
+    impactSoundCount += 1;
     const slime = type === 'slime';
     const start = audio.currentTime;
     const volume = Math.min(.44, .085 + speed * .035);
@@ -619,15 +648,15 @@
   function updateRollingSound(type, speed) {
     const audio = audioContext;
     if (!audio || speed < .08) {
-      if (rollingAudio && audio.currentTime - rollingAudio.lastContactAt > .12) {
+      if (rollingAudio && audio.currentTime - rollingAudio.lastContactAt > .16) {
         rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .08);
       }
-      if (recordedRollingAudio && audio.currentTime - recordedRollingAudio.lastContactAt > .12) {
+      if (recordedRollingAudio && audio.currentTime - recordedRollingAudio.lastContactAt > .16) {
         recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .08);
       }
       return;
     }
-    const useRecordedRolling = Boolean(rollingReferenceBuffer && (type === 'wood' || type === 'basket'));
+    const useRecordedRolling = Boolean(rollingReferenceBuffer && type);
     if (useRecordedRolling) {
       if (rollingAudio) rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
       if (!recordedRollingAudio) {
@@ -642,12 +671,15 @@
         gain.gain.value = .0001;
         source.connect(filter).connect(gain).connect(audioMaster);
         source.start();
+        recordedRollingSourceStarts += 1;
         recordedRollingAudio = { source, filter, gain, lastContactAt: audio.currentTime };
       }
       recordedRollingAudio.lastContactAt = audio.currentTime;
+      const materialCutoff = type === 'slime' ? 1850 : type === 'electric' ? 3400 : type === 'basket' ? 2300 : 2800;
+      const materialVolume = type === 'slime' ? .82 : type === 'electric' ? .94 : 1;
       recordedRollingAudio.source.playbackRate.setTargetAtTime(clamp(.72 + speed * .055, .72, 1.65), audio.currentTime, .05);
-      recordedRollingAudio.filter.frequency.setTargetAtTime(1500 + Math.min(2600, speed * 180), audio.currentTime, .06);
-      recordedRollingAudio.gain.gain.setTargetAtTime(Math.min(.18, .018 + speed * .018), audio.currentTime, .045);
+      recordedRollingAudio.filter.frequency.setTargetAtTime(materialCutoff + Math.min(1200, speed * 90), audio.currentTime, .08);
+      recordedRollingAudio.gain.gain.setTargetAtTime(Math.min(.18, (.018 + speed * .018) * materialVolume), audio.currentTime, .06);
       return;
     }
     if (recordedRollingAudio) recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
@@ -923,7 +955,7 @@
     followButton.textContent = followBall ? '따라가기 끄기' : '공 따라가기';
     followButton.setAttribute('aria-pressed', String(followBall));
     gameTitle.textContent = mode === 'editor' ? '스테이지 만들기' : mode === 'stage' ? `${currentStage?.number || ''}스테이지` : '공 굴리기 연구소';
-    gameSubtitle.textContent = mode === 'stage' ? '주어진 블록을 모두 쓰고 모든 블록을 통과하세요.' : mode === 'editor' ? '블록을 선택해 고정하거나 플레이어 지급 블록으로 만드세요.' : '영상 기준 중력 54.8m/s² · 실제 마찰과 회전 관성';
+    gameSubtitle.textContent = mode === 'stage' ? '주어진 블록을 모두 쓰고 모든 블록을 통과하세요.' : mode === 'editor' ? '블록을 선택해 고정하거나 플레이어 지급 블록으로 만드세요.' : '영상 기준 중력 9.81m/s² · 실제 마찰과 회전 관성';
     renderToolDock();
     updateDeleteButton();
     requestAnimationFrame(resize);
@@ -1239,6 +1271,7 @@
     goalHoldTime = 0;
     goalEnteredAt = null;
     touchedRodIds.clear();
+    resetImpactSoundContacts();
     rods.forEach(rod => { rod.touched = false; });
     successPanel.hidden = true;
     setHint('공이 떨어집니다. 충돌 속도에 따라 실제처럼 살짝 튕겨요.');
@@ -2032,9 +2065,9 @@
     const top = goal.y - goal.height;
     const bottom = goal.y;
     return [
-      { x1: left + radius, y1: top + radius, x2: left + radius, y2: bottom - radius, thickness, material: MATERIALS.basket, name: 'left' },
-      { x1: right - radius, y1: top + radius, x2: right - radius, y2: bottom - radius, thickness, material: MATERIALS.basket, name: 'right' },
-      { x1: left + radius, y1: bottom - radius, x2: right - radius, y2: bottom - radius, thickness, material: MATERIALS.basket, name: 'bottom' }
+      { x1: left + radius, y1: top + radius, x2: left + radius, y2: bottom - radius, thickness, material: MATERIALS.basket, goalId: goal.id, name: 'left' },
+      { x1: right - radius, y1: top + radius, x2: right - radius, y2: bottom - radius, thickness, material: MATERIALS.basket, goalId: goal.id, name: 'right' },
+      { x1: left + radius, y1: bottom - radius, x2: right - radius, y2: bottom - radius, thickness, material: MATERIALS.basket, goalId: goal.id, name: 'bottom' }
     ];
   }
 
@@ -2184,8 +2217,9 @@
     const normalSpeed = contactVx * nx + contactVy * ny;
     const incomingVx = ball.vx;
     const incomingVy = ball.vy;
+    const impactContactKey = `rod:${rect.blockId ?? rect.source?.uid ?? `${rect.x}:${rect.y}`}`;
+    playImpactSoundForContact(impactContactKey, rect.blockType || 'wood', Math.max(0, -normalSpeed));
     if (normalSpeed < 0) {
-      playImpactSound(rect.blockType || 'wood', Math.abs(normalSpeed));
       const inverseMass = 1 / ball.mass;
       const inverseInertia = 1 / BALL_INERTIA;
       const crossN = rx * ny - ry * nx;
@@ -2303,8 +2337,8 @@
     const contactVx = ball.vx - ball.omega * ry;
     const contactVy = ball.vy + ball.omega * rx;
     const normalSpeed = contactVx * nx + contactVy * ny;
+    playImpactSoundForContact(`basket:${segment.goalId ?? 'goal'}:${segment.name}`, 'wood', Math.max(0, -normalSpeed));
     if (normalSpeed < 0) {
-      playImpactSound('wood', Math.abs(normalSpeed));
       const inverseMass = 1 / ball.mass;
       const inverseInertia = 1 / BALL_INERTIA;
       const crossN = rx * ny - ry * nx;
@@ -2370,6 +2404,7 @@
   function physicsStep(dt) {
     if (!ball || won || editDrag) return;
     if (ball.electricRide && updateElectricRide(dt)) return;
+    physicsStepCount += 1;
     specialContactsThisStep.clear();
     if (ball.vy <= 0) ball.fallPeakY = Math.min(ball.fallPeakY ?? ball.y, ball.y);
     let gravityX = 0;
@@ -2410,6 +2445,7 @@
     goals.forEach(goal => basketSegments(goal).forEach(resolveBallBasketSegment));
     applyRollingResistance(dt);
     ball.specialContacts = [...specialContactsThisStep];
+    finishImpactSoundContacts();
 
     const insideGoal = goals.some(goal => pointInsideBasket(goal, ball));
 
@@ -3140,7 +3176,10 @@
       rollingFilterType: rollingAudio?.filter.type || null,
       referenceRollingLoaded: Boolean(rollingReferenceBuffer),
       woodImpactCount: woodImpactBuffers.length,
-      recordedRollingActive: Boolean(recordedRollingAudio)
+      recordedRollingActive: Boolean(recordedRollingAudio),
+      recordedRollingSourceStarts,
+      impactSoundCount,
+      soundedImpactContactCount: soundedImpactContacts.size
     }),
     openBlockCatalog,
     rodOverlapsAnyGoal,

@@ -9,7 +9,7 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=20/);
+    assert.match(html, /game\.js\?v=21/);
     assert.match(html, /styles\.css\?v=14/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
@@ -37,7 +37,7 @@ test('marble builder exposes spawn controls, draggable roads, and a basket goal'
 
 test('marble builder uses video-matched gravity, fixed substeps, friction, and disc inertia', () => {
     assert.match(script, /const PIXELS_PER_METER = 100/);
-    assert.match(script, /const EARTH_GRAVITY = 54\.8/);
+    assert.match(script, /const EARTH_GRAVITY = 9\.81/);
     assert.match(script, /const FIXED_STEP = 1 \/ 120/);
     assert.match(script, /const BALL_INERTIA = 0\.5 \* BALL_MASS/);
     assert.match(script, /maxFriction = rect\.material\.friction \* normalImpulse/);
@@ -57,10 +57,22 @@ test('marble builder uses the approved recording for wood audio without replacin
     assert.match(script, /marble-roll-reference\.wav\?v=1/);
     assert.match(script, /wood-hit-\$\{index\}\.wav\?v=1/);
     assert.match(script, /type === 'wood' && playRecordedWoodImpact/);
-    assert.match(script, /type === 'wood' \|\| type === 'basket'/);
+    assert.match(script, /rollingReferenceBuffer && type/);
+    assert.match(script, /recordedRollingSourceStarts \+= 1/);
+    assert.match(script, /type === 'slime' \? 1850 : type === 'electric' \? 3400/);
     assert.match(script, /const electric = type === 'electric'/);
     assert.match(script, /electric \? 126 : 82/);
     assert.equal(assetManifest.audio.length, 2);
+});
+
+test('marble builder sounds only distinct impacts and suppresses resting contact chatter', () => {
+    assert.match(script, /const IMPACT_SOUND_MIN_SPEED = 0\.65/);
+    assert.match(script, /const IMPACT_SOUND_REARM_STEPS = 12/);
+    assert.match(script, /soundedImpactContacts\.has\(contactKey\)/);
+    assert.match(script, /playImpactSoundForContact\(impactContactKey/);
+    assert.match(script, /finishImpactSoundContacts\(\)/);
+    assert.doesNotMatch(script, /if \(normalSpeed < 0\) \{\s*playImpactSound\(rect\.blockType/);
+    assert.match(script, /wood: \{[^\n]*restitution: 0\.08/);
 });
 
 test('marble builder uses an unbounded world with camera pan and four-times zoom-out', () => {
@@ -217,7 +229,7 @@ test('marble builder supports creations, follow camera, mandatory sound, special
     assert.match(script, /function drawPlatformAsset/);
     assert.match(script, /platformImages\[rod\.type\]/);
     assert.match(script, /audioCompressor = audioContext\.createDynamicsCompressor/);
-    assert.match(script, /audio\.currentTime - rollingAudio\.lastContactAt > \.12/);
+    assert.match(script, /audio\.currentTime - rollingAudio\.lastContactAt > \.16/);
 });
 
 test('basket overlap is rejected for new and moved blocks', () => {
