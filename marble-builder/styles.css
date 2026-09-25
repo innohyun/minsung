@@ -71,6 +71,36 @@ button { font: inherit; }
   transition: opacity .2s;
 }
 
+.physics-lab-panel {
+  position: absolute;
+  top: max(94px, calc(env(safe-area-inset-top) + 82px));
+  left: 50%;
+  z-index: 7;
+  width: min(900px, calc(100% - 24px));
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(210px, 1fr)) auto;
+  align-items: end;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(23, 50, 77, .16);
+  border-radius: 18px;
+  background: rgba(248, 252, 255, .96);
+  box-shadow: 0 12px 30px rgba(31, 74, 111, .18);
+  backdrop-filter: blur(14px);
+  touch-action: manipulation;
+}
+.physics-control { display: grid; gap: 7px; min-width: 0; }
+.physics-control label { display: flex; justify-content: space-between; gap: 8px; font-size: .78rem; font-weight: 850; }
+.physics-control output { color: #245fa8; font-variant-numeric: tabular-nums; }
+.physics-control > div { display: flex; align-items: center; gap: 8px; }
+.physics-control input[type="range"] { min-width: 70px; flex: 1; accent-color: var(--blue); touch-action: pan-x; }
+.physics-control input[type="number"] { width: 78px; min-height: 40px; padding: 0 8px; border: 1px solid rgba(23,50,77,.2); border-radius: 9px; background: #fff; color: var(--ink); font: 800 16px/1 "Avenir Next", sans-serif; text-align: right; }
+.physics-lab-actions { display: flex; gap: 7px; }
+.physics-lab-actions button { min-height: 42px; padding: 0 12px; border: 1px solid rgba(23,50,77,.15); border-radius: 10px; background: #fff; color: var(--ink); font-weight: 850; white-space: nowrap; }
+.physics-lab-actions #physicsLabRespawnButton { border-color: transparent; background: var(--blue); color: #fff; }
+body.is-physics-lab .hint { top: 187px; }
+
 .tool-dock {
   position: absolute;
   left: 50%; bottom: max(12px, env(safe-area-inset-bottom));
@@ -157,7 +187,10 @@ button { font: inherit; }
 .menu-screen { position: absolute; inset: 0; z-index: 30; overflow-y: auto; padding: max(24px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(30px, env(safe-area-inset-bottom)); background: linear-gradient(155deg, #cce8f9 0%, #e9f6f2 57%, #fff2cf 100%); touch-action: pan-y; }
 .menu-screen[hidden] { display: none; }
 .home-screen { display: grid; place-content: center; }
-.developer-button { position: fixed; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 2; min-height: 44px; padding: 0 16px; border: 0; border-radius: 13px; background: #17324d; color: #fff; font-weight: 850; cursor: pointer; }
+.developer-controls { position: fixed; top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); z-index: 2; display: flex; gap: 8px; }
+.developer-button, .physics-lab-button { min-height: 44px; padding: 0 16px; border: 0; border-radius: 13px; color: #fff; font-weight: 850; cursor: pointer; }
+.developer-button { background: #17324d; }
+.physics-lab-button { background: #1d8368; box-shadow: 0 7px 16px rgba(29,131,104,.22); }
 .developer-button.active { background: #5d3b9d; }
 .home-hero { width: min(900px, 100%); margin: 52px auto 24px; display: flex; align-items: center; gap: 22px; }
 .home-hero h1 { margin: 0; font-size: clamp(2rem, 6vw, 4.2rem); line-height: .98; letter-spacing: -.055em; }
@@ -192,6 +225,7 @@ button { font: inherit; }
 .free-card { background: linear-gradient(145deg, #fff 0%, #e6f2ff 100%); }
 .stage-card { background: linear-gradient(145deg, #fff 0%, #fff0c6 100%); }
 .maker-card { background: linear-gradient(145deg, #fff 0%, #efe5ff 100%); }
+
 .speed-options { display: flex; gap: 6px; margin-top: 8px; }
 .speed-options button { min-height: 38px; flex: 1; border: 1px solid rgba(23,50,77,.14); border-radius: 10px; background: #fff; color: var(--ink); font-weight: 800; cursor: pointer; }
 .speed-options button.active { background: var(--blue); color: #fff; border-color: transparent; }
@@ -242,6 +276,10 @@ body.is-home .top-panel, body.is-home .hint, body.is-home .tool-dock, body.is-st
   .home-hero { margin-top: 68px; gap: 13px; }
   .home-grid { grid-template-columns: 1fr; }
   .home-card, .mode-card { min-height: 104px; padding: 16px; }
+  .physics-lab-panel { top: max(120px, calc(env(safe-area-inset-top) + 108px)); grid-template-columns: 1fr; gap: 9px; padding: 10px; }
+  .physics-lab-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .physics-lab-actions button { min-height: 40px; padding: 0 7px; font-size: .72rem; }
+  body.is-physics-lab .hint { top: 330px; }
   body.is-editor #spawnButton, body.is-editor #resetButton { display: none; }
 
   .tool-list { min-width: 0; }

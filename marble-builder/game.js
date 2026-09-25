@@ -34,6 +34,16 @@
   const stageModeButton = document.getElementById('stageModeButton');
   const developerButton = document.getElementById('developerButton');
   const mapMakerButton = document.getElementById('mapMakerButton');
+  const physicsLabButton = document.getElementById('physicsLabButton');
+  const physicsLabPanel = document.getElementById('physicsLabPanel');
+  const gravityRange = document.getElementById('gravityRange');
+  const gravityInput = document.getElementById('gravityInput');
+  const gravityReadout = document.getElementById('gravityReadout');
+  const woodFrictionRange = document.getElementById('woodFrictionRange');
+  const woodFrictionInput = document.getElementById('woodFrictionInput');
+  const woodFrictionReadout = document.getElementById('woodFrictionReadout');
+  const physicsLabRespawnButton = document.getElementById('physicsLabRespawnButton');
+  const physicsLabResetButton = document.getElementById('physicsLabResetButton');
   const developerDialog = document.getElementById('developerDialog');
   const developerForm = document.getElementById('developerForm');
   const developerPassword = document.getElementById('developerPassword');
@@ -118,6 +128,9 @@
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
     basket: { friction: 0.48, restitution: 0.14, rollingResistance: 0.055 }
   };
+  const PHYSICS_LAB_DEFAULTS = { gravity: EARTH_GRAVITY, woodFriction: MATERIALS.wood.friction };
+  const physicsLabSettings = { ...PHYSICS_LAB_DEFAULTS };
+  const physicsLabWoodMaterial = { ...MATERIALS.wood };
   const BLOCK_CATALOG = [
     { type: 'wood', label: '나무 길', detail: '보통 마찰' },
 
@@ -175,6 +188,8 @@
   let rollingNoiseBuffer = null;
   let recordedRollingAudio = null;
   let recordedRollingSourceStarts = 0;
+  let recordedRollingRevolutionsPerSecond = 0;
+  let recordedRollingPlaybackRate = 0;
   let rollingReferenceBuffer = null;
   let woodImpactBuffers = [];
   let materialAudioPromise = null;
@@ -645,13 +660,26 @@
     knock.stop(start + .11);
   }
 
-  function updateRollingSound(type, speed) {
+  function rollingPlaybackRateForOmega(omega, bufferDuration) {
+    const revolutionsPerSecond = Math.abs(Number(omega) || 0) / (Math.PI * 2);
+    return revolutionsPerSecond * Math.max(0, Number(bufferDuration) || 0);
+  }
+
+  function rollingGainForRevolutions(revolutionsPerSecond, materialVolume = 1) {
+    const normalizedSpeed = clamp(Math.max(0, revolutionsPerSecond) / 3, 0, 1);
+    return (.0015 + Math.pow(normalizedSpeed, .72) * .1785) * materialVolume;
+  }
+
+  function updateRollingSound(type, speed, angularSpeed = ball?.omega || 0) {
     const audio = audioContext;
-    if (!audio || speed < .08) {
-      if (rollingAudio && audio.currentTime - rollingAudio.lastContactAt > .16) {
+    const revolutionsPerSecond = Math.abs(Number(angularSpeed) || 0) / (Math.PI * 2);
+    recordedRollingRevolutionsPerSecond = revolutionsPerSecond;
+    if (!audio || speed < .08 || revolutionsPerSecond < .025) {
+      recordedRollingPlaybackRate = 0;
+      if (rollingAudio && audio && audio.currentTime - rollingAudio.lastContactAt > .16) {
         rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .08);
       }
-      if (recordedRollingAudio && audio.currentTime - recordedRollingAudio.lastContactAt > .16) {
+      if (recordedRollingAudio && audio && audio.currentTime - recordedRollingAudio.lastContactAt > .16) {
         recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .08);
       }
       return;
@@ -665,6 +693,8 @@
         const gain = audio.createGain();
         source.buffer = rollingReferenceBuffer;
         source.loop = true;
+        source.loopStart = 0;
+        source.loopEnd = rollingReferenceBuffer.duration;
         filter.type = 'lowpass';
         filter.frequency.value = 3600;
         filter.Q.value = .4;
@@ -677,9 +707,10 @@
       recordedRollingAudio.lastContactAt = audio.currentTime;
       const materialCutoff = type === 'slime' ? 1850 : type === 'electric' ? 3400 : type === 'basket' ? 2300 : 2800;
       const materialVolume = type === 'slime' ? .82 : type === 'electric' ? .94 : 1;
-      recordedRollingAudio.source.playbackRate.setTargetAtTime(clamp(.72 + speed * .055, .72, 1.65), audio.currentTime, .05);
+      recordedRollingPlaybackRate = rollingPlaybackRateForOmega(angularSpeed, rollingReferenceBuffer.duration);
+      recordedRollingAudio.source.playbackRate.setTargetAtTime(Math.max(.001, recordedRollingPlaybackRate), audio.currentTime, .035);
       recordedRollingAudio.filter.frequency.setTargetAtTime(materialCutoff + Math.min(1200, speed * 90), audio.currentTime, .08);
-      recordedRollingAudio.gain.gain.setTargetAtTime(Math.min(.18, (.018 + speed * .018) * materialVolume), audio.currentTime, .06);
+      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, materialVolume), audio.currentTime, .08);
       return;
     }
     if (recordedRollingAudio) recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
@@ -749,6 +780,49 @@
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
+  }
+
+  function activeGravity() {
+    return appMode === 'physics-lab' ? physicsLabSettings.gravity : EARTH_GRAVITY;
+  }
+
+  function materialForType(type) {
+    if (appMode === 'physics-lab' && type === 'wood') {
+      physicsLabWoodMaterial.friction = physicsLabSettings.woodFriction;
+      const frictionRatio = physicsLabSettings.woodFriction / PHYSICS_LAB_DEFAULTS.woodFriction;
+      physicsLabWoodMaterial.rollingResistance = MATERIALS.wood.rollingResistance * frictionRatio;
+      return physicsLabWoodMaterial;
+    }
+    return MATERIALS[type];
+  }
+
+  function syncPhysicsLabControls() {
+    const gravityValue = physicsLabSettings.gravity.toFixed(2);
+    const frictionValue = physicsLabSettings.woodFriction.toFixed(2);
+    gravityRange.value = String(physicsLabSettings.gravity);
+    gravityInput.value = gravityValue;
+    gravityReadout.value = `${gravityValue}m/s²`;
+    woodFrictionRange.value = String(physicsLabSettings.woodFriction);
+    woodFrictionInput.value = frictionValue;
+    woodFrictionReadout.value = frictionValue;
+    physicsLabWoodMaterial.friction = physicsLabSettings.woodFriction;
+    if (appMode === 'physics-lab') {
+      gameSubtitle.textContent = `중력 ${gravityValue}m/s² · 나무 마찰 ${frictionValue}`;
+    }
+  }
+
+  function updatePhysicsLabSetting(key, rawValue) {
+    const numeric = Number(rawValue);
+    if (!Number.isFinite(numeric)) return;
+    if (key === 'gravity') physicsLabSettings.gravity = clamp(numeric, 5, 30);
+    if (key === 'woodFriction') physicsLabSettings.woodFriction = clamp(numeric, 0, 1);
+    syncPhysicsLabControls();
+  }
+
+  function resetPhysicsLabSettings() {
+    Object.assign(physicsLabSettings, PHYSICS_LAB_DEFAULTS);
+    syncPhysicsLabControls();
+    setHint('물리 계산값을 현재 게임 기본값으로 되돌렸습니다.');
   }
 
   function setHint(message, duration = 2600) {
@@ -945,17 +1019,19 @@
     document.body.className = `is-${mode}`;
     homeScreen.hidden = mode !== 'home';
     stageScreen.hidden = mode !== 'stage-list';
+    physicsLabPanel.hidden = mode !== 'physics-lab';
     saveStageButton.hidden = mode !== 'editor';
     cancelEditorButton.hidden = mode !== 'editor';
     toggleFixedButton.hidden = mode !== 'editor';
-    undoButton.hidden = !['free', 'stage', 'editor'].includes(mode);
-    redoButton.hidden = !['free', 'stage', 'editor'].includes(mode);
+    undoButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
+    redoButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
     saveMapButton.hidden = mode !== 'free';
-    followButton.hidden = !['free', 'stage'].includes(mode);
+    followButton.hidden = !['free', 'stage', 'physics-lab'].includes(mode);
     followButton.textContent = followBall ? '따라가기 끄기' : '공 따라가기';
     followButton.setAttribute('aria-pressed', String(followBall));
-    gameTitle.textContent = mode === 'editor' ? '스테이지 만들기' : mode === 'stage' ? `${currentStage?.number || ''}스테이지` : '공 굴리기 연구소';
-    gameSubtitle.textContent = mode === 'stage' ? '주어진 블록을 모두 쓰고 모든 블록을 통과하세요.' : mode === 'editor' ? '블록을 선택해 고정하거나 플레이어 지급 블록으로 만드세요.' : '영상 기준 중력 9.81m/s² · 실제 마찰과 회전 관성';
+    gameTitle.textContent = mode === 'editor' ? '스테이지 만들기' : mode === 'stage' ? `${currentStage?.number || ''}스테이지` : mode === 'physics-lab' ? '물리 계산' : '공 굴리기 연구소';
+    gameSubtitle.textContent = mode === 'stage' ? '주어진 블록을 모두 쓰고 모든 블록을 통과하세요.' : mode === 'editor' ? '블록을 선택해 고정하거나 플레이어 지급 블록으로 만드세요.' : mode === 'physics-lab' ? '' : '영상 기준 중력 9.81m/s² · 실제 마찰과 회전 관성';
+    if (mode === 'physics-lab') syncPhysicsLabControls();
     renderToolDock();
     updateDeleteButton();
     requestAnimationFrame(resize);
@@ -991,6 +1067,7 @@
     developerButton.classList.toggle('active', developerEnabled);
     developerButton.textContent = developerEnabled ? '개발자 모드 끄기' : '개발자 모드';
     mapMakerButton.hidden = !developerEnabled;
+    physicsLabButton.hidden = !developerEnabled;
     stageProgressText.textContent = `${unlockedStage}스테이지까지 도전 가능`;
     renderCreations();
     setAppMode('home');
@@ -1112,6 +1189,19 @@
     setHint('자유 모드: 개수 제한 없이 길을 만들 수 있어요.', 3200);
   }
 
+  function startPhysicsLab() {
+    if (!developerEnabled) return;
+    currentStage = null;
+    editorStageId = null;
+    activeCreationId = null;
+    clearWorldState();
+    successTitle.textContent = '골인!';
+    successMessage.textContent = '공이 바구니에 도착했어요.';
+    setAppMode('physics-lab');
+    freeModeDirty = false;
+    setHint('중력과 나무 마찰을 바꾸고 공 다시 놓기로 바로 비교하세요.', 3800);
+  }
+
   function startEditor(stage = null, setup = null) {
     const source = normalizeStage(stage || {
       id: `stage-${Date.now()}`,
@@ -1212,7 +1302,8 @@
     if (canvas.height !== bitmapHeight) canvas.height = bitmapHeight;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     view.dockTop = toolDock.getBoundingClientRect().top - rect.top;
-    view.playTop = topPanel.getBoundingClientRect().bottom - rect.top;
+    const controlsBottom = appMode === 'physics-lab' ? physicsLabPanel.getBoundingClientRect().bottom : topPanel.getBoundingClientRect().bottom;
+    view.playTop = controlsBottom - rect.top;
 
     if (!initialized) {
       spawn.x = Math.max(90, Math.min(view.width * 0.23, view.width - 90));
@@ -1356,7 +1447,7 @@
     if (appMode === 'stage' && rod.supplyId) {
       const supply = stageSupplies.find(item => item.supplyId === rod.supplyId);
       if (supply) supply.used = true;
-    } else if (appMode === 'free' || appMode === 'editor') {
+    } else if (appMode === 'free' || appMode === 'editor' || appMode === 'physics-lab') {
       rememberTool(type, rod.fixed);
     }
     selectEntity(rod);
@@ -2098,7 +2189,7 @@
   }
 
   function reboundSpeed(fallDistanceMeters, reboundRatio) {
-    return Math.sqrt(2 * EARTH_GRAVITY * Math.max(0, fallDistanceMeters) * reboundRatio);
+    return Math.sqrt(2 * activeGravity() * Math.max(0, fallDistanceMeters) * reboundRatio);
   }
 
   function placeBallOnElectricRide(ride) {
@@ -2133,7 +2224,7 @@
         ride.distance += ride.direction * travel;
         placeBallOnElectricRide(ride);
         ball.angle += ball.omega * dt;
-        updateRollingSound('electric', ride.speed);
+        updateRollingSound('electric', ride.speed, ball.omega);
         return true;
       }
       ride.distance = ride.direction > 0 ? rod.length : 0;
@@ -2371,6 +2462,7 @@
 
   function applyRollingResistance(dt) {
     if (!ball) return;
+    const gravity = activeGravity();
     let rollingType = null;
     let rollingSpeed = 0;
     for (const contact of supportContacts) {
@@ -2381,8 +2473,8 @@
         rollingSpeed = Math.abs(tangentSpeed);
         rollingType = contact.type;
       }
-      const gravityAlongTangent = EARTH_GRAVITY * ty;
-      let maxSlowdown = EARTH_GRAVITY * contact.resistance * dt;
+      const gravityAlongTangent = gravity * ty;
+      let maxSlowdown = gravity * contact.resistance * dt;
       const movingDownhill = tangentSpeed * gravityAlongTangent > 0;
       if (movingDownhill && Math.abs(gravityAlongTangent) > 0.001) {
         maxSlowdown = Math.min(maxSlowdown, Math.abs(gravityAlongTangent) * dt * 0.85);
@@ -2398,7 +2490,7 @@
         ball.omega = 0;
       }
     }
-    updateRollingSound(rollingType, rollingSpeed);
+    updateRollingSound(rollingType, rollingSpeed, ball.omega);
   }
 
   function physicsStep(dt) {
@@ -2407,12 +2499,13 @@
     physicsStepCount += 1;
     specialContactsThisStep.clear();
     if (ball.vy <= 0) ball.fallPeakY = Math.min(ball.fallPeakY ?? ball.y, ball.y);
+    const gravity = activeGravity();
     let gravityX = 0;
-    let gravityY = EARTH_GRAVITY;
+    let gravityY = gravity;
     for (const field of fields) {
       if (!pointInField(ball, field)) continue;
-      gravityX = field.direction === 'left' ? -EARTH_GRAVITY : field.direction === 'right' ? EARTH_GRAVITY : 0;
-      gravityY = field.direction === 'up' ? -EARTH_GRAVITY : 0;
+      gravityX = field.direction === 'left' ? -gravity : field.direction === 'right' ? gravity : 0;
+      gravityY = field.direction === 'up' ? -gravity : 0;
     }
     ball.vx += gravityX * dt;
     ball.vy += gravityY * dt;
@@ -2432,7 +2525,7 @@
         width: rod.length,
         height: rod.thickness,
         angle: rod.angle,
-        material: MATERIALS[rod.type],
+        material: materialForType(rod.type),
         blockType: rod.type,
         blockId: rod.id,
         source: rod
@@ -2913,7 +3006,7 @@
       accumulator -= FIXED_STEP;
     }
     updateParticles(elapsed);
-    if (followBall && ball && (appMode === 'free' || appMode === 'stage')) {
+    if (followBall && ball && (appMode === 'free' || appMode === 'stage' || appMode === 'physics-lab')) {
       const targetX = ball.x - view.width / (2 * camera.zoom);
       const targetY = ball.y - view.height / (2 * camera.zoom);
       camera.x += (targetX - camera.x) * 0.14;
@@ -2962,6 +3055,7 @@
   homeButton.addEventListener('click', requestHome);
   document.querySelector('.stage-home-button').addEventListener('click', showHome);
   freeModeButton.addEventListener('click', startFreeMode);
+  physicsLabButton.addEventListener('click', startPhysicsLab);
   stageModeButton.addEventListener('click', showStageList);
   saveStageButton.addEventListener('click', saveEditedStage);
   cancelEditorButton.addEventListener('click', showStageList);
@@ -3011,6 +3105,12 @@
   });
   cancelSizeButton.addEventListener('click', () => finishToolSizing(false));
   confirmSizeButton.addEventListener('click', () => finishToolSizing(true));
+  gravityRange.addEventListener('input', () => updatePhysicsLabSetting('gravity', gravityRange.value));
+  gravityInput.addEventListener('change', () => updatePhysicsLabSetting('gravity', gravityInput.value));
+  woodFrictionRange.addEventListener('input', () => updatePhysicsLabSetting('woodFriction', woodFrictionRange.value));
+  woodFrictionInput.addEventListener('change', () => updatePhysicsLabSetting('woodFriction', woodFrictionInput.value));
+  physicsLabRespawnButton.addEventListener('click', spawnBall);
+  physicsLabResetButton.addEventListener('click', resetPhysicsLabSettings);
   mapMakerButton.addEventListener('click', () => {
     let nextNumber = 1;
     while (stages.some(stage => Number(stage.number) === nextNumber)) nextNumber += 1;
@@ -3067,7 +3167,7 @@
       return;
     }
     if ((event.key === 'Delete' || event.key === 'Backspace') && selected) deleteSelected();
-    if (event.code === 'Space' && ['free', 'stage', 'editor'].includes(appMode)) {
+    if (event.code === 'Space' && ['free', 'stage', 'editor', 'physics-lab'].includes(appMode)) {
       event.preventDefault();
       spawnBall();
     }
@@ -3105,6 +3205,10 @@
       won,
       appMode,
       developerEnabled,
+      physicsLabSettings: { ...physicsLabSettings },
+      activeGravity: activeGravity(),
+      activeWoodFriction: materialForType('wood').friction,
+      activeWoodRollingResistance: materialForType('wood').rollingResistance,
 
       unlockedStage,
       touchedRodIds: [...touchedRodIds],
@@ -3151,6 +3255,9 @@
     showHome,
     showStageList,
     startFreeMode,
+    startPhysicsLab,
+    updatePhysicsLabSetting,
+    resetPhysicsLabSettings,
     loadStage,
     startEditor,
     saveEditedStage,
@@ -3166,6 +3273,8 @@
     reboundSpeed,
     playImpactSound,
     updateRollingSound,
+    rollingPlaybackRateForOmega,
+    rollingGainForRevolutions,
     getAudioState: () => ({
       contextState: audioContext?.state || 'none',
       masterGain: audioMaster?.gain.value || 0,
@@ -3178,6 +3287,8 @@
       woodImpactCount: woodImpactBuffers.length,
       recordedRollingActive: Boolean(recordedRollingAudio),
       recordedRollingSourceStarts,
+      recordedRollingRevolutionsPerSecond,
+      recordedRollingPlaybackRate,
       impactSoundCount,
       soundedImpactContactCount: soundedImpactContacts.size
     }),

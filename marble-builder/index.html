@@ -10,14 +10,17 @@
   <link rel="preload" as="image" href="/assets/marble-builder/platforms/slime.png?v=2">
   <link rel="preload" as="image" href="/assets/marble-builder/platforms/electric.png">
 
-  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="stylesheet" href="styles.css?v=15">
 </head>
 <body class="is-home">
   <main class="game-shell">
     <canvas id="gameCanvas" aria-label="공 굴리기 게임 화면"></canvas>
 
     <section id="homeScreen" class="menu-screen home-screen" aria-labelledby="homeTitle">
-      <button id="developerButton" class="developer-button" type="button">개발자 모드</button>
+      <div class="developer-controls">
+        <button id="physicsLabButton" class="physics-lab-button" type="button" hidden>물리 계산</button>
+        <button id="developerButton" class="developer-button" type="button">개발자 모드</button>
+      </div>
       <div class="home-hero">
         <span class="home-ball" aria-hidden="true"></span>
         <div>
@@ -69,6 +72,21 @@
       </div>
     </header>
 
+    <section id="physicsLabPanel" class="physics-lab-panel" aria-label="물리 계산 설정" hidden>
+      <div class="physics-control">
+        <label for="gravityRange">중력 <output id="gravityReadout" for="gravityRange gravityInput">9.81m/s²</output></label>
+        <div><input id="gravityRange" type="range" min="5" max="30" step="0.01" value="9.81"><input id="gravityInput" type="number" min="5" max="30" step="0.01" value="9.81" inputmode="decimal" aria-label="중력 수치"></div>
+      </div>
+      <div class="physics-control">
+        <label for="woodFrictionRange">나무 마찰 <output id="woodFrictionReadout" for="woodFrictionRange woodFrictionInput">0.38</output></label>
+        <div><input id="woodFrictionRange" type="range" min="0" max="1" step="0.01" value="0.38"><input id="woodFrictionInput" type="number" min="0" max="1" step="0.01" value="0.38" inputmode="decimal" aria-label="나무 마찰 수치"></div>
+      </div>
+      <div class="physics-lab-actions">
+        <button id="physicsLabRespawnButton" type="button">공 다시 놓기</button>
+        <button id="physicsLabResetButton" type="button">기본값 복구</button>
+      </div>
+    </section>
+
     <aside id="hint" class="hint" role="status">아래 블록을 끌어서 화면에 놓아 보세요.</aside>
 
     <section class="tool-dock" aria-label="설치할 블록 목록">
@@ -101,6 +119,6 @@
 
     <dialog id="deleteStageDialog" class="app-dialog"><form method="dialog"><h2>정말 삭제하시겠습니까?</h2><p>삭제한 스테이지는 되돌릴 수 없습니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button id="confirmDeleteStageButton" class="danger-dialog" type="button">삭제</button></div></form></dialog>
   </main>
-  <script src="game.js?v=21"></script>
+  <script src="game.js?v=22"></script>
 </body>
 </html>

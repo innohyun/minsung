@@ -9,8 +9,8 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=21/);
-    assert.match(html, /styles\.css\?v=14/);
+    assert.match(html, /game\.js\?v=22/);
+    assert.match(html, /styles\.css\?v=15/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
@@ -43,8 +43,9 @@ test('marble builder uses video-matched gravity, fixed substeps, friction, and d
     assert.match(script, /maxFriction = rect\.material\.friction \* normalImpulse/);
     assert.match(script, /rollingResistance:/);
     assert.match(script, /function applyRollingResistance/);
-    assert.match(script, /EARTH_GRAVITY \* contact\.resistance \* dt/);
-    assert.match(script, /const gravityAlongTangent = EARTH_GRAVITY \* ty/);
+    assert.match(script, /const gravity = activeGravity\(\)/);
+    assert.match(script, /gravity \* contact\.resistance \* dt/);
+    assert.match(script, /const gravityAlongTangent = gravity \* ty/);
     assert.match(script, /const movingDownhill = tangentSpeed \* gravityAlongTangent > 0/);
     assert.match(script, /Math\.abs\(gravityAlongTangent\) \* dt \* 0\.85/);
     assert.match(script, /const nearlyLevel = Math\.abs\(ty\) < 0\.005/);
@@ -59,6 +60,13 @@ test('marble builder uses the approved recording for wood audio without replacin
     assert.match(script, /type === 'wood' && playRecordedWoodImpact/);
     assert.match(script, /rollingReferenceBuffer && type/);
     assert.match(script, /recordedRollingSourceStarts \+= 1/);
+    assert.match(script, /function rollingPlaybackRateForOmega/);
+    assert.match(script, /Math\.abs\(Number\(omega\) \|\| 0\) \/ \(Math\.PI \* 2\)/);
+    assert.match(script, /rollingPlaybackRateForOmega\(angularSpeed, rollingReferenceBuffer\.duration\)/);
+    assert.match(script, /function rollingGainForRevolutions/);
+    assert.match(script, /Math\.pow\(normalizedSpeed, \.72\)/);
+    assert.match(script, /rollingGainForRevolutions\(revolutionsPerSecond, materialVolume\)/);
+    assert.match(script, /source\.loopEnd = rollingReferenceBuffer\.duration/);
     assert.match(script, /type === 'slime' \? 1850 : type === 'electric' \? 3400/);
     assert.match(script, /const electric = type === 'electric'/);
     assert.match(script, /electric \? 126 : 82/);
@@ -171,6 +179,26 @@ test('developer mode gates stage creation, editing, and confirmed deletion', () 
     assert.match(script, /supplyBlocks/);
     assert.match(script, /angleLocked: appMode === 'stage'/);
     assert.match(script, /appMode === 'editor' && !rod\.fixed \? 0\.42 : 1/);
+});
+
+test('developer physics lab adjusts gravity and wood friction without changing normal-mode defaults', () => {
+    assert.match(html, /id="physicsLabButton"[^>]*hidden/);
+    assert.match(html, /id="physicsLabPanel"[^>]*hidden/);
+    assert.match(html, /id="gravityRange"/);
+    assert.match(html, /id="woodFrictionRange"/);
+    assert.match(html, /id="physicsLabRespawnButton"/);
+    assert.match(html, /class="developer-controls"[\s\S]*id="physicsLabButton"[\s\S]*id="developerButton"/);
+    assert.match(script, /function startPhysicsLab/);
+    assert.match(script, /if \(!developerEnabled\) return/);
+    assert.match(script, /physicsLabButton\.hidden = !developerEnabled/);
+    assert.match(script, /return appMode === 'physics-lab' \? physicsLabSettings\.gravity : EARTH_GRAVITY/);
+    assert.match(script, /appMode === 'physics-lab' && type === 'wood'/);
+    assert.match(script, /material: materialForType\(rod\.type\)/);
+    assert.match(script, /physicsLabWoodMaterial\.rollingResistance = MATERIALS\.wood\.rollingResistance \* frictionRatio/);
+    assert.match(script, /gravityRange\.addEventListener\('input'/);
+    assert.match(script, /woodFrictionRange\.addEventListener\('input'/);
+    assert.match(styles, /\.physics-lab-panel/);
+    assert.match(styles, /body\.is-physics-lab \.hint/);
 });
 
 test('default stage one is removed without deleting user-created stage one', () => {
