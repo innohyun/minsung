@@ -12,7 +12,7 @@
 
   <link rel="preload" as="image" href="/assets/marble-builder/swing/swing-magnet.png?v=2">
   <link rel="preload" as="image" href="/assets/marble-builder/swing/swing-weight.png?v=2">
-  <link rel="stylesheet" href="styles.css?v=22">
+  <link rel="stylesheet" href="styles.css?v=23">
 </head>
 <body class="is-home">
   <main class="game-shell">
@@ -47,6 +47,7 @@
       <div class="screen-heading">
         <button class="icon-button stage-home-button" type="button" aria-label="홈으로 이동">⌂</button>
         <div><h2 id="stageTitle">스테이지 선택</h2><p>열린 스테이지를 골라 도전하세요.</p></div>
+        <button id="swapStagesButton" class="action stage-swap-button" type="button" hidden>자리 바꾸기</button>
       </div>
       <div id="stageList" class="stage-list"></div>
     </section>
@@ -112,6 +113,7 @@
     <dialog id="developerDialog" class="app-dialog"><form method="dialog" id="developerForm"><h2>개발자 모드</h2><p>비밀번호를 입력하세요.</p><input id="developerPassword" type="password" autocomplete="off" aria-label="개발자 비밀번호" required><p id="developerError" class="form-error" hidden>비밀번호가 맞지 않습니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button class="primary-dialog" type="submit">확인</button></div></form></dialog>
 
     <dialog id="stageSetupDialog" class="app-dialog"><form method="dialog" id="stageSetupForm"><h2>새 스테이지 설정</h2><label>스테이지 번호<input id="stageNumberInput" type="number" min="1" required></label><p>블록 개수와 각도는 맵 만들기에서 배치한 내용으로 정해집니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button class="primary-dialog" type="submit">맵 만들기 시작</button></div></form></dialog>
+    <dialog id="swapStagesDialog" class="app-dialog"><form id="swapStagesForm"><h2>스테이지 자리 바꾸기</h2><p>서로 바꿀 스테이지 번호를 입력하세요.</p><label>첫 번째 스테이지<input id="firstStageNumber" type="number" min="1" step="1" required inputmode="numeric"></label><label>두 번째 스테이지<input id="secondStageNumber" type="number" min="1" step="1" required inputmode="numeric"></label><p id="swapStagesError" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button class="primary-dialog" type="submit">자리 바꾸기</button></div></form></dialog>
 
     <dialog id="blockCatalogDialog" class="app-dialog catalog-dialog"><div class="catalog-shell"><div class="catalog-heading"><div><h2>모든 블록</h2><p>블록을 고르고 맵으로 끌어 놓으세요.</p></div><button id="closeCatalogButton" type="button" aria-label="블록 목록 닫기">×</button></div><div id="blockCatalogGrid" class="catalog-grid"></div></div></dialog>
 
@@ -125,6 +127,6 @@
 
     <dialog id="deleteStageDialog" class="app-dialog"><form method="dialog"><h2>정말 삭제하시겠습니까?</h2><p>삭제한 스테이지는 되돌릴 수 없습니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button id="confirmDeleteStageButton" class="danger-dialog" type="button">삭제</button></div></form></dialog>
   </main>
-  <script src="game.js?v=33"></script>
+  <script src="game.js?v=34"></script>
 </body>
 </html>

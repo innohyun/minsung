@@ -30,6 +30,12 @@
   const homeScreen = document.getElementById('homeScreen');
   const stageScreen = document.getElementById('stageScreen');
   const stageList = document.getElementById('stageList');
+  const swapStagesButton = document.getElementById('swapStagesButton');
+  const swapStagesDialog = document.getElementById('swapStagesDialog');
+  const swapStagesForm = document.getElementById('swapStagesForm');
+  const firstStageNumber = document.getElementById('firstStageNumber');
+  const secondStageNumber = document.getElementById('secondStageNumber');
+  const swapStagesError = document.getElementById('swapStagesError');
   const homeButton = document.getElementById('homeButton');
   const freeModeButton = document.getElementById('freeModeButton');
   const stageModeButton = document.getElementById('stageModeButton');
@@ -376,16 +382,16 @@
     persistStages();
   }
 
-  function reorderStage(sourceId, targetId, after = false) {
-    if (!developerEnabled || sourceId === targetId) return;
+  function swapStageNumbers(firstNumber, secondNumber) {
+    if (!developerEnabled || firstNumber === secondNumber) return false;
     const ordered = [...stages].sort((a, b) => a.number - b.number);
-    const from = ordered.findIndex(stage => stage.id === sourceId);
-    if (from < 0 || !ordered.some(stage => stage.id === targetId)) return;
-    const [source] = ordered.splice(from, 1);
-    const to = ordered.findIndex(stage => stage.id === targetId);
-    ordered.splice(to + (after ? 1 : 0), 0, source);
+    const first = ordered.findIndex(stage => stage.number === firstNumber);
+    const second = ordered.findIndex(stage => stage.number === secondNumber);
+    if (first < 0 || second < 0) return false;
+    [ordered[first], ordered[second]] = [ordered[second], ordered[first]];
     persistStageOrder(ordered);
     renderStageList();
+    return true;
   }
 
   function persistCreations() {
@@ -959,10 +965,10 @@
     toolList.scrollLeft = 0;
     if (appMode === 'stage') {
       stageSupplies.filter(item => !item.used).forEach(item => toolList.append(createToolCard(item)));
-      if (stageSupplies.length > 0 && stageSupplies.every(item => item.used)) {
+      if (stageSupplies.every(item => item.used)) {
         const empty = document.createElement('span');
         empty.className = 'tool-card';
-        empty.textContent = '모든 블록 사용 완료';
+        empty.textContent = stageSupplies.length ? '모든 블록 사용 완료' : '고정 블록으로 출발하세요';
         toolList.append(empty);
       }
       return;
@@ -1088,6 +1094,7 @@
     document.body.className = `is-${mode}`;
     homeScreen.hidden = mode !== 'home';
     stageScreen.hidden = mode !== 'stage-list';
+    swapStagesButton.hidden = mode !== 'stage-list' || !developerEnabled;
     physicsLabPanel.hidden = mode !== 'physics-lab';
     saveStageButton.hidden = mode !== 'editor';
     cancelEditorButton.hidden = mode !== 'editor';
@@ -1095,7 +1102,7 @@
     undoButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
     redoButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
     saveMapButton.hidden = mode !== 'free';
-    followButton.hidden = !['free', 'stage', 'physics-lab'].includes(mode);
+    followButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
     followButton.textContent = followBall ? '따라가기 끄기' : '공 따라가기';
     followButton.setAttribute('aria-pressed', String(followBall));
     gameTitle.textContent = mode === 'editor' ? '스테이지 만들기' : mode === 'stage' ? `${currentStage?.number || ''}스테이지` : mode === 'physics-lab' ? '물리 계산' : '공 굴리기 연구소';
@@ -1152,6 +1159,7 @@
 
   function renderStageList() {
     stageList.replaceChildren();
+    swapStagesButton.hidden = !developerEnabled;
     const ordered = [...stages].sort((a, b) => a.number - b.number);
     ordered.forEach(stage => {
       const locked = !developerEnabled && stage.number > unlockedStage;
@@ -1161,8 +1169,7 @@
       const title = document.createElement('h3');
       title.textContent = `${stage.number}스테이지`;
       const detail = document.createElement('p');
-      const supplyCount = (stage.fixedBlocks?.length || 0) + (stage.supplyBlocks?.length || 0);
-      detail.textContent = `시작 시 고정 0개 · 배치할 블록 ${supplyCount}개`;
+      detail.textContent = `시작 시 고정 ${stage.fixedBlocks?.length || 0}개 · 배치할 블록 ${stage.supplyBlocks?.length || 0}개`;
       const play = document.createElement('button');
       play.className = 'stage-play';
       play.type = 'button';
@@ -1171,48 +1178,6 @@
       play.addEventListener('click', () => loadStage(stage.id));
       item.append(title, detail, play);
       if (developerEnabled) {
-        const moveHint = document.createElement('span');
-        moveHint.className = 'stage-move-hint';
-        moveHint.textContent = '⠿ 꾹 눌러 이동';
-        item.append(moveHint);
-        item.tabIndex = 0;
-        item.setAttribute('aria-label', `${stage.number}스테이지, 길게 눌러 순서 이동`);
-        let holdTimer = null; let holding = false; let startX = 0; let startY = 0;
-        const clearHold = () => { clearTimeout(holdTimer); holdTimer = null; };
-        item.addEventListener('pointerdown', event => {
-          if (event.target.closest('button')) return;
-          clearHold(); holding = false; startX = event.clientX; startY = event.clientY;
-          holdTimer = setTimeout(() => {
-            holding = true;
-            item.classList.add('reordering');
-            item.setPointerCapture?.(event.pointerId);
-          }, 420);
-        });
-        item.addEventListener('pointermove', event => {
-          if (!holding && Math.hypot(event.clientX - startX, event.clientY - startY) > 8) clearHold();
-          if (holding) event.preventDefault();
-        });
-        item.addEventListener('pointerup', event => {
-          clearHold();
-          if (!holding) return;
-          holding = false; item.classList.remove('reordering');
-          const candidates = [...stageList.querySelectorAll('.stage-item')].filter(card => card !== item);
-          const target = candidates.sort((a, b) => {
-            const ra = a.getBoundingClientRect(); const rb = b.getBoundingClientRect();
-            return Math.hypot(event.clientX - (ra.left + ra.right) / 2, event.clientY - (ra.top + ra.bottom) / 2)
-              - Math.hypot(event.clientX - (rb.left + rb.right) / 2, event.clientY - (rb.top + rb.bottom) / 2);
-          })[0];
-          if (!target) return;
-          const rect = target.getBoundingClientRect();
-          reorderStage(stage.id, target.dataset.stageId, event.clientX > (rect.left + rect.right) / 2);
-        });
-        item.addEventListener('pointercancel', () => { clearHold(); holding = false; item.classList.remove('reordering'); });
-        item.addEventListener('keydown', event => {
-          if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
-          event.preventDefault();
-          const next = ordered[ordered.indexOf(stage) + (event.key === 'ArrowRight' ? 1 : -1)];
-          if (next) reorderStage(stage.id, next.id, event.key === 'ArrowRight');
-        });
         const admin = document.createElement('div');
         admin.className = 'stage-admin';
         const edit = document.createElement('button');
@@ -1244,7 +1209,7 @@
     clearWorldState();
     spawn.x = stage.spawn?.x ?? 220;
     spawn.y = stage.spawn?.y ?? 150;
-    if (mode === 'editor') (stage.fixedBlocks || []).forEach(source => rods.push({
+    (stage.fixedBlocks || []).forEach(source => rods.push({
       ...normalizeRodRecord(clone(source)),
       uid: source.uid || makeRodUid(),
       fixed: true,
@@ -1269,16 +1234,7 @@
         touched: false
       }));
     } else {
-      // A fixed swing belongs in the world, not in the player's supply dock.
-      (stage.fixedBlocks || []).filter(source => source.type === 'swing').forEach(source => rods.push({
-        ...normalizeRodRecord(clone(source)), id: nextId++, kind: 'rod', fixed: true, touched: false
-      }));
-      stageSupplies = [...(stage.fixedBlocks || []).map((source, index) => ({
-        ...normalizeRodRecord(clone(source)),
-        supplyId: source.supplyId || `${stage.id}-fixed-${index}`,
-        editorX: source.x, editorY: source.y,
-        used: false
-      })).filter(source => source.type !== 'swing'), ...(stage.supplyBlocks || []).map(source => ({ ...normalizeRodRecord(clone(source)), used: false }))];
+      stageSupplies = (stage.supplyBlocks || []).map(source => ({ ...normalizeRodRecord(clone(source)), used: false }));
     }
     (stage.goals || []).forEach(source => goals.push({ ...clone(source), id: nextId++, kind: 'goal' }));
     (stage.fields || []).forEach(source => fields.push({ ...clone(source), id: nextId++, kind: 'field' }));
@@ -3489,7 +3445,7 @@
       accumulator -= FIXED_STEP;
     }
     updateParticles(elapsed);
-    if (followBall && ball && (appMode === 'free' || appMode === 'stage' || appMode === 'physics-lab')) {
+    if (followBall && ball && (appMode === 'free' || appMode === 'stage' || appMode === 'editor' || appMode === 'physics-lab')) {
       const targetX = ball.x - view.width / (2 * camera.zoom);
       const targetY = ball.y - view.height / (2 * camera.zoom);
       camera.x += (targetX - camera.x) * 0.14;
@@ -3541,6 +3497,25 @@
   freeModeButton.addEventListener('click', startFreeMode);
   physicsLabButton.addEventListener('click', startPhysicsLab);
   stageModeButton.addEventListener('click', showStageList);
+  swapStagesButton.addEventListener('click', () => {
+    firstStageNumber.value = '';
+    secondStageNumber.value = '';
+    swapStagesError.hidden = true;
+    swapStagesDialog.showModal();
+    firstStageNumber.focus();
+  });
+  swapStagesForm.addEventListener('submit', event => {
+    event.preventDefault();
+    const first = Number(firstStageNumber.value);
+    const second = Number(secondStageNumber.value);
+    if (!Number.isInteger(first) || !Number.isInteger(second) || !swapStageNumbers(first, second)) {
+      swapStagesError.textContent = first === second ? '서로 다른 번호 두 개를 입력하세요.' : '두 번호 모두 존재하는 스테이지를 입력하세요.';
+      swapStagesError.hidden = false;
+      return;
+    }
+    document.activeElement?.blur();
+    swapStagesDialog.close();
+  });
   saveStageButton.addEventListener('click', saveEditedStage);
   cancelEditorButton.addEventListener('click', showStageList);
   developerButton.addEventListener('click', () => {
@@ -3749,7 +3724,7 @@
     setZoomAt,
     showHome,
     showStageList,
-    reorderStage,
+    swapStageNumbers,
     startFreeMode,
     startPhysicsLab,
     updatePhysicsLabSetting,

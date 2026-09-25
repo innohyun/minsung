@@ -239,7 +239,11 @@ test('default stage one is removed without deleting user-created stage one', () 
     assert.match(script, /persistStageOrder\(orderedStages\)/);
     assert.match(script, /number: index \+ 1/);
     assert.match(script, /persistStageOrder\(stages\.filter\(stage => stage\.id !== pendingDeleteStageId\)/);
-    assert.match(script, /function reorderStage\(sourceId, targetId/);
+    assert.match(script, /function swapStageNumbers\(firstNumber, secondNumber/);
+    assert.match(html, /id="swapStagesButton"/);
+    assert.match(html, /id="firstStageNumber"/);
+    assert.match(html, /id="secondStageNumber"/);
+    assert.doesNotMatch(script, /꾹 눌러 이동|reorderStage/);
 });
 
 test('block inventory scrolls, keeps eight recent tools, and stage setup only asks for a number', () => {
