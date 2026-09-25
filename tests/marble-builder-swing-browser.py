@@ -16,6 +16,10 @@ def exercise(browser, mobile):
     page.goto(URL, wait_until='networkidle')
     assert page.locator('#freeModeButton').is_visible(), errors
     page.locator('#freeModeButton').click()
+    pinned = page.locator('#toolList .tool-card').first
+    assert pinned.get_attribute('data-tool') == 'swing', 'swing is hidden in the three-dot catalog'
+    bounds = pinned.bounding_box()
+    assert bounds and bounds['x'] >= 0 and bounds['x'] + bounds['width'] <= page.viewport_size['width'], bounds
     page.get_by_label('모든 블록 보기').click()
     swing = page.locator('.catalog-item').filter(has_text='스윙')
     assert swing.count() == 1

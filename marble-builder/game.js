@@ -967,9 +967,11 @@
       }
       return;
     }
+    // Keep the new swing discoverable even for players with older saved recent-tool lists.
+    toolList.append(createToolCard({ type: 'swing', fixed: false }));
     recentTools
       .map(toolDescriptor)
-      .filter(item => appMode === 'editor' || !item.fixed)
+      .filter(item => (appMode === 'editor' || !item.fixed) && item.type !== 'swing')
       .forEach(item => toolList.append(createToolCard(item)));
     const more = document.createElement('button');
     more.type = 'button';
