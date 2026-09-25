@@ -122,7 +122,7 @@
     }
   ];
   const MATERIALS = {
-    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.11, rollingResistance: 0.04 * (0.20 / 0.38) },
+    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.30, rollingResistance: 0.04 * (0.20 / 0.38) },
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
@@ -2558,7 +2558,7 @@
     ball.angle += ball.omega * dt;
 
     supportContacts.length = 0;
-    rods.forEach(rod => {
+    for (const rod of rods) {
       const touched = resolveBallRect({
         x: rod.x,
         y: rod.y,
@@ -2574,7 +2574,15 @@
         rod.touched = true;
         touchedRodIds.add(rod.id);
       }
-    });
+      // Once the marble attaches, the ride owns this frame. Another platform
+      // touching the same corner must not apply a second impulse and reverse it.
+      if (ball.electricRide) break;
+    }
+    if (ball.electricRide) {
+      ball.specialContacts = [...specialContactsThisStep];
+      finishImpactSoundContacts();
+      return;
+    }
     goals.forEach(goal => basketSegments(goal).forEach(resolveBallBasketSegment));
     applyRollingResistance(dt);
     ball.specialContacts = [...specialContactsThisStep];

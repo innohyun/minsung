@@ -9,7 +9,7 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=24/);
+    assert.match(html, /game\.js\?v=25/);
     assert.match(html, /styles\.css\?v=17/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
@@ -80,7 +80,7 @@ test('marble builder sounds only distinct impacts and suppresses resting contact
     assert.match(script, /playImpactSoundForContact\(impactContactKey/);
     assert.match(script, /finishImpactSoundContacts\(\)/);
     assert.doesNotMatch(script, /if \(normalSpeed < 0\) \{\s*playImpactSound\(rect\.blockType/);
-    assert.match(script, /wood: \{[^\n]*friction: 0\.20, restitution: 0\.11/);
+    assert.match(script, /wood: \{[^\n]*friction: 0\.20, restitution: 0\.30/);
 });
 
 test('marble builder uses an unbounded world with camera pan and four-times zoom-out', () => {
@@ -345,6 +345,8 @@ test('electric platforms support corner joints, group editing, and persistent at
     assert.match(script, /function adjacentElectricExit\(rod, end, side\)/);
     assert.match(script, /return matches\.length === 1 \? matches\[0\] : null/);
     assert.match(script, /ball\.electricRide = null;\s*\/\/ Do not collide again in this same step at the track tip/);
+    assert.match(script, /if \(ball\.electricRide\) break/);
+    assert.match(script, /if \(ball\.electricRide\) \{\s*ball\.specialContacts = \[\.\.\.specialContactsThisStep\];\s*finishImpactSoundContacts\(\);\s*return;/);
     assert.match(script, /drawElectricJoints\(\)/);
 });
 

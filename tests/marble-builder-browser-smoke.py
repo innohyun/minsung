@@ -15,7 +15,7 @@ with sync_playwright() as playwright:
         page.wait_for_load_state('load')
         state = page.evaluate('window.__marbleBuilderDebug.getState()')
         assert state['activeGravity'] == 19.35 and state['activeWoodFriction'] == 0.2, state
-        assert page.evaluate("window.__marbleBuilderDebug.getImpactRestitution('wood', 3)") == 0.11
+        assert page.evaluate("window.__marbleBuilderDebug.getImpactRestitution('wood', 3)") == 0.30
         legacy = page.evaluate("""() => {
             const d = window.__marbleBuilderDebug;
             return [d.normalizeStage({id: 'old', fixedBlocks: [{type:'wood', thickness:14}, {type:'slime', thickness:18}, {type:'wood', thickness:30}]}).fixedBlocks.map(r => r.thickness)];
@@ -30,6 +30,23 @@ with sync_playwright() as playwright:
             return d.getState().rods.map(rod => rod.thickness);
         }""")
         assert thicknesses == [20, 20, 20], thicknesses
+        # Normal ball drop, not a restitution constant alone: the rebound must be visible.
+        rebound = page.evaluate('''() => {
+            const d = window.__marbleBuilderDebug;
+            d.setBallState({x: 200, y: 170, vx: 0, vy: 0, omega: 0, electricRide: null});
+            let impactY = null, apexY = null;
+            for (let i = 0; i < 240; i++) {
+                d.stepPhysics(1);
+                const ball = d.getState().ball;
+                if (impactY === null && ball.vy < -0.5) impactY = ball.y;
+                if (impactY !== null) {
+                    apexY = Math.min(apexY ?? ball.y, ball.y);
+                    if (ball.vy >= 0) break;
+                }
+            }
+            return {impactY, apexY, rise: impactY - apexY};
+        }''')
+        assert 8 <= rebound['rise'] <= 35, rebound
         stage = {
             'id': 'test-stage', 'number': 5, 'spawn': {'x': 200, 'y': 160},
             'fixedBlocks': [
@@ -112,7 +129,54 @@ with sync_playwright() as playwright:
         }''')
         assert any(s['electricRide'] for s in natural), natural
         assert all(s['vx'] >= 0 for s in natural), natural
+        # Screenshot shape: shallow descent into a much steeper linked drop.
+        bent = {**stage, 'fixedBlocks': [{**stage['fixedBlocks'][0], 'angle': 0}], 'electricLinks': []}
+        joint_x, joint_y = 290, 290
+        for index, angle in enumerate((0.27, 1.2), start=1):
+            uid = ('b', 'c')[index - 1]
+            x = joint_x + 90 * math.cos(angle) - 10 * math.sin(angle)
+            y = joint_y + 90 * math.sin(angle) + 10 * math.cos(angle)
+            bent['fixedBlocks'].append({'uid': uid, 'type': 'electric', 'x': x, 'y': y,
+                                        'angle': angle, 'length': 180, 'thickness': 20})
+            bent['electricLinks'].append({'id': uid, 'a': {'rodUid': bent['fixedBlocks'][index-1]['uid'],
+                                                          'end': 'end', 'side': 'top'},
+                                          'b': {'rodUid': uid, 'end': 'start', 'side': 'top'}})
+            joint_x = x + 90 * math.cos(angle) + 10 * math.sin(angle)
+            joint_y = y + 90 * math.sin(angle) - 10 * math.cos(angle)
+        page.evaluate('(stage) => window.__marbleBuilderDebug.startEditor(stage)', bent)
+        angled = page.evaluate('''() => {
+            const d = window.__marbleBuilderDebug;
+            d.setBallState({x: 155, y: 271, vx: 4, vy: 0.4, omega: 0, electricRide: null});
+            const samples = [];
+            for (let i = 0; i < 250; i++) {
+                d.stepPhysics(1);
+                if (i % 5 === 0) samples.push(d.getState().ball);
+            }
+            return samples;
+        }''')
+        visited = [s['electricRide']['rodUid'] for s in angled if s['electricRide']]
+        assert 'b' in visited and 'c' in visited, (visited, angled)
+        assert all(s['electricRide']['direction'] == 1 for s in angled if s['electricRide']), angled
+        # Explore normal shallow arrivals near the first visible corner, not an injected ride.
+        arrivals = page.evaluate('''() => {
+            const d = window.__marbleBuilderDebug;
+            const failures = [];
+            for (const speed of [2, 4, 8, 14]) {
+              for (let x = 252; x <= 300; x += 4) {
+                for (let y = 257; y <= 279; y += 3) {
+                    d.setBallState({x, y, vx: speed, vy: speed * .25, omega: 0, electricRide: null, specialContacts: []});
+                    for (let i = 0; i < 20; i++) {
+                        d.stepPhysics(1);
+                        const s = d.getState().ball;
+                        if (s.vx < -0.05) {failures.push({speed, x, y, step: i, ball: s}); break;}
+                    }
+                }
+              }
+            }
+            return failures.slice(0, 8);
+        }''')
+        assert not arrivals, arrivals
         assert not errors, errors
-        print(f'PASS {width}x{height}: default physics, equal block thickness, editor spawn/save, electric joint')
+        print(f'PASS {width}x{height}: wood rebound {rebound["rise"]:.1f}px, editor drop, linked/unlinked angled electric tracks')
         page.close()
     browser.close()
