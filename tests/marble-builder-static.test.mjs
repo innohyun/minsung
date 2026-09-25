@@ -9,8 +9,8 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=25/);
-    assert.match(html, /styles\.css\?v=17/);
+    assert.match(html, /game\.js\?v=29/);
+    assert.match(html, /styles\.css\?v=19/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
@@ -67,9 +67,9 @@ test('marble builder uses the approved recording for wood audio without replacin
     assert.match(script, /Math\.pow\(normalizedSpeed, \.72\)/);
     assert.match(script, /rollingGainForRevolutions\(revolutionsPerSecond, materialVolume\)/);
     assert.match(script, /source\.loopEnd = rollingReferenceBuffer\.duration/);
-    assert.match(script, /type === 'slime' \? 1850 : type === 'electric' \? 3400/);
+    assert.match(script, /type === 'basket' \? 850 : type === 'slime' \? 1500 : type === 'electric' \? 2200 : 1800/);
     assert.match(script, /const electric = type === 'electric'/);
-    assert.match(script, /electric \? 126 : 82/);
+    assert.match(script, /slime \? 220 : electric \? 640 : 320/);
     assert.equal(assetManifest.audio.length, 2);
 });
 
@@ -80,7 +80,10 @@ test('marble builder sounds only distinct impacts and suppresses resting contact
     assert.match(script, /playImpactSoundForContact\(impactContactKey/);
     assert.match(script, /finishImpactSoundContacts\(\)/);
     assert.doesNotMatch(script, /if \(normalSpeed < 0\) \{\s*playImpactSound\(rect\.blockType/);
-    assert.match(script, /wood: \{[^\n]*friction: 0\.20, restitution: 0\.30/);
+    assert.match(script, /wood: \{[^\n]*friction: 0\.20, restitution: 0\.23/);
+    assert.match(script, /const WOOD_IMPACT_SOUND_MIN_SPEED = 0\.18/);
+    assert.match(script, /soundedImpactContacts\.has\(contactKey\)/);
+    assert.match(script, /Math\.min\(\.44, \.085 \+ speed \* \.035\) \* clamp/);
 });
 
 test('marble builder uses an unbounded world with camera pan and four-times zoom-out', () => {
@@ -205,8 +208,10 @@ test('developer physics lab adjusts gravity and wood friction without changing n
 test('default stage one is removed without deleting user-created stage one', () => {
     assert.doesNotMatch(script, /id: 'stage-1', number: 1/);
     assert.match(script, /stages\.filter\(stage => stage\.id !== 'stage-1'\)/);
-    assert.match(script, /const firstStageNumber = stages\.reduce/);
-    assert.match(script, /unlockedStage = Math\.max\(Number\.isFinite\(firstStageNumber\)/);
+    assert.match(script, /persistStageOrder\(orderedStages\)/);
+    assert.match(script, /number: index \+ 1/);
+    assert.match(script, /persistStageOrder\(stages\.filter\(stage => stage\.id !== pendingDeleteStageId\)/);
+    assert.match(script, /function reorderStage\(sourceId, targetId/);
 });
 
 test('block inventory scrolls, keeps eight recent tools, and stage setup only asks for a number', () => {
@@ -252,7 +257,7 @@ test('marble builder supports creations, follow camera, mandatory sound, special
     assert.match(script, /function makeSoftNoiseBuffer/);
     assert.match(script, /knockFilter\.type = 'lowpass'/);
     assert.match(script, /body\.type = 'sine'/);
-    assert.match(script, /tone\.type = 'sine'/);
+    assert.doesNotMatch(script, /rollingAudio\.tone|toneGain\.gain/);
     assert.doesNotMatch(script, /rollingAudio\.osc\.type|osc\.type = slime \? 'sine'/);
     assert.match(styles, /\.tool-icon\.road[^}]*border-radius: 0/);
     assert.match(script, /function drawPlatformAsset/);
@@ -325,7 +330,7 @@ test('rotated special platforms use their local top face and loud limited audio'
     assert.match(script, /incomingNormalSpeed \* Math\.sqrt\(2 \/ 3\)/);
     assert.match(script, /audioLimiter = audioContext\.createDynamicsCompressor/);
     assert.match(script, /audioMaster\.gain\.value = 1\.6/);
-    assert.match(script, /const volume = Math\.min\(\.44, \.085 \+ speed \* \.035\)/);
+    assert.match(script, /const volume = Math\.min\(\.44, \.085 \+ speed \* \.035\) \* clamp/);
     assert.match(script, /const maximumVolume = slime \? \.12 : electric \? \.17 : \.15/);
 });
 
@@ -333,10 +338,18 @@ test('electric platforms support corner joints, group editing, and persistent at
     assert.match(html, /id="combineElectricButton"[^>]*>결합</);
     assert.match(html, /id="detachElectricButton"[^>]*>해제</);
     assert.match(html, /id="convertElectricButton"[^>]*>변환</);
-    assert.match(script, /const ELECTRIC_MIN_JOINT_ANGLE = Math\.PI \/ 2/);
+    assert.doesNotMatch(html, /id="curveElectricButton"/);
+    assert.match(script, /const ELECTRIC_MIN_JOINT_ANGLE = Math\.PI \* 3 \/ 4/);
+    assert.match(script, /const ELECTRIC_MAX_SPEED = 18/);
+    assert.match(script, /function electricJointSides/);
+    assert.match(script, /function validAdjacentElectricJoints/);
+    assert.doesNotMatch(script, /drawElectricSeams\(|drawCurvedElectric\(|electricCurveSample\(/);
     assert.match(script, /function combineSelectedElectric/);
     assert.match(script, /function detachSelectedElectricLink/);
-    assert.match(script, /function convertSelectedElectricLink/);
+    assert.match(script, /function convertSelectedElectricCorner/);
+    assert.match(script, /convertElectricButton\.addEventListener\('click', convertSelectedElectricCorner\)/);
+    assert.match(script, /electricLinks\.find\(link => !validElectricJoint\(link\)\)/);
+    assert.doesNotMatch(script, /function convertSelectedElectricLink/);
     assert.match(script, /function moveElectricJoint/);
     assert.match(script, /function connectedRodUids/);
     assert.match(script, /electricLinks: clone\(electricLinks\)/);

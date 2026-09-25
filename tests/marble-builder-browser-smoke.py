@@ -1,9 +1,10 @@
 """Browser regression for Marble Builder; run from repository root with python3."""
 from pathlib import Path
 import math
+import os
 from playwright.sync_api import sync_playwright
 
-url = (Path(__file__).resolve().parents[1] / 'marble-builder' / 'index.html').as_uri()
+url = os.environ.get('MARBLE_BUILDER_URL', (Path(__file__).resolve().parents[1] / 'marble-builder' / 'index.html').as_uri())
 with sync_playwright() as playwright:
     chrome = Path('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome')
     browser = playwright.chromium.launch(headless=True, **({'executable_path': str(chrome)} if chrome.exists() else {}))
@@ -15,7 +16,7 @@ with sync_playwright() as playwright:
         page.wait_for_load_state('load')
         state = page.evaluate('window.__marbleBuilderDebug.getState()')
         assert state['activeGravity'] == 19.35 and state['activeWoodFriction'] == 0.2, state
-        assert page.evaluate("window.__marbleBuilderDebug.getImpactRestitution('wood', 3)") == 0.30
+        assert page.evaluate("window.__marbleBuilderDebug.getImpactRestitution('wood', 3)") == 0.23
         legacy = page.evaluate("""() => {
             const d = window.__marbleBuilderDebug;
             return [d.normalizeStage({id: 'old', fixedBlocks: [{type:'wood', thickness:14}, {type:'slime', thickness:18}, {type:'wood', thickness:30}]}).fixedBlocks.map(r => r.thickness)];
@@ -46,7 +47,7 @@ with sync_playwright() as playwright:
             }
             return {impactY, apexY, rise: impactY - apexY};
         }''')
-        assert 8 <= rebound['rise'] <= 35, rebound
+        assert 5 <= rebound['rise'] <= 20, rebound
         stage = {
             'id': 'test-stage', 'number': 5, 'spawn': {'x': 200, 'y': 160},
             'fixedBlocks': [
@@ -59,9 +60,13 @@ with sync_playwright() as playwright:
         }
         page.evaluate('(stage) => window.__marbleBuilderDebug.startEditor(stage)', stage)
         assert page.locator('#spawnButton').is_visible(), 'editor spawn control hidden'
+        page.evaluate('window.__marbleBuilderDebug.selectRod(0)')
+        assert page.locator('#curveElectricButton').count() == 0
+        assert page.locator('#convertElectricButton').is_visible()
         page.locator('#spawnButton').click()
         initial = page.evaluate('window.__marbleBuilderDebug.getState()')
         assert initial['ball'] is not None and initial['appMode'] == 'editor'
+        assert page.evaluate('window.__marbleBuilderDebug.spawnBall()') is True
         # A ball at a real joined corner should keep moving to the next road.
         result = page.evaluate("""() => {
             const d = window.__marbleBuilderDebug;
@@ -73,7 +78,7 @@ with sync_playwright() as playwright:
         assert result['after']['electricRide']['rodUid'] == 'b', result
         assert result['after']['electricRide']['direction'] == 1, result
         assert result['after']['x'] > result['before']['x'] and not result['won'], result
-        for angle in (0, -0.7853981634, -1.5707963268):
+        for angle in (0, -0.4, -0.7853981634):
             stage['fixedBlocks'][1]['angle'] = angle
             stage['fixedBlocks'][1]['x'] = 290 + 90 * math.cos(angle) - 10 * math.sin(angle)
             stage['fixedBlocks'][1]['y'] = 290 + 90 * math.sin(angle) + 10 * math.cos(angle)
@@ -129,20 +134,20 @@ with sync_playwright() as playwright:
         }''')
         assert any(s['electricRide'] for s in natural), natural
         assert all(s['vx'] >= 0 for s in natural), natural
-        # Screenshot shape: shallow descent into a much steeper linked drop.
+        # Shallow downhill bend, joined at the inner (bottom) corners.
         bent = {**stage, 'fixedBlocks': [{**stage['fixedBlocks'][0], 'angle': 0}], 'electricLinks': []}
-        joint_x, joint_y = 290, 290
-        for index, angle in enumerate((0.27, 1.2), start=1):
+        joint_x, joint_y = 290, 310
+        for index, angle in enumerate((0.27, 0.56), start=1):
             uid = ('b', 'c')[index - 1]
-            x = joint_x + 90 * math.cos(angle) - 10 * math.sin(angle)
-            y = joint_y + 90 * math.sin(angle) + 10 * math.cos(angle)
+            x = joint_x + 90 * math.cos(angle) + 10 * math.sin(angle)
+            y = joint_y + 90 * math.sin(angle) - 10 * math.cos(angle)
             bent['fixedBlocks'].append({'uid': uid, 'type': 'electric', 'x': x, 'y': y,
                                         'angle': angle, 'length': 180, 'thickness': 20})
-            bent['electricLinks'].append({'id': uid, 'a': {'rodUid': bent['fixedBlocks'][index-1]['uid'],
-                                                          'end': 'end', 'side': 'top'},
-                                          'b': {'rodUid': uid, 'end': 'start', 'side': 'top'}})
-            joint_x = x + 90 * math.cos(angle) + 10 * math.sin(angle)
-            joint_y = y + 90 * math.sin(angle) - 10 * math.cos(angle)
+            bent['electricLinks'].append({'id': uid, 'curved': True, 'a': {'rodUid': bent['fixedBlocks'][index-1]['uid'],
+                                                          'end': 'end', 'side': 'bottom'},
+                                          'b': {'rodUid': uid, 'end': 'start', 'side': 'bottom'}})
+            joint_x = x + 90 * math.cos(angle) - 10 * math.sin(angle)
+            joint_y = y + 90 * math.sin(angle) + 10 * math.cos(angle)
         page.evaluate('(stage) => window.__marbleBuilderDebug.startEditor(stage)', bent)
         angled = page.evaluate('''() => {
             const d = window.__marbleBuilderDebug;

@@ -12,6 +12,7 @@
   const combineElectricButton = document.getElementById('combineElectricButton');
   const detachElectricButton = document.getElementById('detachElectricButton');
   const convertElectricButton = document.getElementById('convertElectricButton');
+
   const undoButton = document.getElementById('undoButton');
   const redoButton = document.getElementById('redoButton');
   const saveMapButton = document.getElementById('saveMapButton');
@@ -42,6 +43,9 @@
   const woodFrictionRange = document.getElementById('woodFrictionRange');
   const woodFrictionInput = document.getElementById('woodFrictionInput');
   const woodFrictionReadout = document.getElementById('woodFrictionReadout');
+  const woodBounceRange = document.getElementById('woodBounceRange');
+  const woodBounceInput = document.getElementById('woodBounceInput');
+  const woodBounceReadout = document.getElementById('woodBounceReadout');
   const physicsLabRespawnButton = document.getElementById('physicsLabRespawnButton');
   const physicsLabResetButton = document.getElementById('physicsLabResetButton');
   const developerDialog = document.getElementById('developerDialog');
@@ -90,11 +94,12 @@
   const GOAL_SUCCESS_DELAY = 1;
   const ELECTRIC_ATTACH_ANGLE = Math.PI / 6;
   const ELECTRIC_SPEED_MULTIPLIER = 4 / 3;
-  const ELECTRIC_ACCELERATION = 4.8;
+  const ELECTRIC_ACCELERATION = 210;
   const ELECTRIC_MAX_SPEED = 18;
   const ELECTRIC_CONNECT_DISTANCE = 34;
-  const ELECTRIC_MIN_JOINT_ANGLE = Math.PI / 2;
+  const ELECTRIC_MIN_JOINT_ANGLE = Math.PI * 3 / 4;
   const IMPACT_SOUND_MIN_SPEED = 0.65;
+  const WOOD_IMPACT_SOUND_MIN_SPEED = 0.18;
   const IMPACT_SOUND_REARM_STEPS = 12;
   const DEVELOPER_PASSWORD = '12345@';
   const STAGES_STORAGE_KEY = 'marble-builder-stages-v1';
@@ -122,13 +127,13 @@
     }
   ];
   const MATERIALS = {
-    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.30, rollingResistance: 0.04 * (0.20 / 0.38) },
+    wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
     basket: { friction: 0.48, restitution: 0.14, rollingResistance: 0.055 }
   };
-  const PHYSICS_LAB_DEFAULTS = { gravity: EARTH_GRAVITY, woodFriction: MATERIALS.wood.friction };
+  const PHYSICS_LAB_DEFAULTS = { gravity: EARTH_GRAVITY, woodFriction: MATERIALS.wood.friction, woodBounce: MATERIALS.wood.restitution };
   const physicsLabSettings = { ...PHYSICS_LAB_DEFAULTS };
   const physicsLabWoodMaterial = { ...MATERIALS.wood };
   const BLOCK_CATALOG = [
@@ -309,12 +314,16 @@
   }
 
   function loadPersistentState() {
-    stages = readStoredJson(STAGES_STORAGE_KEY, clone(DEFAULT_STAGES));
-    if (!Array.isArray(stages) || stages.length === 0) stages = clone(DEFAULT_STAGES);
+    stages = readStoredJson(STAGES_STORAGE_KEY, null);
+    if (!Array.isArray(stages)) stages = clone(DEFAULT_STAGES);
     stages = stages.map(normalizeStage);
+    unlockedStage = Number(localStorage.getItem(PROGRESS_STORAGE_KEY)) || 1;
     const removedBuiltInStage1 = stages.some(stage => stage.id === 'stage-1');
     stages = stages.filter(stage => stage.id !== 'stage-1');
-    if (removedBuiltInStage1) localStorage.setItem(STAGES_STORAGE_KEY, JSON.stringify(stages));
+    const orderedStages = [...stages].sort((a, b) => a.number - b.number);
+    if (removedBuiltInStage1 || orderedStages.some((stage, index) => stage.number !== index + 1)) {
+      persistStageOrder(orderedStages);
+    }
     const storedRecent = readStoredJson(RECENT_TOOLS_STORAGE_KEY, recentTools);
     if (Array.isArray(storedRecent)) {
       const allowed = new Set(['wood', 'slime', 'electric', 'antigravity']);
@@ -324,8 +333,7 @@
         return allowed.has(type) ? `${type}:normal` : null;
       }).filter(Boolean))].slice(0, MAX_RECENT_TOOLS);
     }
-    const firstStageNumber = stages.reduce((minimum, stage) => Math.min(minimum, Number(stage.number) || Infinity), Infinity);
-    unlockedStage = Math.max(Number.isFinite(firstStageNumber) ? firstStageNumber : 1, Number(localStorage.getItem(PROGRESS_STORAGE_KEY)) || 1);
+    unlockedStage = Math.max(1, unlockedStage);
     developerEnabled = localStorage.getItem(DEVELOPER_STORAGE_KEY) === 'true';
 
     const storedCreations = readStoredJson(CREATIONS_STORAGE_KEY, []);
@@ -338,6 +346,30 @@
 
   function persistStages() {
     localStorage.setItem(STAGES_STORAGE_KEY, JSON.stringify(stages));
+  }
+
+  function persistStageOrder(ordered) {
+    const unlockedIds = new Set(stages.filter(stage => Number(stage.number) <= unlockedStage).map(stage => stage.id));
+    stages = ordered.map((stage, index) => ({
+      ...stage,
+      number: index + 1,
+      name: !stage.name || stage.name === `${stage.number}스테이지` ? `${index + 1}스테이지` : stage.name
+    }));
+    unlockedStage = Math.max(1, ...stages.filter(stage => unlockedIds.has(stage.id)).map(stage => stage.number));
+    localStorage.setItem(PROGRESS_STORAGE_KEY, String(unlockedStage));
+    persistStages();
+  }
+
+  function reorderStage(sourceId, targetId, after = false) {
+    if (!developerEnabled || sourceId === targetId) return;
+    const ordered = [...stages].sort((a, b) => a.number - b.number);
+    const from = ordered.findIndex(stage => stage.id === sourceId);
+    if (from < 0 || !ordered.some(stage => stage.id === targetId)) return;
+    const [source] = ordered.splice(from, 1);
+    const to = ordered.findIndex(stage => stage.id === targetId);
+    ordered.splice(to + (after ? 1 : 0), 0, source);
+    persistStageOrder(ordered);
+    renderStageList();
   }
 
   function persistCreations() {
@@ -585,7 +617,8 @@
 
   function playImpactSoundForContact(contactKey, type, speed) {
     impactContactLastSeenStep.set(contactKey, physicsStepCount);
-    if (speed < IMPACT_SOUND_MIN_SPEED || soundedImpactContacts.has(contactKey)) return;
+    if (speed < (type === 'wood' ? WOOD_IMPACT_SOUND_MIN_SPEED : IMPACT_SOUND_MIN_SPEED)
+      || soundedImpactContacts.has(contactKey)) return;
     soundedImpactContacts.add(contactKey);
     playImpactSound(type, speed);
   }
@@ -607,7 +640,8 @@
     impactSoundCount += 1;
     const slime = type === 'slime';
     const start = audio.currentTime;
-    const volume = Math.min(.44, .085 + speed * .035);
+    // Small impacts fade toward silence without raising the existing peak volume.
+    const volume = Math.min(.44, .085 + speed * .035) * clamp((speed - .1) / 1.4, .05, 1);
 
     if (type === 'wood' && playRecordedWoodImpact(audio, start, speed, volume)) return;
 
@@ -712,11 +746,12 @@
         recordedRollingAudio = { source, filter, gain, lastContactAt: audio.currentTime };
       }
       recordedRollingAudio.lastContactAt = audio.currentTime;
-      const materialCutoff = type === 'slime' ? 1850 : type === 'electric' ? 3400 : type === 'basket' ? 2300 : 2800;
-      const materialVolume = type === 'slime' ? .82 : type === 'electric' ? .94 : 1;
+      // Basket walls amplify the high-pitched whirr in the recorded loop.
+      const materialCutoff = type === 'basket' ? 850 : type === 'slime' ? 1500 : type === 'electric' ? 2200 : 1800;
+      const materialVolume = type === 'slime' ? .82 : type === 'electric' ? .94 : type === 'basket' ? .85 : 1;
       recordedRollingPlaybackRate = rollingPlaybackRateForOmega(angularSpeed, rollingReferenceBuffer.duration);
       recordedRollingAudio.source.playbackRate.setTargetAtTime(Math.max(.001, recordedRollingPlaybackRate), audio.currentTime, .035);
-      recordedRollingAudio.filter.frequency.setTargetAtTime(materialCutoff + Math.min(1200, speed * 90), audio.currentTime, .08);
+      recordedRollingAudio.filter.frequency.setTargetAtTime(materialCutoff + Math.min(300, speed * 25), audio.currentTime, .08);
       recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, materialVolume), audio.currentTime, .08);
       return;
     }
@@ -725,33 +760,23 @@
       rollingNoiseBuffer ||= makeSoftNoiseBuffer(audio, 1.8, .94);
       const noise = audio.createBufferSource();
       const filter = audio.createBiquadFilter();
-      const tone = audio.createOscillator();
-      const toneGain = audio.createGain();
       const gain = audio.createGain();
       noise.buffer = rollingNoiseBuffer;
       noise.loop = true;
       filter.type = 'lowpass';
       filter.frequency.value = 360;
       filter.Q.value = .5;
-      tone.type = 'sine';
-      tone.frequency.value = 84;
-      toneGain.gain.value = .16;
       gain.gain.value = .0001;
       noise.connect(filter).connect(gain);
-      tone.connect(toneGain).connect(gain);
       gain.connect(audioMaster);
       noise.start();
-      tone.start();
-      rollingAudio = { noise, filter, tone, toneGain, gain, lastContactAt: audio.currentTime };
+      rollingAudio = { noise, filter, gain, lastContactAt: audio.currentTime };
     }
     rollingAudio.lastContactAt = audio.currentTime;
     const slime = type === 'slime';
     const electric = type === 'electric';
-    const rollPitch = (slime ? 58 : electric ? 126 : 82) + Math.min(180, speed * (electric ? 16 : 11));
     const filterPitch = (slime ? 220 : electric ? 640 : 320) + Math.min(720, speed * (electric ? 42 : 30));
-    rollingAudio.tone.frequency.setTargetAtTime(rollPitch, audio.currentTime, .055);
     rollingAudio.filter.frequency.setTargetAtTime(filterPitch, audio.currentTime, .065);
-    rollingAudio.toneGain.gain.setTargetAtTime(slime ? .13 : electric ? .24 : .2, audio.currentTime, .06);
     const maximumVolume = slime ? .12 : electric ? .17 : .15;
     rollingAudio.gain.gain.setTargetAtTime(Math.min(maximumVolume, .025 + speed * .015), audio.currentTime, .045);
   }
@@ -796,6 +821,7 @@
   function materialForType(type) {
     if (appMode === 'physics-lab' && type === 'wood') {
       physicsLabWoodMaterial.friction = physicsLabSettings.woodFriction;
+      physicsLabWoodMaterial.restitution = physicsLabSettings.woodBounce;
       const frictionRatio = physicsLabSettings.woodFriction / PHYSICS_LAB_DEFAULTS.woodFriction;
       physicsLabWoodMaterial.rollingResistance = MATERIALS.wood.rollingResistance * frictionRatio;
       return physicsLabWoodMaterial;
@@ -812,9 +838,14 @@
     woodFrictionRange.value = String(physicsLabSettings.woodFriction);
     woodFrictionInput.value = frictionValue;
     woodFrictionReadout.value = frictionValue;
+    const bounceValue = physicsLabSettings.woodBounce.toFixed(2);
+    woodBounceRange.value = String(physicsLabSettings.woodBounce);
+    woodBounceInput.value = bounceValue;
+    woodBounceReadout.value = bounceValue;
     physicsLabWoodMaterial.friction = physicsLabSettings.woodFriction;
+    physicsLabWoodMaterial.restitution = physicsLabSettings.woodBounce;
     if (appMode === 'physics-lab') {
-      gameSubtitle.textContent = `중력 ${gravityValue}m/s² · 나무 마찰 ${frictionValue}`;
+      gameSubtitle.textContent = `중력 ${gravityValue}m/s² · 나무 마찰 ${frictionValue} · 나무 튕김 ${bounceValue}`;
     }
   }
 
@@ -823,6 +854,7 @@
     if (!Number.isFinite(numeric)) return;
     if (key === 'gravity') physicsLabSettings.gravity = clamp(numeric, 5, 30);
     if (key === 'woodFriction') physicsLabSettings.woodFriction = clamp(numeric, 0, 1);
+    if (key === 'woodBounce') physicsLabSettings.woodBounce = clamp(numeric, 0, .9);
     syncPhysicsLabControls();
   }
 
@@ -1095,12 +1127,12 @@
       const locked = !developerEnabled && stage.number > unlockedStage;
       const item = document.createElement('article');
       item.className = `stage-item${locked ? ' locked' : ''}`;
+      item.dataset.stageId = stage.id;
       const title = document.createElement('h3');
       title.textContent = `${stage.number}스테이지`;
       const detail = document.createElement('p');
-      const fixedCount = stage.fixedBlocks?.length || 0;
-      const supplyCount = stage.supplyBlocks?.length || 0;
-      detail.textContent = `고정 ${fixedCount}개 · 플레이어 지급 ${supplyCount}개`;
+      const supplyCount = (stage.fixedBlocks?.length || 0) + (stage.supplyBlocks?.length || 0);
+      detail.textContent = `시작 시 고정 0개 · 배치할 블록 ${supplyCount}개`;
       const play = document.createElement('button');
       play.className = 'stage-play';
       play.type = 'button';
@@ -1109,6 +1141,48 @@
       play.addEventListener('click', () => loadStage(stage.id));
       item.append(title, detail, play);
       if (developerEnabled) {
+        const moveHint = document.createElement('span');
+        moveHint.className = 'stage-move-hint';
+        moveHint.textContent = '⠿ 꾹 눌러 이동';
+        item.append(moveHint);
+        item.tabIndex = 0;
+        item.setAttribute('aria-label', `${stage.number}스테이지, 길게 눌러 순서 이동`);
+        let holdTimer = null; let holding = false; let startX = 0; let startY = 0;
+        const clearHold = () => { clearTimeout(holdTimer); holdTimer = null; };
+        item.addEventListener('pointerdown', event => {
+          if (event.target.closest('button')) return;
+          clearHold(); holding = false; startX = event.clientX; startY = event.clientY;
+          holdTimer = setTimeout(() => {
+            holding = true;
+            item.classList.add('reordering');
+            item.setPointerCapture?.(event.pointerId);
+          }, 420);
+        });
+        item.addEventListener('pointermove', event => {
+          if (!holding && Math.hypot(event.clientX - startX, event.clientY - startY) > 8) clearHold();
+          if (holding) event.preventDefault();
+        });
+        item.addEventListener('pointerup', event => {
+          clearHold();
+          if (!holding) return;
+          holding = false; item.classList.remove('reordering');
+          const candidates = [...stageList.querySelectorAll('.stage-item')].filter(card => card !== item);
+          const target = candidates.sort((a, b) => {
+            const ra = a.getBoundingClientRect(); const rb = b.getBoundingClientRect();
+            return Math.hypot(event.clientX - (ra.left + ra.right) / 2, event.clientY - (ra.top + ra.bottom) / 2)
+              - Math.hypot(event.clientX - (rb.left + rb.right) / 2, event.clientY - (rb.top + rb.bottom) / 2);
+          })[0];
+          if (!target) return;
+          const rect = target.getBoundingClientRect();
+          reorderStage(stage.id, target.dataset.stageId, event.clientX > (rect.left + rect.right) / 2);
+        });
+        item.addEventListener('pointercancel', () => { clearHold(); holding = false; item.classList.remove('reordering'); });
+        item.addEventListener('keydown', event => {
+          if (!event.altKey || !['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+          event.preventDefault();
+          const next = ordered[ordered.indexOf(stage) + (event.key === 'ArrowRight' ? 1 : -1)];
+          if (next) reorderStage(stage.id, next.id, event.key === 'ArrowRight');
+        });
         const admin = document.createElement('div');
         admin.className = 'stage-admin';
         const edit = document.createElement('button');
@@ -1140,7 +1214,7 @@
     clearWorldState();
     spawn.x = stage.spawn?.x ?? 220;
     spawn.y = stage.spawn?.y ?? 150;
-    (stage.fixedBlocks || []).forEach(source => rods.push({
+    if (mode === 'editor') (stage.fixedBlocks || []).forEach(source => rods.push({
       ...normalizeRodRecord(clone(source)),
       uid: source.uid || makeRodUid(),
       fixed: true,
@@ -1164,7 +1238,12 @@
         touched: false
       }));
     } else {
-      stageSupplies = (stage.supplyBlocks || []).map(source => ({ ...normalizeRodRecord(clone(source)), used: false }));
+      stageSupplies = [...(stage.fixedBlocks || []).map((source, index) => ({
+        ...normalizeRodRecord(clone(source)),
+        supplyId: source.supplyId || `${stage.id}-fixed-${index}`,
+        editorX: source.x, editorY: source.y,
+        used: false
+      })), ...(stage.supplyBlocks || []).map(source => ({ ...normalizeRodRecord(clone(source)), used: false }))];
     }
     (stage.goals || []).forEach(source => goals.push({ ...clone(source), id: nextId++, kind: 'goal' }));
     (stage.fields || []).forEach(source => fields.push({ ...clone(source), id: nextId++, kind: 'field' }));
@@ -1206,7 +1285,7 @@
     successMessage.textContent = '공이 바구니에 도착했어요.';
     setAppMode('physics-lab');
     freeModeDirty = false;
-    setHint('중력과 나무 마찰을 바꾸고 공 다시 놓기로 바로 비교하세요.', 3800);
+    setHint('중력·나무 마찰·나무 튕김을 바꾸고 공 다시 놓기로 비교하세요.', 3800);
   }
 
   function startEditor(stage = null, setup = null) {
@@ -1283,6 +1362,7 @@
     combineElectricButton.hidden = !canEditElectric || !findElectricConnectionCandidate(selected);
     detachElectricButton.hidden = !selectedElectricLinkId;
     convertElectricButton.hidden = !selectedElectricLinkId;
+
   }
 
   function toggleSelectedFixed() {
@@ -1353,6 +1433,16 @@
   }
 
   function spawnBall() {
+    const invalid = electricLinks.find(link => !validElectricJoint(link));
+    if (invalid) {
+      const a = rodByUid(invalid.a.rodUid); const b = rodByUid(invalid.b.rodUid);
+      const sides = a && b && electricJointSides(a, invalid.a.end, b, invalid.b.end);
+      setHint(invalid.a.side !== invalid.b.side
+        ? '결합 꼭짓점의 위·아래 설정이 달라 공을 투하할 수 없어요. 변환으로 맞춰 주세요.'
+        : !sides ? '전기 발판 결합 각도는 안쪽 135~180°여야 공을 투하할 수 있어요.'
+          : '전기 발판 꼭짓점이 바깥쪽이거나 떨어져 있어요. 결합을 고쳐 주세요.', 4700);
+      return false;
+    }
     ball = {
       x: spawn.x,
       y: spawn.y,
@@ -1373,6 +1463,7 @@
     rods.forEach(rod => { rod.touched = false; });
     successPanel.hidden = true;
     setHint('공이 떨어집니다. 충돌 속도에 따라 실제처럼 살짝 튕겨요.');
+    return true;
   }
 
   function rodBounds(rod) {
@@ -1512,7 +1603,12 @@
 
   function selectEntity(entity) {
     selected = entity;
-    selectedElectricLinkId = null;
+    const previous = electricLinks.find(link => link.id === selectedElectricLinkId);
+    const connected = entity?.kind === 'rod'
+      ? electricLinks.filter(link => link.a.rodUid === entity.uid || link.b.rodUid === entity.uid) : [];
+    selectedElectricLinkId = entity?.kind === 'rod' && previous
+      && (previous.a.rodUid === entity.uid || previous.b.rodUid === entity.uid)
+      ? previous.id : connected.length === 1 ? connected[0].id : null;
     updateDeleteButton();
   }
 
@@ -1652,27 +1748,58 @@
     return Math.acos(clamp((ax * bx + ay * by) / denominator, -1, 1));
   }
 
+  // Signed travel turn keeps the 135–180° inside angle on the actual concave side.
+  // An unsigned acos alone accepts a flipped (>180°) outside corner.
+  function electricJointSides(aRod, aEnd, bRod, bEnd) {
+    const aForward = aEnd === 'end' ? 1 : -1;
+    const bForward = bEnd === 'start' ? 1 : -1;
+    const ax = Math.cos(aRod.angle) * aForward;
+    const ay = Math.sin(aRod.angle) * aForward;
+    const bx = Math.cos(bRod.angle) * bForward;
+    const by = Math.sin(bRod.angle) * bForward;
+    const turn = Math.atan2(ax * by - ay * bx, ax * bx + ay * by);
+    if (Math.abs(turn) > Math.PI - ELECTRIC_MIN_JOINT_ANGLE + .0001) return null;
+    const innerSide = (forward, clockwise) => (forward > 0) === clockwise ? 'bottom' : 'top';
+    if (Math.abs(turn) < .0001) return { turn, pairs: [
+      { a: 'top', b: aForward === bForward ? 'top' : 'bottom' },
+      { a: 'bottom', b: aForward === bForward ? 'bottom' : 'top' }
+    ] };
+    return { turn, pairs: [{ a: innerSide(aForward, turn > 0), b: innerSide(bForward, turn > 0) }] };
+  }
+
+  function validElectricJoint(link) {
+    const a = rodByUid(link.a.rodUid); const b = rodByUid(link.b.rodUid);
+    const sides = a && b && electricJointSides(a, link.a.end, b, link.b.end);
+    return Boolean(sides?.pairs.some(pair => pair.a === link.a.side && pair.b === link.b.side)
+      && distanceSquared(rodCorner(a, link.a.end, link.a.side), rodCorner(b, link.b.end, link.b.side)) < 9);
+  }
+
+  function validAdjacentElectricJoints(...uids) {
+    return electricLinks.every(link => !uids.includes(link.a.rodUid) && !uids.includes(link.b.rodUid)
+      || validElectricJoint(link));
+  }
+
+
   function findElectricConnectionCandidate(rod = selected) {
     if (!rod || rod.type !== 'electric' || appMode === 'stage') return null;
     const maximum = ELECTRIC_CONNECT_DISTANCE / camera.zoom;
     let best = null;
     for (const end of ['start', 'end']) {
       if (endpointLink(rod.uid, end)) continue;
-      const point = rodCorner(rod, end, 'top');
       for (const other of rods) {
         if (other === rod || other.type !== 'electric') continue;
         if (connectedRodUids(rod.uid).has(other.uid)) continue;
         for (const otherEnd of ['start', 'end']) {
           if (endpointLink(other.uid, otherEnd)) continue;
-          const target = rodCorner(other, otherEnd, 'top');
-          const distance = Math.hypot(point.x - target.x, point.y - target.y);
-          if (distance > maximum || (best && distance >= best.distance)) continue;
-          const incomingA = { x: rod.x - point.x, y: rod.y - point.y };
-          const incomingB = { x: other.x - target.x, y: other.y - target.y };
-          const denominator = Math.hypot(incomingA.x, incomingA.y) * Math.hypot(incomingB.x, incomingB.y) || 1;
-          const angle = Math.acos(clamp((incomingA.x * incomingB.x + incomingA.y * incomingB.y) / denominator, -1, 1));
-          if (angle + .001 < ELECTRIC_MIN_JOINT_ANGLE) continue;
-          best = { rod, end, side: 'top', other, otherEnd, otherSide: 'top', point, target, distance };
+          const sides = electricJointSides(rod, end, other, otherEnd);
+          if (!sides) continue;
+          for (const pair of sides.pairs) {
+            const point = rodCorner(rod, end, pair.a);
+            const target = rodCorner(other, otherEnd, pair.b);
+            const distance = Math.hypot(point.x - target.x, point.y - target.y);
+            if (distance > maximum || (best && distance >= best.distance)) continue;
+            best = { rod, end, side: pair.a, other, otherEnd, otherSide: pair.b, point, target, distance };
+          }
         }
       }
     }
@@ -1705,21 +1832,24 @@
     setHint('전기 발판 결합을 해제했습니다.');
   }
 
-  function convertSelectedElectricLink() {
+  function convertSelectedElectricCorner() {
+    if (appMode === 'stage') return;
     const link = electricLinks.find(item => item.id === selectedElectricLinkId);
-    if (!link) return;
-    const endpoint = selected && link.a.rodUid === selected.uid ? link.a : selected && link.b.rodUid === selected.uid ? link.b : link.b;
-    const other = endpoint === link.a ? link.b : link.a;
-    const rod = rodByUid(endpoint.rodUid);
-    const otherRod = rodByUid(other.rodUid);
-    if (!rod || !otherRod) return;
+    const endpoint = link && endpointForRod(link, selected?.uid);
+    if (!endpoint) return;
     pushUndo();
     endpoint.side = endpoint.side === 'top' ? 'bottom' : 'top';
-    const moving = rodCorner(rod, endpoint.end, endpoint.side);
-    const target = rodCorner(otherRod, other.end, other.side);
-    translateElectricComponent(rod.uid, target.x - moving.x, target.y - moving.y, link.id);
+    const a = rodByUid(link.a.rodUid); const b = rodByUid(link.b.rodUid);
+    const sides = electricJointSides(a, link.a.end, b, link.b.end);
+    if (sides?.pairs.some(pair => pair.a === link.a.side && pair.b === link.b.side)) {
+      const first = rodCorner(a, link.a.end, link.a.side);
+      const second = rodCorner(b, link.b.end, link.b.side);
+      translateElectricComponent(b.uid, first.x - second.x, first.y - second.y, link.id);
+    }
+    if (ball) ball = null;
+    setHint(validElectricJoint(link) ? '선택한 블록의 결합 꼭짓점을 전환했습니다.'
+      : '꼭짓점의 위·아래 또는 안쪽 각도가 맞지 않습니다. 맞춘 뒤 공을 투하하세요.', 4200);
     updateDeleteButton();
-    setHint(`결합 기준을 ${endpoint.side === 'top' ? '위' : '아래'} 꼭짓점으로 바꿨습니다.`);
   }
 
   function findElectricLinkAt(point, radius) {
@@ -1790,9 +1920,8 @@
     const previous = [{ rod: aRod, x: aRod.x, y: aRod.y, angle: aRod.angle }, { rod: bRod, x: bRod.x, y: bRod.y, angle: bRod.angle }];
     placeRodByCorners(aRod, aAnchor.end, aAnchor.side, aAnchor.point, link.a.end, link.a.side, target);
     placeRodByCorners(bRod, bAnchor.end, bAnchor.side, bAnchor.point, link.b.end, link.b.side, target);
-    if (electricJointAngle(link) + .001 < ELECTRIC_MIN_JOINT_ANGLE) {
+    if (!validAdjacentElectricJoints(aRod.uid, bRod.uid)) {
       previous.forEach(item => Object.assign(item.rod, { x: item.x, y: item.y, angle: item.angle }));
-      translateElectricComponent(aRod.uid, requestedPoint.x - current.x, requestedPoint.y - current.y);
     }
   }
 
@@ -1806,7 +1935,7 @@
     const target = { x: fixedPoint.x + dx / distance * radius, y: fixedPoint.y + dy / distance * radius };
     const previous = { x: rod.x, y: rod.y, angle: rod.angle };
     placeRodByCorners(rod, linkedEnd, linkedEndpoint.side, fixedPoint, movingEnd, movingSide, target);
-    if (electricJointAngle(link) + .001 < ELECTRIC_MIN_JOINT_ANGLE) Object.assign(rod, previous);
+    if (!validAdjacentElectricJoints(rod.uid)) Object.assign(rod, previous);
   }
 
   function pointInRod(point, rod, padding = 11 / camera.zoom) {
@@ -2203,8 +2332,7 @@
     const rod = rodByUid(ride.rodUid);
     if (!rod || !ball) return false;
     const localX = clamp(ride.distance, 0, rod.length) - rod.length / 2;
-    const sideSign = ride.side === 'top' ? -1 : 1;
-    const localY = sideSign * (rod.thickness / 2 + ball.radius + .25);
+    const localY = -(rod.thickness / 2 + ball.radius + .25);
     const cos = Math.cos(rod.angle); const sin = Math.sin(rod.angle);
     ball.x = rod.x + localX * cos - localY * sin;
     ball.y = rod.y + localX * sin + localY * cos;
@@ -2233,7 +2361,7 @@
         const towardOther = { x: other.x - target.x, y: other.y - target.y };
         const dot = towardRod.x * towardOther.x + towardRod.y * towardOther.y;
         const length = Math.hypot(towardRod.x, towardRod.y) * Math.hypot(towardOther.x, towardOther.y);
-        if (dot > length * .001) continue; // inside angle must be 90°..180°
+        if (dot > -length * Math.SQRT1_2) continue; // inside angle must be 135°..180°
         matches.push({ rodUid: other.uid, end: otherEnd, side: 'top' });
       }
     }
@@ -2244,13 +2372,16 @@
   function updateElectricRide(dt) {
     const ride = ball?.electricRide;
     if (!ride) return false;
-    ride.speed = Math.min(ELECTRIC_MAX_SPEED, ride.speed + ELECTRIC_ACCELERATION * dt);
+    // Brief visible roll at the entry, then a strong boost on the same block.
+    ride.speed = Math.min(ELECTRIC_MAX_SPEED, ride.speed + ((ride.boostTravel || 0) < 24 ? 10 : ELECTRIC_ACCELERATION) * dt);
     let travel = ride.speed * PIXELS_PER_METER * dt;
+    ride.boostTravel = (ride.boostTravel || 0) + travel;
     let guard = 0;
     while (travel > 0 && guard++ < 12) {
       const rod = rodByUid(ride.rodUid);
       if (!rod) { ball.electricRide = null; return false; }
-      const available = ride.direction > 0 ? rod.length - ride.distance : ride.distance;
+      const rodLength = rod.length;
+      const available = ride.direction > 0 ? rodLength - ride.distance : ride.distance;
       if (travel <= available) {
         ride.distance += ride.direction * travel;
         placeBallOnElectricRide(ride);
@@ -2258,7 +2389,7 @@
         updateRollingSound('electric', ride.speed, ball.omega);
         return true;
       }
-      ride.distance = ride.direction > 0 ? rod.length : 0;
+      ride.distance = ride.direction > 0 ? rodLength : 0;
       placeBallOnElectricRide(ride);
       travel -= Math.max(0, available);
       const end = ride.direction > 0 ? 'end' : 'start';
@@ -2267,9 +2398,8 @@
         ? link.a.rodUid === rod.uid ? link.b : link.a
         : adjacentElectricExit(rod, end, ride.side);
       if (!nextEndpoint) {
-        const cos = Math.cos(rod.angle); const sin = Math.sin(rod.angle);
-        ball.vx = cos * ride.direction * ride.speed;
-        ball.vy = sin * ride.direction * ride.speed;
+        ball.vx = Math.cos(rod.angle) * ride.direction * ride.speed;
+        ball.vy = Math.sin(rod.angle) * ride.direction * ride.speed;
         ball.electricRide = null;
         // Do not collide again in this same step at the track tip: it can reverse the launch.
         return true;
@@ -2277,7 +2407,7 @@
       const nextRod = rodByUid(nextEndpoint.rodUid);
       if (!nextRod) { ball.electricRide = null; return true; }
       ride.rodUid = nextRod.uid;
-      ride.side = nextEndpoint.side;
+      ride.side = 'top';
       ride.direction = nextEndpoint.end === 'start' ? 1 : -1;
       ride.distance = nextEndpoint.end === 'start' ? 0 : nextRod.length;
     }
@@ -2400,7 +2530,8 @@
         const incomingSpeed = Math.hypot(incomingVx, incomingVy);
         const angleFromSurface = Math.asin(clamp(Math.max(0, -(incomingVx * nx + incomingVy * ny)) / Math.max(.0001, incomingSpeed), 0, 1));
         if (angleFromSurface <= ELECTRIC_ATTACH_ANGLE && rect.source) {
-          const tangent = { x: Math.cos(rect.source.angle), y: Math.sin(rect.source.angle) };
+          const surfaceAngle = rect.surfaceAngle ?? rect.source.angle;
+          const tangent = { x: Math.cos(surfaceAngle), y: Math.sin(surfaceAngle) };
           const along = incomingVx * tangent.x + incomingVy * tangent.y;
           const localDx = ball.x - rect.source.x;
           const localDy = ball.y - rect.source.y;
@@ -2410,7 +2541,8 @@
             side: 'top',
             direction: Math.abs(along) > .08 ? Math.sign(along) : 1,
             speed: Math.max(1.5, Math.abs(along)),
-            distance: clamp(localX + rect.source.length / 2, 0, rect.source.length)
+            distance: clamp(localX + rect.source.length / 2, 0, rect.source.length),
+            boostTravel: 0
           };
           placeBallOnElectricRide(ball.electricRide);
         } else {
@@ -2559,16 +2691,11 @@
 
     supportContacts.length = 0;
     for (const rod of rods) {
-      const touched = resolveBallRect({
-        x: rod.x,
-        y: rod.y,
-        width: rod.length,
-        height: rod.thickness,
-        angle: rod.angle,
-        material: materialForType(rod.type),
-        blockType: rod.type,
-        blockId: rod.id,
-        source: rod
+      let touched = false;
+      touched = resolveBallRect({
+        x: rod.x, y: rod.y, width: rod.length, height: rod.thickness,
+        angle: rod.angle, material: materialForType(rod.type),
+        blockType: rod.type, blockId: rod.id, source: rod
       });
       if (touched) {
         rod.touched = true;
@@ -2773,6 +2900,7 @@
     return true;
   }
 
+  // The original electric sprite stays intact; cover only a joint's open wedge.
   function drawRod(rod, alpha = 1) {
     const material = MATERIALS[rod.type] || MATERIALS.wood;
     ctx.save();
@@ -2939,10 +3067,10 @@
       const joint = electricJointPoint(link);
       if (!joint) continue;
       ctx.save();
-      ctx.fillStyle = '#ffbd18';
+      ctx.fillStyle = validElectricJoint(link) ? '#ffbd18' : '#e84d53';
       ctx.strokeStyle = link.id === selectedElectricLinkId ? '#fff7cf' : '#c46d00';
       ctx.lineWidth = link.id === selectedElectricLinkId ? 5 : 2;
-      ctx.shadowColor = 'rgba(255,181,0,.45)';
+      ctx.shadowColor = validElectricJoint(link) ? 'rgba(255,181,0,.45)' : 'rgba(232,77,83,.5)';
       ctx.shadowBlur = 8;
       ctx.beginPath();
       ctx.arc(joint.x, joint.y, 10, 0, Math.PI * 2);
@@ -3029,6 +3157,7 @@
     applyWorldTransform();
     drawSpawn();
     fields.forEach(field => drawField(field));
+
     rods.forEach(rod => drawRod(rod, appMode === 'editor' && !rod.fixed ? 0.42 : 1));
     drawElectricJoints();
     goals.forEach(goal => drawBasket(goal));
@@ -3092,7 +3221,8 @@
   toggleFixedButton.addEventListener('click', toggleSelectedFixed);
   combineElectricButton.addEventListener('click', combineSelectedElectric);
   detachElectricButton.addEventListener('click', detachSelectedElectricLink);
-  convertElectricButton.addEventListener('click', convertSelectedElectricLink);
+  convertElectricButton.addEventListener('click', convertSelectedElectricCorner);
+
   undoButton.addEventListener('click', undoLastAction);
   redoButton.addEventListener('click', redoLastAction);
   saveMapButton.addEventListener('click', openSaveCreation);
@@ -3159,6 +3289,8 @@
   gravityInput.addEventListener('change', () => updatePhysicsLabSetting('gravity', gravityInput.value));
   woodFrictionRange.addEventListener('input', () => updatePhysicsLabSetting('woodFriction', woodFrictionRange.value));
   woodFrictionInput.addEventListener('change', () => updatePhysicsLabSetting('woodFriction', woodFrictionInput.value));
+  woodBounceRange.addEventListener('input', () => updatePhysicsLabSetting('woodBounce', woodBounceRange.value));
+  woodBounceInput.addEventListener('change', () => updatePhysicsLabSetting('woodBounce', woodBounceInput.value));
   physicsLabRespawnButton.addEventListener('click', spawnBall);
   physicsLabResetButton.addEventListener('click', resetPhysicsLabSettings);
   mapMakerButton.addEventListener('click', () => {
@@ -3185,8 +3317,7 @@
   closeCatalogButton.addEventListener('click', () => blockCatalogDialog.close());
   confirmDeleteStageButton.addEventListener('click', () => {
     if (pendingDeleteStageId) {
-      stages = stages.filter(stage => stage.id !== pendingDeleteStageId);
-      persistStages();
+      persistStageOrder(stages.filter(stage => stage.id !== pendingDeleteStageId).sort((a, b) => a.number - b.number));
     }
     pendingDeleteStageId = null;
     deleteStageDialog.close();
@@ -3236,6 +3367,8 @@
       ELECTRIC_PLATFORM_THICKNESS,
       ELECTRIC_ATTACH_ANGLE,
       ELECTRIC_SPEED_MULTIPLIER,
+      ELECTRIC_ACCELERATION,
+      ELECTRIC_MAX_SPEED,
       ELECTRIC_MIN_JOINT_ANGLE
     },
     getState: () => ({
@@ -3244,6 +3377,7 @@
       fieldCount: fields.length,
       electricLinkCount: electricLinks.length,
       electricLinks: clone(electricLinks),
+
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
       rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId })),
@@ -3258,6 +3392,7 @@
       physicsLabSettings: { ...physicsLabSettings },
       activeGravity: activeGravity(),
       activeWoodFriction: materialForType('wood').friction,
+      activeWoodBounce: materialForType('wood').restitution,
       activeWoodRollingResistance: materialForType('wood').rollingResistance,
 
       unlockedStage,
@@ -3274,6 +3409,7 @@
       canvasRect: (() => { const rect = canvas.getBoundingClientRect(); return { width: rect.width, height: rect.height, bottom: rect.bottom }; })()
     }),
     addRod,
+    getRodByUid: rodByUid,
     addGoal,
     selectRod: index => selectEntity(rods[index] || null),
     setBallState: state => {
@@ -3288,8 +3424,13 @@
     },
     combineSelectedElectric,
     detachSelectedElectricLink,
-    convertSelectedElectricLink,
+    convertSelectedElectricCorner,
     electricJointAngle,
+    electricJointSides,
+    validElectricJoint,
+    moveElectricJoint,
+    rotateElectricOuterEnd,
+    findElectricConnectionCandidate,
     selectElectricLink: index => {
       const link = electricLinks[index];
       if (!link) return null;
@@ -3304,6 +3445,7 @@
     setZoomAt,
     showHome,
     showStageList,
+    reorderStage,
     startFreeMode,
     startPhysicsLab,
     updatePhysicsLabSetting,
@@ -3331,7 +3473,7 @@
       limiterActive: Boolean(audioLimiter),
       limiterThreshold: audioLimiter?.threshold.value ?? null,
       rollingActive: Boolean(rollingAudio),
-      rollingToneType: rollingAudio?.tone.type || null,
+      rollingToneType: null,
       rollingFilterType: rollingAudio?.filter.type || null,
       referenceRollingLoaded: Boolean(rollingReferenceBuffer),
       woodImpactCount: woodImpactBuffers.length,

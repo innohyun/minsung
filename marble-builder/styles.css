@@ -50,6 +50,7 @@ button { font: inherit; }
   box-shadow: inset -4px -5px 8px rgba(108, 44, 8, .2), 0 5px 12px rgba(115, 60, 13, .22);
 }
 .top-actions { display: flex; align-items: center; gap: 7px; flex: 0 1 auto; max-width: 70%; overflow-x: auto; scrollbar-width: thin; touch-action: pan-x; }
+.top-actions > button { flex: 0 0 auto; white-space: nowrap; }
 .action {
   min-height: 42px; padding: 0 13px; border-radius: 11px;
   border: 1px solid rgba(23, 50, 77, .14); background: #fff; color: var(--ink);
@@ -79,7 +80,7 @@ button { font: inherit; }
   width: min(900px, calc(100% - 24px));
   transform: translateX(-50%);
   display: grid;
-  grid-template-columns: repeat(2, minmax(210px, 1fr)) auto;
+  grid-template-columns: repeat(3, minmax(165px, 1fr)) auto;
   align-items: end;
   gap: 12px;
   padding: 12px 14px;
@@ -235,6 +236,9 @@ body.is-physics-lab .hint { top: 187px; }
 .stage-list { width: min(900px,100%); margin: auto; display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 13px; }
 .stage-item { position: relative; min-height: 164px; padding: 18px; display: grid; align-content: end; border: 1px solid rgba(23,50,77,.12); border-radius: 20px; background: rgba(255,255,255,.9); box-shadow: 0 12px 28px rgba(31,74,111,.1); }
 .stage-item.locked { opacity: .58; }
+.stage-item[tabindex] { touch-action: none; user-select: none; cursor: grab; }
+.stage-item.reordering { opacity: .55; cursor: grabbing; transform: scale(.98); border-color: #2674d9; }
+.stage-move-hint { position: absolute; top: 18px; left: 18px; color: #376da6; font-size: .68rem; font-weight: 800; pointer-events: none; }
 .stage-item h3 { margin: 0 0 5px; font-size: 1.25rem; }
 .stage-item p { margin: 0 0 13px; color: var(--muted); font-size: .78rem; }
 .stage-play { min-height: 42px; border: 0; border-radius: 11px; background: var(--blue); color: #fff; font-weight: 850; cursor: pointer; }
@@ -276,10 +280,10 @@ body.is-home .top-panel, body.is-home .hint, body.is-home .tool-dock, body.is-st
   .home-hero { margin-top: 68px; gap: 13px; }
   .home-grid { grid-template-columns: 1fr; }
   .home-card, .mode-card { min-height: 104px; padding: 16px; }
-  .physics-lab-panel { top: max(120px, calc(env(safe-area-inset-top) + 108px)); grid-template-columns: 1fr; gap: 9px; padding: 10px; }
+  .physics-lab-panel { top: max(120px, calc(env(safe-area-inset-top) + 108px)); grid-template-columns: 1fr; gap: 9px; padding: 10px; max-height: calc(100dvh - 260px); overflow-y: auto; touch-action: pan-y; }
   .physics-lab-actions { display: grid; grid-template-columns: 1fr 1fr; }
   .physics-lab-actions button { min-height: 40px; padding: 0 7px; font-size: .72rem; }
-  body.is-physics-lab .hint { top: 330px; }
+  body.is-physics-lab .hint { top: auto; bottom: 125px; }
   body.is-editor #resetButton { display: none; }
 
   .tool-list { min-width: 0; }
