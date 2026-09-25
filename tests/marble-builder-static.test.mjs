@@ -9,8 +9,8 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=32/);
-    assert.match(html, /styles\.css\?v=22/);
+    assert.match(html, /game\.js\?v=35/);
+    assert.match(html, /styles\.css\?v=23/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
@@ -28,18 +28,19 @@ test('swing is registered with length-only setup and an isolated selection path'
     assert.match(styles, /swing\/swing\.png\?v=2/);
 });
 
-test('swing pendulum, magnet release and swept-disk placement share the pivot', () => {
+test('swing pendulum uses a draggable blue release marker and allows obstacles in its orbit', () => {
     assert.match(script, /function swingRadius\(rod\)/);
-    assert.match(script, /function swingPlacementConflict\(candidate/);
-    assert.match(script, /function advanceSwings\(dt\)/);
+    assert.match(script, /function swingReleasePoint\(rod\)/);
+    assert.match(script, /function crossedSwingRelease\(before, after, target\)/);
+    assert.match(script, /function swingBlockedAt\(rod, angle\)/);
+    assert.match(script, /function attractSwingBall\(rod, dt\)/);
     assert.match(script, /function resolveSwingContact\(rod\)/);
     assert.match(script, /function releaseSwingBall\(rod\)/);
-    assert.match(script, /drawSwingSweep\(rod/);
-    assert.match(script, /if \(attachedPivot && releaseSwingBall\(attachedPivot\)\)/);
-    assert.match(script, /swingPoint\(rod, -\(rod\.length \+ SWING_MOUTH\)\)/);
+    assert.match(script, /editDrag\.mode === 'swingRelease'/);
+    assert.match(script, /attachedPivot\.releaseRequested = true/);
+    assert.match(script, /circleTouchesRect\(mouth, ball\.radius, rect\)/);
     assert.match(script, /drawImage\(swingImages\.magnet, -42, -rod\.length - 53/);
     assert.match(script, /drawImage\(swingImages\.weight, -14, -16/);
-    assert.match(script, /swingConflictsInWorld\(\)/);
 });
 
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {
@@ -68,6 +69,9 @@ test('marble builder uses video-matched gravity, fixed substeps, friction, and d
     assert.match(script, /const EARTH_GRAVITY = 19\.35/);
     assert.match(script, /const FIXED_STEP = 1 \/ 120/);
     assert.match(script, /const BALL_INERTIA = 0\.5 \* BALL_MASS/);
+    assert.match(script, /function ballInertia\(\)/);
+    assert.match(html, /id="ballTypeButton"/);
+    assert.match(script, /GIANT_BALL_MASS/);
     assert.match(script, /maxFriction = rect\.material\.friction \* normalImpulse/);
     assert.match(script, /rollingResistance:/);
     assert.match(script, /function applyRollingResistance/);

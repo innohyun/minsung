@@ -5,6 +5,7 @@
   const ctx = canvas.getContext('2d');
   const gameShell = document.querySelector('.game-shell');
   const spawnButton = document.getElementById('spawnButton');
+  const ballTypeButton = document.getElementById('ballTypeButton');
 
   const deleteButton = document.getElementById('deleteButton');
   const resetButton = document.getElementById('resetButton');
@@ -92,10 +93,14 @@
   const FIXED_STEP = 1 / 120;
   const BALL_RADIUS = 18;
   const BALL_MASS = 0.18;
+  const GIANT_BALL_RADIUS = 32;
+  const GIANT_BALL_MASS = 1.5;
   const SWING_MOUTH = 64;
+  const DEFAULT_SWING_RELEASE_ANGLE = -1.82;
   const SWING_MAGNET_MASS = 0.65;
   const SWING_ROD_MASS = 0.12;
   const BALL_INERTIA = 0.5 * BALL_MASS * Math.pow(BALL_RADIUS / PIXELS_PER_METER, 2);
+  function ballInertia() { return ball ? 0.5 * ball.mass * Math.pow(ball.radius / PIXELS_PER_METER, 2) : BALL_INERTIA; }
   const MIN_ZOOM = 0.25;
   const MAX_ZOOM = 1;
   const DEFAULT_ROD_LENGTH = 180;
@@ -195,6 +200,11 @@
   let creations = [];
   let activeCreationId = null;
   let followBall = false;
+  let selectedBallType = 'normal';
+  function updateBallTypeButton() {
+    ballTypeButton.textContent = selectedBallType === 'giant' ? '공: 거대' : '공: 기본';
+    ballTypeButton.setAttribute('aria-pressed', String(selectedBallType === 'giant'));
+  }
   let audioContext = null;
   let audioMaster = null;
   let audioCompressor = null;
@@ -276,7 +286,8 @@
     const type = normalizeRodType(rod.type);
     return { ...rod, type, thickness: normalizedRodThickness(type, rod.thickness),
       ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
-        swingStarted: false, swingOmega: 0 } : {}) };
+        releaseAngle: Number.isFinite(rod.releaseAngle) ? rod.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
+        swingStarted: false, swingOmega: 0, releaseRequested: false } : {}) };
   }
 
   function makeRodUid() {
@@ -401,6 +412,7 @@
   function captureWorld() {
     return {
       rods: clone(rods),
+      ballType: selectedBallType,
       goals: clone(goals),
       fields: clone(fields),
       electricLinks: clone(electricLinks),
@@ -425,6 +437,8 @@
 
   function restoreWorld(snapshot) {
     rods.splice(0, rods.length, ...clone(snapshot.rods).map(normalizeRodRecord));
+    selectedBallType = snapshot.ballType === 'giant' ? 'giant' : 'normal';
+    updateBallTypeButton();
     goals.splice(0, goals.length, ...clone(snapshot.goals));
     fields.splice(0, fields.length, ...clone(snapshot.fields || []));
     electricLinks.splice(0, electricLinks.length, ...clone(snapshot.electricLinks || []));
@@ -507,6 +521,7 @@
     const creation = creations.find(item => item.id === id);
     if (!creation) return;
     clearWorldState();
+    selectedBallType = creation.ballType === 'giant' ? 'giant' : 'normal';
     activeCreationId = id;
     rods.push(...clone(creation.rods).map(rod => ({
       ...normalizeRodRecord(rod),
@@ -545,12 +560,13 @@
     const saved = {
       id: activeCreationId || `creation-${now}`,
       name: name.trim() || `내 작품 ${creations.length + 1}`,
-      rods: rods.map(({ id, kind, touched, fixed, supplyId, angleLocked, swingOmega, swingStarted, ...rod }) => ({
+      rods: rods.map(({ id, kind, touched, fixed, supplyId, angleLocked, swingOmega, swingStarted, releaseRequested, ...rod }) => ({
         ...rod, angle: rod.type === 'swing' ? (rod.startAngle ?? rod.angle) : rod.angle
       })),
       goals: goals.map(({ id, kind, ...goal }) => ({ ...goal })),
       fields: fields.map(({ id, kind, ...field }) => ({ ...field })),
       electricLinks: clone(electricLinks),
+      ballType: selectedBallType,
       spawn: { ...spawn },
       camera: { ...camera },
       updatedAt: now
@@ -935,6 +951,7 @@
     card.dataset.fixed = descriptor.fixed ? 'true' : 'false';
     if (descriptor.supplyId) card.dataset.supplyId = descriptor.supplyId;
     if (Number.isFinite(descriptor.angle)) card.dataset.angle = String(descriptor.angle);
+    if (Number.isFinite(descriptor.releaseAngle)) card.dataset.releaseAngle = String(descriptor.releaseAngle);
     const settings = descriptor.supplyId ? descriptor : toolSettings[descriptor.type] || {};
     if (settings.length) card.dataset.length = String(settings.length);
     if (settings.thickness) card.dataset.thickness = String(settings.thickness);
@@ -1103,6 +1120,8 @@
     redoButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
     saveMapButton.hidden = mode !== 'free';
     followButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
+    ballTypeButton.hidden = mode === 'stage';
+    updateBallTypeButton();
     followButton.textContent = followBall ? '따라가기 끄기' : '공 따라가기';
     followButton.setAttribute('aria-pressed', String(followBall));
     gameTitle.textContent = mode === 'editor' ? '스테이지 만들기' : mode === 'stage' ? `${currentStage?.number || ''}스테이지` : mode === 'physics-lab' ? '물리 계산' : '공 굴리기 연구소';
@@ -1209,6 +1228,7 @@
     clearWorldState();
     spawn.x = stage.spawn?.x ?? 220;
     spawn.y = stage.spawn?.y ?? 150;
+    selectedBallType = stage.ballType === 'giant' ? 'giant' : 'normal';
     (stage.fixedBlocks || []).forEach(source => rods.push({
       ...normalizeRodRecord(clone(source)),
       uid: source.uid || makeRodUid(),
@@ -1226,7 +1246,9 @@
         length: source.length || DEFAULT_ROD_LENGTH,
         thickness: normalizedRodThickness(source.type, source.thickness),
         angle: source.angle || 0,
-        ...(source.type === 'swing' ? { startAngle: Number.isFinite(source.startAngle) ? source.startAngle : (source.angle || 0), swingOmega: 0, swingStarted: false } : {}),
+        ...(source.type === 'swing' ? { startAngle: Number.isFinite(source.startAngle) ? source.startAngle : (source.angle || 0),
+          releaseAngle: Number.isFinite(source.releaseAngle) ? source.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
+          swingOmega: 0, swingStarted: false, releaseRequested: false } : {}),
         fixed: false,
         supplyId: source.supplyId,
         id: nextId++,
@@ -1260,6 +1282,7 @@
     editorStageId = null;
     activeCreationId = null;
     clearWorldState();
+    selectedBallType = 'normal';
     successTitle.textContent = '골인!';
     successMessage.textContent = '공이 바구니에 도착했어요.';
     setAppMode('free');
@@ -1312,7 +1335,7 @@
       setHint('블록을 한 개 이상 배치해 주세요.', 3200);
       return;
     }
-    const fixedBlocks = rods.filter(rod => rod.fixed).map(({ id, kind, touched, supplyId, swingOmega, swingStarted, ...rod }) => ({
+    const fixedBlocks = rods.filter(rod => rod.fixed).map(({ id, kind, touched, supplyId, swingOmega, swingStarted, releaseRequested, ...rod }) => ({
       ...rod, angle: rod.type === 'swing' ? (rod.startAngle ?? rod.angle) : rod.angle, fixed: true
     }));
     const supplyBlocks = rods.filter(rod => !rod.fixed).map((rod, index) => ({
@@ -1323,11 +1346,13 @@
       editorY: rod.y,
       length: rod.length,
       thickness: rod.thickness,
+      releaseAngle: rod.releaseAngle,
       uid: rod.uid
     }));
     const saved = normalizeStage({
       ...currentStage,
       number: Number(currentStage.number),
+      ballType: selectedBallType,
       spawn: { x: spawn.x, y: spawn.y },
       fixedBlocks,
       supplyBlocks,
@@ -1457,8 +1482,9 @@
       omega: 0,
       fallPeakY: spawn.y,
       specialContacts: [],
-      radius: BALL_RADIUS,
-      mass: BALL_MASS
+      radius: selectedBallType === 'giant' ? GIANT_BALL_RADIUS : BALL_RADIUS,
+      mass: selectedBallType === 'giant' ? GIANT_BALL_MASS : BALL_MASS,
+      type: selectedBallType
     };
     won = false;
     goalHoldTime = 0;
@@ -1479,8 +1505,8 @@
     return { left: rod.x - halfWidth, right: rod.x + halfWidth, top: rod.y - halfHeight, bottom: rod.y + halfHeight };
   }
 
-  // The dotted disk is the entire swept volume, including the weight and magnet.
-  function swingRadius(rod) { return rod.length + SWING_MOUTH + BALL_RADIUS + 4; }
+  // Only the magnet's orbit is drawn; other objects are allowed inside it.
+  function swingRadius(rod) { return rod.length + SWING_MOUTH; }
 
   function circleTouchesRect(circle, radius, rect) {
     const dx = circle.x - rect.x; const dy = circle.y - rect.y;
@@ -1491,25 +1517,8 @@
     return outsideX * outsideX + outsideY * outsideY < radius * radius;
   }
 
-  function swingPlacementConflict(candidate, ignore = candidate) {
-    const swings = rods.filter(rod => rod.type === 'swing' && rod !== ignore);
-    if (candidate.type === 'swing') {
-      const radius = swingRadius(candidate);
-      return swings.some(rod => Math.hypot(rod.x - candidate.x, rod.y - candidate.y) < swingRadius(rod) + radius)
-        || rods.some(rod => rod !== ignore && rod.type !== 'swing'
-          && circleTouchesRect(candidate, radius, { ...rod, width: rod.length, height: rod.thickness }))
-        || fields.some(field => circleTouchesRect(candidate, radius, field))
-        || goals.some(goal => circleTouchesRect(candidate, radius, { x: goal.x, y: goal.y - goal.height / 2, width: goal.width, height: goal.height }));
-    }
-    if (candidate.kind === 'rod') return swings.some(rod => circleTouchesRect(rod, swingRadius(rod), { ...candidate, width: candidate.length, height: candidate.thickness }));
-    if (candidate.kind === 'field') return swings.some(rod => circleTouchesRect(rod, swingRadius(rod), candidate));
-    if (candidate.kind === 'goal') return swings.some(rod => circleTouchesRect(rod, swingRadius(rod), { x: candidate.x, y: candidate.y - candidate.height / 2, width: candidate.width, height: candidate.height }));
-    return false;
-  }
-
-  function swingConflictsInWorld() {
-    return rods.some(rod => rod.type === 'swing' && swingPlacementConflict(rod));
-  }
+  function swingPlacementConflict() { return false; }
+  function swingConflictsInWorld() { return false; }
 
   function goalBounds(goal) {
     return { left: goal.x - goal.width / 2, right: goal.x + goal.width / 2, top: goal.y - goal.height, bottom: goal.y };
@@ -1569,7 +1578,9 @@
       length: options.length || DEFAULT_ROD_LENGTH,
       thickness: normalizedRodThickness(type, options.thickness),
       angle: Number.isFinite(options.angle) ? options.angle : 0,
-      ...(type === 'swing' ? { startAngle: Number.isFinite(options.angle) ? options.angle : 0, swingOmega: 0, swingStarted: false } : {}),
+      ...(type === 'swing' ? { startAngle: Number.isFinite(options.angle) ? options.angle : 0,
+        releaseAngle: Number.isFinite(options.releaseAngle) ? options.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
+        swingOmega: 0, swingStarted: false, releaseRequested: false } : {}),
       fixed: Boolean(options.fixed),
       supplyId: options.supplyId || null,
       angleLocked: appMode === 'stage' && !options.fixed,
@@ -1593,7 +1604,7 @@
     }
     selectEntity(rod);
     updateToolAvailability();
-    setHint(type === 'swing' ? '점선 원은 회전 범위입니다. 끝점은 작대기 길이, 자석 쪽은 시작 각도, 축은 위치를 바꿉니다.'
+    setHint(type === 'swing' ? '점선은 자석 궤도입니다. 파란 표식을 끌어 방출 위치를 옮길 수 있어요.'
       : appMode === 'stage' ? '저장된 각도로 배치했습니다. 위치만 바꿀 수 있어요.' : '주황색 끝점은 각도, 파란색 가운데 점은 위치를 바꿉니다.');
     return rod;
   }
@@ -2102,9 +2113,19 @@
     const point = screenToWorld(screen);
     const handleRadius = (event.pointerType === 'touch' ? 24 : 17) / camera.zoom;
 
+    const releaseMarker = appMode !== 'stage' && rods.find(rod => rod.type === 'swing'
+      && distanceSquared(point, swingReleasePoint(rod)) <= (handleRadius + 9) ** 2);
+    if (releaseMarker) {
+      selectEntity(releaseMarker);
+      editDrag = makeEditDrag(event.pointerId, 'swingRelease', releaseMarker);
+      event.preventDefault();
+      return;
+    }
     const attachedPivot = ball?.attachedSwingUid && rods.find(rod => rod.uid === ball.attachedSwingUid
       && distanceSquared(point, rod) <= handleRadius * handleRadius);
-    if (attachedPivot && releaseSwingBall(attachedPivot)) {
+    if (attachedPivot) {
+      attachedPivot.releaseRequested = true;
+      setHint('파란 표식에 자석이 도착하면 공을 놓습니다. 장애물에 막히면 붙어 있어요.', 3200);
       event.preventDefault();
       return;
     }
@@ -2228,6 +2249,8 @@
       } else if (editDrag.mode === 'swingLength') {
         entity.length = clamp((point.x - entity.x) * Math.sin(entity.angle)
           - (point.y - entity.y) * Math.cos(entity.angle), 65, 480);
+      } else if (editDrag.mode === 'swingRelease') {
+        entity.releaseAngle = Math.atan2(point.x - entity.x, entity.y - point.y);
       } else if (editDrag.mode === 'swingAngle') {
         entity.angle = Math.atan2(point.x - entity.x, entity.y - point.y);
         entity.startAngle = entity.angle;
@@ -2298,6 +2321,7 @@
       fixed: card.dataset.fixed === 'true',
       supplyId: card.dataset.supplyId || null,
       angle: Number.isFinite(Number(card.dataset.angle)) ? Number(card.dataset.angle) : 0,
+      releaseAngle: card.dataset.releaseAngle === undefined ? undefined : Number(card.dataset.releaseAngle),
       length: Number(card.dataset.length) || undefined,
       thickness: Number(card.dataset.thickness) || undefined,
       width: Number(card.dataset.width) || undefined,
@@ -2360,6 +2384,7 @@
         fixed: current.fixed,
         supplyId: current.supplyId,
         angle: current.angle,
+        releaseAngle: current.releaseAngle,
         length: current.length,
         thickness: current.thickness
       });
@@ -2567,7 +2592,7 @@
     playImpactSoundForContact(impactContactKey, rect.blockType || 'wood', Math.max(0, -normalSpeed));
     if (normalSpeed < 0) {
       const inverseMass = 1 / ball.mass;
-      const inverseInertia = 1 / BALL_INERTIA;
+      const inverseInertia = 1 / ballInertia();
       const crossN = rx * ny - ry * nx;
       const restitution = getImpactRestitution(rect.material, normalSpeed);
       const normalImpulse = -(1 + restitution) * normalSpeed
@@ -2688,7 +2713,7 @@
     playImpactSoundForContact(`basket:${segment.goalId ?? 'goal'}:${segment.name}`, 'wood', Math.max(0, -normalSpeed));
     if (normalSpeed < 0) {
       const inverseMass = 1 / ball.mass;
-      const inverseInertia = 1 / BALL_INERTIA;
+      const inverseInertia = 1 / ballInertia();
       const crossN = rx * ny - ry * nx;
       const restitution = getImpactRestitution(segment.material, normalSpeed);
       const normalImpulse = -(1 + restitution) * normalSpeed
@@ -2754,10 +2779,35 @@
     const angle = rod.angle || 0;
     return { x: rod.x - distance * Math.sin(angle), y: rod.y + distance * Math.cos(angle) };
   }
-
+  function swingReleasePoint(rod) {
+    return swingPoint({ x: rod.x, y: rod.y, angle: rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE }, -swingRadius(rod));
+  }
+  function swingCapturePoint(rod, radius = BALL_RADIUS) {
+    return swingPoint(rod, -(swingRadius(rod) + Math.max(0, radius - BALL_RADIUS) * 1.5));
+  }
+  function crossedSwingRelease(before, after, target) {
+    const wrap = value => ((value % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    return after > before ? wrap(target - before) <= after - before
+      : after < before && wrap(before - target) <= before - after;
+  }
+  function swingBlockedAt(rod, angle) {
+    const probe = { ...rod, angle };
+    const magnet = swingPoint(probe, -rod.length - 28);
+    const shaft = swingPoint(probe, -rod.length * .48);
+    const sweptShaft = orientedRectCorners({ ...shaft, width: 9, height: rod.length - 25, angle });
+    const obstacles = rods.filter(other => other !== rod).map(other => other.type === 'swing'
+      ? { x: other.x, y: other.y, width: 26, height: 26 }
+      : { x: other.x, y: other.y, width: other.length, height: other.thickness, angle: other.angle });
+    obstacles.push(...goals.map(goal => ({ x: goal.x, y: goal.y - goal.height / 2, width: goal.width, height: goal.height })));
+    const attached = ball?.attachedSwingUid === rod.uid;
+    const mouth = attached && swingCapturePoint(probe, ball.radius);
+    return obstacles.some(rect => circleTouchesRect(magnet, 17, rect)
+      || polygonsOverlap(sweptShaft, orientedRectCorners(rect))
+      || (mouth && circleTouchesRect(mouth, ball.radius, rect)));
+  }
   function swingInertia(rod, attachedMass = 0) {
     const length = rod.length / PIXELS_PER_METER;
-    const mouthArm = (rod.length + SWING_MOUTH) / PIXELS_PER_METER;
+    const mouthArm = (rod.length + SWING_MOUTH + (attachedMass && ball ? Math.max(0, ball.radius - BALL_RADIUS) * 1.5 : 0)) / PIXELS_PER_METER;
     return SWING_MAGNET_MASS * length * length
       + SWING_ROD_MASS * length * length / 3 + attachedMass * mouthArm * mouthArm;
   }
@@ -2767,18 +2817,20 @@
       rod.angle = Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0);
       rod.swingOmega = 0;
       rod.swingStarted = !rod.fixed;
+      rod.releaseRequested = false;
     });
   }
 
   function releaseSwingBall(rod) {
     if (!ball || ball.attachedSwingUid !== rod.uid) return false;
-    const mouth = swingPoint(rod, -(rod.length + SWING_MOUTH));
-    const speed = (rod.swingOmega || 0) * (rod.length + SWING_MOUTH) / PIXELS_PER_METER;
+    const mouth = swingCapturePoint(rod, ball.radius);
+    const speed = (rod.swingOmega || 0) * Math.hypot(mouth.x - rod.x, mouth.y - rod.y) / PIXELS_PER_METER;
     // Velocity at the magnet, not at the distant weight or the pivot.
     ball.x = mouth.x; ball.y = mouth.y;
     ball.vx = speed * Math.cos(rod.angle);
     ball.vy = speed * Math.sin(rod.angle);
     ball.attachedSwingUid = null;
+    rod.releaseRequested = false;
     ball.swingDetachUid = rod.uid;
     ball.swingDetachTime = 0.35;
     ball.fallPeakY = ball.y;
@@ -2795,18 +2847,37 @@
         + SWING_ROD_MASS * rod.length / (2 * PIXELS_PER_METER)
         + attachedMass * (rod.length + SWING_MOUTH) / PIXELS_PER_METER) * activeGravity() * Math.sin(rod.angle);
       rod.swingOmega = clamp((rod.swingOmega || 0) + torque / moment * dt, -9, 9) * Math.exp(-0.18 * dt);
-      rod.angle += rod.swingOmega * dt;
+      const before = rod.angle;
+      const after = before + rod.swingOmega * dt;
+      if (swingBlockedAt(rod, after)) {
+        rod.swingOmega = 0;
+        continue;
+      }
+      rod.angle = after;
+      if (rod.releaseRequested && ball?.attachedSwingUid === rod.uid
+        && crossedSwingRelease(before, after, rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE)) releaseSwingBall(rod);
     }
+  }
+
+  function attractSwingBall(rod, dt) {
+    if (!ball || ball.attachedSwingUid || ball.swingDetachUid === rod.uid) return;
+    const mouth = swingCapturePoint(rod, ball.radius);
+    const dx = mouth.x - ball.x; const dy = mouth.y - ball.y;
+    const distance = Math.hypot(dx, dy);
+    const localY = -Math.sin(rod.angle) * (ball.x - rod.x) + Math.cos(rod.angle) * (ball.y - rod.y);
+    if (distance > 150 || distance < .001 || localY > -rod.length - 20) return;
+    const acceleration = 14 + 100 * Math.pow(1 - distance / 150, 1.5);
+    ball.vx += dx / distance * acceleration * dt;
+    ball.vy += dy / distance * acceleration * dt;
   }
 
   function resolveSwingContact(rod) {
     if (!ball || ball.attachedSwingUid) return false;
-    const mouth = swingPoint(rod, -(rod.length + SWING_MOUTH));
+    const mouth = swingCapturePoint(rod, ball.radius);
     const dx = ball.x - mouth.x; const dy = ball.y - mouth.y;
     const localY = -Math.sin(rod.angle) * (ball.x - rod.x) + Math.cos(rod.angle) * (ball.y - rod.y);
-    const canAttach = ball.swingDetachUid !== rod.uid || ball.swingDetachTime <= 0
-      && Math.hypot(dx, dy) > ball.radius + 18;
-    if (canAttach && localY < -rod.length - SWING_MOUTH + 22 && Math.hypot(dx, dy) <= ball.radius + 7) {
+    const canAttach = ball.swingDetachUid !== rod.uid;
+    if (canAttach && localY < -rod.length - 20 && Math.hypot(dx, dy) <= 7) {
       const rx = (mouth.x - rod.x) / PIXELS_PER_METER;
       const ry = (mouth.y - rod.y) / PIXELS_PER_METER;
       rod.swingOmega = clamp(((rod.swingOmega || 0) * swingInertia(rod) + ball.mass * (rx * ball.vy - ry * ball.vx))
@@ -2816,7 +2887,7 @@
       ball.x = mouth.x; ball.y = mouth.y;
       ball.vx = 0; ball.vy = 0;
       rod.touched = true; touchedRodIds.add(rod.id);
-      setHint('공이 자석에 붙었어요. 중심축을 터치하면 놓습니다.', 2800);
+      setHint('공이 자석에 붙었어요. 중심축을 터치하면 파란 지점에서 놓습니다.', 2800);
       return true;
     }
     const magnet = swingPoint(rod, -rod.length);
@@ -2824,7 +2895,13 @@
     const vx = end.x - rod.x; const vy = end.y - rod.y;
     const along = clamp(((ball.x - rod.x) * vx + (ball.y - rod.y) * vy) / (rod.length * rod.length), 0, 1);
     const shaft = { x: rod.x + along * vx, y: rod.y + along * vy };
-    const contacts = [{ point: magnet, radius: 19 }, { point: shaft, radius: 4 }, { point: rod, radius: 13 }];
+    // The opening is empty: only the visible side arms and lower bridge collide.
+    const arms = [-25, 25].flatMap(offset => [-31, -48].map(depth => ({
+      point: { x: magnet.x + offset * Math.cos(rod.angle) - depth * Math.sin(rod.angle),
+        y: magnet.y + offset * Math.sin(rod.angle) + depth * Math.cos(rod.angle) }, radius: 5
+    })));
+    const bridge = swingPoint(rod, -(rod.length + 8));
+    const contacts = [...arms, { point: bridge, radius: 9 }, { point: shaft, radius: 4 }, { point: rod, radius: 13 }];
     for (const { point, radius } of contacts) {
       let nx = ball.x - point.x; let ny = ball.y - point.y;
       const distance = Math.hypot(nx, ny);
@@ -2857,10 +2934,11 @@
     if (ball.attachedSwingUid) {
       const rod = rods.find(item => item.uid === ball.attachedSwingUid);
       if (rod) {
-        const mouth = swingPoint(rod, -(rod.length + SWING_MOUTH));
+        const mouth = swingCapturePoint(rod, ball.radius);
         ball.x = mouth.x; ball.y = mouth.y;
-        ball.vx = rod.swingOmega * (rod.length + SWING_MOUTH) / PIXELS_PER_METER * Math.cos(rod.angle);
-        ball.vy = rod.swingOmega * (rod.length + SWING_MOUTH) / PIXELS_PER_METER * Math.sin(rod.angle);
+        const arm = Math.hypot(mouth.x - rod.x, mouth.y - rod.y) / PIXELS_PER_METER;
+        ball.vx = rod.swingOmega * arm * Math.cos(rod.angle);
+        ball.vy = rod.swingOmega * arm * Math.sin(rod.angle);
         return;
       }
       ball.attachedSwingUid = null;
@@ -2868,7 +2946,7 @@
     if (ball.swingDetachUid) {
       ball.swingDetachTime = Math.max(0, (ball.swingDetachTime || 0) - dt);
       const old = rods.find(rod => rod.uid === ball.swingDetachUid);
-      if (!old || (ball.swingDetachTime <= 0 && Math.hypot(ball.x - swingPoint(old, -(old.length + SWING_MOUTH)).x, ball.y - swingPoint(old, -(old.length + SWING_MOUTH)).y) > ball.radius + 18)) {
+      if (!old || (ball.swingDetachTime <= 0 && Math.hypot(ball.x - swingCapturePoint(old, ball.radius).x, ball.y - swingCapturePoint(old, ball.radius).y) > ball.radius + 18)) {
         ball.swingDetachUid = null;
       }
     }
@@ -2877,6 +2955,7 @@
     specialContactsThisStep.clear();
     if (ball.vy <= 0) ball.fallPeakY = Math.min(ball.fallPeakY ?? ball.y, ball.y);
     const gravity = activeGravity();
+    for (const rod of rods) if (rod.type === 'swing') attractSwingBall(rod, dt);
     let gravityX = 0;
     let gravityY = gravity;
     for (const field of fields) {
@@ -3010,7 +3089,7 @@
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
-    ctx.arc(spawn.x, spawn.y, BALL_RADIUS + 5, 0, Math.PI * 2);
+    ctx.arc(spawn.x, spawn.y, (selectedBallType === 'giant' ? GIANT_BALL_RADIUS : BALL_RADIUS) + 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.setLineDash([]);
@@ -3114,12 +3193,22 @@
   function drawSwingSweep(rod, alpha = 1) {
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = swingPlacementConflict(rod) ? '#e8585d' : 'rgba(42,110,205,.75)';
+    ctx.strokeStyle = 'rgba(210,226,250,.9)';
     ctx.lineWidth = 2;
     ctx.setLineDash([2, 8]);
     ctx.beginPath();
     ctx.arc(rod.x, rod.y, swingRadius(rod), 0, Math.PI * 2);
     ctx.stroke();
+    const marker = swingReleasePoint(rod);
+    ctx.setLineDash([]);
+    ctx.translate(marker.x, marker.y);
+    ctx.rotate(rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE);
+    ctx.fillStyle = '#1976e9';
+    ctx.strokeStyle = '#a5dfff';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(-14, -23, 28, 46, 8);
+    ctx.fill(); ctx.stroke();
     ctx.restore();
   }
 
@@ -3291,6 +3380,9 @@
           drawHandle(ends.end.x, ends.end.y, '#ffaf21');
           const angleHandle = swingPoint(selected, -(selected.length + 38));
           drawHandle(angleHandle.x, angleHandle.y, '#a967db');
+          const marker = swingReleasePoint(selected);
+          ctx.beginPath(); ctx.arc(marker.x, marker.y, 26, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(25,118,233,.9)'; ctx.stroke();
         }
         ctx.restore();
         return;
@@ -3365,7 +3457,7 @@
     ctx.shadowColor = 'rgba(68, 38, 8, .25)';
     ctx.shadowBlur = 9;
     ctx.shadowOffsetY = 5;
-    const gradient = ctx.createRadialGradient(-6, -7, 2, 0, 0, ball.radius);
+    const gradient = ctx.createRadialGradient(-ball.radius / 3, -ball.radius / 3, 2, 0, 0, ball.radius);
     gradient.addColorStop(0, '#fff7bd');
     gradient.addColorStop(.24, '#ffd158');
     gradient.addColorStop(.7, '#ed8b24');
@@ -3477,6 +3569,11 @@
   window.visualViewport?.addEventListener('resize', resize);
   new ResizeObserver(resize).observe(gameShell);
   spawnButton.addEventListener('click', spawnBall);
+  ballTypeButton.addEventListener('click', () => {
+    selectedBallType = selectedBallType === 'giant' ? 'normal' : 'giant';
+    updateBallTypeButton();
+    setHint(selectedBallType === 'giant' ? '크고 무거운 거대 공을 선택했어요.' : '기본 공을 선택했어요.');
+  });
   deleteButton.addEventListener('click', deleteSelected);
   toggleFixedButton.addEventListener('click', toggleSelectedFixed);
   combineElectricButton.addEventListener('click', combineSelectedElectric);
@@ -3659,12 +3756,13 @@
 
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
-      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted })),
+      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted })),
       goals: goals.map(goal => ({ id: goal.id, x: goal.x, y: goal.y })),
       fields: fields.map(field => ({ id: field.id, x: field.x, y: field.y, width: field.width, height: field.height, direction: field.direction })),
       supplies: clone(stageSupplies),
       recentTools: [...recentTools],
-      ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, omega: ball.omega, fallPeakY: ball.fallPeakY, attachedSwingUid: ball.attachedSwingUid || null, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
+      ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, radius: ball.radius, mass: ball.mass, type: ball.type, omega: ball.omega, fallPeakY: ball.fallPeakY, attachedSwingUid: ball.attachedSwingUid || null, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
+      selectedBallType,
       won,
       appMode,
       developerEnabled,
@@ -3689,6 +3787,16 @@
     }),
     addRod,
     getRodByUid: rodByUid,
+    swingReleasePoint,
+    swingBlockedAt,
+    setSwingState: (uid, state) => {
+      const rod = rodByUid(uid);
+      if (!rod || rod.type !== 'swing') return null;
+      if (Number.isFinite(state.angle)) rod.angle = state.angle;
+      if (Number.isFinite(state.omega)) rod.swingOmega = state.omega;
+      if (typeof state.started === 'boolean') rod.swingStarted = state.started;
+      return rod;
+    },
     addGoal,
     selectRod: index => selectEntity(rods[index] || null),
     setBallState: state => {

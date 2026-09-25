@@ -60,6 +60,7 @@
       </div>
       <div class="top-actions">
         <button id="spawnButton" class="action primary" type="button">공 생성</button>
+        <button id="ballTypeButton" class="action" type="button" aria-label="공 종류 선택" aria-pressed="false">공: 기본</button>
         <button id="deleteButton" class="action danger" type="button" disabled>선택 삭제</button>
         <button id="toggleFixedButton" class="action fixed-toggle" type="button" hidden disabled>고정</button>
         <button id="resetButton" class="action" type="button">리셋</button>
@@ -127,6 +128,6 @@
 
     <dialog id="deleteStageDialog" class="app-dialog"><form method="dialog"><h2>정말 삭제하시겠습니까?</h2><p>삭제한 스테이지는 되돌릴 수 없습니다.</p><div class="dialog-actions"><button type="button" data-close-dialog>취소</button><button id="confirmDeleteStageButton" class="danger-dialog" type="button">삭제</button></div></form></dialog>
   </main>
-  <script src="game.js?v=34"></script>
+  <script src="game.js?v=35"></script>
 </body>
 </html>
