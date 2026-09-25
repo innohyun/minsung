@@ -9,9 +9,23 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=29/);
-    assert.match(html, /styles\.css\?v=19/);
+    assert.match(html, /game\.js\?v=31/);
+    assert.match(html, /styles\.css\?v=21/);
     assert.match(html, /rel="icon" href="data:,"/);
+});
+
+test('swing is registered with length-only setup and an isolated selection path', () => {
+    const swing = assetManifest.assets.find(asset => asset.id === 'swing');
+    assert.equal(swing?.name, '스윙');
+    assert.equal(swing?.runtime, 'swing/swing.png');
+    assert.deepEqual(swing?.parts, ['swing/swing-magnet.png', 'swing/swing-weight.png']);
+    assert.match(script, /type: 'swing', label: '스윙'/);
+    assert.match(script, /toolSettings\.swing = \{ length: preview\.width \}/);
+    assert.match(script, /if \(selected\.type === 'swing'\)/);
+    assert.match(script, /editDrag\.mode === 'swingLength'/);
+    assert.match(script, /swingImages\.magnet\.complete/);
+    assert.match(script, /swingImages\.weight\.complete/);
+    assert.match(styles, /swing\/swing\.png\?v=1/);
 });
 
 test('marble builder exposes spawn controls, draggable roads, and a basket goal', () => {
@@ -287,8 +301,8 @@ test('basket has no decorative inner lines and uses exact wall collision geometr
 });
 
 test('marble builder registers and uses the named flat material assets', () => {
-    assert.deepEqual(assetManifest.assets.map(asset => asset.name), ['나무', '슬라임', '전기']);
-    for (const asset of assetManifest.assets) {
+    assert.deepEqual(assetManifest.assets.filter(asset => asset.id !== 'swing').map(asset => asset.name), ['나무', '슬라임', '전기']);
+    for (const asset of assetManifest.assets.filter(asset => asset.id !== 'swing')) {
         assert.equal(asset.alpha, true);
         assert.match(asset.runtime, /^platforms\/(wood|slime|electric)\.png$/);
     }

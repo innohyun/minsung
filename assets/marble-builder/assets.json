@@ -48,6 +48,15 @@
         150
       ],
       "alpha": true
+    },
+    {
+      "name": "스윙",
+      "id": "swing",
+      "source": "swing/swing-source.png",
+      "runtime": "swing/swing.png",
+      "parts": ["swing/swing-magnet.png", "swing/swing-weight.png"],
+      "size": [466, 1280],
+      "alpha": true
     }
   ]
 }
