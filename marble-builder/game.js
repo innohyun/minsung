@@ -8,6 +8,7 @@
   const ballTypeButton = document.getElementById('ballTypeButton');
 
   const deleteButton = document.getElementById('deleteButton');
+  const pinZiplineButton = document.getElementById('pinZiplineButton');
   const resetButton = document.getElementById('resetButton');
   const toggleFixedButton = document.getElementById('toggleFixedButton');
   const combineElectricButton = document.getElementById('combineElectricButton');
@@ -156,7 +157,8 @@
   const MATERIALS = {
     wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
     breakable: { label: '깨지는 블록', color: '#bd7840', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
-    movable: { label: '밀리는 블록', color: 'rgba(20,24,33,.48)', edge: 'rgba(13,18,28,.75)', friction: .64, restitution: .12, rollingResistance: 0 },
+    rotor: { label: '회전축 블록', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0 },
+    zipline: { label: '곡선 짚라인', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0 },
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
@@ -168,7 +170,8 @@
   const BLOCK_CATALOG = [
     { type: 'wood', label: '나무 길', detail: '보통 마찰' },
     { type: 'breakable', label: '깨지는 블록', detail: '충격에 따라 금이 가고 부서짐' },
-    { type: 'movable', label: '밀리는 블록', detail: '중력과 충격에 반응 · 도미노와 지렛대' },
+    { type: 'rotor', label: '회전축 블록', detail: '공의 힘으로 베어링 회전' },
+    { type: 'zipline', label: '곡선 짚라인', detail: '공의 힘으로 곡선을 따라 이동' },
 
     { type: 'slime', label: '슬라임 길', detail: '낙하 높이의 2/3 반동' },
     { type: 'electric', label: '전기 발판', detail: '강한 낙하는 4/3 점프' },
@@ -336,7 +339,8 @@
   const toolSettings = {
     wood: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     breakable: { length: 180, thickness: BREAKABLE_THICKNESS },
-    movable: { length: 90, thickness: 24 },
+    rotor: { length: 150, thickness: ELECTRIC_PLATFORM_THICKNESS },
+    zipline: { length: 120, thickness: ELECTRIC_PLATFORM_THICKNESS },
 
     slime: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     electric: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
@@ -415,10 +419,8 @@
       ...(type === 'magnet' ? { length: clamp(Number(rod.length) || MAGNET_DIAMETER, 40, 180),
         triggerCount: clamp(Math.floor(Number(rod.triggerCount) || 2), 1, 20),
         onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
-      ...(type === 'movable' ? { vx: Number(rod.vx) || 0, vy: Number(rod.vy) || 0, omega: Number(rod.omega) || 0,
-        restX: Number.isFinite(rod.restX) ? rod.restX : rod.x,
-        restY: Number.isFinite(rod.restY) ? rod.restY : rod.y,
-        restAngle: Number.isFinite(rod.restAngle) ? rod.restAngle : (rod.angle || 0) } : {}),
+      ...(type === 'rotor' ? { pivotOffset: Number(rod.pivotOffset) || 0, pivotX: Number.isFinite(rod.pivotX) ? rod.pivotX : rod.x, pivotY: Number.isFinite(rod.pivotY) ? rod.pivotY : rod.y, omega: Number(rod.omega) || 0, restAngle: Number.isFinite(rod.restAngle) ? rod.restAngle : rod.angle || 0 } : {}),
+      ...(type === 'zipline' ? { path: Array.isArray(rod.path) ? clone(rod.path) : [{x:rod.x,y:rod.y},{x:rod.x+180,y:rod.y}], fixedCount: Math.max(1,Number(rod.fixedCount)||1), pathT: Number(rod.pathT) || 0, pathSpeed: Number(rod.pathSpeed) || 0 } : {}),
       ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
         releaseAngle: Number.isFinite(rod.releaseAngle) ? rod.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
         swingStarted: false, swingOmega: 0, releaseRequested: false } : {}) };
@@ -439,8 +441,8 @@
 
   function normalizeStage(stage) {
     const normalized = clone(stage);
-    const legacyRods = Array.isArray(normalized.rods) ? normalized.rods : [];
-    normalized.fixedBlocks = (normalized.fixedBlocks || legacyRods.filter(rod => rod.fixed)).map(rod => ({
+    const legacyRods = Array.isArray(normalized.rods) ? normalized.rods.filter(rod => rod.type !== 'movable') : [];
+    normalized.fixedBlocks = (normalized.fixedBlocks || legacyRods.filter(rod => rod.fixed)).filter(rod => rod.type !== 'movable').map(rod => ({
       ...normalizeRodRecord(rod),
       uid: rod.uid || makeRodUid(),
       fixed: true
@@ -453,7 +455,7 @@
       editorY: rod.y,
       length: rod.length,
       thickness: rod.thickness
-    }))).map((block, index) => ({
+    }))).filter(block => block.type !== 'movable').map((block, index) => ({
       ...normalizeRodRecord(block),
       uid: block.uid || makeRodUid(),
       supplyId: block.supplyId || `${normalized.id}-supply-${index}`
@@ -506,7 +508,7 @@
     const storedCreations = readStoredJson(CREATIONS_STORAGE_KEY, []);
     creations = Array.isArray(storedCreations) ? storedCreations.map(creation => ({
       ...creation,
-      rods: Array.isArray(creation.rods) ? creation.rods.map(normalizeRodRecord) : []
+      rods: Array.isArray(creation.rods) ? creation.rods.filter(rod => rod.type !== 'movable').map(normalizeRodRecord) : []
     })) : [];
 
   }
@@ -571,7 +573,7 @@
 
   function restoreWorld(snapshot) {
     magnetStates.clear();
-    rods.splice(0, rods.length, ...clone(snapshot.rods).map(normalizeRodRecord));
+    rods.splice(0, rods.length, ...clone(snapshot.rods).filter(rod => rod.type !== 'movable').map(normalizeRodRecord));
     selectedBallType = snapshot.ballType === 'giant' ? 'giant' : 'normal';
     updateBallTypeButton();
     goals.splice(0, goals.length, ...clone(snapshot.goals));
@@ -1130,6 +1132,13 @@
     if (Number.isFinite(descriptor.releaseAngle)) card.dataset.releaseAngle = String(descriptor.releaseAngle);
     const settings = descriptor.supplyId ? descriptor : toolSettings[descriptor.type] || {};
     if (settings.length) card.dataset.length = String(settings.length);
+    if (descriptor.type === 'rotor' && Number.isFinite(descriptor.pivotOffset)) card.dataset.pivotOffset = String(descriptor.pivotOffset);
+    if (descriptor.type === 'zipline' && Array.isArray(descriptor.path)) {
+      card.dataset.path = JSON.stringify(descriptor.path);
+      card.dataset.fixedCount = String(descriptor.fixedCount || 1);
+      card.dataset.editorX = String(descriptor.editorX ?? descriptor.x);
+      card.dataset.editorY = String(descriptor.editorY ?? descriptor.y);
+    }
     if (settings.thickness) card.dataset.thickness = String(settings.thickness);
     if (settings.width) card.dataset.width = String(settings.width);
     if (settings.height) card.dataset.height = String(settings.height);
@@ -1252,11 +1261,13 @@
     const height = type === 'antigravity' ? settings.height : type === 'magnet' ? settings.length : settings.thickness;
     const center = screenToWorld({ x: view.width / 2, y: (view.playTop + view.dockTop) / 2 });
     sizingMode = { type, pointerId: null, start: null, preview: { x: center.x, y: center.y, width, height } };
-    sizeEditorTitle.textContent = type === 'swing' ? '스윙 작대기 길이 설정' : `${BLOCK_CATALOG.find(item => item.type === type)?.label || type} 크기 설정`;
+    sizeEditorTitle.textContent = type === 'rotor' || type === 'zipline' ? '블록 길이 설정' : type === 'swing' ? '스윙 작대기 길이 설정' : `${BLOCK_CATALOG.find(item => item.type === type)?.label || type} 크기 설정`;
     sizeEditorHelp.textContent = type === 'magnet' ? '가로로 드래그해 자석 원의 크기를 정하세요. 취소하면 자석 설정은 유지됩니다.' : type === 'swing'
       ? '가로로 드래그해 작대기 길이만 정하세요. 자석과 무게추 크기는 그대로입니다.'
       : type === 'breakable'
       ? '가로로 드래그해 길이만 정하세요. 깨지는 블록의 두께는 고정됩니다.'
+      : type === 'rotor' || type === 'zipline'
+      ? '가로로 드래그해 길이만 정하세요. 나무 블록 두께는 고정됩니다.'
       : type === 'electric'
       ? '가로로 드래그해 길이를 정하세요. 전기 장판 두께는 고정됩니다.'
       : '화면에서 대각선으로 드래그해 직사각형을 만드세요.';
@@ -1278,6 +1289,8 @@
         toolSettings.magnet.length = clamp(preview.width, 40, 180);
       } else if (sizingMode.type === 'swing') {
         toolSettings.swing = { length: preview.width };
+      } else if (sizingMode.type === 'rotor' || sizingMode.type === 'zipline') {
+        toolSettings[sizingMode.type] = { length: preview.width, thickness: ELECTRIC_PLATFORM_THICKNESS };
       } else if (sizingMode.type === 'electric') {
         toolSettings.electric = { length: preview.width, thickness: ELECTRIC_PLATFORM_THICKNESS };
       } else if (sizingMode.type === 'breakable') {
@@ -1589,8 +1602,9 @@
   }
 
   function updateDeleteButton() {
-    selectedSettingsButton.hidden = !selected || (appMode === 'stage' && (selected.fixed || selected.kind === 'field')) || !(selected.kind === 'field' || selected.kind === 'rod' && ['magnet', 'breakable'].includes(selected.type));
+    selectedSettingsButton.hidden = !selected || (appMode === 'stage' && (selected.fixed || selected.kind === 'field')) || !(selected.kind === 'field' || selected.kind === 'rod' && ['magnet', 'breakable', 'rotor'].includes(selected.type));
     deleteButton.disabled = !selected || (appMode === 'stage' && (selected?.fixed || selected?.kind === 'field'));
+    pinZiplineButton.hidden = selected?.type !== 'zipline' || (appMode === 'stage' && selected.fixed);
     const canToggleFixed = appMode === 'editor' && selected?.kind === 'rod';
     toggleFixedButton.disabled = !canToggleFixed;
     toggleFixedButton.textContent = canToggleFixed && selected.fixed ? '고정 해제' : '고정';
@@ -1806,10 +1820,14 @@
         triggerCount: clamp(Math.floor(Number(options.triggerCount) || toolSettings.magnet.triggerCount), 1, 20),
         onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
       ...(type === 'breakable' ? { maxHp: BREAKABLE_HP, hp: BREAKABLE_HP } : {}),
-      ...(type === 'movable' ? { vx: Number(options.vx) || 0, vy: Number(options.vy) || 0, omega: Number(options.omega) || 0,
-        restX: Number.isFinite(options.restX) ? options.restX : x,
-        restY: Number.isFinite(options.restY) ? options.restY : y,
-        restAngle: Number.isFinite(options.restAngle) ? options.restAngle : (options.angle || 0) } : {}),
+      ...(type === 'rotor' ? { pivotOffset:Number(options.pivotOffset)||0,
+        pivotX:x+Math.cos(options.angle||0)*(Number(options.pivotOffset)||0),
+        pivotY:y+Math.sin(options.angle||0)*(Number(options.pivotOffset)||0), omega:0, restAngle:options.angle||0 } : {}),
+      ...(type === 'zipline' ? { path:Array.isArray(options.path) && options.path.length>=2
+        ? options.path.map(node=>({x:x+node.x-(Number.isFinite(options.editorX)?options.editorX:options.path[0].x),
+          y:y+node.y-(Number.isFinite(options.editorY)?options.editorY:options.path[0].y)}))
+        : [{x,y},{x:x+180,y}], fixedCount:Number(options.fixedCount)||1,
+        pathT:0, pathSpeed:0, editPhase:'length' } : {}),
       angle: Number.isFinite(options.angle) ? options.angle : 0,
       ...(type === 'swing' ? { startAngle: Number.isFinite(options.angle) ? options.angle : 0,
         releaseAngle: Number.isFinite(options.releaseAngle) ? options.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
@@ -1819,6 +1837,7 @@
       angleLocked: appMode === 'stage' && !options.fixed,
       touched: false
     };
+    if (type === 'zipline') positionZipline(rod);
     if (rodOverlapsAnyGoal(rod)) {
       setHint('골인 바구니와 블록은 겹칠 수 없습니다.');
       return null;
@@ -1902,7 +1921,7 @@
       && (previous.a.rodUid === entity.uid || previous.b.rodUid === entity.uid)
       ? previous.id : connected.length === 1 ? connected[0].id : null;
     updateDeleteButton();
-    selectedSettingsButton.hidden = !entity || !(entity.kind === 'field' || entity.kind === 'rod' && ['magnet', 'breakable'].includes(entity.type));
+    selectedSettingsButton.hidden = !entity || (appMode === 'stage' && (entity.fixed || entity.kind === 'field')) || !(entity.kind === 'field' || entity.kind === 'rod' && ['magnet', 'breakable', 'rotor'].includes(entity.type));
   }
 
   function deleteSelected() {
@@ -1963,10 +1982,8 @@
     nextLaunchAt = 0;
     rods.forEach(rod => {
       if (rod.type === 'breakable') { rod.hp = rod.maxHp || BREAKABLE_HP; rod.lastDamageSeenStep = -100; }
-      if (rod.type === 'movable') {
-        rod.x = rod.restX ?? rod.x; rod.y = rod.restY ?? rod.y; rod.angle = rod.restAngle ?? rod.angle;
-        rod.vx = 0; rod.vy = 0; rod.omega = 0;
-      }
+      if (rod.type === 'rotor') { rod.angle = rod.restAngle ?? rod.angle; rod.omega = 0; positionRotor(rod); }
+      if (rod.type === 'zipline') { rod.pathT = 0; rod.pathSpeed = 0; positionZipline(rod); }
     });
     ball = null;
     selected = null;
@@ -2403,6 +2420,29 @@
       }
     }
 
+    if (selected?.kind === 'rod' && !(appMode === 'stage' && selected.fixed)) {
+      if (selected.type === 'rotor' && distanceSquared(point, {x:selected.pivotX,y:selected.pivotY}) <= handleRadius ** 2) {
+        editDrag = makeEditDrag(event.pointerId, 'rotorPivot', selected);
+        event.preventDefault(); return;
+      }
+      if (selected.type === 'zipline') {
+        const nodes = selected.path || [];
+        const index = nodes.findIndex(node => distanceSquared(point,node) <= handleRadius ** 2);
+        if (index >= 0) {
+          if(index === nodes.length-1 && index < (selected.fixedCount||1) && nodes.length >= 2) {
+            editDrag=makeEditDrag(event.pointerId,'zipDraft',selected,
+              {nodeIndex:nodes.length,startPoint:{...point},moved:false});
+            const prev=nodes[index-1];
+            nodes.push({x:point.x+(point.x-prev.x)*.5,y:point.y+(point.y-prev.y)*.5});
+            positionZipline(selected);
+          } else {
+            editDrag = makeEditDrag(event.pointerId, index < (selected.fixedCount || 1) ? 'zipAnchor' : 'zipDraft', selected,
+              { nodeIndex:index, startPoint:{...point}, moved:false });
+          }
+          event.preventDefault(); return;
+        }
+      }
+    }
     if (selected?.kind === 'rod') {
       const ends = rodEndpoints(selected);
       if (selected.type === 'magnet') {
@@ -2473,7 +2513,7 @@
     if (sizingMode?.pointerId === event.pointerId) {
       const point = screenToWorld(screenPoint(event));
       const width = clamp(Math.abs(point.x - sizingMode.start.x), sizingMode.type === 'swing' ? 65 : 40, sizingMode.type === 'swing' ? 480 : sizingMode.type === 'magnet' ? 180 : 600);
-      const height = sizingMode.type === 'magnet' ? width : sizingMode.type === 'electric' || sizingMode.type === 'breakable'
+      const height = sizingMode.type === 'magnet' ? width : ['electric','breakable','rotor','zipline'].includes(sizingMode.type)
         ? (sizingMode.type === 'breakable' ? BREAKABLE_THICKNESS : ELECTRIC_PLATFORM_THICKNESS)
         : clamp(Math.abs(point.y - sizingMode.start.y), 12, 420);
       sizingMode.preview = { x: (point.x + sizingMode.start.x) / 2, y: (point.y + sizingMode.start.y) / 2, width, height };
@@ -2494,7 +2534,22 @@
     if (editDrag?.pointerId === event.pointerId) {
       const point = screenToWorld(screen);
       const entity = editDrag.entity;
-      if (editDrag.mode === 'joint') {
+      if (editDrag.mode === 'rotorPivot') {
+        const along = (point.x-entity.x)*Math.cos(entity.angle)+(point.y-entity.y)*Math.sin(entity.angle);
+        entity.pivotOffset = clamp(along,-entity.length/2,entity.length/2);
+        entity.pivotX = entity.x+Math.cos(entity.angle)*entity.pivotOffset;
+        entity.pivotY = entity.y+Math.sin(entity.angle)*entity.pivotOffset;
+      } else if (editDrag.mode === 'zipAnchor' || editDrag.mode === 'zipDraft') {
+        const index=editDrag.nodeIndex;
+        if (distanceSquared(point,editDrag.startPoint)>16) editDrag.moved=true;
+        if (editDrag.mode === 'zipDraft' && entity.editPhase === 'angle') {
+          const previous=entity.path[index-1];
+          const radius=Math.hypot(entity.path[index].x-previous.x,entity.path[index].y-previous.y);
+          const angle=Math.atan2(point.y-previous.y,point.x-previous.x);
+          entity.path[index]={x:previous.x+radius*Math.cos(angle),y:previous.y+radius*Math.sin(angle)};
+        } else entity.path[index]={x:point.x,y:point.y};
+        positionZipline(entity);
+      } else if (editDrag.mode === 'joint') {
         const link = electricLinks.find(item => item.id === editDrag.linkId);
         if (link) moveElectricJoint(link, point);
       } else if (editDrag.mode === 'electricOuter') {
@@ -2509,8 +2564,11 @@
           const dy = nextY - editDrag.original.y;
           editDrag.groupOriginal.forEach(item => { item.rod.x = item.x + dx; item.rod.y = item.y + dy; });
         } else {
+          const dx=nextX-entity.x,dy=nextY-entity.y;
           entity.x = nextX;
           entity.y = nextY;
+          if(entity.type==='rotor') {entity.pivotX+=dx;entity.pivotY+=dy;}
+          if(entity.type==='zipline') {entity.path.forEach(p=>{p.x+=dx;p.y+=dy;});positionZipline(entity);}
         }
       } else if (editDrag.mode === 'swingLength') {
         entity.length = clamp((point.x - entity.x) * Math.sin(entity.angle)
@@ -2538,6 +2596,10 @@
           ? Math.atan2(dy, dx)
           : Math.atan2(-dy, -dx);
       }
+      if (entity?.type==='rotor' && editDrag.mode!=='rotorPivot' && editDrag.mode!=='move') {
+        entity.pivotX=entity.x+Math.cos(entity.angle)*(entity.pivotOffset||0);
+        entity.pivotY=entity.y+Math.sin(entity.angle)*(entity.pivotOffset||0);
+      }
       event.preventDefault();
       return;
     }
@@ -2558,6 +2620,10 @@
     if (!activePointers.has(event.pointerId)) return;
     activePointers.delete(event.pointerId);
     if (editDrag?.pointerId === event.pointerId) {
+      if(editDrag.mode==='zipDraft' && !editDrag.moved) {
+        editDrag.entity.editPhase=editDrag.entity.editPhase==='angle'?'length':'angle';
+        setHint(editDrag.entity.editPhase==='angle'?'녹색 점을 끌어 각도를 조절하세요.':'녹색 점을 끌어 길이를 조절하세요.');
+      }
       const blockedGoal = editDrag.entity.kind === 'field' || editDrag.entity.type === 'swing' ? false : editDrag.entity.kind === 'goal'
         ? goalOverlapsAnyRod(editDrag.entity)
         : editDrag.groupOriginal || editDrag.mode === 'joint'
@@ -2570,11 +2636,7 @@
       } else {
         const changed = JSON.stringify(captureWorld()) !== JSON.stringify(editDrag.beforeSnapshot);
         if (changed) {
-          if (editDrag.entity.type === 'movable') {
-            const rod = editDrag.entity;
-            rod.restX = rod.x; rod.restY = rod.y; rod.restAngle = rod.angle;
-            rod.vx = 0; rod.vy = 0; rod.omega = 0;
-          }
+          if (editDrag.entity.type === 'rotor') { editDrag.entity.restAngle = editDrag.entity.angle; editDrag.entity.omega = 0; }
           pushUndo(editDrag.beforeSnapshot);
         }
       }
@@ -2595,6 +2657,10 @@
       fixed: card.dataset.fixed === 'true',
       supplyId: card.dataset.supplyId || null,
       angle: Number.isFinite(Number(card.dataset.angle)) ? Number(card.dataset.angle) : 0,
+      pivotOffset: Number(card.dataset.pivotOffset) || 0,
+      path: card.dataset.path ? JSON.parse(card.dataset.path) : null,
+      fixedCount: Number(card.dataset.fixedCount) || 1,
+      editorX: Number(card.dataset.editorX), editorY: Number(card.dataset.editorY),
       releaseAngle: card.dataset.releaseAngle === undefined ? undefined : Number(card.dataset.releaseAngle),
       length: Number(card.dataset.length) || undefined,
       thickness: Number(card.dataset.thickness) || undefined,
@@ -2661,6 +2727,10 @@
         fixed: current.fixed,
         supplyId: current.supplyId,
         angle: current.angle,
+        pivotOffset: current.pivotOffset,
+        path: current.path,
+        fixedCount: current.fixedCount,
+        editorX: current.editorX, editorY: current.editorY,
         releaseAngle: current.releaseAngle,
         length: current.length,
         thickness: current.thickness,
@@ -3538,7 +3608,7 @@
     supportContacts.length = 0;
     for (const rod of rods) {
       if (rod.type === 'breakable' && rod.hp <= 0) continue;
-      if (rod.type === 'magnet' || rod.type === 'movable') continue;
+      if (rod.type === 'magnet' || rod.type === 'rotor' || rod.type === 'zipline') continue;
       if (rod.type === 'swing') {
         resolveSwingContact(rod);
         if (ball.attachedSwingUid) break;
@@ -3599,191 +3669,8 @@
     }
   }
 
-  function movableMass(rod) { return clamp(rod.length * rod.thickness / 3600 * .7, .18, 5); }
-  function movableInertia(rod) {
-    return movableMass(rod) * (rod.length ** 2 + rod.thickness ** 2) / (12 * PIXELS_PER_METER ** 2);
-  }
-  function resolveMovableOnStaticFace(a, b) {
-    // Clip the incident edge to the *finite* support. A beam may straddle the
-    // ledge with neither original corner over the board; the board's rim is
-    // still a real contact. Never switch solvers at an arbitrary angle.
-    const nx = -Math.sin(b.angle), ny = Math.cos(b.angle);
-    const tx = Math.cos(b.angle), ty = Math.sin(b.angle);
-    if ((b.x-a.x)*nx + (b.y-a.y)*ny < 0) return false;
-    const corners = orientedRectCorners({ x:a.x, y:a.y, width:a.length, height:a.thickness, angle:a.angle });
-    const faces = [[0,1],[1,2],[2,3],[3,0]];
-    const face = faces.reduce((best, pair) => {
-      const score = ((corners[pair[0]].x+corners[pair[1]].x)/2-a.x)*nx
-        + ((corners[pair[0]].y+corners[pair[1]].y)/2-a.y)*ny;
-      return score > best.score ? { pair, score } : best;
-    }, { score:-Infinity });
-    const endpoints = face.pair.map(index => corners[index]);
-    const u0 = (endpoints[0].x-b.x)*tx+(endpoints[0].y-b.y)*ty;
-    const u1 = (endpoints[1].x-b.x)*tx+(endpoints[1].y-b.y)*ty;
-    const low = Math.max(-b.length/2, Math.min(u0,u1));
-    const high = Math.min(b.length/2, Math.max(u0,u1));
-    if (low > high || Math.abs(u1-u0) < 1e-5) return false;
-    const topX = b.x-nx*b.thickness/2, topY = b.y-ny*b.thickness/2;
-    const contacts = [low,high].map(along => {
-      const t = (along-u0)/(u1-u0);
-      const x = endpoints[0].x + t*(endpoints[1].x-endpoints[0].x);
-      const y = endpoints[0].y + t*(endpoints[1].y-endpoints[0].y);
-      return { x,y, depth:(x-topX)*nx+(y-topY)*ny };
-    });
-    const active = contacts.filter(p => p.depth > -.7);
-    if (!active.length) return false;
-    const penetration = Math.max(0, ...active.map(p => p.depth));
-    a.x -= nx*penetration; a.y -= ny*penetration;
-    const inv = 1/movableMass(a), inertia = 1/movableInertia(a);
-    for (let pass=0; pass<4; pass++) {
-      for (const p of contacts) {
-        if (p.depth-penetration < -.35) continue;
-        const rx = (p.x-nx*penetration-a.x)/PIXELS_PER_METER;
-        const ry = (p.y-ny*penetration-a.y)/PIXELS_PER_METER;
-        const cross = rx*ny-ry*nx;
-        const approach = -(a.vx-a.omega*ry)*nx-(a.vy+a.omega*rx)*ny;
-        if (approach >= 0) continue;
-        const j = -(1+(Math.abs(approach)>2?.08:0))*approach/(inv+cross*cross*inertia);
-        a.vx -= j*nx*inv; a.vy -= j*ny*inv; a.omega -= j*cross*inertia;
-        const tangentSpeed = (a.vx-a.omega*ry)*tx+(a.vy+a.omega*rx)*ty;
-        const tangentCross = rx*ty-ry*tx;
-        const friction = clamp(tangentSpeed/(inv+tangentCross*tangentCross*inertia), -.55*j, .55*j);
-        a.vx -= friction*tx*inv; a.vy -= friction*ty*inv; a.omega -= friction*tangentCross*inertia;
-      }
-    }
-    const edgeAngle = Math.atan2(endpoints[1].y-endpoints[0].y, endpoints[1].x-endpoints[0].x)-b.angle;
-    const difference = Math.atan2(Math.sin(2*edgeAngle),Math.cos(2*edgeAngle))/2;
-    const centerAlong = (a.x-b.x)*tx+(a.y-b.y)*ty;
-    if (active.length === 2 && high-low > 1 && centerAlong > low+.5 && centerAlong < high-.5
-      && Math.abs(difference) < .03 && Math.abs(a.omega) < .35
-      && Math.hypot(a.vx,a.vy) < .15) {
-      // Both *clipped* points are supported. Near rest, remove only the tiny
-      // numerical gap; a single rim contact must remain free to rotate.
-      a.angle -= difference;
-      const gap = (b.x-a.x)*nx+(b.y-a.y)*ny-face.score-b.thickness/2;
-      a.x += nx*gap; a.y += ny*gap;
-      if (a.previousPosition && Math.abs(b.angle) < Math.atan(.55)) {
-        const drift = (a.x-a.previousPosition.x)*tx+(a.y-a.previousPosition.y)*ty;
-        if (Math.abs(drift) < 1) {
-          a.x -= tx*drift; a.y -= ty*drift;
-          a.vx = 0; a.vy = 0; a.omega = 0;
-        }
-      }
-    }
-    return true;
-  }
-  function resolveMovableRects(a, b) {
-    if (b.type !== 'movable' && resolveMovableOnStaticFace(a,b)) return;
-    const ac = orientedRectCorners({ x: a.x, y: a.y, width: a.length, height: a.thickness, angle: a.angle });
-    const bc = orientedRectCorners({ x: b.x, y: b.y, width: b.length, height: b.thickness, angle: b.angle });
-    const axes = [a.angle, a.angle + Math.PI / 2, b.angle, b.angle + Math.PI / 2];
-    let depth = Infinity, nx = 0, ny = 0;
-    for (const angle of axes) {
-      const x = Math.cos(angle), y = Math.sin(angle);
-      const ap = ac.map(p => p.x * x + p.y * y), bp = bc.map(p => p.x * x + p.y * y);
-      const overlap = Math.min(Math.max(...ap), Math.max(...bp)) - Math.max(Math.min(...ap), Math.min(...bp));
-      if (overlap <= 0) return;
-      if (overlap < depth) { depth = overlap; const sign = (b.x - a.x) * x + (b.y - a.y) * y >= 0 ? 1 : -1; nx = x * sign; ny = y * sign; }
-    }
-    const invA = 1 / movableMass(a), invB = b.type === 'movable' ? 1 / movableMass(b) : 0;
-    const sum = invA + invB;
-    a.x -= nx * depth * invA / sum; a.y -= ny * depth * invA / sum;
-    if (invB) { b.x += nx * depth * invB / sum; b.y += ny * depth * invB / sum; }
-    // Rebuild witnesses after separation. A face centre must never be averaged
-    // with the OTHER body's corner: that midpoint invents a lever arm which
-    // makes a resting tilted block lift and rock against gravity.
-    const movedA = orientedRectCorners({ x: a.x, y: a.y, width: a.length, height: a.thickness, angle: a.angle });
-    const movedB = invB ? orientedRectCorners({ x: b.x, y: b.y, width: b.length, height: b.thickness, angle: b.angle }) : bc;
-    const tx = -ny, ty = nx;
-    const aMax = Math.max(...movedA.map(p => p.x * nx + p.y * ny));
-    const bMin = Math.min(...movedB.map(p => p.x * nx + p.y * ny));
-    // Small angular mismatches still form a two-corner resting contact.
-    // Treating one subpixel-high corner as the entire support amplifies torque.
-    const faceA = movedA.filter(p => aMax - p.x * nx - p.y * ny < 1.5);
-    const faceB = movedB.filter(p => p.x * nx + p.y * ny - bMin < 1.5);
-    const alongA = faceA.map(p => p.x * tx + p.y * ty);
-    const alongB = faceB.map(p => p.x * tx + p.y * ty);
-    const first = Math.max(Math.min(...alongA), Math.min(...alongB));
-    const last = Math.min(Math.max(...alongA), Math.max(...alongB));
-    const across = (aMax + bMin) / 2;
-    const contactPositions = [first <= last ? (first + last) / 2
-      : clamp((Math.min(...alongA) + Math.max(...alongA)) / 2, Math.min(...alongB), Math.max(...alongB))];
-
-    const ia = 1/movableInertia(a), ib = invB ? 1/movableInertia(b) : 0;
-    for (const along of contactPositions) {
-      const px = nx * across + tx * along, py = ny * across + ty * along;
-      const raX = (px-a.x)/PIXELS_PER_METER, raY = (py-a.y)/PIXELS_PER_METER;
-      const rbX = (px-b.x)/PIXELS_PER_METER, rbY = (py-b.y)/PIXELS_PER_METER;
-      const crossA = raX*ny-raY*nx, crossB = rbX*ny-rbY*nx;
-      const velAx = a.vx - a.omega*raY, velAy = a.vy + a.omega*raX;
-      const velBx = (b.vx||0) - (b.omega||0)*rbY, velBy = (b.vy||0) + (b.omega||0)*rbX;
-      const approach = (velBx-velAx)*nx+(velBy-velAy)*ny;
-
-      if (approach >= 0) continue;
-      const j = -(1 + (Math.abs(approach) > .6 ? .16 : 0)) * approach / (sum + crossA**2*ia + crossB**2*ib);
-      a.vx -= j*nx*invA; a.vy -= j*ny*invA; a.omega -= j*crossA*ia;
-      if (invB) { b.vx += j*nx*invB; b.vy += j*ny*invB; b.omega += j*crossB*ib; }
-      const tangentVelAx = a.vx - a.omega*raY, tangentVelAy = a.vy + a.omega*raX;
-      const tangentVelBx = (b.vx||0) - (b.omega||0)*rbY;
-      const tangentVelBy = (b.vy||0) + (b.omega||0)*rbX;
-      const tangential = (tangentVelBx-tangentVelAx)*tx+(tangentVelBy-tangentVelAy)*ty;
-      const ta = raX*ty-raY*tx, tb = rbX*ty-rbY*tx;
-      const friction = clamp(-tangential/(sum+ta**2*ia+tb**2*ib), -.55*j, .55*j);
-      a.vx -= friction*tx*invA; a.vy -= friction*ty*invA; a.omega -= friction*ta*ia;
-      if (invB) { b.vx += friction*tx*invB; b.vy += friction*ty*invB; b.omega += friction*tb*ib; }
-    }
-  }
-  function updateMovableRods(dt) {
-    const moving = rods.filter(rod => rod.type === 'movable');
-    for (const rod of moving) {
-      rod.previousPosition = { x:rod.x, y:rod.y };
-      rod.vy = clamp((rod.vy || 0) + activeGravity()*dt, -18, 18);
-      rod.vx = (rod.vx || 0)*Math.exp(-.08*dt);
-      rod.omega = clamp((rod.omega || 0)*Math.exp(-.3*dt), -14, 14);
-      rod.x += rod.vx*PIXELS_PER_METER*dt;
-      rod.y += rod.vy*PIXELS_PER_METER*dt;
-      rod.angle += rod.omega*dt;
-    }
-    for (let pass=0; pass<3; pass++) {
-      for (const a of moving) {
-        for (const b of rods) {
-          if (a === b || b.type === 'magnet' || b.type === 'swing' || (b.type === 'breakable' && b.hp<=0)) continue;
-          if (b.type === 'movable' && rods.indexOf(a) > rods.indexOf(b)) continue;
-          resolveMovableRects(a,b);
-        }
-      }
-    }
-    for (const rod of moving) delete rod.previousPosition;
-  }
-  function resolveMovableBall(rod) {
-    if (!ball) return;
-    const c = Math.cos(rod.angle), s = Math.sin(rod.angle), dx = ball.x-rod.x, dy = ball.y-rod.y;
-    const lx = c*dx+s*dy, ly = -s*dx+c*dy;
-    const cx = clamp(lx,-rod.length/2,rod.length/2), cy = clamp(ly,-rod.thickness/2,rod.thickness/2);
-    let nx = lx-cx, ny = ly-cy, dist = Math.hypot(nx,ny);
-    if (dist >= ball.radius) return;
-    if (dist < .0001) {
-      const xgap = rod.length/2-Math.abs(lx), ygap = rod.thickness/2-Math.abs(ly);
-      if (xgap < ygap) { nx = lx>=0?1:-1; ny=0; dist=-xgap; }
-      else { ny=ly>=0?1:-1; nx=0; dist=-ygap; }
-    } else { nx/=dist; ny/=dist; }
-    const normalX=c*nx-s*ny, normalY=s*nx+c*ny;
-    const ballInv = ball.attachedMagnetUid || ball.attachedSwingUid || ball.electricRide ? 0 : 1/ball.mass;
-    const rodInv=1/movableMass(rod), sum=ballInv+rodInv;
-    const penetration=ball.radius-dist+.02;
-    ball.x+=normalX*penetration*ballInv/sum; ball.y+=normalY*penetration*ballInv/sum;
-    rod.x-=normalX*penetration*rodInv/sum; rod.y-=normalY*penetration*rodInv/sum;
-    const rx = (c*cx-s*cy)/PIXELS_PER_METER, ry=(s*cx+c*cy)/PIXELS_PER_METER;
-    const cross=rx*normalY-ry*normalX, inertia=1/movableInertia(rod);
-    const rvx=ball.vx-(rod.vx-rod.omega*ry), rvy=ball.vy-(rod.vy+rod.omega*rx);
-    const speed=rvx*normalX+rvy*normalY;
-    if (speed>=0) return;
-    const impulse=-(1+(speed<-.45?.2:0))*speed/(sum+cross*cross*inertia);
-    if (ballInv) {ball.vx+=normalX*impulse*ballInv;ball.vy+=normalY*impulse*ballInv;}
-    rod.vx-=normalX*impulse*rodInv;rod.vy-=normalY*impulse*rodInv;rod.omega-=cross*impulse*inertia;
-
-    rod.touched=true;touchedRodIds.add(rod.id);
-  }
+  function positionRotor(rod) { window.MarbleKinetics.position(rod); }
+  function positionZipline(rod) { window.MarbleKinetics.position(rod); }
   function resolveBallPair(a, b) {
     const dx = b.x - a.x, dy = b.y - a.y;
     const minDistance = a.radius + b.radius, distanceSq = dx * dx + dy * dy;
@@ -3824,7 +3711,7 @@
 
   function physicsStep(dt) {
     if (['free', 'stage', 'editor', 'physics-lab'].includes(appMode)) updateMagnetStates(dt);
-    if (['free', 'stage', 'physics-lab'].includes(appMode) && !won && !editDrag) updateMovableRods(dt);
+    if (['free', 'stage', 'physics-lab'].includes(appMode) && !won && !editDrag) window.MarbleKinetics.advance(rods, dt, PIXELS_PER_METER);
     magnetPullStrength = 0;
     if (!ball || won || editDrag) { updateMagnetWhoosh(); return; }
     const current = ball;
@@ -3835,7 +3722,11 @@
     for (const item of activeBalls.length ? activeBalls : [current]) {
       ball = item;
       physicsStepOne(dt);
-      for (const rod of rods) if (rod.type === 'movable') resolveMovableBall(rod);
+      for (const rod of rods) if (rod.type === 'rotor' || rod.type === 'zipline') {
+        if (window.MarbleKinetics.collideBall(rod, ball, PIXELS_PER_METER)) {
+          rod.touched=true;touchedRodIds.add(rod.id);
+        }
+      }
       if (won) break;
     }
     updateMagnetWhoosh();
@@ -4117,6 +4008,16 @@
       ctx.restore();
       return;
     }
+    if (rod.type === 'zipline') {
+      const points = rod.path || [];
+      if (points.length > 1) {
+        ctx.save(); ctx.globalAlpha = alpha; ctx.strokeStyle = '#237ee9'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+        ctx.beginPath();
+        const total = window.MarbleKinetics.curve(rod, 0).total;
+        for (let d = 0; d <= total; d += 5) { const p = window.MarbleKinetics.curve(rod, d); if (!d) ctx.moveTo(p.x,p.y); else ctx.lineTo(p.x,p.y); }
+        const last = window.MarbleKinetics.curve(rod, total); ctx.lineTo(last.x,last.y); ctx.stroke();ctx.restore();
+      }
+    }
     if (rod.type === 'swing') {
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -4157,7 +4058,7 @@
         ctx.drawImage(sprite, sourceCap, 0, sprite.naturalWidth - sourceCap * 2, sprite.naturalHeight, -rod.length / 2 + cap, -rod.thickness / 2, rod.length - cap * 2, rod.thickness);
         ctx.drawImage(sprite, sprite.naturalWidth - sourceCap, 0, sourceCap, sprite.naturalHeight, rod.length / 2 - cap, -rod.thickness / 2, cap, rod.thickness);
       }
-    } else if (rod.type !== 'movable') drawPlatformAsset(platformImages[rod.type], rod.length, rod.thickness, rod.type);
+    } else drawPlatformAsset(platformImages[rod.type === 'rotor' || rod.type === 'zipline' ? 'wood' : rod.type], rod.length, rod.thickness, rod.type === 'rotor' || rod.type === 'zipline' ? 'wood' : rod.type);
     ctx.strokeStyle = material.edge;
     ctx.lineWidth = 4;
     const borderInset = ctx.lineWidth / 2;
@@ -4189,6 +4090,10 @@
         ctx.shadowColor = 'transparent';
         ctx.globalAlpha = alpha;
       }
+    }
+    if (rod.type === 'rotor') {
+      ctx.beginPath(); ctx.arc(rod.pivotOffset || 0, 0, 8, 0, Math.PI*2);
+      ctx.fillStyle = '#e34242'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
     }
     if (appMode === 'stage' && rod.touched) {
       ctx.fillStyle = '#2fa66f';
@@ -4295,6 +4200,12 @@
         }
         ctx.restore();
         return;
+      }
+      if (selected.type === 'rotor') {
+        drawHandle(selected.pivotX, selected.pivotY, '#d43747');
+      }
+      if (selected.type === 'zipline') {
+        (selected.path || []).forEach((p,i) => drawHandle(p.x,p.y, i < (selected.fixedCount || 1) ? '#e23d42' : '#25a957'));
       }
       if (selected.type === 'magnet') {
         ctx.beginPath(); ctx.arc(selected.x, selected.y, selected.length / 2 + 7, 0, Math.PI * 2); ctx.stroke();
@@ -4536,6 +4447,14 @@
     else if (launchMode === 'auto' && queueIndex > 0) nextLaunchAt = performance.now() + launchInterval * 1000;
   });
   deleteButton.addEventListener('click', deleteSelected);
+  pinZiplineButton.addEventListener('click', () => {
+    if(selected?.type!=='zipline' || (appMode==='stage' && selected.fixed))return;
+    if((selected.fixedCount||1)>=selected.path.length) {setHint('빨간 끝점을 끌어 다음 녹색 점을 만드세요.');return;}
+    const end=selected.path.at(-1),prev=selected.path.at(-2);
+    if(Math.hypot(end.x-prev.x,end.y-prev.y)<20) {setHint('녹색 점을 더 멀리 움직인 뒤 고정하세요.');return;}
+    pushUndo();selected.fixedCount=selected.path.length;selected.editPhase='length';
+    updateDeleteButton();setHint('끝점이 고정됐어요. 빨간 끝점을 끌어 다음 곡선을 이어 주세요.');
+  });
   toggleFixedButton.addEventListener('click', toggleSelectedFixed);
   combineElectricButton.addEventListener('click', combineSelectedElectric);
   detachElectricButton.addEventListener('click', detachSelectedElectricLink);
@@ -4631,10 +4550,26 @@
       document.getElementById('magnetCount').value = String(editingSettingsTarget.triggerCount);
       document.getElementById('magnetSettingsSubmit').textContent = '적용';
       magnetSettingsDialog.showModal();
+    } else if (editingSettingsTarget.type === 'rotor') {
+      document.getElementById('rotorLengthInput').value = String(Math.round(editingSettingsTarget.length));
+      document.getElementById('rotorLengthDialog').showModal();
     } else if (editingSettingsTarget.type === 'breakable') {
       document.getElementById('breakableHealth').value = String(Math.round((editingSettingsTarget.maxHp || BREAKABLE_HP) / BREAKABLE_HP * 6));
       breakableSettingsDialog.showModal();
     }
+  });
+  document.getElementById('rotorLengthForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const target=editingSettingsTarget;
+    if(target?.type==='rotor') {
+      const length=clamp(Number(document.getElementById('rotorLengthInput').value)||target.length,40,600);
+      if(length!==target.length) {
+        pushUndo();target.length=length;
+        target.pivotOffset=clamp(target.pivotOffset||0,-length/2,length/2);
+        positionRotor(target);
+      }
+    }
+    document.getElementById('rotorLengthDialog').close();editingSettingsTarget=null;
   });
   function applyGravityDirectionChoice() {
     const target = editingSettingsTarget?.kind === 'field' ? editingSettingsTarget : toolSettings.antigravity;
@@ -4783,7 +4718,7 @@
 
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
-      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, vx: rod.vx, vy: rod.vy, omega: rod.omega, restX: rod.restX, restY: rod.restY, maxHp: rod.maxHp, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked })),
+      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, omega: rod.omega, pivotX: rod.pivotX, pivotY: rod.pivotY, pivotOffset: rod.pivotOffset, path: rod.path ? clone(rod.path) : undefined, fixedCount: rod.fixedCount, editPhase: rod.editPhase, pathT: rod.pathT, pathSpeed: rod.pathSpeed, maxHp: rod.maxHp, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked })),
       magnets: rods.filter(rod => rod.type === 'magnet').map(rod => { const state = magnetStateFor(rod); return { uid: rod.uid, phase: state.phase, range: state.range, seen: state.seen.size, inside: state.inside.size }; }),
       magnetTemplate: { ...toolSettings.magnet },
       antigravityTemplate: { ...toolSettings.antigravity },
