@@ -105,6 +105,8 @@
   const MAX_ZOOM = 1;
   const DEFAULT_ROD_LENGTH = 180;
   const ELECTRIC_PLATFORM_THICKNESS = 20;
+  const BREAKABLE_THICKNESS = 20;
+  const BREAKABLE_HP = 100;
   const GOAL_SUCCESS_DELAY = 1;
   const ELECTRIC_ATTACH_ANGLE = Math.PI / 6;
   const ELECTRIC_SPEED_MULTIPLIER = 4 / 3;
@@ -142,6 +144,7 @@
   ];
   const MATERIALS = {
     wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
+    breakable: { label: '깨지는 블록', color: '#bd7840', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
@@ -152,6 +155,7 @@
   const physicsLabWoodMaterial = { ...MATERIALS.wood };
   const BLOCK_CATALOG = [
     { type: 'wood', label: '나무 길', detail: '보통 마찰' },
+    { type: 'breakable', label: '깨지는 블록', detail: '충격에 따라 금이 가고 부서짐' },
 
     { type: 'slime', label: '슬라임 길', detail: '낙하 높이의 2/3 반동' },
     { type: 'electric', label: '전기 발판', detail: '강한 낙하는 4/3 점프' },
@@ -229,6 +233,7 @@
   let selectedElectricLinkId = null;
   const toolSettings = {
     wood: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
+    breakable: { length: 180, thickness: BREAKABLE_THICKNESS },
 
     slime: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     electric: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
@@ -241,7 +246,7 @@
     electric: '/assets/marble-builder/platforms/electric.png'
   };
   const MATERIAL_AUDIO_URLS = {
-    rolling: '/assets/marble-builder/audio/marble-roll-reference.wav?v=1',
+    rolling: '/assets/marble-builder/audio/wood-roll-video-3.wav?v=1',
     woodImpacts: [1, 2, 3].map(index => `/assets/marble-builder/audio/wood-hit-${index}.wav?v=1`)
   };
 
@@ -251,6 +256,12 @@
     image.src = url;
     return [type, image];
   }));
+  const breakableImages = Array.from({ length: 6 }, (_, index) => {
+    const image = new Image();
+    image.decoding = 'async';
+    image.src = `/assets/marble-builder/breakable/six/stage-${index}.png?v=1`;
+    return image;
+  });
   const swingImages = Object.fromEntries(Object.entries({
     magnet: '/assets/marble-builder/swing/swing-magnet.png?v=2',
     weight: '/assets/marble-builder/swing/swing-weight.png?v=2'
@@ -274,6 +285,7 @@
   function normalizedRodThickness(type, thickness) {
     const normalizedType = normalizeRodType(type);
     if (normalizedType === 'electric') return ELECTRIC_PLATFORM_THICKNESS;
+    if (normalizedType === 'breakable') return BREAKABLE_THICKNESS;
     const value = Number(thickness);
     // Old default blocks were thinner. Keep deliberately resized blocks unchanged.
     if ((normalizedType === 'wood' && value === 14) || (normalizedType === 'slime' && value === 18)) {
@@ -282,9 +294,15 @@
     return value > 0 ? value : toolSettings[normalizedType]?.thickness || ELECTRIC_PLATFORM_THICKNESS;
   }
 
+  function breakableStage(hp) {
+    if (hp >= BREAKABLE_HP) return 0;
+    return Math.min(5, 1 + Math.floor((BREAKABLE_HP - Math.max(1, hp)) / 20));
+  }
+
   function normalizeRodRecord(rod) {
     const type = normalizeRodType(rod.type);
     return { ...rod, type, thickness: normalizedRodThickness(type, rod.thickness),
+      ...(type === 'breakable' ? { hp: BREAKABLE_HP } : {}),
       ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
         releaseAngle: Number.isFinite(rod.releaseAngle) ? rod.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
         swingStarted: false, swingOmega: 0, releaseRequested: false } : {}) };
@@ -359,7 +377,7 @@
     }
     const storedRecent = readStoredJson(RECENT_TOOLS_STORAGE_KEY, recentTools);
     if (Array.isArray(storedRecent)) {
-      const allowed = new Set(['wood', 'slime', 'electric', 'swing', 'antigravity']);
+      const allowed = new Set(['wood', 'breakable', 'slime', 'electric', 'swing', 'antigravity']);
       recentTools = [...new Set(storedRecent.map(key => {
         if (key === 'goal') return 'goal';
         const type = normalizeRodType(String(key).split(':')[0]);
@@ -448,7 +466,7 @@
       Object.entries(snapshot.toolSettings).forEach(([type, settings]) => {
         toolSettings[type] = clone(settings);
       });
-      for (const type of ['wood', 'slime', 'electric']) {
+      for (const type of ['wood', 'breakable', 'slime', 'electric']) {
         toolSettings[type].thickness = normalizedRodThickness(type, toolSettings[type].thickness);
       }
     }
@@ -663,7 +681,7 @@
 
   function playImpactSoundForContact(contactKey, type, speed) {
     impactContactLastSeenStep.set(contactKey, physicsStepCount);
-    if (speed < (type === 'wood' ? WOOD_IMPACT_SOUND_MIN_SPEED : IMPACT_SOUND_MIN_SPEED)
+    if (speed < (type === 'wood' || type === 'breakable' ? WOOD_IMPACT_SOUND_MIN_SPEED : IMPACT_SOUND_MIN_SPEED)
       || soundedImpactContacts.has(contactKey)) return;
     soundedImpactContacts.add(contactKey);
     playImpactSound(type, speed);
@@ -689,7 +707,7 @@
     // Small impacts fade toward silence without raising the existing peak volume.
     const volume = Math.min(.44, .085 + speed * .035) * clamp((speed - .1) / 1.4, .05, 1);
 
-    if (type === 'wood' && playRecordedWoodImpact(audio, start, speed, volume)) return;
+    if ((type === 'wood' || type === 'breakable') && playRecordedWoodImpact(audio, start, speed, volume)) return;
 
     if (slime) {
       const osc = audio.createOscillator();
@@ -753,25 +771,27 @@
   }
 
   function rollingGainForRevolutions(revolutionsPerSecond, materialVolume = 1) {
-    const normalizedSpeed = clamp(Math.max(0, revolutionsPerSecond) / 3, 0, 1);
-    return (.0015 + Math.pow(normalizedSpeed, .72) * .1785) * materialVolume;
+    const speed = Math.max(0, revolutionsPerSecond);
+    // A nearly stationary marble remains barely perceptible, even at full device volume.
+    const faint = .001 + .008 * clamp(speed / 1.2, 0, 1);
+    return Math.max(.001, faint - Math.max(0, speed - 1.2) * .001) * materialVolume;
   }
 
   function updateRollingSound(type, speed, angularSpeed = ball?.omega || 0) {
     const audio = audioContext;
     const revolutionsPerSecond = Math.abs(Number(angularSpeed) || 0) / (Math.PI * 2);
     recordedRollingRevolutionsPerSecond = revolutionsPerSecond;
-    if (!audio || speed < .08 || revolutionsPerSecond < .025) {
+    if (!audio || (type !== 'wood' && type !== 'breakable') || speed < .08 || revolutionsPerSecond < .025) {
       recordedRollingPlaybackRate = 0;
-      if (rollingAudio && audio && audio.currentTime - rollingAudio.lastContactAt > .16) {
-        rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .08);
+      if (rollingAudio && audio) {
+        rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .12);
       }
-      if (recordedRollingAudio && audio && audio.currentTime - recordedRollingAudio.lastContactAt > .16) {
-        recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .08);
+      if (recordedRollingAudio && audio) {
+        recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .12);
       }
       return;
     }
-    const useRecordedRolling = Boolean(rollingReferenceBuffer && type);
+    const useRecordedRolling = Boolean(rollingReferenceBuffer);
     if (useRecordedRolling) {
       if (rollingAudio) rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
       if (!recordedRollingAudio) {
@@ -792,13 +812,12 @@
         recordedRollingAudio = { source, filter, gain, lastContactAt: audio.currentTime };
       }
       recordedRollingAudio.lastContactAt = audio.currentTime;
-      // Basket walls amplify the high-pitched whirr in the recorded loop.
-      const materialCutoff = type === 'basket' ? 850 : type === 'slime' ? 1500 : type === 'electric' ? 2200 : 1800;
-      const materialVolume = type === 'slime' ? .82 : type === 'electric' ? .94 : type === 'basket' ? .85 : 1;
-      recordedRollingPlaybackRate = rollingPlaybackRateForOmega(angularSpeed, rollingReferenceBuffer.duration);
-      recordedRollingAudio.source.playbackRate.setTargetAtTime(Math.max(.001, recordedRollingPlaybackRate), audio.currentTime, .035);
-      recordedRollingAudio.filter.frequency.setTargetAtTime(materialCutoff + Math.min(300, speed * 25), audio.currentTime, .08);
-      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, materialVolume), audio.currentTime, .08);
+      recordedRollingPlaybackRate = 1;
+      recordedRollingAudio.source.playbackRate.setTargetAtTime(1, audio.currentTime, .035);
+      recordedRollingAudio.filter.frequency.setTargetAtTime(1800, audio.currentTime, .08);
+      // The faint low-angle grain is most discernible on slow revolutions.
+      const turnPulse = speed < 1.5 && ball ? .85 + .15 * (1 + Math.cos(ball.angle || 0)) / 2 : .85;
+      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, turnPulse), audio.currentTime, .18);
       return;
     }
     if (recordedRollingAudio) recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
@@ -823,8 +842,7 @@
     const electric = type === 'electric';
     const filterPitch = (slime ? 220 : electric ? 640 : 320) + Math.min(720, speed * (electric ? 42 : 30));
     rollingAudio.filter.frequency.setTargetAtTime(filterPitch, audio.currentTime, .065);
-    const maximumVolume = slime ? .12 : electric ? .17 : .15;
-    rollingAudio.gain.gain.setTargetAtTime(Math.min(maximumVolume, .025 + speed * .015), audio.currentTime, .045);
+    rollingAudio.gain.gain.setTargetAtTime(Math.min(.022, rollingGainForRevolutions(revolutionsPerSecond)), audio.currentTime, .045);
   }
 
   function spawnContactParticles(x, y, type, strength = 1) {
@@ -1066,6 +1084,8 @@
     sizeEditorTitle.textContent = type === 'swing' ? '스윙 작대기 길이 설정' : `${BLOCK_CATALOG.find(item => item.type === type)?.label || type} 크기 설정`;
     sizeEditorHelp.textContent = type === 'swing'
       ? '가로로 드래그해 작대기 길이만 정하세요. 자석과 무게추 크기는 그대로입니다.'
+      : type === 'breakable'
+      ? '가로로 드래그해 길이만 정하세요. 깨지는 블록의 두께는 고정됩니다.'
       : type === 'electric'
       ? '가로로 드래그해 길이를 정하세요. 전기 장판 두께는 고정됩니다.'
       : '화면에서 대각선으로 드래그해 직사각형을 만드세요.';
@@ -1087,6 +1107,8 @@
         toolSettings.swing = { length: preview.width };
       } else if (sizingMode.type === 'electric') {
         toolSettings.electric = { length: preview.width, thickness: ELECTRIC_PLATFORM_THICKNESS };
+      } else if (sizingMode.type === 'breakable') {
+        toolSettings.breakable = { length: preview.width, thickness: BREAKABLE_THICKNESS };
       } else {
         toolSettings[sizingMode.type] = { length: preview.width, thickness: preview.height };
       }
@@ -1396,7 +1418,8 @@
     if (selected.type === 'swing') {
       selected.startAngle = selected.angle;
       selected.swingOmega = 0;
-      selected.swingStarted = !selected.fixed;
+      selected.swingStarted = false;
+      selected.swingBlocked = false;
     }
     selected.angleLocked = false;
     selected.supplyId = null;
@@ -1577,6 +1600,7 @@
       y,
       length: options.length || DEFAULT_ROD_LENGTH,
       thickness: normalizedRodThickness(type, options.thickness),
+      ...(type === 'breakable' ? { hp: BREAKABLE_HP } : {}),
       angle: Number.isFinite(options.angle) ? options.angle : 0,
       ...(type === 'swing' ? { startAngle: Number.isFinite(options.angle) ? options.angle : 0,
         releaseAngle: Number.isFinite(options.releaseAngle) ? options.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
@@ -1604,7 +1628,7 @@
     }
     selectEntity(rod);
     updateToolAvailability();
-    setHint(type === 'swing' ? '점선은 자석 궤도입니다. 파란 표식을 끌어 방출 위치를 옮길 수 있어요.'
+    setHint(type === 'swing' ? '점선은 자석 궤도입니다. 빨간 곡선을 끌어 정확한 방출 위치를 정하세요.'
       : appMode === 'stage' ? '저장된 각도로 배치했습니다. 위치만 바꿀 수 있어요.' : '주황색 끝점은 각도, 파란색 가운데 점은 위치를 바꿉니다.');
     return rod;
   }
@@ -1720,6 +1744,7 @@
 
   function resetGame() {
     resetSwingState();
+    rods.forEach(rod => { if (rod.type === 'breakable') { rod.hp = BREAKABLE_HP; rod.lastDamageSeenStep = -100; } });
     ball = null;
     selected = null;
     placement = null;
@@ -2035,6 +2060,7 @@
       if (pointInGoal(point, goals[i])) return goals[i];
     }
     for (let i = rods.length - 1; i >= 0; i -= 1) {
+      if (rods[i].type === 'breakable' && rods[i].hp <= 0) continue;
       if (pointInRod(point, rods[i])) return rods[i];
     }
     for (let i = fields.length - 1; i >= 0; i -= 1) {
@@ -2114,7 +2140,7 @@
     const handleRadius = (event.pointerType === 'touch' ? 24 : 17) / camera.zoom;
 
     const releaseMarker = appMode !== 'stage' && rods.find(rod => rod.type === 'swing'
-      && distanceSquared(point, swingReleasePoint(rod)) <= (handleRadius + 9) ** 2);
+      && onSwingReleaseArc(rod, point, handleRadius));
     if (releaseMarker) {
       selectEntity(releaseMarker);
       editDrag = makeEditDrag(event.pointerId, 'swingRelease', releaseMarker);
@@ -2125,7 +2151,7 @@
       && distanceSquared(point, rod) <= handleRadius * handleRadius);
     if (attachedPivot) {
       attachedPivot.releaseRequested = true;
-      setHint('파란 표식에 자석이 도착하면 공을 놓습니다. 장애물에 막히면 붙어 있어요.', 3200);
+      setHint('빨간 곡선에 자석이 도착하면 공을 놓습니다. 장애물에 막히면 붙어 있어요.', 3200);
       event.preventDefault();
       return;
     }
@@ -2207,8 +2233,8 @@
     if (sizingMode?.pointerId === event.pointerId) {
       const point = screenToWorld(screenPoint(event));
       const width = clamp(Math.abs(point.x - sizingMode.start.x), sizingMode.type === 'swing' ? 65 : 40, sizingMode.type === 'swing' ? 480 : 600);
-      const height = sizingMode.type === 'electric'
-        ? ELECTRIC_PLATFORM_THICKNESS
+      const height = sizingMode.type === 'electric' || sizingMode.type === 'breakable'
+        ? (sizingMode.type === 'breakable' ? BREAKABLE_THICKNESS : ELECTRIC_PLATFORM_THICKNESS)
         : clamp(Math.abs(point.y - sizingMode.start.y), 12, 420);
       sizingMode.preview = { x: (point.x + sizingMode.start.x) / 2, y: (point.y + sizingMode.start.y) / 2, width, height };
       confirmSizeButton.disabled = false;
@@ -2255,7 +2281,8 @@
         entity.angle = Math.atan2(point.x - entity.x, entity.y - point.y);
         entity.startAngle = entity.angle;
         entity.swingOmega = 0;
-        entity.swingStarted = !entity.fixed;
+        entity.swingStarted = false;
+        entity.swingBlocked = false;
       } else if (editDrag.mode === 'rotateFixed') {
         entity.angle = Math.atan2(point.y - entity.y, point.x - entity.x);
       } else {
@@ -2586,6 +2613,26 @@
     if (contactKey) specialContactsThisStep.add(contactKey);
 
     const normalSpeed = contactVx * nx + contactVy * ny;
+    if (rect.blockType === 'breakable' && rect.source && appMode !== 'editor') {
+      const rod = rect.source;
+      const separated = physicsStepCount - (rod.lastDamageSeenStep ?? -100) > 8;
+      rod.lastDamageSeenStep = physicsStepCount;
+      if (separated && normalSpeed < -0.35 && rod.hp > 0) {
+        const massFactor = Math.pow(ball.mass / BALL_MASS, .75);
+        const damage = Math.max(1, Math.round(12 * Math.pow(-normalSpeed - .35, 2) * massFactor));
+        const previousStage = breakableStage(rod.hp);
+        rod.hp = Math.max(0, rod.hp - damage);
+        if (breakableStage(rod.hp) !== previousStage || rod.hp === 0) {
+          spawnContactParticles(ball.x - nx * ball.radius, ball.y - ny * ball.radius, 'breakable', rod.hp === 0 ? 9 : 2);
+        }
+        if (rod.hp === 0) {
+          rod.touched = true;
+          touchedRodIds.add(rod.id);
+          if (selected === rod) selectEntity(null);
+          return false;
+        }
+      }
+    }
     const incomingVx = ball.vx;
     const incomingVy = ball.vy;
     const impactContactKey = `rod:${rect.blockId ?? rect.source?.uid ?? `${rect.x}:${rect.y}`}`;
@@ -2772,7 +2819,9 @@
         ball.omega = 0;
       }
     }
-    updateRollingSound(rollingType, rollingSpeed, ball.omega);
+    // Roll only while supported by a wooden block; empty map space stays quiet.
+    const woodSupported = rollingType === 'wood' || rollingType === 'breakable';
+    updateRollingSound(woodSupported ? rollingType : null, woodSupported ? rollingSpeed : 0, ball.omega);
   }
 
   function swingPoint(rod, distance) {
@@ -2782,6 +2831,15 @@
   function swingReleasePoint(rod) {
     return swingPoint({ x: rod.x, y: rod.y, angle: rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE }, -swingRadius(rod));
   }
+  function onSwingReleaseArc(rod, point, handleRadius) {
+    const dx = point.x - rod.x; const dy = point.y - rod.y;
+    const radius = swingRadius(rod);
+    const angle = Math.atan2(dx, -dy);
+    const releaseAngle = rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE;
+    const difference = Math.atan2(Math.sin(angle - releaseAngle), Math.cos(angle - releaseAngle));
+    return Math.abs(Math.hypot(dx, dy) - radius) <= handleRadius
+      && Math.abs(difference) <= .09 + handleRadius / radius;
+  }
   function swingCapturePoint(rod, radius = BALL_RADIUS) {
     return swingPoint(rod, -(swingRadius(rod) + Math.max(0, radius - BALL_RADIUS) * 1.5));
   }
@@ -2790,20 +2848,124 @@
     return after > before ? wrap(target - before) <= after - before
       : after < before && wrap(before - target) <= before - after;
   }
+  function exactSwingReleaseAngle(before, after, target) {
+    if (!crossedSwingRelease(before, after, target)) return null;
+    const wrap = value => ((value % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    return before + (after > before ? wrap(target - before) : -wrap(before - target));
+  }
+  // The sprite's opaque pixels, not its rectangular image bounds or an invisible disk,
+  // define both the solid arms and the open mouth of the magnet.
+  let magnetShape = null;
+  function swingMagnetShape() {
+    if (magnetShape) return magnetShape;
+    const image = swingImages.magnet;
+    if (!image.complete || !image.naturalWidth) return null;
+    const sample = document.createElement('canvas');
+    sample.width = 84; sample.height = 59;
+    const context = sample.getContext('2d', { willReadFrequently: true });
+    context.drawImage(image, 0, 0, 84, 59);
+    const pixels = context.getImageData(0, 0, 84, 59).data;
+    const solid = new Uint8Array(84 * 59);
+    for (let index = 0; index < solid.length; index++) solid[index] = pixels[index * 4 + 3] >= 96 ? 1 : 0;
+    const edge = [];
+    const has = (x, y) => x >= 0 && x < 84 && y >= 0 && y < 59 && solid[y * 84 + x];
+    for (let y = 0; y < 59; y++) for (let x = 0; x < 84; x++) {
+      if (has(x, y) && (!has(x - 1, y) || !has(x + 1, y) || !has(x, y - 1) || !has(x, y + 1))) {
+        edge.push({ x: x - 41.5, y: y - 52.5 });
+      }
+    }
+    magnetShape = { solid, edge };
+    return magnetShape;
+  }
+  function swingLocalPoint(rod, point) {
+    const dx = point.x - rod.x; const dy = point.y - rod.y;
+    const cos = Math.cos(rod.angle); const sin = Math.sin(rod.angle);
+    return { x: dx * cos + dy * sin, y: -dx * sin + dy * cos + rod.length };
+  }
+  function magnetSolidAt(shape, x, y) {
+    const ix = Math.floor(x + 42); const iy = Math.floor(y + 53);
+    return ix >= 0 && ix < 84 && iy >= 0 && iy < 59 && shape.solid[iy * 84 + ix];
+  }
+  function magnetContact(rod, point, radius) {
+    const shape = swingMagnetShape();
+    if (!shape) return null;
+    const local = swingLocalPoint(rod, point);
+    let nearest = null; let distanceSquaredToEdge = (radius + 2) ** 2;
+    const inside = magnetSolidAt(shape, local.x, local.y);
+    for (const edge of shape.edge) {
+      const dx = local.x - edge.x; const dy = local.y - edge.y;
+      const distance = dx * dx + dy * dy;
+      if (distance < distanceSquaredToEdge || (inside && !nearest)) {
+        distanceSquaredToEdge = distance; nearest = edge;
+      }
+    }
+    if (!nearest || (!inside && distanceSquaredToEdge >= (radius + .5) ** 2)) return null;
+    const distance = Math.sqrt(distanceSquaredToEdge) || .0001;
+    const direction = inside ? -1 : 1;
+    const localNx = (local.x - nearest.x) / distance * direction;
+    const localNy = (local.y - nearest.y) / distance * direction;
+    const cos = Math.cos(rod.angle); const sin = Math.sin(rod.angle);
+    return { nx: localNx * cos - localNy * sin, ny: localNx * sin + localNy * cos,
+      penetration: inside ? radius + distance : radius + .5 - distance,
+      point: { x: rod.x + nearest.x * cos - (nearest.y - rod.length) * sin,
+        y: rod.y + nearest.x * sin + (nearest.y - rod.length) * cos } };
+  }
+  function magnetTouchesRect(rod, rect) {
+    const shape = swingMagnetShape();
+    if (!shape) return false;
+    const cos = Math.cos(rod.angle); const sin = Math.sin(rod.angle);
+    for (const point of shape.edge) {
+      const x = rod.x + point.x * cos - (point.y - rod.length) * sin;
+      const y = rod.y + point.x * sin + (point.y - rod.length) * cos;
+      if (circleTouchesRect({ x, y }, .7, rect)) return true;
+    }
+    return orientedRectCorners(rect).some(corner => {
+      const local = swingLocalPoint(rod, corner);
+      return magnetSolidAt(shape, local.x, local.y);
+    });
+  }
+  function pointSegmentDistanceSquared(point, start, end) {
+    const dx = end.x - start.x; const dy = end.y - start.y;
+    const fraction = clamp(((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+    const x = start.x + fraction * dx; const y = start.y + fraction * dy;
+    return { x, y, distance: (point.x - x) ** 2 + (point.y - y) ** 2 };
+  }
+  function shaftTouchesRect(rod, rect) {
+    const start = { x: rod.x, y: rod.y };
+    const end = swingPoint(rod, -(rod.length + 5));
+    if (circleTouchesRect(start, 2, rect) || circleTouchesRect(end, 2, rect)) return true;
+    const corners = orientedRectCorners(rect);
+    if (corners.some(corner => pointSegmentDistanceSquared(corner, start, end).distance <= 4)) return true;
+    const intersects = (a, b, c, d) => {
+      const cross = (u, v) => u.x * v.y - u.y * v.x;
+      const ab = { x: b.x - a.x, y: b.y - a.y };
+      const cd = { x: d.x - c.x, y: d.y - c.y };
+      const divisor = cross(ab, cd);
+      if (Math.abs(divisor) < 1e-8) return false;
+      const ac = { x: c.x - a.x, y: c.y - a.y };
+      const t = cross(ac, cd) / divisor; const u = cross(ac, ab) / divisor;
+      return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+    };
+    return corners.some((corner, index) => intersects(start, end, corner, corners[(index + 1) % 4]));
+  }
   function swingBlockedAt(rod, angle) {
     const probe = { ...rod, angle };
-    const magnet = swingPoint(probe, -rod.length - 28);
-    const shaft = swingPoint(probe, -rod.length * .48);
-    const sweptShaft = orientedRectCorners({ ...shaft, width: 9, height: rod.length - 25, angle });
-    const obstacles = rods.filter(other => other !== rod).map(other => other.type === 'swing'
+    const obstacles = rods.filter(other => other !== rod && !(other.type === 'breakable' && other.hp <= 0)).map(other => other.type === 'swing'
       ? { x: other.x, y: other.y, width: 26, height: 26 }
       : { x: other.x, y: other.y, width: other.length, height: other.thickness, angle: other.angle });
-    obstacles.push(...goals.map(goal => ({ x: goal.x, y: goal.y - goal.height / 2, width: goal.width, height: goal.height })));
+    obstacles.push(...goals.flatMap(goal => basketSegments(goal).map(basketSegmentBounds)));
     const attached = ball?.attachedSwingUid === rod.uid;
     const mouth = attached && swingCapturePoint(probe, ball.radius);
-    return obstacles.some(rect => circleTouchesRect(magnet, 17, rect)
-      || polygonsOverlap(sweptShaft, orientedRectCorners(rect))
+    return obstacles.some(rect => magnetTouchesRect(probe, rect)
+      || shaftTouchesRect(probe, rect)
       || (mouth && circleTouchesRect(mouth, ball.radius, rect)));
+  }
+  function swingBlockedBetween(rod, from, to) {
+    const steps = Math.max(1, Math.ceil(Math.abs(to - from) * swingRadius(rod) / 4));
+    for (let step = 1; step <= steps; step++) {
+      if (swingBlockedAt(rod, from + (to - from) * step / steps)) return true;
+    }
+    return false;
   }
   function swingInertia(rod, attachedMass = 0) {
     const length = rod.length / PIXELS_PER_METER;
@@ -2811,12 +2973,14 @@
     return SWING_MAGNET_MASS * length * length
       + SWING_ROD_MASS * length * length / 3 + attachedMass * mouthArm * mouthArm;
   }
-
+  let lastSwingRelease = null;
   function resetSwingState() {
+    lastSwingRelease = null;
     rods.filter(rod => rod.type === 'swing').forEach(rod => {
       rod.angle = Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0);
       rod.swingOmega = 0;
-      rod.swingStarted = !rod.fixed;
+      rod.swingStarted = false;
+      rod.swingBlocked = false;
       rod.releaseRequested = false;
     });
   }
@@ -2829,10 +2993,11 @@
     ball.x = mouth.x; ball.y = mouth.y;
     ball.vx = speed * Math.cos(rod.angle);
     ball.vy = speed * Math.sin(rod.angle);
+    lastSwingRelease = { angle: rod.angle, x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy };
     ball.attachedSwingUid = null;
     rod.releaseRequested = false;
     ball.swingDetachUid = rod.uid;
-    ball.swingDetachTime = 0.35;
+    ball.swingDetachTime = 2;
     ball.fallPeakY = ball.y;
     setHint('자석에서 공을 놓았습니다. 스윙 속도를 이어받아 날아갑니다.', 2500);
     return true;
@@ -2841,6 +3006,11 @@
   function advanceSwings(dt) {
     for (const rod of rods) {
       if (rod.type !== 'swing' || !rod.swingStarted) continue;
+      if (rod.swingBlocked) {
+        const toward = Math.sign(rod.swingOmega || Math.sin(rod.angle) || 1);
+        if (!swingBlockedAt(rod, rod.angle + toward * .001)) rod.swingBlocked = false;
+        else continue;
+      }
       const attachedMass = ball?.attachedSwingUid === rod.uid ? ball.mass : 0;
       const moment = swingInertia(rod, attachedMass);
       const torque = (SWING_MAGNET_MASS * rod.length / PIXELS_PER_METER
@@ -2849,13 +3019,26 @@
       rod.swingOmega = clamp((rod.swingOmega || 0) + torque / moment * dt, -9, 9) * Math.exp(-0.18 * dt);
       const before = rod.angle;
       const after = before + rod.swingOmega * dt;
-      if (swingBlockedAt(rod, after)) {
+      const release = rod.releaseRequested && ball?.attachedSwingUid === rod.uid
+        ? exactSwingReleaseAngle(before, after, rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE) : null;
+      const destination = release ?? after;
+      if (swingBlockedBetween(rod, before, destination)) {
+        // Binary-search the last nonintersecting position to stop at visible contact.
+        if (!swingBlockedAt(rod, before)) {
+          let free = before; let blocked = destination;
+          for (let probe = 0; probe < 10; probe += 1) {
+            const middle = (free + blocked) / 2;
+            if (swingBlockedBetween(rod, before, middle)) blocked = middle;
+            else free = middle;
+          }
+          rod.angle = free;
+        }
         rod.swingOmega = 0;
+        rod.swingBlocked = true;
         continue;
       }
-      rod.angle = after;
-      if (rod.releaseRequested && ball?.attachedSwingUid === rod.uid
-        && crossedSwingRelease(before, after, rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE)) releaseSwingBall(rod);
+      rod.angle = destination;
+      if (release !== null) releaseSwingBall(rod);
     }
   }
 
@@ -2865,8 +3048,8 @@
     const dx = mouth.x - ball.x; const dy = mouth.y - ball.y;
     const distance = Math.hypot(dx, dy);
     const localY = -Math.sin(rod.angle) * (ball.x - rod.x) + Math.cos(rod.angle) * (ball.y - rod.y);
-    if (distance > 150 || distance < .001 || localY > -rod.length - 20) return;
-    const acceleration = 14 + 100 * Math.pow(1 - distance / 150, 1.5);
+    if (distance > 65 || distance < .001 || localY > -rod.length - 20) return;
+    const acceleration = 12 + 80 * Math.pow(1 - distance / 65, 1.5);
     ball.vx += dx / distance * acceleration * dt;
     ball.vy += dy / distance * acceleration * dt;
   }
@@ -2877,39 +3060,39 @@
     const dx = ball.x - mouth.x; const dy = ball.y - mouth.y;
     const localY = -Math.sin(rod.angle) * (ball.x - rod.x) + Math.cos(rod.angle) * (ball.y - rod.y);
     const canAttach = ball.swingDetachUid !== rod.uid;
-    if (canAttach && localY < -rod.length - 20 && Math.hypot(dx, dy) <= 7) {
+    const captureDistance = ball.radius > BALL_RADIUS ? 14 : 6;
+    if (canAttach && localY < -rod.length - 20 && Math.hypot(dx, dy) <= captureDistance) {
       const rx = (mouth.x - rod.x) / PIXELS_PER_METER;
       const ry = (mouth.y - rod.y) / PIXELS_PER_METER;
       rod.swingOmega = clamp(((rod.swingOmega || 0) * swingInertia(rod) + ball.mass * (rx * ball.vy - ry * ball.vx))
         / swingInertia(rod, ball.mass), -9, 9);
       rod.swingStarted = true;
+      rod.swingBlocked = false;
       ball.attachedSwingUid = rod.uid;
       ball.x = mouth.x; ball.y = mouth.y;
       ball.vx = 0; ball.vy = 0;
       rod.touched = true; touchedRodIds.add(rod.id);
-      setHint('공이 자석에 붙었어요. 중심축을 터치하면 파란 지점에서 놓습니다.', 2800);
+      setHint('공이 자석에 붙었어요. 중심축을 터치하면 빨간 곡선에서 놓습니다.', 2800);
       return true;
     }
-    const magnet = swingPoint(rod, -rod.length);
-    const end = magnet;
-    const vx = end.x - rod.x; const vy = end.y - rod.y;
-    const along = clamp(((ball.x - rod.x) * vx + (ball.y - rod.y) * vy) / (rod.length * rod.length), 0, 1);
-    const shaft = { x: rod.x + along * vx, y: rod.y + along * vy };
-    // The opening is empty: only the visible side arms and lower bridge collide.
-    const arms = [-25, 25].flatMap(offset => [-31, -48].map(depth => ({
-      point: { x: magnet.x + offset * Math.cos(rod.angle) - depth * Math.sin(rod.angle),
-        y: magnet.y + offset * Math.sin(rod.angle) + depth * Math.cos(rod.angle) }, radius: 5
-    })));
-    const bridge = swingPoint(rod, -(rod.length + 8));
-    const contacts = [...arms, { point: bridge, radius: 9 }, { point: shaft, radius: 4 }, { point: rod, radius: 13 }];
-    for (const { point, radius } of contacts) {
-      let nx = ball.x - point.x; let ny = ball.y - point.y;
-      const distance = Math.hypot(nx, ny);
-      if (distance >= ball.radius + radius) continue;
-      if (distance > 0.0001) { nx /= distance; ny /= distance; }
-      else { nx = 1; ny = 0; }
-      ball.x += nx * (ball.radius + radius - distance + 0.02);
-      ball.y += ny * (ball.radius + radius - distance + 0.02);
+    const end = swingPoint(rod, -(rod.length + 5));
+    const shaft = pointSegmentDistanceSquared(ball, rod, end);
+    const shaftDistance = Math.sqrt(shaft.distance);
+    const magnetHit = magnetContact(rod, ball, ball.radius);
+    const weightDistance = Math.hypot(ball.x - rod.x, ball.y - rod.y);
+    let contact = null;
+    if (magnetHit) contact = magnetHit;
+    else if (shaftDistance < ball.radius + 2) {
+      contact = { point: shaft, nx: (ball.x - shaft.x) / (shaftDistance || 1),
+        ny: (ball.y - shaft.y) / (shaftDistance || 1), penetration: ball.radius + 2 - shaftDistance };
+    } else if (weightDistance < ball.radius + 12) {
+      contact = { point: rod, nx: (ball.x - rod.x) / (weightDistance || 1),
+        ny: (ball.y - rod.y) / (weightDistance || 1), penetration: ball.radius + 12 - weightDistance };
+    }
+    if (contact) {
+      const { point, nx, ny } = contact;
+      ball.x += nx * (contact.penetration + .02);
+      ball.y += ny * (contact.penetration + .02);
       const rx = (point.x - rod.x) / PIXELS_PER_METER;
       const ry = (point.y - rod.y) / PIXELS_PER_METER;
       const angular = rod.swingOmega || 0;
@@ -2921,6 +3104,7 @@
         ball.vy += ny * impulse / ball.mass;
         rod.swingOmega = clamp(angular - cross * impulse / swingInertia(rod), -9, 9);
         rod.swingStarted = true;
+        rod.swingBlocked = false;
         rod.touched = true; touchedRodIds.add(rod.id);
       }
       return true;
@@ -2975,6 +3159,7 @@
 
     supportContacts.length = 0;
     for (const rod of rods) {
+      if (rod.type === 'breakable' && rod.hp <= 0) continue;
       if (rod.type === 'swing') {
         resolveSwingContact(rod);
         if (ball.attachedSwingUid) break;
@@ -3193,27 +3378,26 @@
   function drawSwingSweep(rod, alpha = 1) {
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.strokeStyle = 'rgba(210,226,250,.9)';
+    ctx.strokeStyle = '#73a7dc';
     ctx.lineWidth = 2;
-    ctx.setLineDash([2, 8]);
+    ctx.setLineDash([3, 7]);
     ctx.beginPath();
     ctx.arc(rod.x, rod.y, swingRadius(rod), 0, Math.PI * 2);
     ctx.stroke();
-    const marker = swingReleasePoint(rod);
     ctx.setLineDash([]);
-    ctx.translate(marker.x, marker.y);
-    ctx.rotate(rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE);
-    ctx.fillStyle = '#1976e9';
-    ctx.strokeStyle = '#a5dfff';
-    ctx.lineWidth = 3;
+    const center = (rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE) - Math.PI / 2;
+    ctx.strokeStyle = '#e94736';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.roundRect(-14, -23, 28, 46, 8);
-    ctx.fill(); ctx.stroke();
+    ctx.arc(rod.x, rod.y, swingRadius(rod), center - .09, center + .09);
+    ctx.stroke();
     ctx.restore();
   }
 
   // The original electric sprite stays intact; cover only a joint's open wedge.
   function drawRod(rod, alpha = 1) {
+    if (rod.type === 'breakable' && rod.hp <= 0) return;
     if (rod.type === 'swing') {
       ctx.save();
       ctx.globalAlpha = alpha;
@@ -3245,7 +3429,16 @@
     ctx.fillStyle = material.color;
     ctx.fillRect(-rod.length / 2, -rod.thickness / 2, rod.length, rod.thickness);
     ctx.shadowColor = 'transparent';
-    drawPlatformAsset(platformImages[rod.type], rod.length, rod.thickness, rod.type);
+    if (rod.type === 'breakable') {
+      const sprite = breakableImages[breakableStage(rod.hp ?? BREAKABLE_HP)];
+      if (sprite.complete && sprite.naturalWidth) {
+        const cap = Math.min(rod.length / 3, rod.thickness * 1.2);
+        const sourceCap = sprite.naturalHeight * 1.2;
+        ctx.drawImage(sprite, 0, 0, sourceCap, sprite.naturalHeight, -rod.length / 2, -rod.thickness / 2, cap, rod.thickness);
+        ctx.drawImage(sprite, sourceCap, 0, sprite.naturalWidth - sourceCap * 2, sprite.naturalHeight, -rod.length / 2 + cap, -rod.thickness / 2, rod.length - cap * 2, rod.thickness);
+        ctx.drawImage(sprite, sprite.naturalWidth - sourceCap, 0, sourceCap, sprite.naturalHeight, rod.length / 2 - cap, -rod.thickness / 2, cap, rod.thickness);
+      }
+    } else drawPlatformAsset(platformImages[rod.type], rod.length, rod.thickness, rod.type);
     ctx.strokeStyle = material.edge;
     ctx.lineWidth = 4;
     const borderInset = ctx.lineWidth / 2;
@@ -3359,7 +3552,7 @@
     }
     for (const particle of particles) {
       ctx.globalAlpha = clamp(particle.life / particle.maxLife, 0, 1);
-      ctx.fillStyle = particle.type === 'electric' ? '#55ddff' : '#54c95b';
+      ctx.fillStyle = particle.type === 'electric' ? '#55ddff' : particle.type === 'breakable' ? '#ac662e' : '#54c95b';
       ctx.fillRect(particle.x - particle.size / 2, particle.y - particle.size / 2, particle.size, particle.size);
     }
     ctx.globalAlpha = 1;
@@ -3380,9 +3573,6 @@
           drawHandle(ends.end.x, ends.end.y, '#ffaf21');
           const angleHandle = swingPoint(selected, -(selected.length + 38));
           drawHandle(angleHandle.x, angleHandle.y, '#a967db');
-          const marker = swingReleasePoint(selected);
-          ctx.beginPath(); ctx.arc(marker.x, marker.y, 26, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(25,118,233,.9)'; ctx.stroke();
         }
         ctx.restore();
         return;
@@ -3489,6 +3679,7 @@
         length: placement.length || DEFAULT_ROD_LENGTH,
         thickness: placement.thickness || toolSettings[placement.tool]?.thickness || 14,
         angle: placement.angle || 0,
+        releaseAngle: placement.releaseAngle,
         type: placement.tool
       };
       drawRod(preview, appMode === 'editor' && !placement.fixed ? .42 : .65);
@@ -3741,6 +3932,8 @@
       MAX_ZOOM,
       GOAL_SUCCESS_DELAY,
       ELECTRIC_PLATFORM_THICKNESS,
+      BREAKABLE_HP,
+      BREAKABLE_THICKNESS,
       ELECTRIC_ATTACH_ANGLE,
       ELECTRIC_SPEED_MULTIPLIER,
       ELECTRIC_ACCELERATION,
@@ -3756,13 +3949,14 @@
 
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
-      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted })),
+      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked })),
       goals: goals.map(goal => ({ id: goal.id, x: goal.x, y: goal.y })),
       fields: fields.map(field => ({ id: field.id, x: field.x, y: field.y, width: field.width, height: field.height, direction: field.direction })),
       supplies: clone(stageSupplies),
       recentTools: [...recentTools],
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, radius: ball.radius, mass: ball.mass, type: ball.type, omega: ball.omega, fallPeakY: ball.fallPeakY, attachedSwingUid: ball.attachedSwingUid || null, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
       selectedBallType,
+      lastSwingRelease: lastSwingRelease ? { ...lastSwingRelease } : null,
       won,
       appMode,
       developerEnabled,
@@ -3789,6 +3983,9 @@
     getRodByUid: rodByUid,
     swingReleasePoint,
     swingBlockedAt,
+    shaftTouchesRect,
+    magnetTouchesRect,
+    magnetContact,
     setSwingState: (uid, state) => {
       const rod = rodByUid(uid);
       if (!rod || rod.type !== 'swing') return null;
@@ -3864,10 +4061,12 @@
       rollingFilterType: rollingAudio?.filter.type || null,
       referenceRollingLoaded: Boolean(rollingReferenceBuffer),
       woodImpactCount: woodImpactBuffers.length,
+      woodImpactDurations: woodImpactBuffers.map(buffer => buffer.duration),
       recordedRollingActive: Boolean(recordedRollingAudio),
       recordedRollingSourceStarts,
       recordedRollingRevolutionsPerSecond,
       recordedRollingPlaybackRate,
+      recordedRollingGain: recordedRollingAudio?.gain.gain.value ?? 0,
       impactSoundCount,
       soundedImpactContactCount: soundedImpactContacts.size
     }),

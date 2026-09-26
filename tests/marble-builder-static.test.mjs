@@ -9,8 +9,8 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=35/);
-    assert.match(html, /styles\.css\?v=23/);
+    assert.match(html, /game\.js\?v=38/);
+    assert.match(html, /styles\.css\?v=24/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 
@@ -32,13 +32,20 @@ test('swing pendulum uses a draggable blue release marker and allows obstacles i
     assert.match(script, /function swingRadius\(rod\)/);
     assert.match(script, /function swingReleasePoint\(rod\)/);
     assert.match(script, /function crossedSwingRelease\(before, after, target\)/);
+    assert.match(script, /function exactSwingReleaseAngle\(before, after, target\)/);
+    assert.match(script, /function swingMagnetShape\(\)/);
+    assert.match(script, /function magnetContact\(rod, point, radius\)/);
+    assert.match(script, /function shaftTouchesRect\(rod, rect\)/);
     assert.match(script, /function swingBlockedAt\(rod, angle\)/);
+    assert.match(script, /function swingBlockedBetween\(rod, from, to\)/);
     assert.match(script, /function attractSwingBall\(rod, dt\)/);
     assert.match(script, /function resolveSwingContact\(rod\)/);
     assert.match(script, /function releaseSwingBall\(rod\)/);
     assert.match(script, /editDrag\.mode === 'swingRelease'/);
     assert.match(script, /attachedPivot\.releaseRequested = true/);
     assert.match(script, /circleTouchesRect\(mouth, ball\.radius, rect\)/);
+    assert.match(script, /ctx\.strokeStyle = '#e94736'/);
+    assert.match(script, /ctx\.setLineDash\(\[3, 7\]\)/);
     assert.match(script, /drawImage\(swingImages\.magnet, -42, -rod\.length - 53/);
     assert.match(script, /drawImage\(swingImages\.weight, -14, -16/);
 });
@@ -86,23 +93,21 @@ test('marble builder uses video-matched gravity, fixed substeps, friction, and d
     assert.match(script, /ball\.omega/);
 });
 
-test('marble builder uses the approved recording for wood audio without replacing electric audio', () => {
-    assert.match(script, /marble-roll-reference\.wav\?v=1/);
+test('wood impact is the original short click; quiet rolling plays on wood only at unchanged pitch', () => {
+    assert.match(script, /wood-roll-video-3\.wav\?v=1/);
     assert.match(script, /wood-hit-\$\{index\}\.wav\?v=1/);
-    assert.match(script, /type === 'wood' && playRecordedWoodImpact/);
-    assert.match(script, /rollingReferenceBuffer && type/);
+    assert.doesNotMatch(script, /wood-hit-video-/);
+    assert.match(script, /source\.buffer = woodImpactBuffers\[Math\.floor\(Math\.random\(\) \* woodImpactBuffers\.length\)\]/);
+    assert.match(script, /source\.stop\(start \+ \.26\)/);
+    assert.match(script, /\(type === 'wood' \|\| type === 'breakable'\) && playRecordedWoodImpact/);
+    assert.match(script, /type !== 'wood' && type !== 'breakable'/);
     assert.match(script, /recordedRollingSourceStarts \+= 1/);
-    assert.match(script, /function rollingPlaybackRateForOmega/);
-    assert.match(script, /Math\.abs\(Number\(omega\) \|\| 0\) \/ \(Math\.PI \* 2\)/);
-    assert.match(script, /rollingPlaybackRateForOmega\(angularSpeed, rollingReferenceBuffer\.duration\)/);
     assert.match(script, /function rollingGainForRevolutions/);
-    assert.match(script, /Math\.pow\(normalizedSpeed, \.72\)/);
-    assert.match(script, /rollingGainForRevolutions\(revolutionsPerSecond, materialVolume\)/);
+    assert.match(script, /source\.playbackRate\.setTargetAtTime\(1, audio\.currentTime/);
+    assert.match(script, /setTargetAtTime\(rollingGainForRevolutions\(revolutionsPerSecond, turnPulse\)/);
+    assert.match(script, /recordedRollingAudio\.gain\.gain\.setTargetAtTime\(\.0001, audio\.currentTime, \.12\)/);
     assert.match(script, /source\.loopEnd = rollingReferenceBuffer\.duration/);
-    assert.match(script, /type === 'basket' \? 850 : type === 'slime' \? 1500 : type === 'electric' \? 2200 : 1800/);
-    assert.match(script, /const electric = type === 'electric'/);
-    assert.match(script, /slime \? 220 : electric \? 640 : 320/);
-    assert.equal(assetManifest.audio.length, 2);
+    assert.equal(assetManifest.audio.length, 3);
 });
 
 test('marble builder sounds only distinct impacts and suppresses resting contact chatter', () => {

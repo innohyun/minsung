@@ -39,6 +39,25 @@ def run(browser, mobile):
         page.mouse.up()
     actual = page.evaluate(f'{D}.getRodByUid({swing!r}).releaseAngle')
     assert abs(actual - target_angle) < .08, actual
+    page.wait_for_timeout(80)
+    painted = page.evaluate(f'''() => {{
+      const canvas = document.getElementById('gameCanvas'), context = canvas.getContext('2d');
+      const state = {D}.getState(), camera = state.camera, pivot = state.rods[0];
+      const ratio = canvas.width / canvas.getBoundingClientRect().width;
+      const pixel = (angle, radius) => {{
+        const x = pivot.x + radius * Math.sin(angle);
+        const y = pivot.y - radius * Math.cos(angle);
+        const px = Math.round((x - camera.x) * camera.zoom * ratio);
+        const py = Math.round((y - camera.y) * camera.zoom * ratio);
+        if (px < 0 || px >= canvas.width || py < 0 || py >= canvas.height) return null;
+        return [...context.getImageData(px, py, 1, 1).data];
+      }};
+      const radius = pivot.length + 64;
+      return {{ red: pixel(pivot.releaseAngle, radius),
+        dashed: Array.from({{length:90}}, (_,i) => pixel(-.6 + i * .005, radius)) }};
+    }}''')
+    assert painted['red'] and painted['red'][0] > painted['red'][1] * 1.35, painted['red']
+    assert sum(bool(px and px[0] < 190 and px[2] > px[0]) for px in painted['dashed']) >= 3, 'orbit dots invisible'
     # Merely spawning a ball leaves a fixed swing at its authored angle.
     page.evaluate(f'{D}.setBallState({{x:{x + 450},y:-240,vx:0,vy:0}})')
     page.evaluate(f'{D}.stepPhysics(20)')
@@ -52,28 +71,36 @@ def run(browser, mobile):
     page.evaluate(f'{D}.stepPhysics(65)')
     state = page.evaluate(f'{D}.getState()')
     assert state['ball']['attachedSwingUid'] == swing, state
-    # Pivot touch ARMS release; crossing the marker actually lets go.
+    # Put the blocker in place before touching the pivot: a real RAF may cross
+    # the target between the touchend and the subsequent Python assertion.
+    block_x = x + (length + 64) * math.sin(target_angle)
+    block_y = y - (length + 64) * math.cos(target_angle)
+    assert page.evaluate(f'{D}.addRod("wood",{block_x},{block_y},{{length:50}})') is not None
+    page.evaluate(f'{D}.setSwingState({swing!r},{{angle:{target_angle + .55},omega:-2,started:true}})')
+    # Pivot touch ARMS release; the blocker must prevent crossing the marker.
     if mobile:
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': x, 'y': y, 'id': 2}]})
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
     else:
         page.mouse.click(x, y)
     armed = page.evaluate(f'{D}.getState()')
-    assert armed['ball']['attachedSwingUid'] == swing and armed['rods'][0]['releaseRequested']
+    assert armed['ball']['attachedSwingUid'] == swing and armed['rods'][0]['releaseRequested'], armed
     # A block directly on the release route stops the swinging ball before the marker.
-    block_x = x + (length + 64) * math.sin(target_angle)
-    block_y = y - (length + 64) * math.cos(target_angle)
-    assert page.evaluate(f'{D}.addRod("wood",{block_x},{block_y},{{length:50}})') is not None
-    page.evaluate(f'{D}.setSwingState({swing!r},{{angle:{target_angle + .55},omega:-2,started:true}})')
     page.evaluate(f'{D}.stepPhysics(90)')
     blocked = page.evaluate(f'{D}.getState()')
     assert blocked['ball']['attachedSwingUid'] == swing and blocked['rods'][0]['releaseRequested'], blocked
+    assert blocked['lastSwingRelease'] is None
     page.evaluate(f'{D}.selectRod(1)')
     page.locator('#deleteButton').click()
     page.evaluate(f'{D}.setSwingState({swing!r},{{angle:{target_angle + .45},omega:-3,started:true}})')
     page.evaluate(f'{D}.stepPhysics(90)')
-    released = page.evaluate(f'{D}.getState().ball')
+    release_state = page.evaluate(f'{D}.getState()')
+    released = release_state['ball']
     assert released['attachedSwingUid'] is None and math.hypot(released['vx'], released['vy']) > .2, released
+    exact = release_state['lastSwingRelease']
+    assert exact and abs((exact['angle'] - actual + math.pi) % (2 * math.pi) - math.pi) < 5e-7, exact
+    assert abs(exact['x'] - target[0]) < .01 and abs(exact['y'] - target[1]) < .01, exact
+    assert abs(exact['vy'] - exact['vx'] * math.tan(target_angle)) < .0001, exact
     page.evaluate(f'{D}.stepPhysics(12)')
     assert page.evaluate(f'{D}.getState().ball.attachedSwingUid') is None
     # Giant ball uses its actual radius/mass in collisions and magnetic attachment.
@@ -102,6 +129,27 @@ def run(browser, mobile):
     assert stage['selectedBallType'] == 'giant'
     page.locator('#spawnButton').click()
     assert page.evaluate(f'{D}.getState().ball.radius') == 32
+    # Reproduce the two pictured gaps: a 2 px visible shaft clearance cannot
+    # be an invisible wall, while actual contact is a wall. The U's hole is empty.
+    page.evaluate(f'{D}.startFreeMode()')
+    angle = 1.15
+    pivot_x, pivot_y, span = (250, 510, 110) if mobile else (500, 500, 180)
+    pictured = page.evaluate(f'{D}.addRod("swing",{pivot_x},{pivot_y},{{length:{span},angle:{angle},fixed:true}})?.uid')
+    mid_x = pivot_x + span / 2 * math.sin(angle)
+    mid_y = pivot_y - span / 2 * math.cos(angle)
+    plank_x = mid_x + 14 * math.cos(angle)
+    plank_y = mid_y + 14 * math.sin(angle)
+    wood_angle = angle - math.pi / 2
+    plank = page.evaluate(f'{D}.addRod("wood",{plank_x},{plank_y},{{length:72,thickness:14,angle:{wood_angle}}})?.uid')
+    assert plank
+    assert page.evaluate(f'{D}.swingBlockedAt({D}.getRodByUid({pictured!r}),{angle})') is False, 'shaft gap became a wall'
+    page.evaluate(f'''() => {{ const w={D}.getRodByUid({plank!r});
+      w.x -= 3 * Math.cos({angle}); w.y -= 3 * Math.sin({angle}); }}''')
+    assert page.evaluate(f'{D}.swingBlockedAt({D}.getRodByUid({pictured!r}),{angle})') is True, 'visible shaft contact was missed'
+    mouth_hole = page.evaluate(f'{D}.magnetContact({D}.getRodByUid({pictured!r}), '
+                               f'{{x:{pivot_x + (span + 34) * math.sin(angle)}, '
+                               f'y:{pivot_y - (span + 34) * math.cos(angle)}}}, 3)')
+    assert mouth_hole is None, 'transparent U opening became a solid disk'
     assert not errors, errors
     context.close()
     print('mobile' if mobile else 'desktop', 'PASS orbit/drag/pull/obstacle/marker/giant')

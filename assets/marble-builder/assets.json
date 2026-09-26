@@ -1,6 +1,11 @@
 {
   "audio": [
     {
+      "id": "wood-roll-video-reference",
+      "source": "3.mp4 (낮은 각도)",
+      "runtime": "audio/wood-roll-video-3.wav"
+    },
+    {
       "id": "marble-roll-reference",
       "runtime": "audio/marble-roll-reference.wav",
       "source": "approved-video-1",
@@ -56,6 +61,14 @@
       "runtime": "swing/swing.png",
       "parts": ["swing/swing-magnet.png", "swing/swing-weight.png"],
       "size": [466, 1310],
+      "alpha": true
+    },
+    {
+      "name": "깨지는 나무 블록 (HP 6단계)",
+      "id": "breakable",
+      "source": "breakable/six/source/stage-0-generated.png",
+      "runtime": ["breakable/six/stage-0.png", "breakable/six/stage-1.png", "breakable/six/stage-2.png", "breakable/six/stage-3.png", "breakable/six/stage-4.png", "breakable/six/stage-5.png"],
+      "size": [1024, 120],
       "alpha": true
     }
   ]
