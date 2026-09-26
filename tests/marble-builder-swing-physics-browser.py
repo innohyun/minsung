@@ -105,15 +105,23 @@ def run(browser, mobile):
     assert page.evaluate(f'{D}.getState().ball.attachedSwingUid') is None
     # Giant ball uses its actual radius/mass in collisions and magnetic attachment.
     page.locator('#ballTypeButton').click()
-    assert page.locator('#ballTypeButton').inner_text() == '공: 거대'
+    page.locator('#ballChoices button').nth(1).click()
+    page.locator('#closeBallQueue').click()
+    assert page.locator('#ballTypeButton').inner_text().startswith('공 설정')
     page.locator('#spawnButton').click()
     giant = page.evaluate(f'{D}.getState().ball')
     assert giant['radius'] > 18 and giant['mass'] > .18 and giant['type'] == 'giant', giant
     page.evaluate(f'{D}.setSwingState({swing!r},{{angle:0,omega:0,started:false}})')
     page.evaluate(f'{D}.setBallState({{x:{x + 40},y:{y - length - 115},vx:0,vy:0}})')
-    page.evaluate(f'{D}.stepPhysics(120)')
-    giant = page.evaluate(f'{D}.getState().ball')
-    assert giant['attachedSwingUid'] == swing, giant
+    giant_trace = page.evaluate(f'''() => {{
+      const d = {D}; let attached = false, released = false;
+      for (let i=0;i<120;i++) {{ d.stepPhysics(1); const s=d.getState();
+        if (s.ball.attachedSwingUid === {swing!r}) attached=true;
+        if (attached && s.lastSwingRelease) {{ released=true; break; }}
+      }}
+      return {{attached,released,ball:d.getState().ball}};
+    }}''')
+    assert giant_trace['attached'] and giant_trace['released'], giant_trace
     # The authored release angle and giant-ball choice survive stage save/reload.
     page.evaluate(f'{D}.startEditor(null,{{number:91}})')
     page.evaluate(f'{D}.addRod("swing",{x},{y},{{length:{length},angle:.35,releaseAngle:-.95,fixed:true}})')

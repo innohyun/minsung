@@ -5,13 +5,28 @@ import { createMinsungServer } from '../server.mjs';
 
 const html = readFileSync(new URL('../marble-builder/index.html', import.meta.url), 'utf8');
 const script = readFileSync(new URL('../marble-builder/game.js', import.meta.url), 'utf8');
+const ballsScript = readFileSync(new URL('../marble-builder/balls.js', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.url), 'utf8');
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=40/);
-    assert.match(html, /styles\.css\?v=24/);
+    assert.match(html, /balls\.js\?v=1/);
+    assert.match(html, /game\.js\?v=46/);
+    assert.match(html, /styles\.css\?v=25/);
     assert.match(html, /rel="icon" href="data:,"/);
+});
+
+test('custom balls have editing, persistence, and circle-triggered launch ordering', () => {
+    for (const id of ['ballWorkshopButton','ballEditor','colorWheel','pixelEraser','objectEraser','ballPhotoInput','photoCropDialog','deleteBallDialog','ballQueueDialog','ballQueueList','ballInterval']) {
+        assert.match(html, new RegExp(`id="${id}"`));
+    }
+    assert.match(ballsScript, /localStorage\.setItem\(key, JSON\.stringify\(saved\)\)/);
+    assert.match(ballsScript, /wheel\.onpointermove/);
+    assert.match(ballsScript, /crop\.onpointermove/);
+    assert.match(script, /onSpawnCircle \|\| onSpawnArrow/);
+    assert.match(script, /activeBalls\.push\(ball\)/);
+    assert.match(script, /queueIndex \+= 1/);
+    assert.match(script, /const release = ball\?\.attachedSwingUid === rod\.uid/);
 });
 
 test('swing is registered with length-only setup and an isolated selection path', () => {

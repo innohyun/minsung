@@ -205,9 +205,39 @@
   let activeCreationId = null;
   let followBall = false;
   let selectedBallType = 'normal';
+  const activeBalls = [];
+  let ballQueue = [];
+  let queueIndex = 0;
+  let launchMode = 'manual';
+  let launchInterval = 2;
+  let nextLaunchAt = 0;
+  const queueDialog = document.getElementById('ballQueueDialog');
+  const queueList = document.getElementById('ballQueueList');
+  const ballChoices = document.getElementById('ballChoices');
+  const labelForBall = id => id === 'normal' ? '기본 공' : id === 'giant' ? '거대 공' : `내 공 ${window.MarbleBalls.list().indexOf(id) + 1}`;
+  function drawQueueEditor() {
+    ballChoices.replaceChildren(); queueList.replaceChildren();
+    for (const id of ['normal', 'giant', ...window.MarbleBalls.list()]) {
+      const button = document.createElement('button'); button.type = 'button'; button.textContent = labelForBall(id);
+      if (window.MarbleBalls.has(id)) button.style.backgroundImage = `url("${window.MarbleBalls.getImage(id).src}")`;
+      button.addEventListener('click', () => { ballQueue.push(id); queueIndex = 0; drawQueueEditor(); updateBallTypeButton(); });
+      ballChoices.append(button);
+    }
+    ballQueue.forEach((id, index) => {
+      const item = document.createElement('li'); item.append(document.createTextNode(labelForBall(id)));
+      for (const [symbol, destination] of [['↑', index-1], ['↓', index+1], ['×', -1]]) {
+        const button = document.createElement('button'); button.type = 'button'; button.textContent = symbol;
+        button.setAttribute('aria-label', `${labelForBall(id)} ${symbol === '×' ? '제거' : symbol === '↑' ? '위로' : '아래로'}`);
+        button.disabled = symbol !== '×' && (destination < 0 || destination >= ballQueue.length);
+        button.addEventListener('click', () => { if (symbol === '×') ballQueue.splice(index, 1); else [ballQueue[index], ballQueue[destination]] = [ballQueue[destination], ballQueue[index]]; queueIndex = 0; drawQueueEditor(); updateBallTypeButton(); });
+        item.append(button);
+      }
+      queueList.append(item);
+    });
+  }
   function updateBallTypeButton() {
-    ballTypeButton.textContent = selectedBallType === 'giant' ? '공: 거대' : '공: 기본';
-    ballTypeButton.setAttribute('aria-pressed', String(selectedBallType === 'giant'));
+    ballTypeButton.textContent = appMode === 'editor' ? `공: ${selectedBallType === 'giant' ? '거대' : '기본'}`
+      : `공 설정 › ${ballQueue.length ? `${Math.min(queueIndex + 1, ballQueue.length)}/${ballQueue.length}` : selectedBallType === 'giant' ? '거대' : '기본'}`;
   }
   let audioContext = null;
   let audioMaster = null;
@@ -474,6 +504,7 @@
     }
     selected = null;
     selectedElectricLinkId = null;
+    activeBalls.length = 0;
     ball = null;
     won = false;
     goalEnteredAt = null;
@@ -1164,7 +1195,7 @@
     redoButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
     saveMapButton.hidden = mode !== 'free';
     followButton.hidden = !['free', 'stage', 'editor', 'physics-lab'].includes(mode);
-    ballTypeButton.hidden = mode === 'stage';
+    ballTypeButton.hidden = !['free', 'stage', 'editor'].includes(mode);
     updateBallTypeButton();
     followButton.textContent = followBall ? '따라가기 끄기' : '공 따라가기';
     followButton.setAttribute('aria-pressed', String(followBall));
@@ -1177,6 +1208,10 @@
   }
 
   function clearWorldState() {
+    activeBalls.length = 0;
+    queueIndex = 0;
+    ballQueue = [];
+    nextLaunchAt = 0;
     rods.length = 0;
     goals.length = 0;
     fields.length = 0;
@@ -1517,7 +1552,11 @@
           : '전기 발판 꼭짓점이 바깥쪽이거나 떨어져 있어요. 결합을 고쳐 주세요.', 4700);
       return false;
     }
-    resetSwingState();
+    const queued = ['free', 'stage'].includes(appMode) && ballQueue.length > 0;
+    if (queued && queueIndex >= ballQueue.length) { setHint('정한 순서의 공을 모두 발사했어요. 공 설정에서 다시 정해 주세요.'); return false; }
+    const kind = queued ? ballQueue[queueIndex] : selectedBallType;
+    if (!queued || !activeBalls.length) resetSwingState();
+    else lastSwingRelease = null;
     ball = {
       x: spawn.x,
       y: spawn.y,
@@ -1527,16 +1566,19 @@
       omega: 0,
       fallPeakY: spawn.y,
       specialContacts: [],
-      radius: selectedBallType === 'giant' ? GIANT_BALL_RADIUS : BALL_RADIUS,
-      mass: selectedBallType === 'giant' ? GIANT_BALL_MASS : BALL_MASS,
-      type: selectedBallType
+      radius: kind === 'giant' ? GIANT_BALL_RADIUS : BALL_RADIUS,
+      mass: kind === 'giant' ? GIANT_BALL_MASS : BALL_MASS,
+      type: kind
     };
+    if (queued) { queueIndex += 1; nextLaunchAt = performance.now() + launchInterval * 1000; updateBallTypeButton(); }
+    if (!queued) activeBalls.length = 0;
+    activeBalls.push(ball);
     won = false;
     goalHoldTime = 0;
     goalEnteredAt = null;
-    touchedRodIds.clear();
+    if (!queued || activeBalls.length === 1) touchedRodIds.clear();
     resetImpactSoundContacts();
-    rods.forEach(rod => { rod.touched = false; });
+    if (!queued || activeBalls.length === 1) rods.forEach(rod => { rod.touched = false; });
     successPanel.hidden = true;
     setHint('공이 떨어집니다. 충돌 속도에 따라 실제처럼 살짝 튕겨요.');
     return true;
@@ -1749,6 +1791,7 @@
     goals.length = 0;
     fields.length = 0;
     electricLinks.length = 0;
+    activeBalls.length = 0;
     ball = null;
     selected = null;
     selectedElectricLinkId = null;
@@ -1766,6 +1809,9 @@
 
   function resetGame() {
     resetSwingState();
+    activeBalls.length = 0;
+    queueIndex = 0;
+    nextLaunchAt = 0;
     rods.forEach(rod => { if (rod.type === 'breakable') { rod.hp = BREAKABLE_HP; rod.lastDamageSeenStep = -100; } });
     ball = null;
     selected = null;
@@ -1955,7 +2001,7 @@
       const second = rodCorner(b, link.b.end, link.b.side);
       translateElectricComponent(b.uid, first.x - second.x, first.y - second.y, link.id);
     }
-    if (ball) ball = null;
+    if (ball) { activeBalls.length = 0; ball = null; }
     setHint(validElectricJoint(link) ? '선택한 블록의 결합 꼭짓점을 전환했습니다.'
       : '꼭짓점의 위·아래 또는 안쪽 각도가 맞지 않습니다. 맞춘 뒤 공을 투하하세요.', 4200);
     updateDeleteButton();
@@ -2161,6 +2207,17 @@
     const point = screenToWorld(screen);
     const handleRadius = (event.pointerType === 'touch' ? 24 : 17) / camera.zoom;
 
+    const spawnCircleRadius = (ballQueue[queueIndex] || selectedBallType) === 'giant' ? GIANT_BALL_RADIUS : BALL_RADIUS;
+    const onSpawnCircle = distanceSquared(point, spawn) <= (spawnCircleRadius + handleRadius) ** 2;
+    const onSpawnArrow = distanceSquared(point, { x: spawn.x, y: spawn.y - 36 }) <= (handleRadius + 10) ** 2;
+    if (['free', 'stage'].includes(appMode) && (onSpawnCircle || onSpawnArrow)) {
+      activePointers.delete(event.pointerId);
+      canvas.releasePointerCapture?.(event.pointerId);
+      drawQueueEditor(); queueDialog.showModal();
+      event.preventDefault();
+      return;
+    }
+
     const releaseMarker = appMode !== 'stage' && rods.find(rod => rod.type === 'swing'
       && onSwingReleaseArc(rod, point, handleRadius));
     if (releaseMarker) {
@@ -2169,7 +2226,7 @@
       event.preventDefault();
       return;
     }
-    const attachedPivot = ball?.attachedSwingUid && rods.find(rod => rod.uid === ball.attachedSwingUid
+    const attachedPivot = activeBalls.some(item => item.attachedSwingUid) && rods.find(rod => activeBalls.some(item => item.attachedSwingUid === rod.uid)
       && distanceSquared(point, rod) <= handleRadius * handleRadius);
     if (attachedPivot) {
       attachedPivot.releaseRequested = true;
@@ -3041,7 +3098,7 @@
       rod.swingOmega = clamp((rod.swingOmega || 0) + torque / moment * dt, -9, 9) * Math.exp(-0.18 * dt);
       const before = rod.angle;
       const after = before + rod.swingOmega * dt;
-      const release = rod.releaseRequested && ball?.attachedSwingUid === rod.uid
+      const release = ball?.attachedSwingUid === rod.uid
         ? exactSwingReleaseAngle(before, after, rod.releaseAngle ?? DEFAULT_SWING_RELEASE_ANGLE) : null;
       const destination = release ?? after;
       if (swingBlockedBetween(rod, before, destination)) {
@@ -3083,18 +3140,20 @@
     const localY = -Math.sin(rod.angle) * (ball.x - rod.x) + Math.cos(rod.angle) * (ball.y - rod.y);
     const canAttach = ball.swingDetachUid !== rod.uid;
     const captureDistance = ball.radius > BALL_RADIUS ? 14 : 6;
-    if (canAttach && localY < -rod.length - 20 && Math.hypot(dx, dy) <= captureDistance) {
+    if (canAttach && !activeBalls.some(item => item !== ball && item.attachedSwingUid === rod.uid)
+      && localY < -rod.length - 20 && Math.hypot(dx, dy) <= captureDistance) {
       const rx = (mouth.x - rod.x) / PIXELS_PER_METER;
       const ry = (mouth.y - rod.y) / PIXELS_PER_METER;
       rod.swingOmega = clamp(((rod.swingOmega || 0) * swingInertia(rod) + ball.mass * (rx * ball.vy - ry * ball.vx))
         / swingInertia(rod, ball.mass), -9, 9);
       rod.swingStarted = true;
       rod.swingBlocked = false;
+      rod.releaseRequested = true;
       ball.attachedSwingUid = rod.uid;
       ball.x = mouth.x; ball.y = mouth.y;
       ball.vx = 0; ball.vy = 0;
       rod.touched = true; touchedRodIds.add(rod.id);
-      setHint('공이 자석에 붙었어요. 중심축을 터치하면 빨간 곡선에서 놓습니다.', 2800);
+      setHint('공이 자석에 붙었어요. 빨간 곡선에 도착하면 자동으로 놓습니다.', 2800);
       return true;
     }
     const end = swingPoint(rod, -(rod.length + 5));
@@ -3134,9 +3193,8 @@
     return false;
   }
 
-  function physicsStep(dt) {
+  function physicsStepOne(dt) {
     if (!ball || won || editDrag) return;
-    advanceSwings(dt);
     if (ball.attachedSwingUid) {
       const rod = rods.find(item => item.uid === ball.attachedSwingUid);
       if (rod) {
@@ -3242,6 +3300,20 @@
     }
   }
 
+  function physicsStep(dt) {
+    if (!ball || won || editDrag) return;
+    const current = ball;
+    const attached = activeBalls.find(item => item.attachedSwingUid);
+    ball = attached || current;
+    advanceSwings(dt);
+    for (const item of activeBalls.length ? activeBalls : [current]) {
+      ball = item;
+      physicsStepOne(dt);
+      if (won) break;
+    }
+    ball = activeBalls.at(-1) || current;
+  }
+
   function roundedRectPath(context, x, y, width, height, radius) {
     const r = Math.min(radius, width / 2, height / 2);
     context.beginPath();
@@ -3296,7 +3368,7 @@
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 6]);
     ctx.beginPath();
-    ctx.arc(spawn.x, spawn.y, (selectedBallType === 'giant' ? GIANT_BALL_RADIUS : BALL_RADIUS) + 5, 0, Math.PI * 2);
+    ctx.arc(spawn.x, spawn.y, ((ballQueue[queueIndex] || selectedBallType) === 'giant' ? GIANT_BALL_RADIUS : BALL_RADIUS) + 5, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.setLineDash([]);
@@ -3678,6 +3750,13 @@
     ctx.beginPath();
     ctx.arc(0, 0, ball.radius, 0, Math.PI * 2);
     ctx.fill();
+    if (window.MarbleBalls.has(ball.type)) {
+      const image = window.MarbleBalls.getImage(ball.type);
+      if (image.complete && image.naturalWidth) {
+        ctx.shadowColor = 'transparent';
+        ctx.drawImage(image, -ball.radius, -ball.radius, ball.radius * 2, ball.radius * 2);
+      }
+    }
     ctx.shadowColor = 'transparent';
     ctx.strokeStyle = 'rgba(117, 51, 11, .55)';
     ctx.lineWidth = 2;
@@ -3722,7 +3801,9 @@
     rods.forEach(rod => drawRod(rod, appMode === 'editor' && !rod.fixed ? 0.42 : 1));
     drawElectricJoints();
     goals.forEach(goal => drawBasket(goal));
-    drawBall();
+    const latestBall = ball;
+    for (const item of activeBalls) { ball = item; drawBall(); }
+    ball = latestBall;
     drawParticles();
     drawSelection();
     drawPlacementGhost();
@@ -3744,6 +3825,10 @@
   function frame(time) {
     const elapsed = Math.min((time - lastTime) / 1000, 0.05);
     lastTime = time;
+    if (launchMode === 'auto' && ballQueue.length && queueIndex > 0 && queueIndex < ballQueue.length
+      && time >= nextLaunchAt && ['free', 'stage'].includes(appMode) && !won) spawnBall();
+    if (launchMode === 'auto' && ballQueue.length && queueIndex === 0 && !activeBalls.length
+      && ['free', 'stage'].includes(appMode) && !queueDialog.open) spawnBall();
     accumulator += elapsed;
     while (accumulator >= FIXED_STEP) {
       physicsStep(FIXED_STEP);
@@ -3783,9 +3868,23 @@
   new ResizeObserver(resize).observe(gameShell);
   spawnButton.addEventListener('click', spawnBall);
   ballTypeButton.addEventListener('click', () => {
-    selectedBallType = selectedBallType === 'giant' ? 'normal' : 'giant';
-    updateBallTypeButton();
-    setHint(selectedBallType === 'giant' ? '크고 무거운 거대 공을 선택했어요.' : '기본 공을 선택했어요.');
+    if (appMode === 'editor') {
+      selectedBallType = selectedBallType === 'giant' ? 'normal' : 'giant';
+      updateBallTypeButton();
+    } else { drawQueueEditor(); queueDialog.showModal(); }
+  });
+  document.getElementById('ballLaunchMode').addEventListener('change', event => {
+    launchMode = event.target.value;
+    document.getElementById('ballIntervalLabel').hidden = launchMode !== 'auto';
+  });
+  document.getElementById('ballIntervalLabel').hidden = true;
+  document.getElementById('closeBallQueue').addEventListener('click', () => {
+    ballQueue = ballQueue.filter(id => id === 'normal' || id === 'giant' || window.MarbleBalls.has(id));
+    launchInterval = Math.max(.2, Math.min(60, Number(document.getElementById('ballInterval').value) || 2));
+    document.getElementById('ballInterval').value = String(launchInterval);
+    queueDialog.close(); updateBallTypeButton();
+    if (launchMode === 'auto' && ballQueue.length && queueIndex === 0) spawnBall();
+    else if (launchMode === 'auto' && queueIndex > 0) nextLaunchAt = performance.now() + launchInterval * 1000;
   });
   deleteButton.addEventListener('click', deleteSelected);
   toggleFixedButton.addEventListener('click', toggleSelectedFixed);
@@ -3978,6 +4077,8 @@
       recentTools: [...recentTools],
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, radius: ball.radius, mass: ball.mass, type: ball.type, omega: ball.omega, fallPeakY: ball.fallPeakY, attachedSwingUid: ball.attachedSwingUid || null, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
       selectedBallType,
+      activeBalls: activeBalls.map(item => ({x:item.x, y:item.y, type:item.type, attachedSwingUid:item.attachedSwingUid || null})),
+      ballQueue: [...ballQueue], queueIndex, launchMode, launchInterval,
       lastSwingRelease: lastSwingRelease ? { ...lastSwingRelease } : null,
       won,
       appMode,
