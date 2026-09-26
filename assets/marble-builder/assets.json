@@ -1,9 +1,9 @@
 {
   "audio": [
     {
-      "id": "wood-roll-video-reference",
-      "source": "3.mp4 (낮은 각도)",
-      "runtime": "audio/wood-roll-video-3.wav"
+      "id": "wood-passage-video-reference",
+      "source": ["3.mp4 (낮은 각도)", "1.mp4 (높은 각도)"],
+      "runtime": ["audio/wood-passage-soft.wav", "audio/wood-passage-swish.wav"]
     },
     {
       "id": "marble-roll-reference",

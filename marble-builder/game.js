@@ -220,6 +220,7 @@
   let recordedRollingRevolutionsPerSecond = 0;
   let recordedRollingPlaybackRate = 0;
   let rollingReferenceBuffer = null;
+  let woodSwishBuffer = null;
   let woodImpactBuffers = [];
   let materialAudioPromise = null;
   let lastImpactSoundAt = 0;
@@ -246,7 +247,8 @@
     electric: '/assets/marble-builder/platforms/electric.png'
   };
   const MATERIAL_AUDIO_URLS = {
-    rolling: '/assets/marble-builder/audio/wood-roll-video-3.wav?v=1',
+    rolling: '/assets/marble-builder/audio/wood-passage-soft.wav?v=1',
+    swish: '/assets/marble-builder/audio/wood-passage-swish.wav?v=1',
     woodImpacts: [1, 2, 3].map(index => `/assets/marble-builder/audio/wood-hit-${index}.wav?v=1`)
   };
 
@@ -647,9 +649,11 @@
     };
     materialAudioPromise = Promise.all([
       decode(MATERIAL_AUDIO_URLS.rolling),
+      decode(MATERIAL_AUDIO_URLS.swish),
       ...MATERIAL_AUDIO_URLS.woodImpacts.map(decode)
-    ]).then(([rolling, ...impacts]) => {
+    ]).then(([rolling, swish, ...impacts]) => {
       rollingReferenceBuffer = rolling;
+      woodSwishBuffer = swish;
       woodImpactBuffers = impacts;
       return true;
     }).catch(() => false);
@@ -792,33 +796,50 @@
       }
       return;
     }
-    const useRecordedRolling = Boolean(rollingReferenceBuffer);
+    const useRecordedRolling = Boolean(rollingReferenceBuffer && woodSwishBuffer);
     if (useRecordedRolling) {
       if (rollingAudio) rollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
       if (!recordedRollingAudio) {
         const source = audio.createBufferSource();
         const filter = audio.createBiquadFilter();
         const gain = audio.createGain();
+        const softGain = audio.createGain();
+        const swishSource = audio.createBufferSource();
+        const swishFilter = audio.createBiquadFilter();
+        const swishGain = audio.createGain();
         source.buffer = rollingReferenceBuffer;
         source.loop = true;
         source.loopStart = 0;
         source.loopEnd = rollingReferenceBuffer.duration;
+        swishSource.buffer = woodSwishBuffer;
+        swishSource.loop = true;
+        swishSource.loopStart = 0;
+        swishSource.loopEnd = woodSwishBuffer.duration;
         filter.type = 'lowpass';
         filter.frequency.value = 3600;
         filter.Q.value = .4;
+        swishFilter.type = 'lowpass';
+        swishFilter.frequency.value = 4200;
+        softGain.gain.value = 1;
+        swishGain.gain.value = 0;
         gain.gain.value = .0001;
-        source.connect(filter).connect(gain).connect(audioMaster);
+        source.connect(filter).connect(softGain).connect(gain).connect(audioMaster);
+        swishSource.connect(swishFilter).connect(swishGain).connect(gain);
         source.start();
-        recordedRollingSourceStarts += 1;
-        recordedRollingAudio = { source, filter, gain, lastContactAt: audio.currentTime };
+        swishSource.start();
+        recordedRollingSourceStarts += 2;
+        recordedRollingAudio = { source, filter, softGain, swishSource, swishGain, gain, lastContactAt: audio.currentTime };
       }
       recordedRollingAudio.lastContactAt = audio.currentTime;
       recordedRollingPlaybackRate = 1;
-      recordedRollingAudio.source.playbackRate.setTargetAtTime(1, audio.currentTime, .035);
       recordedRollingAudio.filter.frequency.setTargetAtTime(1800, audio.currentTime, .08);
-      // The faint low-angle grain is most discernible on slow revolutions.
-      const turnPulse = speed < 1.5 && ball ? .85 + .15 * (1 + Math.cos(ball.angle || 0)) / 2 : .85;
-      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, speed, turnPulse), audio.currentTime, .18);
+      // Crossfade texture as the ball moves: faint grain -> smooth passing "swoosh".
+      // Neither loop is restarted, accelerated or modulated by wheel rotation.
+      const passage = clamp(Math.max(0, speed) / 3.2, 0, 1);
+      const swishMix = passage * passage * (3 - 2 * passage);
+      recordedRollingAudio.softGain.gain.setTargetAtTime(1 - swishMix, audio.currentTime, .16);
+      recordedRollingAudio.swishGain.gain.setTargetAtTime(swishMix, audio.currentTime, .16);
+      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, speed), audio.currentTime, .18);
       return;
     }
     if (recordedRollingAudio) recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
@@ -4068,6 +4089,8 @@
       recordedRollingRevolutionsPerSecond,
       recordedRollingPlaybackRate,
       recordedRollingGain: recordedRollingAudio?.gain.gain.value ?? 0,
+      woodPassageMix: recordedRollingAudio?.swishGain.gain.value ?? 0,
+      woodPassageDurations: [rollingReferenceBuffer?.duration, woodSwishBuffer?.duration],
       impactSoundCount,
       soundedImpactContactCount: soundedImpactContacts.size
     }),

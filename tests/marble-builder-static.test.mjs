@@ -9,7 +9,7 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=39/);
+    assert.match(html, /game\.js\?v=40/);
     assert.match(html, /styles\.css\?v=24/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
@@ -94,17 +94,20 @@ test('marble builder uses video-matched gravity, fixed substeps, friction, and d
 });
 
 test('wood impact is the original short click; quiet rolling plays on wood only at unchanged pitch', () => {
-    assert.match(script, /wood-roll-video-3\.wav\?v=1/);
+    assert.match(script, /wood-passage-soft\.wav\?v=1/);
+    assert.match(script, /wood-passage-swish\.wav\?v=1/);
     assert.match(script, /wood-hit-\$\{index\}\.wav\?v=1/);
     assert.doesNotMatch(script, /wood-hit-video-/);
     assert.match(script, /source\.buffer = woodImpactBuffers\[Math\.floor\(Math\.random\(\) \* woodImpactBuffers\.length\)\]/);
     assert.match(script, /source\.stop\(start \+ \.26\)/);
     assert.match(script, /\(type === 'wood' \|\| type === 'breakable'\) && playRecordedWoodImpact/);
     assert.match(script, /type !== 'wood' && type !== 'breakable'/);
-    assert.match(script, /recordedRollingSourceStarts \+= 1/);
+    assert.match(script, /recordedRollingSourceStarts \+= 2/);
     assert.match(script, /function rollingGainForRevolutions/);
-    assert.match(script, /source\.playbackRate\.setTargetAtTime\(1, audio\.currentTime/);
-    assert.match(script, /setTargetAtTime\(rollingGainForRevolutions\(revolutionsPerSecond, speed, turnPulse\)/);
+    assert.doesNotMatch(script, /Math\.cos\(ball\.angle/);
+    assert.match(script, /swishSource\.loopEnd = woodSwishBuffer\.duration/);
+    assert.match(script, /swishGain\.gain\.setTargetAtTime\(swishMix, audio\.currentTime/);
+    assert.match(script, /setTargetAtTime\(rollingGainForRevolutions\(revolutionsPerSecond, speed\)/);
     assert.match(script, /recordedRollingAudio\.gain\.gain\.setTargetAtTime\(\.0001, audio\.currentTime, \.12\)/);
     assert.match(script, /source\.loopEnd = rollingReferenceBuffer\.duration/);
     assert.equal(assetManifest.audio.length, 3);
