@@ -13,7 +13,7 @@
 
   <link rel="preload" as="image" href="/assets/marble-builder/swing/swing-magnet.png?v=2">
   <link rel="preload" as="image" href="/assets/marble-builder/swing/swing-weight.png?v=2">
-  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="stylesheet" href="styles.css?v=26">
 </head>
 <body class="is-home">
   <main class="game-shell">
@@ -132,17 +132,17 @@
     <section id="ballWorkshop" class="ball-workshop" hidden aria-label="나만의 공 만들기">
       <div class="workshop-inner">
         <header><button id="workshopHome" type="button">‹ 홈</button><h2>나만의 공 만들기</h2><button id="workshopSave" type="button">저장</button></header>
-        <div class="color-area"><canvas id="colorWheel" width="220" height="220" aria-label="드래그해서 색 고르기"></canvas><span id="pickedColor" aria-label="현재 색"></span></div>
+        <div class="color-controls"><div class="color-area"><canvas id="colorWheel" width="220" height="220" aria-label="드래그해서 색 고르기"></canvas><span id="pickedColor" aria-label="현재 색"></span></div><div class="color-sliders"><label>채도 <input id="colorSaturation" type="range" min="0" max="100" value="100"></label><label>명도 <input id="colorLightness" type="range" min="5" max="95" value="50"></label><label>불투명도 <input id="colorOpacity" type="range" min="0" max="100" value="100"></label><label>HDR 부스트 <input id="colorBoost" type="range" min="0" max="100" value="0"></label></div></div>
         <div class="ball-editor-row"><button id="previousBall" type="button" aria-label="이전 공">‹</button><canvas id="ballEditor" width="512" height="512" aria-label="공 그림 그리기"></canvas><button id="nextBall" type="button" aria-label="다음 공">›</button></div>
         <p id="workshopPosition">새 공</p>
-        <div class="workshop-tools"><button id="pencilTool" type="button">연필</button><button id="pixelEraser" type="button">픽셀 지우개</button><button id="objectEraser" type="button">대상 지우개</button><label>두께 <input id="brushSize" type="range" min="2" max="52" value="12"></label><button id="addBallPhoto" type="button" aria-label="사진 넣기">＋ 사진</button><input id="ballPhotoInput" type="file" accept="image/*" hidden><button id="editBall" type="button">수정</button><button id="deleteBall" type="button" aria-label="공 삭제">🗑</button></div>
+        <div class="workshop-tools"><button id="pencilTool" type="button">연필</button><button id="pixelEraser" type="button">픽셀 지우개</button><button id="objectEraser" type="button">대상 지우개</button><label>두께 <input id="brushSize" type="range" min="2" max="52" value="12"></label><button id="workshopUndo" type="button" aria-label="공 그림 실행 취소" disabled>↶</button><button id="workshopRedo" type="button" aria-label="공 그림 다시 실행" disabled>↷</button><button id="addBallPhoto" type="button" aria-label="사진 넣기">＋ 사진</button><input id="ballPhotoInput" type="file" accept="image/*" hidden><button id="editBall" type="button">수정</button><button id="deleteBall" type="button" aria-label="공 삭제">🗑</button></div>
       </div>
     </section>
     <dialog id="photoCropDialog" class="app-dialog ball-dialog"><div class="ball-dialog-content"><h2>사진을 원에 맞춰 설정하세요</h2><p>사진을 드래그해 위치를 바꾸고 확대·축소하세요.</p><canvas id="photoCropCanvas" width="320" height="320" aria-label="원 안에 넣을 사진 조절"></canvas><label>확대 <input id="photoZoom" type="range" min="1" max="4" step="0.01" value="1"></label><div class="dialog-actions"><button id="cancelPhoto" type="button">취소</button><button id="applyPhoto" class="primary-dialog" type="button">확인</button></div></div></dialog>
     <dialog id="deleteBallDialog" class="app-dialog"><div class="ball-dialog-content"><h2>이 공을 삭제할까요?</h2><p>삭제하면 되돌릴 수 없습니다.</p><div class="dialog-actions"><button id="cancelDeleteBall" type="button">취소</button><button id="confirmDeleteBall" class="danger-dialog" type="button">계속하기</button></div></div></dialog>
-    <dialog id="ballQueueDialog" class="app-dialog ball-dialog"><div class="ball-dialog-content"><h2>공 발사 설정</h2><p>공을 누른 순서대로 발사 목록에 추가하세요.</p><div id="ballChoices" class="ball-choices"></div><ol id="ballQueueList" class="ball-queue-list"></ol><label>발사 방식 <select id="ballLaunchMode"><option value="manual">사용자화 · 공 생성 버튼</option><option value="auto">자동 발사</option></select></label><label id="ballIntervalLabel">나오는 간격 (초) <input id="ballInterval" type="number" min="0.2" max="60" step="0.1" value="2" inputmode="decimal"></label><div class="dialog-actions"><button id="closeBallQueue" class="primary-dialog" type="button">확인</button></div></div></dialog>
+    <dialog id="ballQueueDialog" class="app-dialog ball-dialog"><div class="ball-dialog-content"><h2>공 발사 설정</h2><p>공을 추가한 뒤 손잡이를 꾹 눌러 원하는 순서로 옮기세요.</p><div id="ballChoices" class="ball-choices"></div><ol id="ballQueueList" class="ball-queue-list"></ol><label class="collision-choice"><input id="ballCollisions" type="checkbox"> 공끼리 부딪히기</label><label>발사 방식 <select id="ballLaunchMode"><option value="manual">사용자화 · 공 생성 버튼</option><option value="auto">자동 발사</option></select></label><label id="ballIntervalLabel">나오는 간격 (초) <input id="ballInterval" type="number" min="0.2" max="60" step="0.1" value="2" inputmode="decimal"></label><div class="dialog-actions"><button id="closeBallQueue" class="primary-dialog" type="button">확인</button></div></div></dialog>
   </main>
-  <script src="balls.js?v=1"></script>
-  <script src="game.js?v=46"></script>
+  <script src="balls.js?v=2"></script>
+  <script src="game.js?v=47"></script>
 </body>
 </html>

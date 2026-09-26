@@ -10,10 +10,21 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /balls\.js\?v=1/);
-    assert.match(html, /game\.js\?v=46/);
-    assert.match(html, /styles\.css\?v=25/);
+    assert.match(html, /balls\.js\?v=2/);
+    assert.match(html, /game\.js\?v=47/);
+    assert.match(html, /styles\.css\?v=26/);
     assert.match(html, /rel="icon" href="data:,"/);
+});
+
+test('custom marble editor and queue collision controls are wired', () => {
+    for (const id of ['workshopUndo', 'workshopRedo', 'colorSaturation', 'colorLightness', 'colorOpacity', 'colorBoost', 'ballCollisions']) {
+        assert.match(html, new RegExp(`id="${id}"`));
+    }
+    assert.match(ballsScript, /function rememberEdit\(/);
+    assert.match(ballsScript, /function updateColor\(/);
+    assert.match(script, /function resolveBallPair\(/);
+    assert.match(script, /function reorderQueue\(/);
+    assert.match(script, /if \(!customBall\)/);
 });
 
 test('custom balls have editing, persistence, and circle-triggered launch ordering', () => {

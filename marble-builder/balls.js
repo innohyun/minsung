@@ -10,6 +10,13 @@
   const crop = $('photoCropCanvas'), cropContext = crop.getContext('2d');
   const imageCache = new Map();
   let currentIndex = saved.length, layers = [], working = false, tool = 'pencil', color = '#ff7100';
+  let hue = 25;
+  const undo = [], redo = [];
+  const cloneLayers = () => JSON.parse(JSON.stringify(layers));
+  function updateHistory() { $('workshopUndo').disabled = !working || !undo.length; $('workshopRedo').disabled = !working || !redo.length; }
+  function rememberEdit() { undo.push(cloneLayers()); if (undo.length > 60) undo.shift(); redo.length = 0; updateHistory(); }
+  $('workshopUndo').onclick = () => { if (!working || !undo.length) return; redo.push(cloneLayers()); layers = undo.pop(); drawing = null; paint(context, 512); updateHistory(); };
+  $('workshopRedo').onclick = () => { if (!working || !redo.length) return; undo.push(cloneLayers()); layers = redo.pop(); drawing = null; paint(context, 512); updateHistory(); };
   let drawing = null, photo = null, photoX = 0, photoY = 0, photoScale = 1, movingPhoto = null;
   const persist = () => { try { localStorage.setItem(key, JSON.stringify(saved)); return true; } catch (_) { alert('저장 공간이 부족해요. 사진을 작게 선택하거나 오래된 공을 삭제해 주세요.'); return false; } };
   function getImage(id) {
@@ -50,13 +57,18 @@
     const record = saved[currentIndex];
     layers = record ? JSON.parse(JSON.stringify(record.layers || [])) : [];
     working = !record;
+    undo.length = 0; redo.length = 0; updateHistory();
     $('workshopPosition').textContent = record ? `내 공 ${currentIndex + 1} / ${saved.length}` : '새 공';
     $('editBall').hidden = !record; $('deleteBall').hidden = !record;
     $('workshopSave').hidden = !working;
     paint(context, 512);
   }
-  function save() {
+  async function save() {
     if (!working) return;
+    const images = layers.filter(layer => layer.kind === 'photo').map(getLayerImage);
+    try { await Promise.all(images.map(img => img.decode())); }
+    catch (_) { alert('사진을 아직 읽지 못했어요. 잠시 뒤 다시 저장해 주세요.'); return; }
+    paint(context, 512);
     const record = saved[currentIndex];
     const value = { id: record?.id || `ball-${Date.now()}-${Math.random().toString(36).slice(2)}`, layers: JSON.parse(JSON.stringify(layers)), image: editor.toDataURL('image/png') };
     const previous = saved.slice();
@@ -68,13 +80,13 @@
   $('ballWorkshopButton').onclick = () => { show(saved.length); $('ballWorkshop').hidden = false; };
   $('workshopHome').onclick = close;
   $('workshopSave').onclick = save;
-  $('editBall').onclick = () => { working = true; $('workshopSave').hidden = false; };
+  $('editBall').onclick = () => { working = true; $('workshopSave').hidden = false; updateHistory(); };
   $('previousBall').onclick = () => { if (working && layers.length && !confirm('저장하지 않은 그림을 버리고 이동할까요?')) return; show(currentIndex - 1); };
   $('nextBall').onclick = () => { if (working && layers.length && !confirm('저장하지 않은 그림을 버리고 이동할까요?')) return; show(currentIndex + 1); };
   $('deleteBall').onclick = () => $('deleteBallDialog').showModal();
   $('cancelDeleteBall').onclick = () => $('deleteBallDialog').close();
   $('confirmDeleteBall').onclick = () => { const previous = saved.slice(); const [deleted] = saved.splice(currentIndex, 1); if (!persist()) saved = previous; else imageCache.delete(deleted.id); $('deleteBallDialog').close(); show(Math.min(currentIndex, saved.length)); };
-  const chooseTool = name => { tool = name; working = true; $('workshopSave').hidden = false; for (const [id, value] of [['pencilTool','pencil'],['pixelEraser','pixel'],['objectEraser','object']]) $(id).classList.toggle('active', name === value); };
+  const chooseTool = name => { tool = name; working = true; $('workshopSave').hidden = false; updateHistory(); for (const [id, value] of [['pencilTool','pencil'],['pixelEraser','pixel'],['objectEraser','object']]) $(id).classList.toggle('active', name === value); };
   $('pencilTool').onclick = () => chooseTool('pencil');
   $('pixelEraser').onclick = () => chooseTool('pixel');
   $('objectEraser').onclick = () => chooseTool('object');
@@ -87,21 +99,38 @@
     editor.setPointerCapture(event.pointerId);
     if (tool === 'object') {
       const hit = [...layers].reverse().findIndex(layer => layer.kind === 'photo' ? pos[0] >= layer.x && pos[0] <= layer.x + layer.w && pos[1] >= layer.y && pos[1] <= layer.y + layer.h : layer.points?.some(([x,y]) => Math.hypot(x-pos[0], y-pos[1]) < layer.width + .025));
-      if (hit >= 0) { layers.splice(layers.length - 1 - hit, 1); paint(context, 512); }
+      if (hit >= 0) { rememberEdit(); layers.splice(layers.length - 1 - hit, 1); paint(context, 512); }
       return;
     }
+    rememberEdit();
     drawing = { kind: tool === 'pixel' ? 'erase' : 'stroke', color, width: Number($('brushSize').value) / 512, points: [pos] };
     layers.push(drawing); paint(context, 512);
   };
   editor.onpointermove = event => { if (!drawing || !editor.hasPointerCapture(event.pointerId)) return; const pos = point(event, editor); if (inside(pos)) { drawing.points.push(pos); paint(context, 512); } };
   editor.onpointerup = editor.onpointercancel = () => { drawing = null; };
 
-  for (let a=0; a<360; a++) { wheelContext.beginPath(); wheelContext.strokeStyle = `hsl(${a} 100% 50%)`; wheelContext.lineWidth = 36; wheelContext.arc(110,110,89,(a-1)*Math.PI/180,(a+1)*Math.PI/180); wheelContext.stroke(); }
-  wheelContext.beginPath(); wheelContext.fillStyle = '#fff'; wheelContext.arc(110,110,62,0,Math.PI*2); wheelContext.fill();
-  function pick(event) { const [x,y] = point(event, wheel); const dx = x-.5, dy = y-.5; if (Math.hypot(dx,dy)<.23) return; const hue = (Math.atan2(dy,dx)*180/Math.PI+360)%360; color = `hsl(${Math.round(hue)} 100% 50%)`; $('pickedColor').style.background = color; chooseTool('pencil'); }
+  function updateColor() {
+    const saturation = Number($('colorSaturation').value);
+    const lightness = Number($('colorLightness').value);
+    const boost = Number($('colorBoost').value) / 100;
+    const opacity = Number($('colorOpacity').value) / 100;
+    // Screen-compatible brightness boost; regular Canvas output is SDR.
+    const boostedLightness = Math.min(95, lightness + (100 - lightness) * boost * .28);
+    color = `hsla(${Math.round(hue)} ${saturation}% ${boostedLightness.toFixed(1)}% / ${opacity.toFixed(2)})`;
+    $('pickedColor').style.background = color;
+    wheelContext.clearRect(0, 0, 220, 220);
+    for (let a = 0; a < 360; a++) { wheelContext.beginPath(); wheelContext.strokeStyle = `hsl(${a} 100% 50%)`; wheelContext.lineWidth = 36; wheelContext.arc(110, 110, 89, (a-1)*Math.PI/180, (a+1)*Math.PI/180); wheelContext.stroke(); }
+    wheelContext.beginPath(); wheelContext.fillStyle = '#fff'; wheelContext.arc(110, 110, 62, 0, Math.PI*2); wheelContext.fill();
+    const angle = hue * Math.PI / 180;
+    wheelContext.beginPath(); wheelContext.arc(110 + 89*Math.cos(angle), 110 + 89*Math.sin(angle), 20, 0, Math.PI*2);
+    wheelContext.fillStyle = `hsl(${Math.round(hue)} 100% 50%)`; wheelContext.fill();
+    wheelContext.strokeStyle = '#fff'; wheelContext.lineWidth = 7; wheelContext.stroke();
+  }
+  function pick(event) { const [x,y] = point(event, wheel); const dx = x-.5, dy = y-.5; if (Math.hypot(dx,dy)<.23) return; hue = (Math.atan2(dy,dx)*180/Math.PI+360)%360; updateColor(); chooseTool('pencil'); }
   wheel.onpointerdown = e => { wheel.setPointerCapture(e.pointerId); pick(e); };
   wheel.onpointermove = e => { if (wheel.hasPointerCapture(e.pointerId)) pick(e); };
-  $('pickedColor').style.background = color;
+  for (const id of ['colorSaturation', 'colorLightness', 'colorOpacity', 'colorBoost']) $(id).oninput = updateColor;
+  updateColor();
   $('addBallPhoto').onclick = () => { if (!working) chooseTool('pencil'); $('ballPhotoInput').click(); };
   $('ballPhotoInput').onchange = async e => {
     const file = e.target.files?.[0]; e.target.value = ''; if (!file || !file.type.startsWith('image/')) return;
@@ -128,6 +157,7 @@
     const temp=document.createElement('canvas'); temp.width=temp.height=384; const c=temp.getContext('2d');
     const scale=Math.max(320/photo.width,320/photo.height)*photoScale*384/320;
     c.drawImage(photo,192-photo.width*scale/2+photoX*384/320,192-photo.height*scale/2+photoY*384/320,photo.width*scale,photo.height*scale);
+    rememberEdit();
     layers.push({kind:'photo',src:temp.toDataURL('image/jpeg',.82),x:0,y:0,w:1,h:1});
     photo=null; $('photoCropDialog').close(); paint(context,512);
   };

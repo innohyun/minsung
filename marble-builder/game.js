@@ -210,11 +210,18 @@
   let queueIndex = 0;
   let launchMode = 'manual';
   let launchInterval = 2;
+  let ballCollisions = false;
   let nextLaunchAt = 0;
   const queueDialog = document.getElementById('ballQueueDialog');
   const queueList = document.getElementById('ballQueueList');
   const ballChoices = document.getElementById('ballChoices');
   const labelForBall = id => id === 'normal' ? '기본 공' : id === 'giant' ? '거대 공' : `내 공 ${window.MarbleBalls.list().indexOf(id) + 1}`;
+  function reorderQueue(from, to) {
+    if (from === to || to < 0 || to >= ballQueue.length) return;
+    ballQueue.splice(to, 0, ballQueue.splice(from, 1)[0]);
+    queueIndex = 0;
+    drawQueueEditor(); updateBallTypeButton();
+  }
   function drawQueueEditor() {
     ballChoices.replaceChildren(); queueList.replaceChildren();
     for (const id of ['normal', 'giant', ...window.MarbleBalls.list()]) {
@@ -224,14 +231,33 @@
       ballChoices.append(button);
     }
     ballQueue.forEach((id, index) => {
-      const item = document.createElement('li'); item.append(document.createTextNode(labelForBall(id)));
-      for (const [symbol, destination] of [['↑', index-1], ['↓', index+1], ['×', -1]]) {
-        const button = document.createElement('button'); button.type = 'button'; button.textContent = symbol;
-        button.setAttribute('aria-label', `${labelForBall(id)} ${symbol === '×' ? '제거' : symbol === '↑' ? '위로' : '아래로'}`);
-        button.disabled = symbol !== '×' && (destination < 0 || destination >= ballQueue.length);
-        button.addEventListener('click', () => { if (symbol === '×') ballQueue.splice(index, 1); else [ballQueue[index], ballQueue[destination]] = [ballQueue[destination], ballQueue[index]]; queueIndex = 0; drawQueueEditor(); updateBallTypeButton(); });
-        item.append(button);
-      }
+      const item = document.createElement('li'); item.dataset.index = String(index);
+      const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'queue-handle';
+      handle.textContent = '⠿'; handle.setAttribute('aria-label', `${labelForBall(id)} 꾹 눌러 순서 변경`);
+      let timer = null, dragging = false, startY = 0, target = index;
+      handle.onpointerdown = event => {
+        if (event.button !== 0 && event.pointerType === 'mouse') return;
+        startY = event.clientY; target = index; dragging = false;
+        timer = setTimeout(() => { dragging = true; handle.setPointerCapture(event.pointerId); item.classList.add('dragging'); }, 280);
+      };
+      handle.onpointermove = event => {
+        if (timer && !dragging && Math.abs(event.clientY - startY) > 8) { clearTimeout(timer); timer = null; }
+        if (!dragging) return;
+        event.preventDefault();
+        const row = document.elementFromPoint(event.clientX, event.clientY)?.closest('#ballQueueList li');
+        if (row) target = Number(row.dataset.index);
+        queueList.querySelectorAll('li').forEach(li => li.classList.toggle('drop-target', Number(li.dataset.index) === target));
+      };
+      const finish = event => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        if (dragging) { dragging = false; if (event.type === 'pointerup') reorderQueue(index, target); else { item.classList.remove('dragging'); queueList.querySelectorAll('li').forEach(li => li.classList.remove('drop-target')); } }
+      };
+      handle.onpointerup = finish; handle.onpointercancel = finish;
+      handle.onkeydown = event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorderQueue(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } };
+      const label = document.createElement('span'); label.className = 'queue-label'; label.textContent = labelForBall(id);
+      const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', `${labelForBall(id)} 제거`);
+      remove.onclick = () => { ballQueue.splice(index, 1); queueIndex = 0; drawQueueEditor(); updateBallTypeButton(); };
+      item.append(handle, label, remove);
       queueList.append(item);
     });
   }
@@ -1211,6 +1237,8 @@
     activeBalls.length = 0;
     queueIndex = 0;
     ballQueue = [];
+    ballCollisions = false;
+    document.getElementById('ballCollisions').checked = false;
     nextLaunchAt = 0;
     rods.length = 0;
     goals.length = 0;
@@ -3300,6 +3328,39 @@
     }
   }
 
+  function resolveBallPair(a, b) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const minDistance = a.radius + b.radius, distanceSq = dx * dx + dy * dy;
+    if (distanceSq >= minDistance * minDistance) return;
+    const distance = Math.sqrt(distanceSq), nx = distance > 1e-8 ? dx / distance : 1;
+    const ny = distance > 1e-8 ? dy / distance : 0;
+    const fixedA = Boolean(a.attachedSwingUid || a.electricRide);
+    const fixedB = Boolean(b.attachedSwingUid || b.electricRide);
+    const invA = fixedA ? 0 : 1 / a.mass, invB = fixedB ? 0 : 1 / b.mass;
+    const inverseSum = invA + invB;
+    if (!inverseSum) return;
+    // Positions are pixels; velocities are metres/second. Resolve overlap in pixels.
+    const correction = Math.max(0, minDistance - distance - .05) / inverseSum;
+    a.x -= nx * correction * invA; a.y -= ny * correction * invA;
+    b.x += nx * correction * invB; b.y += ny * correction * invB;
+    const relativeNormal = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
+    if (relativeNormal >= -.01) return;
+    const impulse = -(1 + .65) * relativeNormal / inverseSum;
+    a.vx -= nx * impulse * invA; a.vy -= ny * impulse * invA;
+    b.vx += nx * impulse * invB; b.vy += ny * impulse * invB;
+    const tx = -ny, ty = nx;
+    const radiusA = a.radius / PIXELS_PER_METER, radiusB = b.radius / PIXELS_PER_METER;
+    const inertiaA = fixedA ? Infinity : .4 * a.mass * radiusA * radiusA;
+    const inertiaB = fixedB ? Infinity : .4 * b.mass * radiusB * radiusB;
+    const tangentMass = inverseSum + radiusA * radiusA / inertiaA + radiusB * radiusB / inertiaB;
+    const tangentSpeed = (b.vx - a.vx) * tx + (b.vy - a.vy) * ty - b.omega * radiusB - a.omega * radiusA;
+    const friction = Math.max(-.16 * impulse, Math.min(.16 * impulse, -tangentSpeed / tangentMass));
+    a.vx -= tx * friction * invA; a.vy -= ty * friction * invA;
+    b.vx += tx * friction * invB; b.vy += ty * friction * invB;
+    if (!fixedA) a.omega -= radiusA * friction / inertiaA;
+    if (!fixedB) b.omega -= radiusB * friction / inertiaB;
+  }
+
   function physicsStep(dt) {
     if (!ball || won || editDrag) return;
     const current = ball;
@@ -3310,6 +3371,11 @@
       ball = item;
       physicsStepOne(dt);
       if (won) break;
+    }
+    if (ballCollisions && !won && activeBalls.length > 1) {
+      for (let i = 0; i < activeBalls.length; i++) {
+        for (let j = i + 1; j < activeBalls.length; j++) resolveBallPair(activeBalls[i], activeBalls[j]);
+      }
     }
     ball = activeBalls.at(-1) || current;
   }
@@ -3735,10 +3801,11 @@
 
   function drawBall() {
     if (!ball) return;
+    const customBall = window.MarbleBalls.has(ball.type);
     ctx.save();
     ctx.translate(ball.x, ball.y);
     ctx.rotate(ball.angle);
-    ctx.shadowColor = 'rgba(68, 38, 8, .25)';
+    ctx.shadowColor = customBall ? 'rgba(23, 50, 77, .2)' : 'rgba(68, 38, 8, .25)';
     ctx.shadowBlur = 9;
     ctx.shadowOffsetY = 5;
     const gradient = ctx.createRadialGradient(-ball.radius / 3, -ball.radius / 3, 2, 0, 0, ball.radius);
@@ -3746,23 +3813,25 @@
     gradient.addColorStop(.24, '#ffd158');
     gradient.addColorStop(.7, '#ed8b24');
     gradient.addColorStop(1, '#b54b13');
-    ctx.fillStyle = gradient;
+    ctx.fillStyle = customBall ? '#fff' : gradient;
     ctx.beginPath();
     ctx.arc(0, 0, ball.radius, 0, Math.PI * 2);
     ctx.fill();
-    if (window.MarbleBalls.has(ball.type)) {
+    if (customBall) {
       const image = window.MarbleBalls.getImage(ball.type);
       if (image.complete && image.naturalWidth) {
         ctx.shadowColor = 'transparent';
         ctx.drawImage(image, -ball.radius, -ball.radius, ball.radius * 2, ball.radius * 2);
       }
     }
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = 'rgba(117, 51, 11, .55)';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, ball.radius - 1, -.7, .7);
-    ctx.stroke();
+    if (!customBall) {
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = 'rgba(117, 51, 11, .55)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, ball.radius - 1, -.7, .7);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -3878,6 +3947,7 @@
     document.getElementById('ballIntervalLabel').hidden = launchMode !== 'auto';
   });
   document.getElementById('ballIntervalLabel').hidden = true;
+  document.getElementById('ballCollisions').addEventListener('change', event => { ballCollisions = event.target.checked; });
   document.getElementById('closeBallQueue').addEventListener('click', () => {
     ballQueue = ballQueue.filter(id => id === 'normal' || id === 'giant' || window.MarbleBalls.has(id));
     launchInterval = Math.max(.2, Math.min(60, Number(document.getElementById('ballInterval').value) || 2));
@@ -4077,8 +4147,8 @@
       recentTools: [...recentTools],
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, radius: ball.radius, mass: ball.mass, type: ball.type, omega: ball.omega, fallPeakY: ball.fallPeakY, attachedSwingUid: ball.attachedSwingUid || null, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
       selectedBallType,
-      activeBalls: activeBalls.map(item => ({x:item.x, y:item.y, type:item.type, attachedSwingUid:item.attachedSwingUid || null})),
-      ballQueue: [...ballQueue], queueIndex, launchMode, launchInterval,
+      activeBalls: activeBalls.map(item => ({x:item.x, y:item.y, vx:item.vx, vy:item.vy, omega:item.omega, radius:item.radius, mass:item.mass, type:item.type, attachedSwingUid:item.attachedSwingUid || null})),
+      ballQueue: [...ballQueue], queueIndex, launchMode, launchInterval, ballCollisions,
       lastSwingRelease: lastSwingRelease ? { ...lastSwingRelease } : null,
       won,
       appMode,
@@ -4125,6 +4195,7 @@
       ball.specialContacts ||= [];
       return ball;
     },
+    setActiveBallState: (index, state) => { const item = activeBalls[index]; if (item) Object.assign(item, state); return item || null; },
     stepPhysics: (steps = 1) => {
       for (let index = 0; index < steps; index += 1) physicsStep(FIXED_STEP);
       return ball;

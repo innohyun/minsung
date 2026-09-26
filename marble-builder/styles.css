@@ -235,9 +235,13 @@ body.is-physics-lab .hint { top: 187px; }
 .workshop-inner h2 { font-size: clamp(1.15rem,4vw,1.8rem); margin: 0; }
 .workshop-inner button, .ball-dialog button { min-height: 44px; padding: 6px 12px; border: 1px solid #b8cfe2; border-radius: 11px; color: var(--ink); background: #fff; font-weight: 800; cursor: pointer; }
 #workshopSave, .ball-dialog .primary-dialog { background: var(--blue); color: #fff; }
-.color-area { position: relative; width: min(180px, 27dvh); aspect-ratio: 1; margin: 5px auto; }
+.color-controls { display: flex; align-items: center; justify-content: center; gap: clamp(8px, 3vw, 26px); max-width: 540px; margin: 5px auto; }
+.color-area { position: relative; width: min(180px, 27dvh, 43vw); aspect-ratio: 1; flex: 0 0 auto; }
 #colorWheel { width: 100%; height: 100%; touch-action: none; }
 #pickedColor { position: absolute; width: 35%; aspect-ratio: 1; border-radius: 50%; left: 32.5%; top: 32.5%; pointer-events: none; box-shadow: inset 0 0 0 3px #fff; }
+.color-sliders { display: grid; gap: 7px; flex: 1; min-width: 0; max-width: 205px; text-align: left; }
+.color-sliders label { display: grid; gap: 3px; font-size: .78rem; font-weight: 850; }
+.color-sliders input { width: 100%; accent-color: var(--blue); touch-action: pan-x; }
 .ball-editor-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
 .ball-editor-row > button { flex: 0 0 44px; font-size: 1.7rem; }
 #ballEditor { display: block; width: min(70vw, 380px, 42dvh); aspect-ratio: 1; border-radius: 50%; background: #fff; box-shadow: 0 10px 30px #597c9d55; touch-action: none; }
@@ -246,6 +250,7 @@ body.is-physics-lab .hint { top: 187px; }
 .workshop-tools .active { background: var(--blue); color: #fff; }
 .workshop-tools label { display: flex; align-items: center; gap: 5px; font-weight: 800; }
 .workshop-tools input { width: 105px; touch-action: pan-x; }
+.workshop-tools button:disabled { opacity: .42; cursor: default; }
 .ball-dialog { width: min(440px,calc(100% - 20px)); max-height: calc(100dvh - 30px); overflow: auto; }
 .ball-dialog-content { display: grid; gap: 12px; padding: 20px; }
 .ball-dialog-content h2, .ball-dialog-content p { margin: 0; }
@@ -255,8 +260,13 @@ body.is-physics-lab .hint { top: 187px; }
 .ball-choices { display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px; overflow: auto; touch-action: pan-y; }
 .ball-choices button { background-size: 34px 34px; background-position: 6px center; background-repeat: no-repeat; padding-left: 44px; }
 .ball-queue-list { margin: 0; padding-left: 24px; max-height: 170px; overflow: auto; touch-action: pan-y; }
-.ball-queue-list li { margin: 4px 0; }
+.ball-queue-list li { margin: 4px 0; display: flex; align-items: center; gap: 8px; min-height: 48px; background: #f2f8fe; border-radius: 11px; padding: 3px 6px; }
+.ball-queue-list li.dragging { background: #dceeff; outline: 2px solid var(--blue); }
+.ball-queue-list .queue-handle { min-width: 44px; min-height: 44px; touch-action: none; cursor: grab; }
+.ball-queue-list .queue-label { flex: 1; }
 .ball-queue-list button { margin-left: 4px; min-width: 38px; padding: 0; }
+.ball-dialog-content .collision-choice { display: flex; align-items: center; gap: 10px; }
+.ball-dialog-content .collision-choice input { width: 22px; min-height: 22px; accent-color: var(--blue); }
 
 .speed-options { display: flex; gap: 6px; margin-top: 8px; }
 .speed-options button { min-height: 38px; flex: 1; border: 1px solid rgba(23,50,77,.14); border-radius: 10px; background: #fff; color: var(--ink); font-weight: 800; cursor: pointer; }
