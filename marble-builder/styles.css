@@ -131,6 +131,7 @@ body.is-physics-lab .hint { top: 187px; }
 .tool-icon.slime { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/slime.png?v=2'); box-shadow: 0 3px 4px rgba(23,50,77,.15); }
 .tool-icon.electric { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/electric.png'); box-shadow: 0 0 8px rgba(46,205,255,.6); }
 .tool-icon.road.swing { width: 28px; height: 47px; background: center / contain no-repeat url('/assets/marble-builder/swing/swing.png?v=2'); transform: none; box-shadow: none; }
+.tool-icon.magnet { width: 34px; height: 34px; flex: 0 0 34px; border: 0; border-radius: 50%; background: center / contain no-repeat url('/assets/marble-builder/magnet/magnet-disc.png?v=1'); box-shadow: 0 0 0 7px rgba(231,46,58,.12); }
 .tool-icon.antigravity { width: 48px; height: 28px; border: 2px dashed #6c5ce7; background: rgba(137,116,255,.25); }
 .tool-icon.basket { position: relative; width: 43px; height: 29px; border: 6px solid #d69536; border-top: 0; border-radius: 0 0 10px 10px; }
 .tool-count { min-height: 1em; color: var(--blue); font-size: .67rem; }

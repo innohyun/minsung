@@ -65,6 +65,14 @@
       "alpha": true
     },
     {
+      "name": "원형 자석",
+      "id": "magnet",
+      "source": "magnet/magnet-generated-source.png",
+      "runtime": "magnet/magnet-disc.png",
+      "size": [512, 512],
+      "alpha": true
+    },
+    {
       "name": "깨지는 나무 블록 (HP 6단계)",
       "id": "breakable",
       "source": "breakable/six/source/stage-0-generated.png",
