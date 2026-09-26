@@ -211,14 +211,17 @@
   let launchMode = 'manual';
   let launchInterval = 2;
   let ballCollisions = false;
+  let autoLaunchArmed = false;
   let nextLaunchAt = 0;
+  let nextBallSoundId = 1;
+  let rollingRequests = null;
   const queueDialog = document.getElementById('ballQueueDialog');
   const queueList = document.getElementById('ballQueueList');
   const ballChoices = document.getElementById('ballChoices');
   const labelForBall = id => id === 'normal' ? '기본 공' : id === 'giant' ? '거대 공' : `내 공 ${window.MarbleBalls.list().indexOf(id) + 1}`;
-  function reorderQueue(from, to) {
-    if (from === to || to < 0 || to >= ballQueue.length) return;
-    ballQueue.splice(to, 0, ballQueue.splice(from, 1)[0]);
+  function reorderQueue(from, slot) {
+    if (slot < 0 || slot > ballQueue.length || slot === from || slot === from + 1) return;
+    ballQueue.splice(slot > from ? slot - 1 : slot, 0, ballQueue.splice(from, 1)[0]);
     queueIndex = 0;
     drawQueueEditor(); updateBallTypeButton();
   }
@@ -234,30 +237,52 @@
       const item = document.createElement('li'); item.dataset.index = String(index);
       const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'queue-handle';
       handle.textContent = '⠿'; handle.setAttribute('aria-label', `${labelForBall(id)} 꾹 눌러 순서 변경`);
-      let timer = null, dragging = false, startY = 0, target = index;
-      handle.onpointerdown = event => {
-        if (event.button !== 0 && event.pointerType === 'mouse') return;
-        startY = event.clientY; target = index; dragging = false;
-        timer = setTimeout(() => { dragging = true; handle.setPointerCapture(event.pointerId); item.classList.add('dragging'); }, 280);
+      const thumbnail = document.createElement('span'); thumbnail.className = 'queue-thumbnail';
+      if (window.MarbleBalls.has(id)) thumbnail.style.backgroundImage = `url("${window.MarbleBalls.getImage(id).src}")`;
+      else thumbnail.classList.add(id === 'giant' ? 'giant-thumbnail' : 'normal-thumbnail');
+      let timer = null, dragging = false, startY = 0, slot = index, ghost = null;
+      const displaySlot = () => queueList.querySelectorAll('li').forEach(li => {
+        li.classList.toggle('drop-before', Number(li.dataset.index) === slot);
+        li.classList.toggle('drop-after', slot === ballQueue.length && Number(li.dataset.index) === ballQueue.length - 1);
+      });
+      const cleanup = () => {
+        if (timer) clearTimeout(timer);
+        timer = null; dragging = false; item.classList.remove('dragging'); ghost?.remove(); ghost = null;
+        queueList.querySelectorAll('li').forEach(li => li.classList.remove('drop-before', 'drop-after'));
       };
-      handle.onpointermove = event => {
+      item.onpointerdown = event => {
+        if (event.target.closest('button') && event.target !== handle) return;
+        if (event.button !== 0 && event.pointerType === 'mouse') return;
+        startY = event.clientY; slot = index; dragging = false;
+        timer = setTimeout(() => {
+          dragging = true; item.setPointerCapture(event.pointerId); item.classList.add('dragging');
+          ghost = item.cloneNode(true); ghost.className = 'queue-ghost'; queueDialog.append(ghost);
+          const rect = item.getBoundingClientRect(); ghost.style.width = `${rect.width}px`;
+          ghost.style.left = `${rect.left}px`; ghost.style.top = `${event.clientY - rect.height / 2}px`;
+          displaySlot();
+        }, 280);
+      };
+      item.onpointermove = event => {
         if (timer && !dragging && Math.abs(event.clientY - startY) > 8) { clearTimeout(timer); timer = null; }
         if (!dragging) return;
         event.preventDefault();
         const row = document.elementFromPoint(event.clientX, event.clientY)?.closest('#ballQueueList li');
-        if (row) target = Number(row.dataset.index);
-        queueList.querySelectorAll('li').forEach(li => li.classList.toggle('drop-target', Number(li.dataset.index) === target));
+        if (row) { const rect = row.getBoundingClientRect(); slot = Number(row.dataset.index) + (event.clientY >= rect.top + rect.height / 2 ? 1 : 0); }
+        else { const rect = queueList.getBoundingClientRect(); if (event.clientY < rect.top) slot = 0; else if (event.clientY > rect.bottom) slot = ballQueue.length; }
+        if (ghost) ghost.style.top = `${event.clientY - ghost.offsetHeight / 2}px`;
+        displaySlot();
       };
       const finish = event => {
-        if (timer) { clearTimeout(timer); timer = null; }
-        if (dragging) { dragging = false; if (event.type === 'pointerup') reorderQueue(index, target); else { item.classList.remove('dragging'); queueList.querySelectorAll('li').forEach(li => li.classList.remove('drop-target')); } }
+        const shouldMove = dragging && event.type === 'pointerup', target = slot;
+        cleanup();
+        if (shouldMove) reorderQueue(index, target);
       };
-      handle.onpointerup = finish; handle.onpointercancel = finish;
-      handle.onkeydown = event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorderQueue(index, index + (event.key === 'ArrowUp' ? -1 : 1)); } };
+      item.onpointerup = finish; item.onpointercancel = finish;
+      handle.onkeydown = event => { if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); reorderQueue(index, index + (event.key === 'ArrowUp' ? -1 : 2)); } };
       const label = document.createElement('span'); label.className = 'queue-label'; label.textContent = labelForBall(id);
       const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.setAttribute('aria-label', `${labelForBall(id)} 제거`);
       remove.onclick = () => { ballQueue.splice(index, 1); queueIndex = 0; drawQueueEditor(); updateBallTypeButton(); };
-      item.append(handle, label, remove);
+      item.append(handle, thumbnail, label, remove);
       queueList.append(item);
     });
   }
@@ -741,6 +766,7 @@
   }
 
   function playImpactSoundForContact(contactKey, type, speed) {
+    contactKey = `${ball?.soundId || 0}:${contactKey}`;
     impactContactLastSeenStep.set(contactKey, physicsStepCount);
     if (speed < (type === 'wood' || type === 'breakable' ? WOOD_IMPACT_SOUND_MIN_SPEED : IMPACT_SOUND_MIN_SPEED)
       || soundedImpactContacts.has(contactKey)) return;
@@ -840,6 +866,10 @@
   }
 
   function updateRollingSound(type, speed, angularSpeed = ball?.omega || 0) {
+    if (rollingRequests) { rollingRequests.push({ type, speed, angularSpeed }); return; }
+    applyRollingSound(type, speed, angularSpeed);
+  }
+  function applyRollingSound(type, speed, angularSpeed) {
     const audio = audioContext;
     const revolutionsPerSecond = Math.abs(Number(angularSpeed) || 0) / (Math.PI * 2);
     recordedRollingRevolutionsPerSecond = revolutionsPerSecond;
@@ -1240,6 +1270,7 @@
     ballCollisions = false;
     document.getElementById('ballCollisions').checked = false;
     nextLaunchAt = 0;
+    autoLaunchArmed = false;
     rods.length = 0;
     goals.length = 0;
     fields.length = 0;
@@ -1594,6 +1625,7 @@
       omega: 0,
       fallPeakY: spawn.y,
       specialContacts: [],
+      soundId: nextBallSoundId++,
       radius: kind === 'giant' ? GIANT_BALL_RADIUS : BALL_RADIUS,
       mass: kind === 'giant' ? GIANT_BALL_MASS : BALL_MASS,
       type: kind
@@ -1605,7 +1637,7 @@
     goalHoldTime = 0;
     goalEnteredAt = null;
     if (!queued || activeBalls.length === 1) touchedRodIds.clear();
-    resetImpactSoundContacts();
+    if (!queued || activeBalls.length === 1) resetImpactSoundContacts();
     if (!queued || activeBalls.length === 1) rods.forEach(rod => { rod.touched = false; });
     successPanel.hidden = true;
     setHint('공이 떨어집니다. 충돌 속도에 따라 실제처럼 살짝 튕겨요.');
@@ -1837,6 +1869,7 @@
 
   function resetGame() {
     resetSwingState();
+    autoLaunchArmed = false;
     activeBalls.length = 0;
     queueIndex = 0;
     nextLaunchAt = 0;
@@ -3364,6 +3397,7 @@
   function physicsStep(dt) {
     if (!ball || won || editDrag) return;
     const current = ball;
+    rollingRequests = [];
     const attached = activeBalls.find(item => item.attachedSwingUid);
     ball = attached || current;
     advanceSwings(dt);
@@ -3377,7 +3411,32 @@
         for (let j = i + 1; j < activeBalls.length; j++) resolveBallPair(activeBalls[i], activeBalls[j]);
       }
     }
+    const loudest = rollingRequests.filter(request => request.type && request.speed >= .08)
+      .reduce((best, request) => !best || rollingGainForRevolutions(Math.abs(request.angularSpeed) / (2 * Math.PI), request.speed)
+        > rollingGainForRevolutions(Math.abs(best.angularSpeed) / (2 * Math.PI), best.speed) ? request : best, null);
+    rollingRequests = null;
+    applyRollingSound(loudest?.type ?? null, loudest?.speed ?? 0, loudest?.angularSpeed ?? 0);
+    if (appMode === 'free' || appMode === 'stage') {
+      const radius = resetBoundaryRadius();
+      for (const item of activeBalls) {
+        if (Math.hypot(item.x - spawn.x, item.y - spawn.y) <= radius + item.radius + 24) continue;
+        item.x = spawn.x; item.y = spawn.y;
+        item.vx = 0; item.vy = 0; item.omega = 0; item.angle = 0;
+        item.attachedSwingUid = null; item.electricRide = null; item.fallPeakY = spawn.y;
+        item.specialContacts = [];
+      }
+    }
     ball = activeBalls.at(-1) || current;
+  }
+  function resetBoundaryRadius() {
+    let radius = 0;
+    for (const rod of rods) {
+      if (rod.type === 'breakable' && rod.hp <= 0) continue;
+      const corners = orientedRectCorners({ x: rod.x, y: rod.y, width: rod.length, height: rod.thickness, angle: rod.angle });
+      for (const corner of corners) radius = Math.max(radius, Math.hypot(corner.x - spawn.x, corner.y - spawn.y));
+    }
+    // Empty maps still need room for a new ball to fall before its first block is placed.
+    return radius || 600;
   }
 
   function roundedRectPath(context, x, y, width, height, radius) {
@@ -3449,6 +3508,16 @@
     ctx.textAlign = 'center';
     ctx.fillStyle = '#285c91';
     ctx.fillText('공 생성 위치', spawn.x, spawn.y + 42);
+    ctx.restore();
+  }
+
+  function drawResetBoundary() {
+    if (appMode !== 'free' && appMode !== 'stage') return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(35, 109, 186, .42)';
+    ctx.lineWidth = 1.5 / camera.zoom;
+    ctx.setLineDash([8 / camera.zoom, 8 / camera.zoom]);
+    ctx.beginPath(); ctx.arc(spawn.x, spawn.y, resetBoundaryRadius(), 0, Math.PI * 2); ctx.stroke();
     ctx.restore();
   }
 
@@ -3863,6 +3932,7 @@
     drawBackground();
     ctx.save();
     applyWorldTransform();
+    drawResetBoundary();
     drawSpawn();
     fields.forEach(field => drawField(field));
 
@@ -3894,9 +3964,9 @@
   function frame(time) {
     const elapsed = Math.min((time - lastTime) / 1000, 0.05);
     lastTime = time;
-    if (launchMode === 'auto' && ballQueue.length && queueIndex > 0 && queueIndex < ballQueue.length
+    if (autoLaunchArmed && launchMode === 'auto' && ballQueue.length && queueIndex > 0 && queueIndex < ballQueue.length
       && time >= nextLaunchAt && ['free', 'stage'].includes(appMode) && !won) spawnBall();
-    if (launchMode === 'auto' && ballQueue.length && queueIndex === 0 && !activeBalls.length
+    if (autoLaunchArmed && launchMode === 'auto' && ballQueue.length && queueIndex === 0 && !activeBalls.length
       && ['free', 'stage'].includes(appMode) && !queueDialog.open) spawnBall();
     accumulator += elapsed;
     while (accumulator >= FIXED_STEP) {
@@ -3935,7 +4005,7 @@
   window.addEventListener('resize', resize);
   window.visualViewport?.addEventListener('resize', resize);
   new ResizeObserver(resize).observe(gameShell);
-  spawnButton.addEventListener('click', spawnBall);
+  spawnButton.addEventListener('click', () => { if (spawnBall() && launchMode === 'auto') autoLaunchArmed = true; });
   ballTypeButton.addEventListener('click', () => {
     if (appMode === 'editor') {
       selectedBallType = selectedBallType === 'giant' ? 'normal' : 'giant';
@@ -3944,6 +4014,7 @@
   });
   document.getElementById('ballLaunchMode').addEventListener('change', event => {
     launchMode = event.target.value;
+    if (launchMode !== 'auto') autoLaunchArmed = false;
     document.getElementById('ballIntervalLabel').hidden = launchMode !== 'auto';
   });
   document.getElementById('ballIntervalLabel').hidden = true;
@@ -3953,7 +4024,7 @@
     launchInterval = Math.max(.2, Math.min(60, Number(document.getElementById('ballInterval').value) || 2));
     document.getElementById('ballInterval').value = String(launchInterval);
     queueDialog.close(); updateBallTypeButton();
-    if (launchMode === 'auto' && ballQueue.length && queueIndex === 0) spawnBall();
+    if (launchMode === 'auto' && ballQueue.length && queueIndex === 0) autoLaunchArmed = spawnBall();
     else if (launchMode === 'auto' && queueIndex > 0) nextLaunchAt = performance.now() + launchInterval * 1000;
   });
   deleteButton.addEventListener('click', deleteSelected);
@@ -3969,6 +4040,14 @@
     followBall = !followBall;
     followButton.textContent = followBall ? '따라가기 끄기' : '공 따라가기';
     followButton.setAttribute('aria-pressed', String(followBall));
+  });
+  document.getElementById('moveToSpawnButton').addEventListener('click', () => {
+    followBall = false;
+    followButton.textContent = '공 따라가기';
+    followButton.setAttribute('aria-pressed', 'false');
+    camera.x = spawn.x - view.width / (2 * camera.zoom);
+    camera.y = spawn.y - view.height / (2 * camera.zoom);
+    render();
   });
   resetButton.addEventListener('click', resetGame);
   homeButton.addEventListener('click', requestHome);

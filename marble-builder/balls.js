@@ -115,9 +115,13 @@
     const boost = Number($('colorBoost').value) / 100;
     const opacity = Number($('colorOpacity').value) / 100;
     // Screen-compatible brightness boost; regular Canvas output is SDR.
-    const boostedLightness = Math.min(95, lightness + (100 - lightness) * boost * .28);
+    const boostedLightness = boost < 0 ? lightness * (1 + boost) : lightness + (100 - lightness) * boost;
     color = `hsla(${Math.round(hue)} ${saturation}% ${boostedLightness.toFixed(1)}% / ${opacity.toFixed(2)})`;
     $('pickedColor').style.background = color;
+    $('actualColor').style.background = color;
+    for (const id of ['colorSaturation', 'colorLightness', 'colorOpacity', 'colorBoost']) {
+      $(id + 'Value').textContent = `${$(id).value}%`;
+    }
     wheelContext.clearRect(0, 0, 220, 220);
     for (let a = 0; a < 360; a++) { wheelContext.beginPath(); wheelContext.strokeStyle = `hsl(${a} 100% 50%)`; wheelContext.lineWidth = 36; wheelContext.arc(110, 110, 89, (a-1)*Math.PI/180, (a+1)*Math.PI/180); wheelContext.stroke(); }
     wheelContext.beginPath(); wheelContext.fillStyle = '#fff'; wheelContext.arc(110, 110, 62, 0, Math.PI*2); wheelContext.fill();
@@ -127,7 +131,13 @@
     wheelContext.strokeStyle = '#fff'; wheelContext.lineWidth = 7; wheelContext.stroke();
   }
   function pick(event) { const [x,y] = point(event, wheel); const dx = x-.5, dy = y-.5; if (Math.hypot(dx,dy)<.23) return; hue = (Math.atan2(dy,dx)*180/Math.PI+360)%360; updateColor(); chooseTool('pencil'); }
-  wheel.onpointerdown = e => { wheel.setPointerCapture(e.pointerId); pick(e); };
+  wheel.onpointerdown = e => {
+    const [x,y] = point(e, wheel);
+    if (Math.hypot(x-.5, y-.5) < .23) return;
+    $('colorSaturation').value = '100'; $('colorLightness').value = '50';
+    $('colorOpacity').value = '100'; $('colorBoost').value = '0';
+    wheel.setPointerCapture(e.pointerId); pick(e);
+  };
   wheel.onpointermove = e => { if (wheel.hasPointerCapture(e.pointerId)) pick(e); };
   for (const id of ['colorSaturation', 'colorLightness', 'colorOpacity', 'colorBoost']) $(id).oninput = updateColor;
   updateColor();

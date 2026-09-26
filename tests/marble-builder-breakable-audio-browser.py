@@ -51,7 +51,9 @@ with sync_playwright() as playwright:
         second = page.evaluate(f'{D}.addRod("swing",650,240,{{length:65,angle:-.4,fixed:true}})?.uid')
         assert first and second
         page.evaluate(f'{D}.getRodByUid({first!r}).startAngle = .7; {D}.getRodByUid({first!r}).angle = .7')
-        page.evaluate(f'{D}.setBallState({{x:900,y:-300,vx:0,vy:0}})')
+        # Keep the test ball inside the new spawn-centred escape boundary;
+        # an escaped ball now respawns by design and can activate a nearby swing.
+        page.evaluate(f'{D}.setBallState({{x:450,y:-120,vx:0,vy:0}})')
         page.evaluate(f'{D}.stepPhysics(50)')
         swings = page.evaluate(f'{D}.getState().rods.filter(r=>r.type==="swing")')
         assert swings[0]['angle'] == .7 and swings[1]['angle'] == -.4 and not any(s['swingStarted'] for s in swings), swings

@@ -27,15 +27,23 @@ with sync_playwright() as p:
         page.locator('#colorBoost').fill('20')
         chosen = page.locator('#pickedColor').evaluate('(e) => e.style.background')
         assert 'hsla' in chosen or 'rgba' in chosen, chosen
+        assert page.locator('#actualColor').evaluate('(e) => e.style.background') == chosen
+        for control, value in [('colorSaturation','60%'),('colorLightness','27%'),('colorOpacity','80%'),('colorBoost','20%')]:
+            assert page.locator(f'#{control}Value').inner_text() == value
         # Hue selector has a white rim distinct from the central preview.
         assert page.evaluate("(() => { const d=document.getElementById('colorWheel').getContext('2d').getImageData(110,2,1,1).data; return d[0]>220 && d[1]>220 && d[2]>220 })()")
         canvas = page.locator('#ballEditor').bounding_box()
         page.mouse.click(canvas['x'] + canvas['width']*.5, canvas['y'] + canvas['height']*.5)
+        painted = page.evaluate("Array.from(document.getElementById('ballEditor').getContext('2d').getImageData(256,256,1,1).data)")
+        assert painted[:3] != [255, 255, 255], painted
         assert not page.locator('#workshopUndo').is_disabled()
         assert len(page.evaluate("JSON.parse(localStorage.getItem('marble-builder-custom-balls-v1') || '[]')")) == 0
         page.locator('#workshopUndo').click()
+        assert page.evaluate("Array.from(document.getElementById('ballEditor').getContext('2d').getImageData(256,256,1,1).data)")[:3] == [255, 255, 255]
         assert page.locator('#workshopUndo').is_disabled() and not page.locator('#workshopRedo').is_disabled()
         page.locator('#workshopRedo').click()
+        restored = page.evaluate("Array.from(document.getElementById('ballEditor').getContext('2d').getImageData(256,256,1,1).data)")
+        assert restored[:3] != [255, 255, 255], (painted, restored)
         assert not page.locator('#workshopUndo').is_disabled()
         page.locator('#workshopSave').click()
         page.locator('#workshopHome').click()
@@ -92,6 +100,28 @@ with sync_playwright() as p:
         page.evaluate(f'{D}.stepPhysics(2)')
         balls = page.evaluate(f'{D}.getState().activeBalls')
         assert balls[0]['vx'] == 0 and balls[1]['vx'] > 1.9, balls
+        # Real UI spawning into a wooden landing zone: second falling ball must
+        # transfer momentum to the first one rather than merely separate debug states.
+        page.locator('#resetButton').click()
+        page.locator('#ballTypeButton').click()
+        page.locator('#ballCollisions').check()
+        page.locator('#closeBallQueue').click()
+        page.evaluate(f"(() => {{ const d={D}, p=d.getState().spawn; d.addRod('wood', p.x, p.y + 160); }})()")
+        page.locator('#spawnButton').click()
+        page.evaluate(f'{D}.stepPhysics(250)')
+        grounded = page.evaluate(f'{D}.getState().activeBalls[0]')
+        page.locator('#spawnButton').click()
+        natural = page.evaluate(f"(() => {{ const d={D}; let peak = 0; for (let i=0;i<220;i++) {{ d.stepPhysics(1); const a=d.getState().activeBalls; peak=Math.max(peak, -a[0].vy); }} return {{peak, balls:d.getState().activeBalls}}; }})()")
+        assert natural['peak'] > .08, (grounded, natural)
+        page.locator('#resetButton').click()
+        page.locator('#ballTypeButton').click()
+        page.locator('#ballCollisions').uncheck()
+        page.locator('#closeBallQueue').click()
+        page.locator('#spawnButton').click()
+        page.evaluate(f'{D}.stepPhysics(250)')
+        page.locator('#spawnButton').click()
+        off_peak = page.evaluate(f"(() => {{ const d={D}; let peak=0; for(let i=0;i<220;i++) {{ d.stepPhysics(1); peak=Math.max(peak,-d.getState().activeBalls[0].vy); }} return peak; }})()")
+        assert natural['peak'] > off_peak + .05, (natural, off_peak)
         assert not errors, errors
         print(f'PASS {width}x{height}: color, undo/redo, hold-reorder, collision momentum/on/off')
         context.close()
