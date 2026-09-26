@@ -1,6 +1,7 @@
 from playwright.sync_api import sync_playwright
+import os
 
-URL = 'http://127.0.0.1:8765/marble-builder/'
+URL = os.environ.get('MARBLE_URL', 'http://127.0.0.1:8765/marble-builder/')
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True, executable_path='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', args=['--no-sandbox'])
     for width, height in [(390, 844), (1280, 800)]:
@@ -33,6 +34,19 @@ with sync_playwright() as p:
         page.wait_for_timeout(150)
         page.locator('#workshopSave').click()
         assert page.evaluate('JSON.parse(localStorage.getItem("marble-builder-custom-balls-v1"))[0].layers.some(l => l.kind === "photo")')
+        page.locator('#nextBall').click()
+        assert page.locator('#workshopPosition').inner_text() == '새 공'
+        page.locator('#workshopSave').click()
+        assert page.locator('#workshopPosition').inner_text().startswith('내 공 2')
+        page.locator('#previousBall').click()
+        assert page.locator('#workshopPosition').inner_text().startswith('내 공 1')
+        page.locator('#deleteBall').click()
+        assert page.locator('#deleteBallDialog').evaluate('(el) => el.open')
+        page.locator('#cancelDeleteBall').click()
+        assert page.evaluate('window.MarbleBalls.list().length') == 2
+        page.locator('#deleteBall').click()
+        page.locator('#confirmDeleteBall').click()
+        assert page.evaluate('window.MarbleBalls.list().length') == 1
         page.locator('#workshopHome').click()
         page.locator('#freeModeButton').click()
         state = page.evaluate('window.__marbleBuilderDebug.getState()')
