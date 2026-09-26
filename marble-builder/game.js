@@ -3604,33 +3604,40 @@
     return movableMass(rod) * (rod.length ** 2 + rod.thickness ** 2) / (12 * PIXELS_PER_METER ** 2);
   }
   function resolveMovableOnStaticFace(a, b) {
-    const difference = Math.atan2(Math.sin(a.angle-b.angle), Math.cos(a.angle-b.angle));
-    if (Math.abs(difference) > .16) return false;
-    // The support's upper plane is the reference, NOT the SAT axis from the
-    // moving body. Its axis can select the far corner of a long sloped road.
+    // Clip the incident edge to the *finite* support. A beam may straddle the
+    // ledge with neither original corner over the board; the board's rim is
+    // still a real contact. Never switch solvers at an arbitrary angle.
     const nx = -Math.sin(b.angle), ny = Math.cos(b.angle);
     const tx = Math.cos(b.angle), ty = Math.sin(b.angle);
     if ((b.x-a.x)*nx + (b.y-a.y)*ny < 0) return false;
     const corners = orientedRectCorners({ x:a.x, y:a.y, width:a.length, height:a.thickness, angle:a.angle });
+    const faces = [[0,1],[1,2],[2,3],[3,0]];
+    const face = faces.reduce((best, pair) => {
+      const score = ((corners[pair[0]].x+corners[pair[1]].x)/2-a.x)*nx
+        + ((corners[pair[0]].y+corners[pair[1]].y)/2-a.y)*ny;
+      return score > best.score ? { pair, score } : best;
+    }, { score:-Infinity });
+    const endpoints = face.pair.map(index => corners[index]);
+    const u0 = (endpoints[0].x-b.x)*tx+(endpoints[0].y-b.y)*ty;
+    const u1 = (endpoints[1].x-b.x)*tx+(endpoints[1].y-b.y)*ty;
+    const low = Math.max(-b.length/2, Math.min(u0,u1));
+    const high = Math.min(b.length/2, Math.max(u0,u1));
+    if (low > high || Math.abs(u1-u0) < 1e-5) return false;
     const topX = b.x-nx*b.thickness/2, topY = b.y-ny*b.thickness/2;
-    const contacts = [corners[2],corners[3]].map(point => ({
-      x:point.x, y:point.y,
-      along:(point.x-b.x)*tx+(point.y-b.y)*ty,
-      depth:(point.x-topX)*nx+(point.y-topY)*ny
-    }));
-    const left = Math.min(...contacts.map(p => p.along));
-    const right = Math.max(...contacts.map(p => p.along));
-    if (right < -b.length/2 || left > b.length/2) return false;
-    const active = contacts.filter(p => Math.abs(p.along) <= b.length/2 + .5 && p.depth > -.35);
+    const contacts = [low,high].map(along => {
+      const t = (along-u0)/(u1-u0);
+      const x = endpoints[0].x + t*(endpoints[1].x-endpoints[0].x);
+      const y = endpoints[0].y + t*(endpoints[1].y-endpoints[0].y);
+      return { x,y, depth:(x-topX)*nx+(y-topY)*ny };
+    });
+    const active = contacts.filter(p => p.depth > -.7);
     if (!active.length) return false;
     const penetration = Math.max(0, ...active.map(p => p.depth));
     a.x -= nx*penetration; a.y -= ny*penetration;
     const inv = 1/movableMass(a), inertia = 1/movableInertia(a);
-    // Re-evaluate both incident corners against the same plane each pass;
-    // a corner still in the air must not exert a phantom restoring torque.
     for (let pass=0; pass<4; pass++) {
       for (const p of contacts) {
-        if (Math.abs(p.along) > b.length/2 + .5 || p.depth-penetration < -.35) continue;
+        if (p.depth-penetration < -.35) continue;
         const rx = (p.x-nx*penetration-a.x)/PIXELS_PER_METER;
         const ry = (p.y-ny*penetration-a.y)/PIXELS_PER_METER;
         const cross = rx*ny-ry*nx;
@@ -3644,12 +3651,16 @@
         a.vx -= friction*tx*inv; a.vy -= friction*ty*inv; a.omega -= friction*tangentCross*inertia;
       }
     }
-    if (active.length === 2 && Math.abs(difference) < .012
-      && Math.abs(a.omega) < .08 && Math.hypot(a.vx,a.vy) < .1) {
-      // Both lower corners touch the plane: settle the remaining subpixel
-      // gap and slope friction, never a lone tip or a moving body.
+    const edgeAngle = Math.atan2(endpoints[1].y-endpoints[0].y, endpoints[1].x-endpoints[0].x)-b.angle;
+    const difference = Math.atan2(Math.sin(2*edgeAngle),Math.cos(2*edgeAngle))/2;
+    const centerAlong = (a.x-b.x)*tx+(a.y-b.y)*ty;
+    if (active.length === 2 && high-low > 1 && centerAlong > low+.5 && centerAlong < high-.5
+      && Math.abs(difference) < .03 && Math.abs(a.omega) < .35
+      && Math.hypot(a.vx,a.vy) < .15) {
+      // Both *clipped* points are supported. Near rest, remove only the tiny
+      // numerical gap; a single rim contact must remain free to rotate.
       a.angle -= difference;
-      const gap = (b.x-a.x)*nx+(b.y-a.y)*ny-(a.thickness+b.thickness)/2;
+      const gap = (b.x-a.x)*nx+(b.y-a.y)*ny-face.score-b.thickness/2;
       a.x += nx*gap; a.y += ny*gap;
       if (a.previousPosition && Math.abs(b.angle) < Math.atan(.55)) {
         const drift = (a.x-a.previousPosition.x)*tx+(a.y-a.previousPosition.y)*ty;
