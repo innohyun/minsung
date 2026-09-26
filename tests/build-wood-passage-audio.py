@@ -33,12 +33,16 @@ def low_and_high_pass(samples, high, low):
     low_state = 0.0
     prev_low = 0.0
     high_state = 0.0
+    prev_high = 0.0
+    second_high = 0.0
     result = []
     for sample in samples:
         low_state += low_alpha * (sample - low_state)
         high_state = high_alpha * (high_state + low_state - prev_low)
         prev_low = low_state
-        result.append(high_state)
+        second_high = high_alpha * (second_high + high_state - prev_high)
+        prev_high = high_state
+        result.append(second_high)
     return result
 
 
@@ -55,7 +59,10 @@ def build(source, start, stop, max_rms, high, low, target_rms, seed, destination
     if len(candidates) < 5:
         raise ValueError(f'Not enough smooth source grains: {destination}: {len(candidates)}')
     randomizer = random.Random(seed)
-    count = round(DURATION * RATE)
+    # Build an extra crossfade's worth; after overlap, trim the prefix so
+    # the final sample leads into the next loop's first sample in time order.
+    fade = round(RATE * .18)
+    count = round(DURATION * RATE) + fade
     output = [0.0] * (count + GRAIN)
     weights = [0.0] * (count + GRAIN)
     window = [.5 - .5 * math.cos(2 * math.pi * i / (GRAIN - 1)) for i in range(GRAIN)]
@@ -84,21 +91,25 @@ def build(source, start, stop, max_rms, high, low, target_rms, seed, destination
     output = [sample * gain for sample, gain in zip(output, local_gain)]
     rms = math.sqrt(sum(sample * sample for sample in output) / count)
     scale = target_rms / rms
-    output = [max(-.2, min(.2, sample * scale)) for sample in output]
+    # Round microphone taps after leveling; keep perceived bed level unchanged.
+    # The original short wood collision files remain separate and untouched.
+    output = [.048 * math.tanh(sample * scale / .048) for sample in output]
+    limited_rms = math.sqrt(sum(sample * sample for sample in output) / count)
+    output = [sample * (target_rms / limited_rms) for sample in output]
     # The last portion is blended into the start, making a true seamless loop.
-    fade = round(RATE * .18)
     for i in range(fade):
         t = i / fade
         last_index = count - fade + i
         output[last_index] = output[last_index] * math.cos(t * math.pi / 2) + output[i] * math.sin(t * math.pi / 2)
+    output = output[fade:]
     destination.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(destination), 'wb') as wav:
         wav.setnchannels(1)
         wav.setsampwidth(2)
         wav.setframerate(RATE)
         wav.writeframes(array('h', (round(max(-1, min(1, sample)) * 32767) for sample in output)).tobytes())
-    chunks = [math.sqrt(sum(x*x for x in output[i:i+2205])/len(output[i:i+2205])) for i in range(0,count,2205)]
-    print(destination.relative_to(ROOT), 'seconds', count / RATE, 'source_grains', len(candidates), 'rms_range_50ms', tuple(round(x,4) for x in (min(chunks), max(chunks))), 'peak', round(max(map(abs,output)),4))
+    chunks = [math.sqrt(sum(x*x for x in output[i:i+2205])/len(output[i:i+2205])) for i in range(0,len(output),2205)]
+    print(destination.relative_to(ROOT), 'seconds', len(output) / RATE, 'source_grains', len(candidates), 'rms_range_50ms', tuple(round(x,4) for x in (min(chunks), max(chunks))), 'peak', round(max(map(abs,output)),4))
 
 
 if __name__ == '__main__':
@@ -109,9 +120,9 @@ if __name__ == '__main__':
             raise FileNotFoundError(f'Reference video required: {video}')
         subprocess.run(['afconvert', '-f', 'WAVE', '-d', 'LEI16', '-c', '1', str(video),
                         str(ROOT / f'tests/wood-video-{number}-temp.wav')], check=True)
-    build(ROOT / 'tests/wood-video-3-temp.wav', 1.32, 2.08, .006, 180, 1800, .016, 73,
+    build(ROOT / 'tests/wood-video-3-temp.wav', 1.32, 2.08, .006, 320, 1800, .016, 73,
           ROOT / 'assets/marble-builder/audio/wood-passage-soft.wav')
-    build(ROOT / 'tests/wood-video-1-temp.wav', 1.53, 2.30, .008, 420, 4200, .022, 113,
+    build(ROOT / 'tests/wood-video-1-temp.wav', 1.53, 2.30, .008, 650, 4200, .022, 113,
           ROOT / 'assets/marble-builder/audio/wood-passage-swish.wav')
     for number in (1, 3):
         (ROOT / f'tests/wood-video-{number}-temp.wav').unlink()
