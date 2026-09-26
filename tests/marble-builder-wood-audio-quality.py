@@ -4,11 +4,19 @@ Waveform checks complement browser playback tests; they cannot certify how the
 sound is perceived by a listener.
 """
 from array import array
+import json
 from pathlib import Path
 import math
 import wave
 
 AUDIO = Path(__file__).resolve().parents[1] / 'assets/marble-builder/audio'
+ROOT = AUDIO.parents[2]
+recipe = (ROOT / 'tests/build-wood-passage-audio.py').read_text()
+assert 'randomizer.uniform(-1, 1)' in recipe
+assert 'mono_pcm(' not in recipe and 'afconvert' not in recipe and 'read_bytes(' not in recipe
+manifest = json.loads((AUDIO.parent / 'assets.json').read_text())
+passage = next(item for item in manifest['audio'] if item['id'] == 'wood-passage-synthesized')
+assert 'no recorded audio' in passage['source']
 for name, target in [('wood-passage-soft.wav', .016), ('wood-passage-swish.wav', .022)]:
     with wave.open(str(AUDIO / name)) as audio:
         assert (audio.getframerate(), audio.getnchannels(), audio.getsampwidth()) == (44100, 1, 2)

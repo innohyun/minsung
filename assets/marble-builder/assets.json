@@ -1,8 +1,9 @@
 {
   "audio": [
     {
-      "id": "wood-passage-video-reference",
-      "source": ["3.mp4 (낮은 각도)", "1.mp4 (높은 각도)"],
+      "id": "wood-passage-synthesized",
+      "source": "deterministic filtered-noise synthesis; no recorded audio in either runtime loop",
+      "reference": ["3.mp4 (낮은 각도)", "1.mp4 (높은 각도)"],
       "runtime": ["audio/wood-passage-soft.wav", "audio/wood-passage-swish.wav"]
     },
     {

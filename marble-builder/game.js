@@ -247,8 +247,8 @@
     electric: '/assets/marble-builder/platforms/electric.png'
   };
   const MATERIAL_AUDIO_URLS = {
-    rolling: '/assets/marble-builder/audio/wood-passage-soft.wav?v=3',
-    swish: '/assets/marble-builder/audio/wood-passage-swish.wav?v=3',
+    rolling: '/assets/marble-builder/audio/wood-passage-soft.wav?v=4',
+    swish: '/assets/marble-builder/audio/wood-passage-swish.wav?v=4',
     woodImpacts: [1, 2, 3].map(index => `/assets/marble-builder/audio/wood-hit-${index}.wav?v=1`)
   };
 

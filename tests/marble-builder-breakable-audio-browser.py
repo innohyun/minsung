@@ -64,7 +64,7 @@ with sync_playwright() as playwright:
         resources = page.evaluate('performance.getEntriesByType("resource").map(entry=>entry.name)')
         assert all(any(f'/audio/wood-hit-{i}.wav' in url for url in resources) for i in (1, 2, 3)), resources
         assert not any('/audio/wood-hit-video-' in url for url in resources), resources
-        assert all(any(f'/audio/{name}.wav?v=3' in url for url in resources)
+        assert all(any(f'/audio/{name}.wav?v=4' in url for url in resources)
                    for name in ('wood-passage-soft', 'wood-passage-swish')), resources
         page.evaluate(f'{D}.updateRollingSound("floor",3,6)')
         assert not page.evaluate(f'{D}.getAudioState().recordedRollingActive')
