@@ -64,7 +64,7 @@ with sync_playwright() as playwright:
         resources = page.evaluate('performance.getEntriesByType("resource").map(entry=>entry.name)')
         assert all(any(f'/audio/wood-hit-{i}.wav' in url for url in resources) for i in (1, 2, 3)), resources
         assert not any('/audio/wood-hit-video-' in url for url in resources), resources
-        assert all(any(f'/audio/{name}.wav?v=4' in url for url in resources)
+        assert all(any(f'/audio/{name}.wav?v=5' in url for url in resources)
                    for name in ('wood-passage-soft', 'wood-passage-swish')), resources
         page.evaluate(f'{D}.updateRollingSound("floor",3,6)')
         assert not page.evaluate(f'{D}.getAudioState().recordedRollingActive')
@@ -74,7 +74,7 @@ with sync_playwright() as playwright:
         page.wait_for_timeout(500)
         very_slow = page.evaluate(f'{D}.getAudioState()')
         assert 0 < very_slow['recordedRollingGain'] < .004, very_slow
-        assert very_slow['woodPassageMix'] < .02 and all(3.5 < duration < 3.7 for duration in very_slow['woodPassageDurations']), very_slow
+        assert very_slow['woodPassageMix'] < .02 and all(3.4 < duration < 3.5 for duration in very_slow['woodPassageDurations']), very_slow
         page.evaluate(f'{D}.updateRollingSound("wood",1.3,9)')
         page.wait_for_timeout(500)
         quiet = page.evaluate(f'{D}.getAudioState()')

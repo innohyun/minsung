@@ -1,8 +1,8 @@
 {
   "audio": [
     {
-      "id": "wood-passage-synthesized",
-      "source": "deterministic filtered-noise synthesis; no recorded audio in either runtime loop",
+      "id": "wood-passage-rolling-restored",
+      "source": "filtered rolling waveform from game version 6fd14a0; review previews in tests/audio-previews",
       "reference": ["3.mp4 (낮은 각도)", "1.mp4 (높은 각도)"],
       "runtime": ["audio/wood-passage-soft.wav", "audio/wood-passage-swish.wav"]
     },

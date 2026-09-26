@@ -1,6 +1,6 @@
-"""Make listening previews from the earlier user-liked rolling sound, not white noise.
+"""Restore the earlier user-liked rolling waveform, suppressing handling noise.
 
-Only writes review samples. Does NOT change the game's current audio assets.
+Default writes one-shot review samples; --install writes seamless game loops.
 Source is the tracked 6fd14a0 WAV (before the later noise-only replacement).
 """
 from array import array
@@ -24,7 +24,7 @@ def prior_roll(name):
     return [sample / 32768 for sample in pcm]
 
 
-def render(name, high, low, target):
+def render(name, high, low, target, install=False):
     samples = prior_roll(name)
     low_alpha = 1 - math.exp(-2 * math.pi * low / RATE)
     high_alpha = math.exp(-2 * math.pi * high / RATE)
@@ -59,11 +59,22 @@ def render(name, high, low, target):
     rms = math.sqrt(sum(sample * sample for sample in leveled) / len(leveled))
     leveled = [sample * target / rms for sample in leveled]
     fade = round(RATE * .18)
-    for i in range(fade):
-        leveled[i] *= i / fade
-        leveled[-i-1] *= i / fade
-    OUT.mkdir(parents=True, exist_ok=True)
-    dest = OUT / name.replace('.wav', '-candidate.wav')
+    if install:
+        # The tail converges on the original prefix; trim that prefix so the
+        # final sample leads naturally into the retained first sample.
+        prefix = leveled[:fade]
+        for i in range(fade):
+            t = (i + 1) / (fade + 1)
+            index = len(leveled) - fade + i
+            leveled[index] = leveled[index] * math.cos(t * math.pi / 2) + prefix[i] * math.sin(t * math.pi / 2)
+        leveled = leveled[fade:]
+        dest = ROOT / 'assets/marble-builder/audio' / name
+    else:
+        for i in range(fade):
+            leveled[i] *= i / fade
+            leveled[-i-1] *= i / fade
+        dest = OUT / name.replace('.wav', '-candidate.wav')
+    dest.parent.mkdir(parents=True, exist_ok=True)
     with wave.open(str(dest), 'wb') as sound:
         sound.setnchannels(1)
         sound.setsampwidth(2)
@@ -75,5 +86,9 @@ def render(name, high, low, target):
 
 
 if __name__ == '__main__':
-    render('wood-passage-soft.wav', 180, 1350, .016)
-    render('wood-passage-swish.wav', 300, 1850, .022)
+    import sys
+    install = sys.argv[1:] == ['--install']
+    if sys.argv[1:] and not install:
+        raise SystemExit('usage: python3 tests/build-wood-roll-previews.py [--install]')
+    render('wood-passage-soft.wav', 180, 1350, .016, install)
+    render('wood-passage-swish.wav', 300, 1850, .022, install)
