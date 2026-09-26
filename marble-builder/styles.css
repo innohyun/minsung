@@ -128,6 +128,7 @@ body.is-physics-lab .hint { top: 187px; }
 .tool-icon.road { width: 50px; height: 9px; border-radius: 0; transform: rotate(var(--tool-angle, -8deg)); box-shadow: 0 3px 4px rgba(23, 50, 77, .15); }
 .tool-icon.wood { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/wood.png?v=2'); }
 .tool-icon.breakable { background: center / 100% 100% no-repeat url('/assets/marble-builder/breakable/six/stage-0.png?v=1'); }
+.tool-icon.movable { height: 15px; background: rgba(20,24,33,.48); border: 2px solid rgba(13,18,28,.75); }
 .tool-icon.slime { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/slime.png?v=2'); box-shadow: 0 3px 4px rgba(23,50,77,.15); }
 .tool-icon.electric { background: center / 100% 100% no-repeat url('/assets/marble-builder/platforms/electric.png'); box-shadow: 0 0 8px rgba(46,205,255,.6); }
 .tool-icon.road.swing { width: 28px; height: 47px; background: center / contain no-repeat url('/assets/marble-builder/swing/swing.png?v=2'); transform: none; box-shadow: none; }

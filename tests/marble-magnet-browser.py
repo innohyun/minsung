@@ -22,16 +22,15 @@ with sync_playwright() as p:
         page.locator('.tool-card[aria-label="모든 블록 보기"]').count()
         page.locator('.more-card').click()
         assert page.locator('#blockCatalogDialog').evaluate('(e)=>e.open')
-        card = page.locator('.catalog-item').filter(has_text='원형 자석')
+        card = page.locator('.catalog-item').filter(has_text='자석')
         card.get_by_role('button', name='설정').click()
         page.locator('#magnetCount').fill('2')
-        page.locator('#magnetOnSeconds').fill('1.2')
-        page.locator('#magnetOffSeconds').fill('1.5')
+        assert not page.locator('#magnetOnSeconds, #magnetOffSeconds').count()
         page.locator('#magnetSettingsForm button[type=submit]').click()
         assert not page.locator('#sizeEditorPanel').is_hidden()
         page.locator('#cancelSizeButton').click()
         s = state(page)
-        assert s['magnetTemplate'] == {'length': 56, 'triggerCount': 2, 'onSeconds': 1.2, 'offSeconds': 1.5}, s['magnetTemplate']
+        assert s['magnetTemplate'] == {'length': 56, 'triggerCount': 2, 'onSeconds': 5, 'offSeconds': 6}, s['magnetTemplate']
         magnet_card = page.locator('.tool-card[data-tool="magnet"]')
         assert magnet_card.count() == 1 and magnet_card.get_attribute('data-trigger-count') == '2'
         # A second settings path: antigravity direction must survive size cancellation.
@@ -47,7 +46,7 @@ with sync_playwright() as p:
         page.locator('#ballChoices button').filter(has_text='기본 공').click()
         page.locator('#closeBallQueue').click()
         s = state(page)
-        magnet = page.evaluate(f"(() => {{let s={D}.getState().spawn;return {D}.addRod('magnet', s.x+120,s.y+60,{{length:56, triggerCount:2, onSeconds:1.2,offSeconds:1.5}})}})()")
+        magnet = page.evaluate(f"(() => {{let s={D}.getState().spawn;return {D}.addRod('magnet', s.x+120,s.y+60,{{length:56, triggerCount:2}})}})()")
         assert magnet and magnet['type'] == 'magnet'
         # First marble accelerates toward the magnet then attaches without bouncing or sliding.
         page.locator('#spawnButton').click()
@@ -61,7 +60,7 @@ with sync_playwright() as p:
         page.locator('#spawnButton').click()
         phase = page.evaluate(f"(() => {{const d={D},m=d.getState().rods.find(r=>r.type==='magnet');d.setActiveBallState(1,{{x:m.x-145,y:m.y-20,vx:0,vy:0}});d.stepPhysics(100);return d.getState()}})()")
         assert phase['magnets'][0]['seen'] == 2 and phase['magnets'][0]['phase'] in ('warning','shrinking'), phase['magnets']
-        off = page.evaluate(f'{D}.stepPhysics(180);{D}.getState()')
+        off = page.evaluate(f"(() => {{const d={D};for(let i=0;i<250;i++){{d.stepPhysics(1);if(d.getState().magnets[0].phase==='off')break}}return d.getState()}})()")
         assert off['magnets'][0]['phase'] == 'off' and off['magnets'][0]['range'] == 0, off['magnets']
         assert any(not item['attachedMagnetUid'] for item in off['activeBalls']), off['activeBalls']
         # The new removal mode preserves all blocks and requires a manual respawn.
@@ -82,12 +81,13 @@ with sync_playwright() as p:
         respawned = page.evaluate(f"(() => {{const d={D},s=d.getState().spawn;d.setActiveBallState(1,{{x:s.x-110,y:s.y-30,vx:0,vy:0,attachedMagnetUid:null}});d.setActiveBallState(0,{{x:s.x+1100,y:s.y,vx:0,vy:0,attachedMagnetUid:null}});d.stepPhysics(1);return d.getState()}})()")
         assert len(respawned['activeBalls']) == 2 and abs(respawned['activeBalls'][0]['x']-respawned['spawn']['x']) < .01, respawned['activeBalls']
         assert respawned['magnetRepeats'] and respawned['escapeBehavior'] == 'respawn'
-        # Timed mode measures on/off intervals from the completed transition.
-        timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(150);return d.getState().magnets[0]}})()")
+        # Timed mode uses fixed dwell intervals, without editable time inputs.
+        page.evaluate(f'{D}.resetGame()')
+        timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(601);return d.getState().magnets[0]}})()")
         assert timed['phase'] == 'warning', timed
         timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(180);return d.getState().magnets[0]}})()")
         assert timed['phase'] == 'off' and timed['range'] == 0, timed
-        timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(185);return d.getState().magnets[0]}})()")
+        timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(730);return d.getState().magnets[0]}})()")
         assert timed['phase'] == 'expanding', timed
         timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(100);return d.getState().magnets[0]}})()")
         assert timed['phase'] == 'on' and timed['range'] == 1, timed
@@ -102,8 +102,12 @@ with sync_playwright() as p:
         card = page.locator('.tool-card[data-tool="magnet"]')
         if not card.count():
             page.locator('.more-card').click()
-            page.locator('.catalog-item').filter(has_text='원형 자석').get_by_role('button', name='선택').click()
+            page.locator('.catalog-item').filter(has_text='자석').get_by_role('button', name='선택').click()
             card = page.locator('.tool-card[data-tool="magnet"]')
+        page.locator('.more-card').click()
+        page.locator('.catalog-item').filter(has_text='자석').get_by_role('button', name='설정').click()
+        page.locator('#magnetSettingsForm button[type=submit]').click()
+        page.locator('#cancelSizeButton').click()
         box = card.bounding_box()
         x, y = box['x']+box['width']/2, box['y']+box['height']/2
         view = state(page)['view']

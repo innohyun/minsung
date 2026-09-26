@@ -88,6 +88,10 @@
   const confirmSizeButton = document.getElementById('confirmSizeButton');
   const magnetSettingsDialog = document.getElementById('magnetSettingsDialog');
   const magnetSettingsForm = document.getElementById('magnetSettingsForm');
+  const selectedSettingsButton = document.getElementById('selectedSettingsButton');
+  const breakableSettingsDialog = document.getElementById('breakableSettingsDialog');
+  const breakableSettingsForm = document.getElementById('breakableSettingsForm');
+  let editingSettingsTarget = null;
 
 
   const PIXELS_PER_METER = 100;
@@ -112,6 +116,8 @@
   const MAGNET_DIAMETER = 56;
   const MAGNET_WARNING = .7;
   const MAGNET_TRANSITION = .75;
+  const MAGNET_ON_SECONDS = 5;
+  const MAGNET_OFF_SECONDS = 6;
   const GOAL_SUCCESS_DELAY = 1;
   const ELECTRIC_ATTACH_ANGLE = Math.PI / 6;
   const ELECTRIC_SPEED_MULTIPLIER = 4 / 3;
@@ -150,6 +156,7 @@
   const MATERIALS = {
     wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
     breakable: { label: '깨지는 블록', color: '#bd7840', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
+    movable: { label: '밀리는 블록', color: 'rgba(20,24,33,.48)', edge: 'rgba(13,18,28,.75)', friction: .64, restitution: .12, rollingResistance: 0 },
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
@@ -161,11 +168,12 @@
   const BLOCK_CATALOG = [
     { type: 'wood', label: '나무 길', detail: '보통 마찰' },
     { type: 'breakable', label: '깨지는 블록', detail: '충격에 따라 금이 가고 부서짐' },
+    { type: 'movable', label: '밀리는 블록', detail: '중력과 충격에 반응 · 도미노와 지렛대' },
 
     { type: 'slime', label: '슬라임 길', detail: '낙하 높이의 2/3 반동' },
     { type: 'electric', label: '전기 발판', detail: '강한 낙하는 4/3 점프' },
     { type: 'swing', label: '스윙', detail: '작대기 길이만 조절' },
-    { type: 'magnet', label: '원형 자석', detail: '공을 끌어당기고 붙잡는 자기장' },
+    { type: 'magnet', label: '자석', detail: '원형 자석 · 공을 끌어당기는 자기장' },
     { type: 'antigravity', label: '반중력 필드', detail: '통과 가능한 방향 중력장' },
     { type: 'goal', label: '골인 바구니', detail: '공의 도착점' }
   ];
@@ -225,6 +233,8 @@
   let nextLaunchAt = 0;
   let nextBallSoundId = 1;
   let rollingRequests = null;
+  let magnetPullStrength = 0;
+  let magnetWhoosh = null;
   const queueDialog = document.getElementById('ballQueueDialog');
   const queueList = document.getElementById('ballQueueList');
   const ballChoices = document.getElementById('ballChoices');
@@ -326,6 +336,7 @@
   const toolSettings = {
     wood: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     breakable: { length: 180, thickness: BREAKABLE_THICKNESS },
+    movable: { length: 90, thickness: 24 },
 
     slime: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     electric: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
@@ -399,10 +410,15 @@
   function normalizeRodRecord(rod) {
     const type = normalizeRodType(rod.type);
     return { ...rod, type, thickness: normalizedRodThickness(type, rod.thickness),
-      ...(type === 'breakable' ? { hp: BREAKABLE_HP } : {}),
+      ...(type === 'breakable' ? { maxHp: clamp(Number(rod.maxHp) || BREAKABLE_HP, BREAKABLE_HP / 6, BREAKABLE_HP),
+        hp: Math.min(Number(rod.hp) || Number(rod.maxHp) || BREAKABLE_HP, Number(rod.maxHp) || BREAKABLE_HP) } : {}),
       ...(type === 'magnet' ? { length: clamp(Number(rod.length) || MAGNET_DIAMETER, 40, 180),
         triggerCount: clamp(Math.floor(Number(rod.triggerCount) || 2), 1, 20),
-        onSeconds: clamp(Number(rod.onSeconds) || 5, .5, 60), offSeconds: clamp(Number(rod.offSeconds) || 6, .5, 60) } : {}),
+        onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
+      ...(type === 'movable' ? { vx: Number(rod.vx) || 0, vy: Number(rod.vy) || 0, omega: Number(rod.omega) || 0,
+        restX: Number.isFinite(rod.restX) ? rod.restX : rod.x,
+        restY: Number.isFinite(rod.restY) ? rod.restY : rod.y,
+        restAngle: Number.isFinite(rod.restAngle) ? rod.restAngle : (rod.angle || 0) } : {}),
       ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
         releaseAngle: Number.isFinite(rod.releaseAngle) ? rod.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
         swingStarted: false, swingOmega: 0, releaseRequested: false } : {}) };
@@ -813,6 +829,21 @@
     const volume = Math.min(.44, .085 + speed * .035) * clamp((speed - .1) / 1.4, .05, 1);
 
     if ((type === 'wood' || type === 'breakable') && playRecordedWoodImpact(audio, start, speed, volume)) return;
+    if (type === 'metal' || type === 'marble') {
+      const gain = audio.createGain();
+      gain.gain.setValueAtTime(Math.min(.12, volume * .45), start);
+      gain.gain.exponentialRampToValueAtTime(.0001, start + (type === 'metal' ? .29 : .18));
+      gain.connect(audioMaster);
+      for (const [pitch, level] of (type === 'metal' ? [[690, .62], [1280, .24], [2390, .14]] : [[980, .52], [1660, .31], [2750, .17]])) {
+        const tone = audio.createOscillator(), partial = audio.createGain();
+        tone.type = 'sine'; tone.frequency.setValueAtTime(pitch, start);
+        tone.frequency.exponentialRampToValueAtTime(pitch * .96, start + .16);
+        partial.gain.value = level;
+        tone.connect(partial).connect(gain);
+        tone.start(start); tone.stop(start + (type === 'metal' ? .3 : .19));
+      }
+      return;
+    }
 
     if (slime) {
       const osc = audio.createOscillator();
@@ -887,7 +918,7 @@
     if (rollingRequests) { rollingRequests.push({ type, speed, angularSpeed }); return; }
     applyRollingSound(type, speed, angularSpeed);
   }
-  function applyRollingSound(type, speed, angularSpeed) {
+  function applyRollingSound(type, speed, angularSpeed, mix = 1) {
     const audio = audioContext;
     const revolutionsPerSecond = Math.abs(Number(angularSpeed) || 0) / (Math.PI * 2);
     recordedRollingRevolutionsPerSecond = revolutionsPerSecond;
@@ -944,7 +975,7 @@
       const swishMix = passage * passage * (3 - 2 * passage);
       recordedRollingAudio.softGain.gain.setTargetAtTime(1 - swishMix, audio.currentTime, .16);
       recordedRollingAudio.swishGain.gain.setTargetAtTime(swishMix, audio.currentTime, .16);
-      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, speed), audio.currentTime, .18);
+      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, speed) * mix, audio.currentTime, .18);
       return;
     }
     if (recordedRollingAudio) recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
@@ -969,7 +1000,7 @@
     const electric = type === 'electric';
     const filterPitch = (slime ? 220 : electric ? 640 : 320) + Math.min(720, speed * (electric ? 42 : 30));
     rollingAudio.filter.frequency.setTargetAtTime(filterPitch, audio.currentTime, .065);
-    rollingAudio.gain.gain.setTargetAtTime(Math.min(.022, rollingGainForRevolutions(revolutionsPerSecond, speed)), audio.currentTime, .045);
+    rollingAudio.gain.gain.setTargetAtTime(Math.min(.022, rollingGainForRevolutions(revolutionsPerSecond, speed) * mix), audio.currentTime, .045);
   }
 
   function spawnContactParticles(x, y, type, strength = 1) {
@@ -1105,8 +1136,7 @@
     if (settings.direction) card.dataset.direction = settings.direction;
     if (descriptor.type === 'magnet') {
       card.dataset.triggerCount = String(settings.triggerCount || 2);
-      card.dataset.onSeconds = String(settings.onSeconds || 5);
-      card.dataset.offSeconds = String(settings.offSeconds || 6);
+
     }
     card.append(createToolIcon(descriptor.type, descriptor.angle ?? null));
     const label = document.createElement('span');
@@ -1140,11 +1170,12 @@
       }
       return;
     }
-    // Keep the new swing discoverable even for players with older saved recent-tool lists.
+    // Both special blocks must be reachable immediately, including on old saved tool lists.
+    toolList.append(createToolCard({ type: 'magnet', fixed: false }));
     toolList.append(createToolCard({ type: 'swing', fixed: false }));
     recentTools
       .map(toolDescriptor)
-      .filter(item => (appMode === 'editor' || !item.fixed) && item.type !== 'swing')
+      .filter(item => (appMode === 'editor' || !item.fixed) && item.type !== 'swing' && item.type !== 'magnet')
       .forEach(item => toolList.append(createToolCard(item)));
     const more = document.createElement('button');
     more.type = 'button';
@@ -1194,13 +1225,14 @@
   function configureTool(type) {
     blockCatalogDialog.close();
     if (type === 'magnet') {
+      editingSettingsTarget = null;
       document.getElementById('magnetCount').value = String(toolSettings.magnet.triggerCount);
-      document.getElementById('magnetOnSeconds').value = String(toolSettings.magnet.onSeconds);
-      document.getElementById('magnetOffSeconds').value = String(toolSettings.magnet.offSeconds);
+      document.getElementById('magnetSettingsSubmit').textContent = '크기 설정';
       magnetSettingsDialog.showModal();
       return;
     }
     if (type === 'antigravity') {
+      editingSettingsTarget = null;
       pendingGravityDirection = toolSettings.antigravity.direction || 'up';
       directionButtons.forEach(button => button.classList.toggle('active', button.dataset.gravityDirection === pendingGravityDirection));
       gravityDirectionDialog.showModal();
@@ -1557,6 +1589,7 @@
   }
 
   function updateDeleteButton() {
+    selectedSettingsButton.hidden = !selected || (appMode === 'stage' && (selected.fixed || selected.kind === 'field')) || !(selected.kind === 'field' || selected.kind === 'rod' && ['magnet', 'breakable'].includes(selected.type));
     deleteButton.disabled = !selected || (appMode === 'stage' && (selected?.fixed || selected?.kind === 'field'));
     const canToggleFixed = appMode === 'editor' && selected?.kind === 'rod';
     toggleFixedButton.disabled = !canToggleFixed;
@@ -1771,9 +1804,12 @@
       thickness: normalizedRodThickness(type, options.thickness),
       ...(type === 'magnet' ? { length: clamp(Number(options.length) || toolSettings.magnet.length, 40, 180),
         triggerCount: clamp(Math.floor(Number(options.triggerCount) || toolSettings.magnet.triggerCount), 1, 20),
-        onSeconds: clamp(Number(options.onSeconds) || toolSettings.magnet.onSeconds, .5, 60),
-        offSeconds: clamp(Number(options.offSeconds) || toolSettings.magnet.offSeconds, .5, 60) } : {}),
-      ...(type === 'breakable' ? { hp: BREAKABLE_HP } : {}),
+        onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
+      ...(type === 'breakable' ? { maxHp: BREAKABLE_HP, hp: BREAKABLE_HP } : {}),
+      ...(type === 'movable' ? { vx: Number(options.vx) || 0, vy: Number(options.vy) || 0, omega: Number(options.omega) || 0,
+        restX: Number.isFinite(options.restX) ? options.restX : x,
+        restY: Number.isFinite(options.restY) ? options.restY : y,
+        restAngle: Number.isFinite(options.restAngle) ? options.restAngle : (options.angle || 0) } : {}),
       angle: Number.isFinite(options.angle) ? options.angle : 0,
       ...(type === 'swing' ? { startAngle: Number.isFinite(options.angle) ? options.angle : 0,
         releaseAngle: Number.isFinite(options.releaseAngle) ? options.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
@@ -1866,6 +1902,7 @@
       && (previous.a.rodUid === entity.uid || previous.b.rodUid === entity.uid)
       ? previous.id : connected.length === 1 ? connected[0].id : null;
     updateDeleteButton();
+    selectedSettingsButton.hidden = !entity || !(entity.kind === 'field' || entity.kind === 'rod' && ['magnet', 'breakable'].includes(entity.type));
   }
 
   function deleteSelected() {
@@ -1924,7 +1961,13 @@
     activeBalls.length = 0;
     queueIndex = 0;
     nextLaunchAt = 0;
-    rods.forEach(rod => { if (rod.type === 'breakable') { rod.hp = BREAKABLE_HP; rod.lastDamageSeenStep = -100; } });
+    rods.forEach(rod => {
+      if (rod.type === 'breakable') { rod.hp = rod.maxHp || BREAKABLE_HP; rod.lastDamageSeenStep = -100; }
+      if (rod.type === 'movable') {
+        rod.x = rod.restX ?? rod.x; rod.y = rod.restY ?? rod.y; rod.angle = rod.restAngle ?? rod.angle;
+        rod.vx = 0; rod.vy = 0; rod.omega = 0;
+      }
+    });
     ball = null;
     selected = null;
     placement = null;
@@ -2526,7 +2569,14 @@
         setHint(blockedGoal ? '골인 바구니와 블록은 겹칠 수 없습니다.' : '스윙 점선 회전 범위에는 다른 블록을 놓을 수 없어요.', 3400);
       } else {
         const changed = JSON.stringify(captureWorld()) !== JSON.stringify(editDrag.beforeSnapshot);
-        if (changed) pushUndo(editDrag.beforeSnapshot);
+        if (changed) {
+          if (editDrag.entity.type === 'movable') {
+            const rod = editDrag.entity;
+            rod.restX = rod.x; rod.restY = rod.y; rod.restAngle = rod.angle;
+            rod.vx = 0; rod.vy = 0; rod.omega = 0;
+          }
+          pushUndo(editDrag.beforeSnapshot);
+        }
       }
       editDrag = null;
       updateDeleteButton();
@@ -3348,7 +3398,28 @@
       }
     }
   }
+  function updateMagnetWhoosh() {
+    if (!magnetPullStrength && !magnetWhoosh) return;
+    const audio = ensureAudio();
+    if (!audio || !audioMaster) return;
+    if (!magnetWhoosh) {
+      const buffer = audio.createBuffer(1, Math.round(audio.sampleRate * .6), audio.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const source = audio.createBufferSource(), filter = audio.createBiquadFilter(), gain = audio.createGain();
+      source.buffer = buffer; source.loop = true;
+      filter.type = 'bandpass'; filter.Q.value = .45;
+      gain.gain.value = 0;
+      source.connect(filter).connect(gain).connect(audioMaster);
+      source.start();
+      magnetWhoosh = { source, filter, gain };
+    }
+    const strength = clamp(magnetPullStrength, 0, 1);
+    magnetWhoosh.filter.frequency.setTargetAtTime(330 + 890 * strength, audio.currentTime, .12);
+    magnetWhoosh.gain.gain.setTargetAtTime(.028 * strength, audio.currentTime, strength ? .08 : .14);
+  }
   function pinToMagnet(rod, distance) {
+    playImpactSoundForContact(`magnet:${rod.uid}`, 'metal', Math.hypot(ball.vx, ball.vy));
     const dx = ball.x - rod.x, dy = ball.y - rod.y;
     const norm = Math.hypot(dx, dy) || 1;
     ball.magnetPinX = dx / norm; ball.magnetPinY = dy / norm;
@@ -3407,6 +3478,7 @@
         }
       } else if (magnetActive(state) && distance > radius && distance < originalMagnetRange(rod) * state.range) {
         const nearness = 1 - distance / originalMagnetRange(rod);
+        magnetPullStrength = Math.max(magnetPullStrength, clamp(.22 + nearness + Math.hypot(ball.vx, ball.vy) / 24, 0, 1));
         const acceleration = 95 + 280 * nearness * nearness;
         ball.vx += dx / distance * acceleration * dt;
         ball.vy += dy / distance * acceleration * dt;
@@ -3466,7 +3538,7 @@
     supportContacts.length = 0;
     for (const rod of rods) {
       if (rod.type === 'breakable' && rod.hp <= 0) continue;
-      if (rod.type === 'magnet') continue;
+      if (rod.type === 'magnet' || rod.type === 'movable') continue;
       if (rod.type === 'swing') {
         resolveSwingContact(rod);
         if (ball.attachedSwingUid) break;
@@ -3527,6 +3599,180 @@
     }
   }
 
+  function movableMass(rod) { return clamp(rod.length * rod.thickness / 3600 * .7, .18, 5); }
+  function movableInertia(rod) {
+    return movableMass(rod) * (rod.length ** 2 + rod.thickness ** 2) / (12 * PIXELS_PER_METER ** 2);
+  }
+  function resolveMovableOnStaticFace(a, b) {
+    const difference = Math.atan2(Math.sin(a.angle-b.angle), Math.cos(a.angle-b.angle));
+    if (Math.abs(difference) > .16) return false;
+    // The support's upper plane is the reference, NOT the SAT axis from the
+    // moving body. Its axis can select the far corner of a long sloped road.
+    const nx = -Math.sin(b.angle), ny = Math.cos(b.angle);
+    const tx = Math.cos(b.angle), ty = Math.sin(b.angle);
+    if ((b.x-a.x)*nx + (b.y-a.y)*ny < 0) return false;
+    const corners = orientedRectCorners({ x:a.x, y:a.y, width:a.length, height:a.thickness, angle:a.angle });
+    const topX = b.x-nx*b.thickness/2, topY = b.y-ny*b.thickness/2;
+    const contacts = [corners[2],corners[3]].map(point => ({
+      x:point.x, y:point.y,
+      along:(point.x-b.x)*tx+(point.y-b.y)*ty,
+      depth:(point.x-topX)*nx+(point.y-topY)*ny
+    }));
+    const left = Math.min(...contacts.map(p => p.along));
+    const right = Math.max(...contacts.map(p => p.along));
+    if (right < -b.length/2 || left > b.length/2) return false;
+    const active = contacts.filter(p => Math.abs(p.along) <= b.length/2 + .5 && p.depth > -.35);
+    if (!active.length) return false;
+    const penetration = Math.max(0, ...active.map(p => p.depth));
+    a.x -= nx*penetration; a.y -= ny*penetration;
+    const inv = 1/movableMass(a), inertia = 1/movableInertia(a);
+    // Re-evaluate both incident corners against the same plane each pass;
+    // a corner still in the air must not exert a phantom restoring torque.
+    for (let pass=0; pass<4; pass++) {
+      for (const p of contacts) {
+        if (Math.abs(p.along) > b.length/2 + .5 || p.depth-penetration < -.35) continue;
+        const rx = (p.x-nx*penetration-a.x)/PIXELS_PER_METER;
+        const ry = (p.y-ny*penetration-a.y)/PIXELS_PER_METER;
+        const cross = rx*ny-ry*nx;
+        const approach = -(a.vx-a.omega*ry)*nx-(a.vy+a.omega*rx)*ny;
+        if (approach >= 0) continue;
+        const j = -(1+(Math.abs(approach)>2?.08:0))*approach/(inv+cross*cross*inertia);
+        a.vx -= j*nx*inv; a.vy -= j*ny*inv; a.omega -= j*cross*inertia;
+        const tangentSpeed = (a.vx-a.omega*ry)*tx+(a.vy+a.omega*rx)*ty;
+        const tangentCross = rx*ty-ry*tx;
+        const friction = clamp(tangentSpeed/(inv+tangentCross*tangentCross*inertia), -.55*j, .55*j);
+        a.vx -= friction*tx*inv; a.vy -= friction*ty*inv; a.omega -= friction*tangentCross*inertia;
+      }
+    }
+    if (active.length === 2 && Math.abs(difference) < .012
+      && Math.abs(a.omega) < .08 && Math.hypot(a.vx,a.vy) < .1) {
+      // Both lower corners touch the plane: settle the remaining subpixel
+      // gap and slope friction, never a lone tip or a moving body.
+      a.angle -= difference;
+      const gap = (b.x-a.x)*nx+(b.y-a.y)*ny-(a.thickness+b.thickness)/2;
+      a.x += nx*gap; a.y += ny*gap;
+      if (a.previousPosition && Math.abs(b.angle) < Math.atan(.55)) {
+        const drift = (a.x-a.previousPosition.x)*tx+(a.y-a.previousPosition.y)*ty;
+        if (Math.abs(drift) < 1) {
+          a.x -= tx*drift; a.y -= ty*drift;
+          a.vx = 0; a.vy = 0; a.omega = 0;
+        }
+      }
+    }
+    return true;
+  }
+  function resolveMovableRects(a, b) {
+    if (b.type !== 'movable' && resolveMovableOnStaticFace(a,b)) return;
+    const ac = orientedRectCorners({ x: a.x, y: a.y, width: a.length, height: a.thickness, angle: a.angle });
+    const bc = orientedRectCorners({ x: b.x, y: b.y, width: b.length, height: b.thickness, angle: b.angle });
+    const axes = [a.angle, a.angle + Math.PI / 2, b.angle, b.angle + Math.PI / 2];
+    let depth = Infinity, nx = 0, ny = 0;
+    for (const angle of axes) {
+      const x = Math.cos(angle), y = Math.sin(angle);
+      const ap = ac.map(p => p.x * x + p.y * y), bp = bc.map(p => p.x * x + p.y * y);
+      const overlap = Math.min(Math.max(...ap), Math.max(...bp)) - Math.max(Math.min(...ap), Math.min(...bp));
+      if (overlap <= 0) return;
+      if (overlap < depth) { depth = overlap; const sign = (b.x - a.x) * x + (b.y - a.y) * y >= 0 ? 1 : -1; nx = x * sign; ny = y * sign; }
+    }
+    const invA = 1 / movableMass(a), invB = b.type === 'movable' ? 1 / movableMass(b) : 0;
+    const sum = invA + invB;
+    a.x -= nx * depth * invA / sum; a.y -= ny * depth * invA / sum;
+    if (invB) { b.x += nx * depth * invB / sum; b.y += ny * depth * invB / sum; }
+    // Rebuild witnesses after separation. A face centre must never be averaged
+    // with the OTHER body's corner: that midpoint invents a lever arm which
+    // makes a resting tilted block lift and rock against gravity.
+    const movedA = orientedRectCorners({ x: a.x, y: a.y, width: a.length, height: a.thickness, angle: a.angle });
+    const movedB = invB ? orientedRectCorners({ x: b.x, y: b.y, width: b.length, height: b.thickness, angle: b.angle }) : bc;
+    const tx = -ny, ty = nx;
+    const aMax = Math.max(...movedA.map(p => p.x * nx + p.y * ny));
+    const bMin = Math.min(...movedB.map(p => p.x * nx + p.y * ny));
+    // Small angular mismatches still form a two-corner resting contact.
+    // Treating one subpixel-high corner as the entire support amplifies torque.
+    const faceA = movedA.filter(p => aMax - p.x * nx - p.y * ny < 1.5);
+    const faceB = movedB.filter(p => p.x * nx + p.y * ny - bMin < 1.5);
+    const alongA = faceA.map(p => p.x * tx + p.y * ty);
+    const alongB = faceB.map(p => p.x * tx + p.y * ty);
+    const first = Math.max(Math.min(...alongA), Math.min(...alongB));
+    const last = Math.min(Math.max(...alongA), Math.max(...alongB));
+    const across = (aMax + bMin) / 2;
+    const contactPositions = [first <= last ? (first + last) / 2
+      : clamp((Math.min(...alongA) + Math.max(...alongA)) / 2, Math.min(...alongB), Math.max(...alongB))];
+
+    const ia = 1/movableInertia(a), ib = invB ? 1/movableInertia(b) : 0;
+    for (const along of contactPositions) {
+      const px = nx * across + tx * along, py = ny * across + ty * along;
+      const raX = (px-a.x)/PIXELS_PER_METER, raY = (py-a.y)/PIXELS_PER_METER;
+      const rbX = (px-b.x)/PIXELS_PER_METER, rbY = (py-b.y)/PIXELS_PER_METER;
+      const crossA = raX*ny-raY*nx, crossB = rbX*ny-rbY*nx;
+      const velAx = a.vx - a.omega*raY, velAy = a.vy + a.omega*raX;
+      const velBx = (b.vx||0) - (b.omega||0)*rbY, velBy = (b.vy||0) + (b.omega||0)*rbX;
+      const approach = (velBx-velAx)*nx+(velBy-velAy)*ny;
+
+      if (approach >= 0) continue;
+      const j = -(1 + (Math.abs(approach) > .6 ? .16 : 0)) * approach / (sum + crossA**2*ia + crossB**2*ib);
+      a.vx -= j*nx*invA; a.vy -= j*ny*invA; a.omega -= j*crossA*ia;
+      if (invB) { b.vx += j*nx*invB; b.vy += j*ny*invB; b.omega += j*crossB*ib; }
+      const tangentVelAx = a.vx - a.omega*raY, tangentVelAy = a.vy + a.omega*raX;
+      const tangentVelBx = (b.vx||0) - (b.omega||0)*rbY;
+      const tangentVelBy = (b.vy||0) + (b.omega||0)*rbX;
+      const tangential = (tangentVelBx-tangentVelAx)*tx+(tangentVelBy-tangentVelAy)*ty;
+      const ta = raX*ty-raY*tx, tb = rbX*ty-rbY*tx;
+      const friction = clamp(-tangential/(sum+ta**2*ia+tb**2*ib), -.55*j, .55*j);
+      a.vx -= friction*tx*invA; a.vy -= friction*ty*invA; a.omega -= friction*ta*ia;
+      if (invB) { b.vx += friction*tx*invB; b.vy += friction*ty*invB; b.omega += friction*tb*ib; }
+    }
+  }
+  function updateMovableRods(dt) {
+    const moving = rods.filter(rod => rod.type === 'movable');
+    for (const rod of moving) {
+      rod.previousPosition = { x:rod.x, y:rod.y };
+      rod.vy = clamp((rod.vy || 0) + activeGravity()*dt, -18, 18);
+      rod.vx = (rod.vx || 0)*Math.exp(-.08*dt);
+      rod.omega = clamp((rod.omega || 0)*Math.exp(-.3*dt), -14, 14);
+      rod.x += rod.vx*PIXELS_PER_METER*dt;
+      rod.y += rod.vy*PIXELS_PER_METER*dt;
+      rod.angle += rod.omega*dt;
+    }
+    for (let pass=0; pass<3; pass++) {
+      for (const a of moving) {
+        for (const b of rods) {
+          if (a === b || b.type === 'magnet' || b.type === 'swing' || (b.type === 'breakable' && b.hp<=0)) continue;
+          if (b.type === 'movable' && rods.indexOf(a) > rods.indexOf(b)) continue;
+          resolveMovableRects(a,b);
+        }
+      }
+    }
+    for (const rod of moving) delete rod.previousPosition;
+  }
+  function resolveMovableBall(rod) {
+    if (!ball) return;
+    const c = Math.cos(rod.angle), s = Math.sin(rod.angle), dx = ball.x-rod.x, dy = ball.y-rod.y;
+    const lx = c*dx+s*dy, ly = -s*dx+c*dy;
+    const cx = clamp(lx,-rod.length/2,rod.length/2), cy = clamp(ly,-rod.thickness/2,rod.thickness/2);
+    let nx = lx-cx, ny = ly-cy, dist = Math.hypot(nx,ny);
+    if (dist >= ball.radius) return;
+    if (dist < .0001) {
+      const xgap = rod.length/2-Math.abs(lx), ygap = rod.thickness/2-Math.abs(ly);
+      if (xgap < ygap) { nx = lx>=0?1:-1; ny=0; dist=-xgap; }
+      else { ny=ly>=0?1:-1; nx=0; dist=-ygap; }
+    } else { nx/=dist; ny/=dist; }
+    const normalX=c*nx-s*ny, normalY=s*nx+c*ny;
+    const ballInv = ball.attachedMagnetUid || ball.attachedSwingUid || ball.electricRide ? 0 : 1/ball.mass;
+    const rodInv=1/movableMass(rod), sum=ballInv+rodInv;
+    const penetration=ball.radius-dist+.02;
+    ball.x+=normalX*penetration*ballInv/sum; ball.y+=normalY*penetration*ballInv/sum;
+    rod.x-=normalX*penetration*rodInv/sum; rod.y-=normalY*penetration*rodInv/sum;
+    const rx = (c*cx-s*cy)/PIXELS_PER_METER, ry=(s*cx+c*cy)/PIXELS_PER_METER;
+    const cross=rx*normalY-ry*normalX, inertia=1/movableInertia(rod);
+    const rvx=ball.vx-(rod.vx-rod.omega*ry), rvy=ball.vy-(rod.vy+rod.omega*rx);
+    const speed=rvx*normalX+rvy*normalY;
+    if (speed>=0) return;
+    const impulse=-(1+(speed<-.45?.2:0))*speed/(sum+cross*cross*inertia);
+    if (ballInv) {ball.vx+=normalX*impulse*ballInv;ball.vy+=normalY*impulse*ballInv;}
+    rod.vx-=normalX*impulse*rodInv;rod.vy-=normalY*impulse*rodInv;rod.omega-=cross*impulse*inertia;
+
+    rod.touched=true;touchedRodIds.add(rod.id);
+  }
   function resolveBallPair(a, b) {
     const dx = b.x - a.x, dy = b.y - a.y;
     const minDistance = a.radius + b.radius, distanceSq = dx * dx + dy * dy;
@@ -3544,7 +3790,12 @@
     b.x += nx * correction * invB; b.y += ny * correction * invB;
     const relativeNormal = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
     if (relativeNormal >= -.01) return;
-    const impulse = -(1 + .65) * relativeNormal / inverseSum;
+    if (relativeNormal < -.18) {
+      const key = `pair:${Math.min(a.soundId, b.soundId)}:${Math.max(a.soundId, b.soundId)}`;
+      playImpactSoundForContact(key, 'marble', -relativeNormal);
+    }
+    // Nearly elastic equal-mass exchange: the striker slows, the resting steel ball carries momentum.
+    const impulse = -(1 + .92) * relativeNormal / inverseSum;
     a.vx -= nx * impulse * invA; a.vy -= ny * impulse * invA;
     b.vx += nx * impulse * invB; b.vy += ny * impulse * invB;
     const tx = -ny, ty = nx;
@@ -3562,7 +3813,9 @@
 
   function physicsStep(dt) {
     if (['free', 'stage', 'editor', 'physics-lab'].includes(appMode)) updateMagnetStates(dt);
-    if (!ball || won || editDrag) return;
+    if (['free', 'stage', 'physics-lab'].includes(appMode) && !won && !editDrag) updateMovableRods(dt);
+    magnetPullStrength = 0;
+    if (!ball || won || editDrag) { updateMagnetWhoosh(); return; }
     const current = ball;
     rollingRequests = [];
     const attached = activeBalls.find(item => item.attachedSwingUid);
@@ -3571,18 +3824,26 @@
     for (const item of activeBalls.length ? activeBalls : [current]) {
       ball = item;
       physicsStepOne(dt);
+      for (const rod of rods) if (rod.type === 'movable') resolveMovableBall(rod);
       if (won) break;
     }
+    updateMagnetWhoosh();
     if (ballCollisions && !won && activeBalls.length > 1) {
       for (let i = 0; i < activeBalls.length; i++) {
         for (let j = i + 1; j < activeBalls.length; j++) resolveBallPair(activeBalls[i], activeBalls[j]);
       }
     }
-    const loudest = rollingRequests.filter(request => request.type && request.speed >= .08)
-      .reduce((best, request) => !best || rollingGainForRevolutions(Math.abs(request.angularSpeed) / (2 * Math.PI), request.speed)
-        > rollingGainForRevolutions(Math.abs(best.angularSpeed) / (2 * Math.PI), best.speed) ? request : best, null);
+    const audible = rollingRequests.filter(request => (request.type === 'wood' || request.type === 'breakable')
+      && request.speed >= .08 && Math.abs(request.angularSpeed) / (2 * Math.PI) >= .025);
+    const loudest = audible.reduce((best, request) => !best || rollingGainForRevolutions(Math.abs(request.angularSpeed) / (2 * Math.PI), request.speed)
+      > rollingGainForRevolutions(Math.abs(best.angularSpeed) / (2 * Math.PI), best.speed) ? request : best, null);
+    const strongest = loudest ? rollingGainForRevolutions(Math.abs(loudest.angularSpeed) / (2 * Math.PI), loudest.speed) : 0;
+    const total = audible.reduce((sum, request) => sum + rollingGainForRevolutions(Math.abs(request.angularSpeed) / (2 * Math.PI), request.speed), 0);
     rollingRequests = null;
-    applyRollingSound(loudest?.type ?? null, loudest?.speed ?? 0, loudest?.angularSpeed ?? 0);
+    // One continuous loop, mixed from every contacting marble. A later ball
+    // without wood contact cannot mute the first, and two rolling balls both contribute.
+    applyRollingSound(loudest?.type ?? null, loudest?.speed ?? 0, loudest?.angularSpeed ?? 0,
+      strongest ? Math.min(1.6, total / strongest) : 1);
     if (appMode === 'free' || appMode === 'stage') {
       const radius = resetBoundaryRadius();
       for (const item of [...activeBalls]) {
@@ -3607,7 +3868,8 @@
     let radius = 0;
     for (const rod of rods) {
       if (rod.type === 'breakable' && rod.hp <= 0) continue;
-      if (rod.type === 'magnet') { radius = Math.max(radius, Math.hypot(rod.x - spawn.x, rod.y - spawn.y) + rod.length / 2); continue; }
+      // A ball pulled toward a magnet remains inside the same visible reset circle.
+      if (rod.type === 'magnet') { radius = Math.max(radius, Math.hypot(rod.x - spawn.x, rod.y - spawn.y) + originalMagnetRange(rod)); continue; }
       const corners = orientedRectCorners({ x: rod.x, y: rod.y, width: rod.length, height: rod.thickness, angle: rod.angle });
       for (const corner of corners) radius = Math.max(radius, Math.hypot(corner.x - spawn.x, corner.y - spawn.y));
     }
@@ -3884,7 +4146,7 @@
         ctx.drawImage(sprite, sourceCap, 0, sprite.naturalWidth - sourceCap * 2, sprite.naturalHeight, -rod.length / 2 + cap, -rod.thickness / 2, rod.length - cap * 2, rod.thickness);
         ctx.drawImage(sprite, sprite.naturalWidth - sourceCap, 0, sourceCap, sprite.naturalHeight, rod.length / 2 - cap, -rod.thickness / 2, cap, rod.thickness);
       }
-    } else drawPlatformAsset(platformImages[rod.type], rod.length, rod.thickness, rod.type);
+    } else if (rod.type !== 'movable') drawPlatformAsset(platformImages[rod.type], rod.length, rod.thickness, rod.type);
     ctx.strokeStyle = material.edge;
     ctx.lineWidth = 4;
     const borderInset = ctx.lineWidth / 2;
@@ -4346,34 +4608,71 @@
     unsavedDialog.close();
     showHome();
   });
+  selectedSettingsButton.addEventListener('click', () => {
+    editingSettingsTarget = selected;
+    if (!editingSettingsTarget) return;
+    if (editingSettingsTarget.kind === 'field') {
+      pendingGravityDirection = editingSettingsTarget.direction;
+      directionButtons.forEach(button => button.classList.toggle('active', button.dataset.gravityDirection === pendingGravityDirection));
+      gravityDirectionForm.querySelector('button[type=submit]').textContent = '적용';
+      gravityDirectionDialog.showModal();
+    } else if (editingSettingsTarget.type === 'magnet') {
+      document.getElementById('magnetCount').value = String(editingSettingsTarget.triggerCount);
+      document.getElementById('magnetSettingsSubmit').textContent = '적용';
+      magnetSettingsDialog.showModal();
+    } else if (editingSettingsTarget.type === 'breakable') {
+      document.getElementById('breakableHealth').value = String(Math.round((editingSettingsTarget.maxHp || BREAKABLE_HP) / BREAKABLE_HP * 6));
+      breakableSettingsDialog.showModal();
+    }
+  });
+  function applyGravityDirectionChoice() {
+    const target = editingSettingsTarget?.kind === 'field' ? editingSettingsTarget : toolSettings.antigravity;
+    if (target.direction !== pendingGravityDirection) {
+      pushUndo(); target.direction = pendingGravityDirection;
+      if (target === toolSettings.antigravity) rememberTool('antigravity');
+    }
+  }
   directionButtons.forEach(button => button.addEventListener('click', () => {
     pendingGravityDirection = button.dataset.gravityDirection;
     directionButtons.forEach(item => item.classList.toggle('active', item === button));
+    // Picking a direction is already a choice: × cancels size, not the direction.
+    applyGravityDirectionChoice();
   }));
+  gravityDirectionDialog.addEventListener('close', () => { editingSettingsTarget = null; });
   gravityDirectionForm.addEventListener('submit', event => {
     event.preventDefault();
-    if (toolSettings.antigravity.direction !== pendingGravityDirection) {
-      pushUndo();
-      toolSettings.antigravity.direction = pendingGravityDirection;
-      rememberTool('antigravity');
-    }
+    applyGravityDirectionChoice();
+    const editing = editingSettingsTarget?.kind === 'field';
     gravityDirectionDialog.close();
-    beginToolSizing('antigravity');
+    editingSettingsTarget = null;
+    if (!editing) beginToolSizing('antigravity');
   });
+  magnetSettingsDialog.addEventListener('close', () => { editingSettingsTarget = null; });
   magnetSettingsForm.addEventListener('submit', event => {
     event.preventDefault();
-    const settings = toolSettings.magnet;
+    const settings = editingSettingsTarget?.type === 'magnet' ? editingSettingsTarget : toolSettings.magnet;
     const count = clamp(Math.floor(Number(document.getElementById('magnetCount').value) || 2), 1, 20);
-    const on = clamp(Number(document.getElementById('magnetOnSeconds').value) || 5, .5, 60);
-    const off = clamp(Number(document.getElementById('magnetOffSeconds').value) || 6, .5, 60);
-    if (settings.triggerCount !== count || settings.onSeconds !== on || settings.offSeconds !== off) {
-      pushUndo();
-      Object.assign(settings, { triggerCount: count, onSeconds: on, offSeconds: off });
-      rememberTool('magnet');
+    if (settings.triggerCount !== count) {
+      pushUndo(); settings.triggerCount = count;
+      if (settings === toolSettings.magnet) rememberTool('magnet');
     }
+    const editing = settings !== toolSettings.magnet;
     magnetSettingsDialog.close();
-    beginToolSizing('magnet');
+    editingSettingsTarget = null;
+    if (!editing) beginToolSizing('magnet');
   });
+  breakableSettingsForm.addEventListener('submit', event => {
+    event.preventDefault();
+    if (editingSettingsTarget?.type === 'breakable') {
+      const hp = clamp(Number(document.getElementById('breakableHealth').value) || 6, 1, 6) * BREAKABLE_HP / 6;
+      if (editingSettingsTarget.maxHp !== hp) {
+        pushUndo(); editingSettingsTarget.maxHp = hp; editingSettingsTarget.hp = hp;
+      }
+    }
+    breakableSettingsDialog.close();
+    editingSettingsTarget = null;
+  });
+  breakableSettingsDialog.addEventListener('close', () => { editingSettingsTarget = null; });
   cancelSizeButton.addEventListener('click', () => finishToolSizing(false));
   confirmSizeButton.addEventListener('click', () => finishToolSizing(true));
   gravityRange.addEventListener('input', () => updatePhysicsLabSetting('gravity', gravityRange.value));
@@ -4473,7 +4772,7 @@
 
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
-      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked })),
+      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, vx: rod.vx, vy: rod.vy, omega: rod.omega, restX: rod.restX, restY: rod.restY, maxHp: rod.maxHp, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked })),
       magnets: rods.filter(rod => rod.type === 'magnet').map(rod => { const state = magnetStateFor(rod); return { uid: rod.uid, phase: state.phase, range: state.range, seen: state.seen.size, inside: state.inside.size }; }),
       magnetTemplate: { ...toolSettings.magnet },
       antigravityTemplate: { ...toolSettings.antigravity },
@@ -4509,6 +4808,7 @@
       canvasRect: (() => { const rect = canvas.getBoundingClientRect(); return { width: rect.width, height: rect.height, bottom: rect.bottom }; })()
     }),
     addRod,
+    addField,
     getRodByUid: rodByUid,
     swingReleasePoint,
     swingBlockedAt,
@@ -4525,6 +4825,7 @@
     },
     addGoal,
     selectRod: index => selectEntity(rods[index] || null),
+    selectField: index => selectEntity(fields[index] || null),
     setBallState: state => {
       if (!ball) spawnBall();
       Object.assign(ball, state);
