@@ -94,8 +94,8 @@ test('marble builder uses video-matched gravity, fixed substeps, friction, and d
 });
 
 test('wood impact is the original short click; quiet rolling plays on wood only at unchanged pitch', () => {
-    assert.match(script, /wood-passage-soft\.wav\?v=2/);
-    assert.match(script, /wood-passage-swish\.wav\?v=2/);
+    assert.match(script, /wood-passage-soft\.wav\?v=3/);
+    assert.match(script, /wood-passage-swish\.wav\?v=3/);
     assert.match(script, /wood-hit-\$\{index\}\.wav\?v=1/);
     assert.doesNotMatch(script, /wood-hit-video-/);
     assert.match(script, /source\.buffer = woodImpactBuffers\[Math\.floor\(Math\.random\(\) \* woodImpactBuffers\.length\)\]/);

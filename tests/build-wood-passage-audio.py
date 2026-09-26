@@ -54,7 +54,14 @@ def build(source, start, stop, max_rms, high, low, target_rms, seed, destination
         grain = source[position:position + GRAIN]
         rms = math.sqrt(sum(sample * sample for sample in grain) / GRAIN)
         peak = max(map(abs, grain))
-        if .0005 < rms < max_rms and peak < max(.01, rms * 6):
+        # Handling/rustling in the phone recording swells abruptly within a
+        # grain. Keep the steadier sections of the same video instead of
+        # copying those little bursts into every pass over a wooden block.
+        third = GRAIN // 3
+        levels = [math.sqrt(sum(x*x for x in grain[i:i+third]) / third)
+                  for i in (0, third, 2*third)]
+        if (.0005 < rms < max_rms and peak < max(.01, rms * 6)
+                and min(levels) > .55 * rms and max(levels) < 1.45 * rms):
             candidates.append((position, rms))
     if len(candidates) < 5:
         raise ValueError(f'Not enough smooth source grains: {destination}: {len(candidates)}')

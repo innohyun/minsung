@@ -17,6 +17,11 @@ for name, target in [('wood-passage-soft.wav', .016), ('wood-passage-swish.wav',
     values = [sample / 32768 for sample in samples]
     rms = math.sqrt(sum(sample * sample for sample in values) / len(values))
     assert abs(rms - target) < .002, (name, rms)
+    # Noticeable recording-handling bursts should not recur in the loop.
+    window = 2205
+    levels = [math.sqrt(sum(x*x for x in values[i:i+window]) / len(values[i:i+window]))
+              for i in range(0, len(values), window)]
+    assert max(levels) / min(levels) < 2, (name, min(levels), max(levels))
     crest = max(map(abs, values)) / rms
     assert crest < 3.6, (name, crest)
     low = 0.0
