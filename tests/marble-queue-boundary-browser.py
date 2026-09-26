@@ -72,6 +72,28 @@ with sync_playwright() as p:
         page.locator('#ballLaunchMode').select_option('manual')
         page.locator('#closeBallQueue').click()
         page.evaluate(f"(() => {{const d={D}, s=d.getState().spawn; d.addRod('wood',s.x+750,s.y,{{angle:.3}});}})()")
+        # Observe the visible circle itself and compare with all four rotated
+        # block corners, rather than accepting a fixed minimum radius.
+        page.evaluate(f"""(() => {{ const d={D}, s=d.getState().spawn;
+          window.__observedBoundary = [];
+          const arc = CanvasRenderingContext2D.prototype.arc;
+          CanvasRenderingContext2D.prototype.arc = function(x,y,r,...rest) {{
+            if (Math.abs(x-s.x)<.01 && Math.abs(y-s.y)<.01 && r>100)
+              window.__observedBoundary.push(r);
+            return arc.call(this,x,y,r,...rest);
+          }};
+        }})()""")
+        page.wait_for_function('window.__observedBoundary.length > 0')
+        actual, expected = page.evaluate(f"""(() => {{ const d={D}, state=d.getState(), rod=state.rods[0], s=state.spawn;
+          const c=Math.cos(rod.angle), t=Math.sin(rod.angle);
+          const corners=[-1,1].flatMap(a=>[-1,1].map(b=>{{
+            const x=rod.x+a*rod.length/2*c-b*rod.thickness/2*t;
+            const y=rod.y+a*rod.length/2*t+b*rod.thickness/2*c;
+            return Math.hypot(x-s.x,y-s.y);
+          }}));
+          return [window.__observedBoundary[0],Math.max(...corners)];
+        }})()""")
+        assert abs(actual - expected) < .01, (actual, expected)
         page.locator('#spawnButton').click()
         page.locator('#spawnButton').click()
         page.evaluate(f"(() => {{const d={D},s=d.getState().spawn;d.setActiveBallState(0,{{x:s.x+1100,y:s.y,vx:0,vy:0}});d.setActiveBallState(1,{{x:s.x+40,y:s.y,vx:0,vy:0}});d.stepPhysics(1);}})()")
