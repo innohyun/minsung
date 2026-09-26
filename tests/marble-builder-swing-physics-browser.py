@@ -71,18 +71,14 @@ def run(browser, mobile):
     page.evaluate(f'{D}.stepPhysics(65)')
     state = page.evaluate(f'{D}.getState()')
     assert state['ball']['attachedSwingUid'] == swing, state
-    # Put the blocker in place before touching the pivot: a real RAF may cross
-    # the target between the touchend and the subsequent Python assertion.
+    # The captured ball is armed automatically. No pivot touch is needed.
+    assert state['rods'][0]['releaseRequested'], state
+    # Put the blocker directly on the release route.
     block_x = x + (length + 64) * math.sin(target_angle)
     block_y = y - (length + 64) * math.cos(target_angle)
     assert page.evaluate(f'{D}.addRod("wood",{block_x},{block_y},{{length:50}})') is not None
     page.evaluate(f'{D}.setSwingState({swing!r},{{angle:{target_angle + .55},omega:-2,started:true}})')
-    # Pivot touch ARMS release; the blocker must prevent crossing the marker.
-    if mobile:
-        cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [{'x': x, 'y': y, 'id': 2}]})
-        cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
-    else:
-        page.mouse.click(x, y)
+    # Without touching the pivot, the blocker must prevent crossing the marker.
     armed = page.evaluate(f'{D}.getState()')
     assert armed['ball']['attachedSwingUid'] == swing and armed['rods'][0]['releaseRequested'], armed
     # A block directly on the release route stops the swinging ball before the marker.
