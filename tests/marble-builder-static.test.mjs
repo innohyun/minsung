@@ -9,7 +9,7 @@ const styles = readFileSync(new URL('../marble-builder/styles.css', import.meta.
 const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/assets.json', import.meta.url), 'utf8'));
 
 test('marble builder uses the current cache-busted game script', () => {
-    assert.match(html, /game\.js\?v=38/);
+    assert.match(html, /game\.js\?v=39/);
     assert.match(html, /styles\.css\?v=24/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
@@ -104,7 +104,7 @@ test('wood impact is the original short click; quiet rolling plays on wood only 
     assert.match(script, /recordedRollingSourceStarts \+= 1/);
     assert.match(script, /function rollingGainForRevolutions/);
     assert.match(script, /source\.playbackRate\.setTargetAtTime\(1, audio\.currentTime/);
-    assert.match(script, /setTargetAtTime\(rollingGainForRevolutions\(revolutionsPerSecond, turnPulse\)/);
+    assert.match(script, /setTargetAtTime\(rollingGainForRevolutions\(revolutionsPerSecond, speed, turnPulse\)/);
     assert.match(script, /recordedRollingAudio\.gain\.gain\.setTargetAtTime\(\.0001, audio\.currentTime, \.12\)/);
     assert.match(script, /source\.loopEnd = rollingReferenceBuffer\.duration/);
     assert.equal(assetManifest.audio.length, 3);

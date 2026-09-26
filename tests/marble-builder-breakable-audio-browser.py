@@ -66,23 +66,31 @@ with sync_playwright() as playwright:
         assert not any('/audio/wood-hit-video-' in url for url in resources), resources
         page.evaluate(f'{D}.updateRollingSound("floor",3,6)')
         assert not page.evaluate(f'{D}.getAudioState().recordedRollingActive')
-        page.evaluate(f'{D}.updateRollingSound("wood",.2,.2)')
-        page.wait_for_timeout(150)
+        # Hold rotation constant: travelling speed must still control loudness,
+        # not playback speed or the number of times the short recording repeats.
+        page.evaluate(f'{D}.updateRollingSound("wood",.12,9)')
+        page.wait_for_timeout(500)
         very_slow = page.evaluate(f'{D}.getAudioState()')
-        assert 0 < very_slow['recordedRollingGain'] < .002, very_slow
-        page.evaluate(f'{D}.updateRollingSound("wood",1,6)')
-        page.wait_for_timeout(160)
+        assert 0 < very_slow['recordedRollingGain'] < .004, very_slow
+        page.evaluate(f'{D}.updateRollingSound("wood",1.3,9)')
+        page.wait_for_timeout(500)
         quiet = page.evaluate(f'{D}.getAudioState()')
         assert quiet['recordedRollingActive'] and quiet['recordedRollingPlaybackRate'] == 1, quiet
-        assert 0 < quiet['recordedRollingGain'] < .009, quiet
-        page.evaluate(f'{D}.updateRollingSound("wood",8,60)')
-        page.wait_for_timeout(160)
+        assert .012 < quiet['recordedRollingGain'] < .035, quiet
+        page.evaluate(f'{D}.updateRollingSound("wood",3.1,9)')
+        page.wait_for_timeout(500)
         fast = page.evaluate(f'{D}.getAudioState()')
         assert fast['recordedRollingSourceStarts'] == 1 and fast['recordedRollingPlaybackRate'] == 1, fast
-        assert 0 < fast['recordedRollingGain'] < .01, fast
+        assert .04 < fast['recordedRollingGain'] < .065, fast
+        assert very_slow['recordedRollingGain'] < quiet['recordedRollingGain'] < fast['recordedRollingGain']
+        page.evaluate(f'{D}.updateRollingSound("wood",10,90)')
+        page.wait_for_timeout(500)
+        extreme = page.evaluate(f'{D}.getAudioState()')
+        assert fast['recordedRollingGain'] <= extreme['recordedRollingGain'] <= .065, extreme
+        assert extreme['recordedRollingSourceStarts'] == 1 and extreme['recordedRollingPlaybackRate'] == 1
         page.evaluate(f'{D}.updateRollingSound("floor",8,60)')
         assert page.evaluate(f'{D}.getAudioState().recordedRollingPlaybackRate') == 0
-        page.wait_for_timeout(350)
+        page.wait_for_timeout(650)
         assert page.evaluate(f'{D}.getAudioState().recordedRollingGain') < very_slow['recordedRollingGain']
         page.evaluate(f'{D}.playImpactSound("wood", 2.8)')
         assert page.evaluate(f'{D}.getAudioState().impactSoundCount') > 0

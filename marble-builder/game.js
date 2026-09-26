@@ -770,11 +770,12 @@
     return revolutionsPerSecond * Math.max(0, Number(bufferDuration) || 0);
   }
 
-  function rollingGainForRevolutions(revolutionsPerSecond, materialVolume = 1) {
-    const speed = Math.max(0, revolutionsPerSecond);
-    // A nearly stationary marble remains barely perceptible, even at full device volume.
-    const faint = .001 + .008 * clamp(speed / 1.2, 0, 1);
-    return Math.max(.001, faint - Math.max(0, speed - 1.2) * .001) * materialVolume;
+  function rollingGainForRevolutions(revolutionsPerSecond, travelSpeed, materialVolume = 1) {
+    // Travel speed changes the quiet loop's gain, never its playback rate or repetition.
+    // Smoothstep stays nearly silent at a crawl and levels off before it gets loud.
+    const fraction = clamp(Math.max(0, travelSpeed) / 3.2, 0, 1);
+    const ramp = fraction * fraction * (3 - 2 * fraction);
+    return (.0015 + .06 * ramp) * materialVolume;
   }
 
   function updateRollingSound(type, speed, angularSpeed = ball?.omega || 0) {
@@ -817,7 +818,7 @@
       recordedRollingAudio.filter.frequency.setTargetAtTime(1800, audio.currentTime, .08);
       // The faint low-angle grain is most discernible on slow revolutions.
       const turnPulse = speed < 1.5 && ball ? .85 + .15 * (1 + Math.cos(ball.angle || 0)) / 2 : .85;
-      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, turnPulse), audio.currentTime, .18);
+      recordedRollingAudio.gain.gain.setTargetAtTime(rollingGainForRevolutions(revolutionsPerSecond, speed, turnPulse), audio.currentTime, .18);
       return;
     }
     if (recordedRollingAudio) recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
@@ -842,7 +843,7 @@
     const electric = type === 'electric';
     const filterPitch = (slime ? 220 : electric ? 640 : 320) + Math.min(720, speed * (electric ? 42 : 30));
     rollingAudio.filter.frequency.setTargetAtTime(filterPitch, audio.currentTime, .065);
-    rollingAudio.gain.gain.setTargetAtTime(Math.min(.022, rollingGainForRevolutions(revolutionsPerSecond)), audio.currentTime, .045);
+    rollingAudio.gain.gain.setTargetAtTime(Math.min(.022, rollingGainForRevolutions(revolutionsPerSecond, speed)), audio.currentTime, .045);
   }
 
   function spawnContactParticles(x, y, type, strength = 1) {
