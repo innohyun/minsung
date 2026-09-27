@@ -60,6 +60,15 @@ window.MarbleKinetics = (() => {
     if (rod.type === 'rotor') rod.omega = (rod.omega || 0) + j*a.jac/a.inertia;
     else rod.pathSpeed = (rod.pathSpeed || 0) + j*a.jac/a.inertia*scale;
   }
+  function applyImpulse(rod, point, ix, iy, scale) {
+    // Constrained bodies retain their existing velocity; impulse projection is
+    // weighted by the same mass, pivot inertia and curved guide tangent as collisions.
+    if (rod.type !== 'rotor' && rod.type !== 'zipline') return;
+    const magnitude = Math.hypot(ix, iy);
+    if (!magnitude) return;
+    const a = axis(rod, point.x, point.y, ix / magnitude, iy / magnitude, scale);
+    push(rod, a, magnitude, scale);
+  }
   function corners(r) {
     const c = Math.cos(r.angle), s = Math.sin(r.angle), w = r.length/2, h = r.thickness/2;
     return [[-w,-h],[w,-h],[w,h],[-w,h]].map(([x,y]) => ({x:r.x+c*x-s*y,y:r.y+s*x+c*y}));
@@ -171,5 +180,5 @@ window.MarbleKinetics = (() => {
     onImpact?.(-approach);
     return true;
   }
-  return { curve,position,advance,collideBall,contact };
+  return { curve,position,advance,collideBall,contact,applyImpulse };
 })();

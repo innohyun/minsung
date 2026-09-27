@@ -160,6 +160,8 @@
     breakable: { label: '깨지는 블록', color: '#bd7840', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
     rotor: { label: '회전축 블록', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0 },
     zipline: { label: '곡선 짚라인', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0 },
+    punch: { label: '버튼+펀치', color: '#435974', edge: '#1d3148', friction: .20, restitution: .23, rollingResistance: 0 },
+
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
     electric: { label: '전기 발판', color: '#35bfe8', edge: '#174da0', friction: 0.2, restitution: 0.08, rollingResistance: 0.018, electric: true },
@@ -173,6 +175,8 @@
     { type: 'breakable', label: '깨지는 블록', detail: '충격에 따라 금이 가고 부서짐' },
     { type: 'rotor', label: '회전축 블록', detail: '공의 힘으로 베어링 회전' },
     { type: 'zipline', label: '곡선 짚라인', detail: '공의 힘으로 곡선을 따라 이동' },
+    { type: 'punch', label: '버튼+펀치', detail: '공이 누르면 밀어내는 블록' },
+
 
     { type: 'slime', label: '슬라임 길', detail: '낙하 높이의 2/3 반동' },
     { type: 'electric', label: '전기 발판', detail: '강한 낙하는 4/3 점프' },
@@ -336,6 +340,7 @@
   const redoStack = [];
   let freeModeDirty = false;
   let sizingMode = null;
+  let pendingPunch = null; // Button-on-wood is chosen before placing its remote punch body.
   let pendingGravityDirection = 'up';
   let selectedElectricLinkId = null;
   const toolSettings = {
@@ -343,6 +348,7 @@
     breakable: { length: 180, thickness: BREAKABLE_THICKNESS },
     rotor: { length: 150, thickness: ELECTRIC_PLATFORM_THICKNESS },
     zipline: { length: 120, thickness: ELECTRIC_PLATFORM_THICKNESS },
+    punch: { length: 70, thickness: 42, force: 7 },
 
     slime: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     electric: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
@@ -423,6 +429,7 @@
         onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
       ...(type === 'rotor' ? { pivotOffset: Number(rod.pivotOffset) || 0, pivotX: Number.isFinite(rod.pivotX) ? rod.pivotX : rod.x, pivotY: Number.isFinite(rod.pivotY) ? rod.pivotY : rod.y, omega: Number(rod.omega) || 0, restAngle: Number.isFinite(rod.restAngle) ? rod.restAngle : rod.angle || 0 } : {}),
       ...(type === 'zipline' ? { path: Array.isArray(rod.path) ? clone(rod.path) : [{x:rod.x,y:rod.y},{x:rod.x+180,y:rod.y}], fixedCount: Math.max(1,Number(rod.fixedCount)||1), pathT: Number(rod.pathT) || 0, pathSpeed: Number(rod.pathSpeed) || 0, curveBend: Number(rod.curveBend) || 0, guideOffset: Number(rod.guideOffset) || 0 } : {}),
+      ...(type === 'punch' ? { buttonAnchor: rod.buttonAnchor ? clone(rod.buttonAnchor) : null, force: clamp(Number(rod.force) || 7, 2, 20) } : {}),
       ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
         releaseAngle: Number.isFinite(rod.releaseAngle) ? rod.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
         swingStarted: false, swingOmega: 0, releaseRequested: false } : {}) };
@@ -497,7 +504,7 @@
     }
     const storedRecent = readStoredJson(RECENT_TOOLS_STORAGE_KEY, recentTools);
     if (Array.isArray(storedRecent)) {
-      const allowed = new Set(['wood', 'breakable', 'slime', 'electric', 'swing', 'antigravity', 'magnet', 'rotor', 'zipline']);
+      const allowed = new Set(['wood', 'breakable', 'slime', 'electric', 'swing', 'antigravity', 'magnet', 'rotor', 'zipline', 'punch']);
       recentTools = [...new Set(storedRecent.map(key => {
         if (key === 'goal') return 'goal';
         const type = normalizeRodType(String(key).split(':')[0]);
@@ -575,6 +582,8 @@
 
   function restoreWorld(snapshot) {
     silenceMotionAudio();
+    pendingPunch = null;
+    window.MarbleDevices.reset();
     magnetStates.clear();
     rods.splice(0, rods.length, ...clone(snapshot.rods).filter(rod => rod.type !== 'movable').map(normalizeRodRecord));
     selectedBallType = snapshot.ballType === 'giant' ? 'giant' : 'normal';
@@ -1170,6 +1179,7 @@
       card.dataset.editorY = String(descriptor.editorY ?? descriptor.y);
     }
     if (settings.thickness) card.dataset.thickness = String(settings.thickness);
+    if (descriptor.type === 'punch') card.dataset.force = String(settings.force || toolSettings.punch.force);
     if (settings.width) card.dataset.width = String(settings.width);
     if (settings.height) card.dataset.height = String(settings.height);
     if (settings.direction) card.dataset.direction = settings.direction;
@@ -1263,6 +1273,10 @@
 
   function configureTool(type) {
     blockCatalogDialog.close();
+    if (window.MarbleDevices.isDevice({ type })) {
+      openDeviceSettings(type, null);
+      return;
+    }
     if (type === 'magnet') {
       editingSettingsTarget = null;
       document.getElementById('magnetCount').value = String(toolSettings.magnet.triggerCount);
@@ -1278,6 +1292,15 @@
       return;
     }
     beginToolSizing(type);
+  }
+
+  function openDeviceSettings(type, target) {
+    editingSettingsTarget = target;
+    document.getElementById('deviceSettingsDialog').dataset.deviceType = type;
+    const values = target || toolSettings[type];
+    document.getElementById('deviceSettingsTitle').textContent = '버튼+펀치 설정';
+    document.getElementById('deviceForce').value = String(values.force || 7);
+    document.getElementById('deviceSettingsDialog').showModal();
   }
 
   function beginToolSizing(type) {
@@ -1373,6 +1396,8 @@
 
   function clearWorldState() {
     silenceMotionAudio();
+    pendingPunch = null;
+    window.MarbleDevices.reset();
     paused = false;
     pauseButton.textContent = '멈춤';
     pauseButton.setAttribute('aria-pressed','false');
@@ -1591,6 +1616,11 @@
       setHint('블록을 한 개 이상 배치해 주세요.', 3200);
       return;
     }
+    if (rods.some(rod => rod.type === 'punch' && rod.fixed &&
+      !rods.some(wood => wood.uid === rod.buttonAnchor?.woodUid && wood.type === 'wood' && wood.fixed))) {
+      setHint('고정 펀치의 버튼은 고정 나무 블록에 붙여야 합니다.', 4200);
+      return;
+    }
     const fixedBlocks = rods.filter(rod => rod.fixed).map(({ id, kind, touched, supplyId, swingOmega, swingStarted, releaseRequested, ...rod }) => ({
       ...rod, angle: rod.type === 'swing' ? (rod.startAngle ?? rod.angle) : rod.angle, fixed: true
     }));
@@ -1602,6 +1632,8 @@
       editorY: rod.y,
       length: rod.length,
       thickness: rod.thickness,
+      force: rod.force,
+      buttonAnchor: rod.buttonAnchor,
       triggerCount: rod.triggerCount,
       onSeconds: rod.onSeconds,
       offSeconds: rod.offSeconds,
@@ -1636,7 +1668,7 @@
   }
 
   function updateDeleteButton() {
-    selectedSettingsButton.hidden = !selected || (appMode === 'stage' && (selected.fixed || selected.kind === 'field')) || !(selected.kind === 'field' || selected.kind === 'rod' && ['magnet', 'breakable', 'rotor'].includes(selected.type));
+    selectedSettingsButton.hidden = !selected || (appMode === 'stage' && (selected.fixed || selected.kind === 'field')) || !(selected.kind === 'field' || selected.kind === 'rod' && ['magnet', 'breakable', 'rotor', 'punch'].includes(selected.type));
     deleteButton.disabled = !selected || (appMode === 'stage' && (selected?.fixed || selected?.kind === 'field'));
     pinZiplineButton.hidden = selected?.type !== 'zipline' || (appMode === 'stage' && selected.fixed);
     const canToggleFixed = appMode === 'editor' && selected?.kind === 'rod';
@@ -1828,8 +1860,8 @@
   function kineticPlacementConflict(candidate) {
     return rods.some(other => {
       if (other === candidate || (other.type === 'breakable' && other.hp <= 0)
-        || (candidate.type !== 'rotor' && candidate.type !== 'zipline'
-          && other.type !== 'rotor' && other.type !== 'zipline')) return false;
+        || (candidate.type !== 'rotor' && candidate.type !== 'zipline' && !window.MarbleDevices.isDevice(candidate)
+          && other.type !== 'rotor' && other.type !== 'zipline' && !window.MarbleDevices.isDevice(other))) return false;
       if (other.type === 'swing' || candidate.type === 'swing') return false;
       if (candidate.type === 'magnet') return circleTouchesRect(candidate, candidate.length / 2,
         {x:other.x,y:other.y,width:other.length,height:other.thickness,angle:other.angle});
@@ -1854,6 +1886,11 @@
   }
 
   function addRod(type, x, y, options = {}) {
+    if (type === 'punch' && (!options.buttonAnchor || !rods.some(other =>
+      other.type === 'wood' && other.uid === options.buttonAnchor.woodUid))) {
+      setHint('먼저 나무 블록에 버튼을 붙여야 펀치를 놓을 수 있어요.');
+      return null;
+    }
     const rod = {
       id: nextId++,
       uid: options.uid || makeRodUid(),
@@ -1861,12 +1898,13 @@
       type,
       x,
       y,
-      length: options.length || DEFAULT_ROD_LENGTH,
+      length: options.length || toolSettings[type]?.length || DEFAULT_ROD_LENGTH,
       thickness: normalizedRodThickness(type, options.thickness),
       ...(type === 'magnet' ? { length: clamp(Number(options.length) || toolSettings.magnet.length, 40, 180),
         triggerCount: clamp(Math.floor(Number(options.triggerCount) || toolSettings.magnet.triggerCount), 1, 20),
         onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
       ...(type === 'breakable' ? { maxHp: BREAKABLE_HP, hp: BREAKABLE_HP } : {}),
+      ...(type === 'punch' ? { buttonAnchor: options.buttonAnchor ? clone(options.buttonAnchor) : null, force: Number(options.force) || toolSettings.punch.force } : {}),
       ...(type === 'rotor' ? { pivotOffset:Number(options.pivotOffset)||0,
         pivotX:x+Math.cos(options.angle||0)*(Number(options.pivotOffset)||0),
         pivotY:y+Math.sin(options.angle||0)*(Number(options.pivotOffset)||0), omega:0, restAngle:options.angle||0 } : {}),
@@ -1890,7 +1928,7 @@
       return null;
     }
     if (kineticPlacementConflict(rod)) {
-      setHint('회전축·짚라인과 다른 블록은 겹쳐 놓을 수 없습니다.');
+      setHint('펀치 본체와 다른 블록은 겹쳐 놓을 수 없습니다.');
       return null;
     }
     if (swingPlacementConflict(rod)) {
@@ -1972,7 +2010,7 @@
       && (previous.a.rodUid === entity.uid || previous.b.rodUid === entity.uid)
       ? previous.id : connected.length === 1 ? connected[0].id : null;
     updateDeleteButton();
-    selectedSettingsButton.hidden = !entity || (appMode === 'stage' && (entity.fixed || entity.kind === 'field')) || !(entity.kind === 'field' || entity.kind === 'rod' && ['magnet', 'breakable', 'rotor'].includes(entity.type));
+    selectedSettingsButton.hidden = !entity || (appMode === 'stage' && (entity.fixed || entity.kind === 'field')) || !(entity.kind === 'field' || entity.kind === 'rod' && ['magnet', 'breakable', 'rotor', 'punch'].includes(entity.type));
   }
 
   function deleteSelected() {
@@ -1989,6 +2027,16 @@
     }
     const index = list.indexOf(selected);
     if (index >= 0) list.splice(index, 1);
+    if (selected.type === 'wood') {
+      for (let i = rods.length - 1; i >= 0; i--) {
+        if (rods[i].type === 'punch' && rods[i].buttonAnchor?.woodUid === selected.uid) {
+          const supply = stageSupplies.find(item => item.supplyId === rods[i].supplyId);
+          if (supply) supply.used = false;
+          rods.splice(i, 1);
+        }
+      }
+      window.MarbleDevices.reset();
+    }
     if (appMode === 'stage' && selected.kind === 'rod' && selected.supplyId) {
       const supply = stageSupplies.find(item => item.supplyId === selected.supplyId);
       if (supply) supply.used = false;
@@ -2003,6 +2051,8 @@
   function clearAll() {
     if (rods.length === 0 && goals.length === 0 && fields.length === 0) return;
     silenceMotionAudio();
+    pendingPunch = null;
+    window.MarbleDevices.reset();
     pushUndo();
     rods.length = 0;
     goals.length = 0;
@@ -2026,6 +2076,8 @@
 
   function resetGame() {
     silenceMotionAudio();
+    pendingPunch = null;
+    window.MarbleDevices.reset();
     paused = false;
     pauseButton.textContent = '멈춤';
     pauseButton.setAttribute('aria-pressed','false');
@@ -2353,6 +2405,11 @@
   }
 
   function findEntity(point) {
+    for (let i = rods.length - 1; i >= 0; i--) {
+      if (rods[i].type !== 'punch') continue;
+      const b = window.MarbleDevices.button(rods, rods[i]);
+      if (b && Math.hypot(point.x - b.x, point.y - b.y) < 19 / camera.zoom) return rods[i];
+    }
     for (let i = goals.length - 1; i >= 0; i -= 1) {
       if (pointInGoal(point, goals[i])) return goals[i];
     }
@@ -2417,6 +2474,17 @@
   function beginCanvasInteraction(event) {
     if (placement || event.button > 0) return;
     const screen = screenPoint(event);
+    if (pendingPunch) {
+      const inGame = screen.y >= view.playTop + 5 && screen.y < view.dockTop - 5;
+      if (inGame) {
+        const point = screenToWorld(screen);
+        const placed = addRod('punch', point.x, point.y, { buttonAnchor: pendingPunch.anchor,
+          force: pendingPunch.force, fixed: pendingPunch.fixed, supplyId: pendingPunch.supplyId });
+        if (placed) { pendingPunch = null; setHint('버튼과 떨어진 곳에 펀치를 연결했어요. 공으로 버튼을 눌러 보세요.'); }
+      }
+      event.preventDefault();
+      return;
+    }
     if (sizingMode) {
       sizingMode.pointerId = event.pointerId;
       sizingMode.start = screenToWorld(screen);
@@ -2747,6 +2815,7 @@
   function beginPlacement(event) {
     const card = event.currentTarget;
     if (card.disabled) return;
+    pendingPunch = null;
     placement = {
       pointerId: event.pointerId,
       tool: card.dataset.tool,
@@ -2762,6 +2831,7 @@
       releaseAngle: card.dataset.releaseAngle === undefined ? undefined : Number(card.dataset.releaseAngle),
       length: Number(card.dataset.length) || undefined,
       thickness: Number(card.dataset.thickness) || undefined,
+      force: Number(card.dataset.force) || undefined,
       width: Number(card.dataset.width) || undefined,
       height: Number(card.dataset.height) || undefined,
       direction: card.dataset.direction || undefined,
@@ -2782,7 +2852,7 @@
     updateDeleteButton();
     try { card.setPointerCapture?.(event.pointerId); } catch { /* cancelled or synthetic pointer */ }
     event.preventDefault();
-    if (placement.dragging) setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
+    if (placement.dragging) setHint(placement.tool === 'punch' ? '버튼을 나무 블록의 면 가까이 가져가세요.' : '게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
   }
 
   function updatePlacement(event) {
@@ -2795,7 +2865,7 @@
       if (!clearlyDraggingUp && !clearlyScrolling) return;
       placement.mode = clearlyDraggingUp ? 'drag' : 'scroll';
       placement.dragging = placement.mode === 'drag';
-      if (placement.dragging) setHint('게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
+      if (placement.dragging) setHint(placement.tool === 'punch' ? '버튼을 나무 블록의 면 가까이 가져가세요.' : '게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
     }
     if (placement.mode === 'scroll') {
       toolList.scrollLeft -= event.clientX - placement.lastX;
@@ -2819,7 +2889,14 @@
       && screen.y >= view.playTop + 5 && screen.y < view.dockTop - 5;
     if (valid) {
       const point = screenToWorld(screen);
-      if (current.tool === 'goal') addGoal(point.x, point.y);
+      if (current.tool === 'punch') {
+        const anchor = window.MarbleDevices.snap(rods, point);
+        if (anchor) {
+          pendingPunch = { anchor, force: current.force || toolSettings.punch.force, fixed: current.fixed, supplyId: current.supplyId, x: point.x, y: point.y };
+          setHint('버튼을 나무에 붙였어요. 이제 게임 화면을 눌러 펀치 본체를 놓으세요.', 0);
+        } else setHint('버튼은 나무 블록의 면에만 붙일 수 있어요. 나무 가까이에 놓으세요.', 3500);
+      }
+      else if (current.tool === 'goal') addGoal(point.x, point.y);
       else if (current.tool === 'antigravity') addField(point.x, point.y, current);
       else addRod(current.tool, point.x, point.y, {
         fixed: current.fixed,
@@ -3738,6 +3815,9 @@
       // touching the same corner must not apply a second impulse and reverse it.
       if (ball.electricRide) break;
     }
+    // The visible extended head, shaft and separate wood-mounted button are
+    // colliders too; the normal rod rectangle only covers the machine housing.
+    window.MarbleDevices.resolveBall(rods, ball);
     if (ball.electricRide) {
       ball.specialContacts = [...specialContactsThisStep];
       finishImpactSoundContacts();
@@ -3834,6 +3914,9 @@
     const attached = activeBalls.find(item => item.attachedSwingUid);
     ball = attached || current;
     advanceSwings(dt);
+    window.MarbleDevices.tick(rods, activeBalls.length ? activeBalls : [current], dt, PIXELS_PER_METER,
+      (device, target, speed) => playImpactSoundForContact(`device:${device.uid}:${target.uid || target.goalId || target.soundId}`, 'wood', speed),
+      goals.flatMap(basketSegments));
     for (const item of activeBalls.length ? activeBalls : [current]) {
       ball = item;
       physicsStepOne(dt);
@@ -4115,6 +4198,7 @@
     ctx.restore();
   }
   function drawRod(rod, alpha = 1) {
+    if (window.MarbleDevices.isDevice(rod)) { window.MarbleDevices.draw(ctx, rod, alpha); return; }
     if (rod.type === 'breakable' && rod.hp <= 0) return;
     if (rod.type === 'magnet') {
       ctx.save();
@@ -4457,8 +4541,20 @@
   }
 
   function drawPlacementGhost() {
+    if (pendingPunch) {
+      const preview = { type: 'punch', x: pendingPunch.x, y: pendingPunch.y,
+        length: toolSettings.punch.length, thickness: toolSettings.punch.thickness,
+        angle: 0, buttonAnchor: pendingPunch.anchor };
+      window.MarbleDevices.drawButton(ctx, rods, preview, .85);
+      window.MarbleDevices.draw(ctx, preview, .55);
+    }
     if (!placement?.dragging) return;
     const point = screenToWorld(clientToCanvasPoint(placement.x, placement.y));
+    if (placement.tool === 'punch') {
+      const anchor = window.MarbleDevices.snap(rods, point);
+      if (anchor) window.MarbleDevices.drawButton(ctx, rods, { type: 'punch', buttonAnchor: anchor }, .75);
+      return;
+    }
     if (placement.tool === 'goal') {
       drawBasket({ x: point.x, y: point.y + 42, width: 126, height: 84, thickness: 11 }, .48);
     } else if (placement.tool === 'antigravity') {
@@ -4492,6 +4588,7 @@
 
     rods.filter(rod => rod.type === 'swing').forEach(rod => drawSwingSweep(rod, .78));
     rods.forEach(rod => drawRod(rod, appMode === 'editor' && !rod.fixed ? 0.42 : 1));
+    rods.filter(rod => rod.type === 'punch').forEach(rod => window.MarbleDevices.drawButton(ctx, rods, rod, appMode === 'editor' && !rod.fixed ? .42 : 1));
     drawElectricJoints();
     goals.forEach(goal => drawBasket(goal));
     const latestBall = ball;
@@ -4543,6 +4640,9 @@
   }
 
   window.addEventListener('pointermove', event => {
+    if (pendingPunch && !placement && !event.buttons) {
+      const point = screenToWorld(screenPoint(event)); pendingPunch.x = point.x; pendingPunch.y = point.y;
+    }
     updatePlacement(event);
     updateCanvasInteraction(event);
   }, { passive: false });
@@ -4553,6 +4653,12 @@
   window.addEventListener('pointercancel', event => {
     if (placement?.pointerId === event.pointerId) placement = null;
     finishCanvasInteraction(event);
+  });
+  window.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && pendingPunch) {
+      pendingPunch = null;
+      setHint('버튼과 펀치 배치를 취소했어요.');
+    }
   });
   canvas.addEventListener('pointerdown', beginCanvasInteraction, { passive: false });
   canvas.addEventListener('wheel', event => {
@@ -4689,6 +4795,10 @@
   selectedSettingsButton.addEventListener('click', () => {
     editingSettingsTarget = selected;
     if (!editingSettingsTarget) return;
+    if (window.MarbleDevices.isDevice(editingSettingsTarget)) {
+      openDeviceSettings(editingSettingsTarget.type, editingSettingsTarget);
+      return;
+    }
     if (editingSettingsTarget.kind === 'field') {
       pendingGravityDirection = editingSettingsTarget.direction;
       directionButtons.forEach(button => button.classList.toggle('active', button.dataset.gravityDirection === pendingGravityDirection));
@@ -4705,6 +4815,25 @@
       document.getElementById('breakableHealth').value = String(Math.round((editingSettingsTarget.maxHp || BREAKABLE_HP) / BREAKABLE_HP * 6));
       breakableSettingsDialog.showModal();
     }
+  });
+  document.getElementById('deviceSettingsForm').addEventListener('submit', event => {
+    event.preventDefault();
+    const dialog = document.getElementById('deviceSettingsDialog');
+    const type = dialog.dataset.deviceType;
+    if (type !== 'punch') return;
+    const installed = editingSettingsTarget?.type === type && editingSettingsTarget.uid
+      ? rodByUid(editingSettingsTarget.uid) : null;
+    const target = installed || toolSettings[type];
+    const next = { force: clamp(Number(document.getElementById('deviceForce').value) || 7, 2, 20) };
+    if (Object.keys(next).some(key => target[key] !== next[key])) {
+      pushUndo();
+      Object.assign(target, next);
+      if (target === toolSettings[type]) rememberTool(type);
+      else { selected = target; updateDeleteButton(); }
+    }
+    dialog.close();
+    editingSettingsTarget = null;
+    setHint(target === toolSettings[type] ? '다음에 놓을 버튼 블록의 기본 설정을 바꿨어요.' : '선택한 버튼 블록의 설정을 바꿨어요.');
   });
   document.getElementById('rotorLengthForm').addEventListener('submit', event => {
     event.preventDefault();
@@ -4872,7 +5001,9 @@
 
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
-      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, omega: rod.omega, pivotX: rod.pivotX, pivotY: rod.pivotY, pivotOffset: rod.pivotOffset, path: rod.path ? clone(rod.path) : undefined, curveBend: rod.curveBend, guideOffset: rod.guideOffset, fixedCount: rod.fixedCount, editPhase: rod.editPhase, pathT: rod.pathT, pathSpeed: rod.pathSpeed, maxHp: rod.maxHp, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked })),
+      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, omega: rod.omega, pivotX: rod.pivotX, pivotY: rod.pivotY, pivotOffset: rod.pivotOffset, path: rod.path ? clone(rod.path) : undefined, curveBend: rod.curveBend, guideOffset: rod.guideOffset, fixedCount: rod.fixedCount, editPhase: rod.editPhase, pathT: rod.pathT, pathSpeed: rod.pathSpeed, maxHp: rod.maxHp, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked, buttonAnchor: rod.buttonAnchor ? clone(rod.buttonAnchor) : null, force: rod.force, device: window.MarbleDevices.isDevice(rod) ? (() => { const s=window.MarbleDevices.state(rod); return { phase:s.phase, depth:s.depth, travel:s.travel }; })() : null })),
+      pendingPunch: pendingPunch ? clone(pendingPunch) : null,
+      deviceTemplates: { punch: { ...toolSettings.punch } },
       magnets: rods.filter(rod => rod.type === 'magnet').map(rod => { const state = magnetStateFor(rod); return { uid: rod.uid, phase: state.phase, range: state.range, seen: state.seen.size, inside: state.inside.size }; }),
       magnetTemplate: { ...toolSettings.magnet },
       antigravityTemplate: { ...toolSettings.antigravity },
