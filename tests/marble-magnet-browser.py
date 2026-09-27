@@ -41,7 +41,7 @@ with sync_playwright() as p:
         page.locator('#cancelSizeButton').click()
         assert state(page)['antigravityTemplate']['direction'] == 'left'
         page.locator('#ballTypeButton').click()
-        assert page.locator('#magnetRepeats').count() == 1
+        assert page.locator('#magnetRepeats').count() == 0
         page.locator('#ballChoices button').filter(has_text='기본 공').click()
         page.locator('#ballChoices button').filter(has_text='기본 공').click()
         page.locator('#closeBallQueue').click()
@@ -63,6 +63,22 @@ with sync_playwright() as p:
         off = page.evaluate(f"(() => {{const d={D};for(let i=0;i<250;i++){{d.stepPhysics(1);if(d.getState().magnets[0].phase==='off')break}}return d.getState()}})()")
         assert off['magnets'][0]['phase'] == 'off' and off['magnets'][0]['range'] == 0, off['magnets']
         assert any(not item['attachedMagnetUid'] for item in off['activeBalls']), off['activeBalls']
+        # Count entrants while the field is still expanding, not only after it reaches full range.
+        expansion = page.evaluate(f'''(() => {{
+          const d={D},m=d.getState().rods[0];
+          d.setActiveBallState(0,{{x:m.x-191,y:m.y-18,vx:0,vy:0,attachedMagnetUid:null}});
+          d.setActiveBallState(1,{{x:m.x-191,y:m.y+18,vx:0,vy:0,attachedMagnetUid:null}});
+          d.stepPhysics(1);
+          const opening=d.getState().magnets[0].phase;
+          d.setActiveBallState(0,{{x:m.x-95,y:m.y-18,vx:0,vy:0}});
+          d.setActiveBallState(1,{{x:m.x-95,y:m.y+18,vx:0,vy:0}});
+          d.stepPhysics(2);
+          const observed=d.getState().magnets[0];
+          d.stepPhysics(90);
+          return {{opening,observed,end:d.getState().magnets[0]}};
+        }})()''')
+        assert expansion['opening'] == 'expanding' and expansion['observed']['seen'] == 2, expansion
+        assert expansion['end']['phase'] in ('warning', 'shrinking'), expansion
         # The new removal mode preserves all blocks and requires a manual respawn.
         page.locator('#ballTypeButton').click()
         page.locator('#escapeBehavior').select_option('remove')
@@ -76,20 +92,13 @@ with sync_playwright() as p:
         # The alternative escape option keeps the existing immediate respawn behavior.
         page.locator('#ballTypeButton').click()
         page.locator('#escapeBehavior').select_option('respawn')
-        page.locator('#magnetRepeats').check()
         page.locator('#closeBallQueue').click()
         respawned = page.evaluate(f"(() => {{const d={D},s=d.getState().spawn;d.setActiveBallState(1,{{x:s.x-110,y:s.y-30,vx:0,vy:0,attachedMagnetUid:null}});d.setActiveBallState(0,{{x:s.x+1100,y:s.y,vx:0,vy:0,attachedMagnetUid:null}});d.stepPhysics(1);return d.getState()}})()")
         assert len(respawned['activeBalls']) == 2 and abs(respawned['activeBalls'][0]['x']-respawned['spawn']['x']) < .01, respawned['activeBalls']
-        assert respawned['magnetRepeats'] and respawned['escapeBehavior'] == 'respawn'
-        # Timed mode uses fixed dwell intervals, without editable time inputs.
+        assert 'magnetRepeats' not in respawned and respawned['escapeBehavior'] == 'respawn'
+        # No timed mode: without an entering marble, the field stays on.
         page.evaluate(f'{D}.resetGame()')
         timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(601);return d.getState().magnets[0]}})()")
-        assert timed['phase'] == 'warning', timed
-        timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(180);return d.getState().magnets[0]}})()")
-        assert timed['phase'] == 'off' and timed['range'] == 0, timed
-        timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(730);return d.getState().magnets[0]}})()")
-        assert timed['phase'] == 'expanding', timed
-        timed = page.evaluate(f"(() => {{const d={D};d.stepPhysics(100);return d.getState().magnets[0]}})()")
         assert timed['phase'] == 'on' and timed['range'] == 1, timed
         assert not errors, errors
         page.close()
@@ -130,5 +139,5 @@ with sync_playwright() as p:
         assert page.evaluate("async () => {const image=new Image();image.src='/assets/marble-builder/magnet/magnet-disc.png?v=1';await image.decode();return [image.naturalWidth,image.naturalHeight]}") == [512,512]
         assert not errors, errors
         page.close()
-        print(f'PASS {width}x{height}: magnet settings, latch/count/timed cycle, both boundary modes, mouse/touch placement')
+        print(f'PASS {width}x{height}: magnet settings, latch/count cycle, both boundary modes, mouse/touch placement')
     browser.close()

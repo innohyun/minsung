@@ -9,7 +9,7 @@ window.MarbleKinetics = (() => {
     for (let i = 0; i < nodes.length - 1; i++) {
       const a = nodes[i], b = nodes[i + 1], before = nodes[i - 1] || a, after = nodes[i + 2] || b;
       const dx = b.x - a.x, dy = b.y - a.y, size = Math.hypot(dx, dy) || 1;
-      const bend = nodes.length === 2 ? 24 : 0;
+      const bend = nodes.length === 2 ? (Number.isFinite(rod.curveBend) ? rod.curveBend : 0) : 0;
       const c1 = { x: a.x + (b.x - before.x) / 6 - dy / size * bend,
         y: a.y + (b.y - before.y) / 6 + dx / size * bend };
       const c2 = { x: b.x - (after.x - a.x) / 6 - dy / size * bend,
@@ -41,7 +41,8 @@ window.MarbleKinetics = (() => {
     } else if (rod.type === 'zipline') {
       const p = curve(rod, rod.pathT || 0);
       rod.pathT = clamp(rod.pathT || 0, 0, p.total);
-      rod.x = p.x; rod.y = p.y;
+      rod.x = p.x - Math.cos(rod.angle || 0)*(rod.guideOffset || 0);
+      rod.y = p.y - Math.sin(rod.angle || 0)*(rod.guideOffset || 0);
     }
   }
   function axis(rod, x, y, nx, ny, scale) {
@@ -63,30 +64,52 @@ window.MarbleKinetics = (() => {
     const c = Math.cos(r.angle), s = Math.sin(r.angle), w = r.length/2, h = r.thickness/2;
     return [[-w,-h],[w,-h],[w,h],[-w,h]].map(([x,y]) => ({x:r.x+c*x-s*y,y:r.y+s*x+c*y}));
   }
-  function collidePair(a,b,scale) {
+  function contact(a,b) {
     const ac = corners(a), bc = corners(b);
     let depth = Infinity, nx = 0, ny = 0;
     for (const theta of [a.angle,a.angle+Math.PI/2,b.angle,b.angle+Math.PI/2]) {
       const ux = Math.cos(theta), uy = Math.sin(theta);
       const aa = ac.map(p => p.x*ux+p.y*uy), bb = bc.map(p => p.x*ux+p.y*uy);
       const overlap = Math.min(Math.max(...aa),Math.max(...bb))-Math.max(Math.min(...aa),Math.min(...bb));
-      if (overlap <= 0) return;
+      if (overlap <= 0) return null;
       if (overlap < depth) { const sign = (b.x-a.x)*ux+(b.y-a.y)*uy >= 0 ? 1 : -1;
         depth = overlap; nx = ux*sign; ny = uy*sign; }
     }
     const ap = ac.reduce((u,p) => p.x*nx+p.y*ny > u.x*nx+u.y*ny ? p : u);
     const bp = bc.reduce((u,p) => p.x*nx+p.y*ny < u.x*nx+u.y*ny ? p : u);
     const x = (ap.x+bp.x)/2, y = (ap.y+bp.y)/2;
+    return {x,y,nx,ny,depth};
+  }
+  function contactCircle(rod, magnet) {
+    const c = Math.cos(rod.angle), s = Math.sin(rod.angle);
+    const dx = magnet.x - rod.x, dy = magnet.y - rod.y;
+    const lx = c*dx+s*dy, ly = -s*dx+c*dy;
+    const px = clamp(lx,-rod.length/2,rod.length/2);
+    const py = clamp(ly,-rod.thickness/2,rod.thickness/2);
+    let nx = lx-px, ny = ly-py, distance = Math.hypot(nx,ny);
+    if (distance >= magnet.length/2) return null;
+    if (distance < .0001) { nx = 0; ny = ly >= 0 ? 1 : -1; distance = 0; }
+    else { nx /= distance; ny /= distance; }
+    return {x:rod.x+c*px-s*py,y:rod.y+s*px+c*py,
+      nx:c*nx-s*ny,ny:s*nx+c*ny,depth:magnet.length/2-distance};
+  }
+  function collidePair(a,b,scale) {
+    const hit = contact(a,b);
+    if (!hit) return 0;
+    const {x,y,nx,ny} = hit;
     const av = axis(a,x,y,nx,ny,scale), bv = axis(b,x,y,nx,ny,scale);
     const approach = (bv.vx-av.vx)*nx+(bv.vy-av.vy)*ny;
     const denom = av.jac**2/av.inertia + bv.jac**2/bv.inertia;
-    if (approach >= 0 || denom < 1e-8) return;
+    if (approach >= 0 || denom < 1e-8) return 0;
     const impulse = -(1+.08)*approach/denom;
     push(a,av,-impulse,scale); push(b,bv,impulse,scale);
+    return -approach;
   }
-  function advance(rods,dt,scale) {
+  function advance(rods,dt,scale,onImpact) {
     const dynamic = rods.filter(r => r.type === 'rotor' || r.type === 'zipline');
+    const solids = rods.filter(r => r.type !== 'rotor' && r.type !== 'zipline' && r.type !== 'swing' && (r.type !== 'breakable' || r.hp > 0));
     for (const rod of dynamic) {
+      const old = {angle:rod.angle,pathT:rod.pathT};
       if (rod.type === 'rotor') {
         rod.omega = (rod.omega || 0)*Math.exp(-.28*dt);
         rod.angle += rod.omega*dt;
@@ -97,12 +120,34 @@ window.MarbleKinetics = (() => {
         if (target !== rod.pathT) rod.pathSpeed = 0;
       }
       position(rod);
+      for (const fixed of solids) {
+        const hit = fixed.type === 'magnet' ? contactCircle(rod,fixed) : contact(rod,fixed);
+        if (!hit) continue;
+        const a = axis(rod,hit.x,hit.y,hit.nx,hit.ny,scale);
+        const inward = a.vx*hit.nx+a.vy*hit.ny;
+        rod.angle=old.angle; rod.pathT=old.pathT; position(rod);
+        if (inward > .02 && Math.abs(a.jac) > 1e-6) {
+          push(rod,a,-(1+.12)*inward*a.inertia/a.jac,scale);
+          onImpact?.(rod,fixed,inward);
+        } else if (rod.type === 'rotor') rod.omega=0;
+        else rod.pathSpeed=0;
+        break;
+      }
     }
     for (let i = 0; i < dynamic.length; i++) for (let j = i+1; j < dynamic.length; j++) {
-      collidePair(dynamic[i],dynamic[j],scale);
+      const speed = collidePair(dynamic[i],dynamic[j],scale);
+      if (speed > .12) {
+        onImpact?.(dynamic[i],dynamic[j],speed);
+        // Let the exchanged impulse drive the following step, not a penetrated pose.
+        for (const r of [dynamic[i],dynamic[j]]) {
+          if (r.type === 'rotor') r.angle -= r.omega*dt;
+          else r.pathT = clamp(r.pathT-r.pathSpeed*dt,0,curve(r).total);
+          position(r);
+        }
+      }
     }
   }
-  function collideBall(rod,ball,scale) {
+  function collideBall(rod,ball,scale,onImpact) {
     if (!ball) return;
     const c = Math.cos(rod.angle), s = Math.sin(rod.angle), dx = ball.x-rod.x, dy = ball.y-rod.y;
     const lx = c*dx+s*dy, ly = -s*dx+c*dy;
@@ -123,7 +168,8 @@ window.MarbleKinetics = (() => {
     const impulse = -(1+.18)*approach/denom;
     if (invBall) { ball.vx += wx*impulse*invBall; ball.vy += wy*impulse*invBall; }
     push(rod,ax,-impulse,scale);
+    onImpact?.(-approach);
     return true;
   }
-  return { curve,position,advance,collideBall };
+  return { curve,position,advance,collideBall,contact };
 })();

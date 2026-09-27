@@ -10,6 +10,7 @@
   const deleteButton = document.getElementById('deleteButton');
   const pinZiplineButton = document.getElementById('pinZiplineButton');
   const resetButton = document.getElementById('resetButton');
+  const pauseButton = document.getElementById('pauseButton');
   const toggleFixedButton = document.getElementById('toggleFixedButton');
   const combineElectricButton = document.getElementById('combineElectricButton');
   const detachElectricButton = document.getElementById('detachElectricButton');
@@ -199,6 +200,7 @@
   let selected = null;
   let nextId = 1;
   let won = false;
+  let paused = false;
   let goalHoldTime = 0;
   let goalEnteredAt = null;
   const supportContacts = [];
@@ -229,7 +231,7 @@
   let launchMode = 'manual';
   let launchInterval = 2;
   let ballCollisions = false;
-  let magnetRepeats = false;
+
   let escapeBehavior = 'respawn';
   let pendingRetrievals = [];
   let autoLaunchArmed = false;
@@ -420,7 +422,7 @@
         triggerCount: clamp(Math.floor(Number(rod.triggerCount) || 2), 1, 20),
         onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
       ...(type === 'rotor' ? { pivotOffset: Number(rod.pivotOffset) || 0, pivotX: Number.isFinite(rod.pivotX) ? rod.pivotX : rod.x, pivotY: Number.isFinite(rod.pivotY) ? rod.pivotY : rod.y, omega: Number(rod.omega) || 0, restAngle: Number.isFinite(rod.restAngle) ? rod.restAngle : rod.angle || 0 } : {}),
-      ...(type === 'zipline' ? { path: Array.isArray(rod.path) ? clone(rod.path) : [{x:rod.x,y:rod.y},{x:rod.x+180,y:rod.y}], fixedCount: Math.max(1,Number(rod.fixedCount)||1), pathT: Number(rod.pathT) || 0, pathSpeed: Number(rod.pathSpeed) || 0 } : {}),
+      ...(type === 'zipline' ? { path: Array.isArray(rod.path) ? clone(rod.path) : [{x:rod.x,y:rod.y},{x:rod.x+180,y:rod.y}], fixedCount: Math.max(1,Number(rod.fixedCount)||1), pathT: Number(rod.pathT) || 0, pathSpeed: Number(rod.pathSpeed) || 0, curveBend: Number(rod.curveBend) || 0, guideOffset: Number(rod.guideOffset) || 0 } : {}),
       ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
         releaseAngle: Number.isFinite(rod.releaseAngle) ? rod.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
         swingStarted: false, swingOmega: 0, releaseRequested: false } : {}) };
@@ -495,7 +497,7 @@
     }
     const storedRecent = readStoredJson(RECENT_TOOLS_STORAGE_KEY, recentTools);
     if (Array.isArray(storedRecent)) {
-      const allowed = new Set(['wood', 'breakable', 'slime', 'electric', 'swing', 'antigravity', 'magnet']);
+      const allowed = new Set(['wood', 'breakable', 'slime', 'electric', 'swing', 'antigravity', 'magnet', 'rotor', 'zipline']);
       recentTools = [...new Set(storedRecent.map(key => {
         if (key === 'goal') return 'goal';
         const type = normalizeRodType(String(key).split(':')[0]);
@@ -572,6 +574,7 @@
   }
 
   function restoreWorld(snapshot) {
+    silenceMotionAudio();
     magnetStates.clear();
     rods.splice(0, rods.length, ...clone(snapshot.rods).filter(rod => rod.type !== 'movable').map(normalizeRodRecord));
     selectedBallType = snapshot.ballType === 'giant' ? 'giant' : 'normal';
@@ -903,6 +906,20 @@
     knock.stop(start + .11);
   }
 
+  function playElectricBoostSound() {
+    const audio = ensureAudio();
+    if (!audio || !audioMaster) return;
+    const start = audio.currentTime;
+    const tone = audio.createOscillator(), gain = audio.createGain();
+    tone.type = 'sine';
+    tone.frequency.setValueAtTime(420,start);
+    tone.frequency.exponentialRampToValueAtTime(940,start+.16);
+    gain.gain.setValueAtTime(.0001,start);
+    gain.gain.linearRampToValueAtTime(.045,start+.025);
+    gain.gain.exponentialRampToValueAtTime(.0001,start+.23);
+    tone.connect(gain).connect(audioMaster);
+    tone.start(start); tone.stop(start+.24);
+  }
   function rollingPlaybackRateForOmega(omega, bufferDuration) {
     const revolutionsPerSecond = Math.abs(Number(omega) || 0) / (Math.PI * 2);
     return revolutionsPerSecond * Math.max(0, Number(bufferDuration) || 0);
@@ -919,6 +936,17 @@
   function updateRollingSound(type, speed, angularSpeed = ball?.omega || 0) {
     if (rollingRequests) { rollingRequests.push({ type, speed, angularSpeed }); return; }
     applyRollingSound(type, speed, angularSpeed);
+  }
+  function silenceMotionAudio() {
+    rollingRequests = null;
+    recordedRollingPlaybackRate = 0;
+    recordedRollingRevolutionsPerSecond = 0;
+    if (!audioContext) return;
+    for (const loop of [rollingAudio,recordedRollingAudio,magnetWhoosh]) {
+      if (!loop) continue;
+      loop.gain.gain.cancelScheduledValues(audioContext.currentTime);
+      loop.gain.gain.setValueAtTime(0,audioContext.currentTime);
+    }
   }
   function applyRollingSound(type, speed, angularSpeed, mix = 1) {
     const audio = audioContext;
@@ -1135,6 +1163,8 @@
     if (descriptor.type === 'rotor' && Number.isFinite(descriptor.pivotOffset)) card.dataset.pivotOffset = String(descriptor.pivotOffset);
     if (descriptor.type === 'zipline' && Array.isArray(descriptor.path)) {
       card.dataset.path = JSON.stringify(descriptor.path);
+      card.dataset.curveBend = String(descriptor.curveBend || 0);
+      card.dataset.guideOffset = String(descriptor.guideOffset || 0);
       card.dataset.fixedCount = String(descriptor.fixedCount || 1);
       card.dataset.editorX = String(descriptor.editorX ?? descriptor.x);
       card.dataset.editorY = String(descriptor.editorY ?? descriptor.y);
@@ -1316,6 +1346,7 @@
 
   function setAppMode(mode) {
     appMode = mode;
+    if (mode === 'home' || mode === 'stage-list') silenceMotionAudio();
     document.body.className = `is-${mode}`;
     homeScreen.hidden = mode !== 'home';
     stageScreen.hidden = mode !== 'stage-list';
@@ -1341,6 +1372,10 @@
   }
 
   function clearWorldState() {
+    silenceMotionAudio();
+    paused = false;
+    pauseButton.textContent = '멈춤';
+    pauseButton.setAttribute('aria-pressed','false');
     activeBalls.length = 0;
     magnetStates.clear();
     pendingRetrievals = [];
@@ -1348,8 +1383,7 @@
     ballQueue = [];
     ballCollisions = false;
     document.getElementById('ballCollisions').checked = false;
-    magnetRepeats = false;
-    document.getElementById('magnetRepeats').checked = false;
+
     escapeBehavior = 'respawn';
     document.getElementById('escapeBehavior').value = escapeBehavior;
     nextLaunchAt = 0;
@@ -1791,6 +1825,19 @@
     });
   }
 
+  function kineticPlacementConflict(candidate) {
+    return rods.some(other => {
+      if (other === candidate || (other.type === 'breakable' && other.hp <= 0)
+        || (candidate.type !== 'rotor' && candidate.type !== 'zipline'
+          && other.type !== 'rotor' && other.type !== 'zipline')) return false;
+      if (other.type === 'swing' || candidate.type === 'swing') return false;
+      if (candidate.type === 'magnet') return circleTouchesRect(candidate, candidate.length / 2,
+        {x:other.x,y:other.y,width:other.length,height:other.thickness,angle:other.angle});
+      if (other.type === 'magnet') return circleTouchesRect(other, other.length / 2,
+        {x:candidate.x,y:candidate.y,width:candidate.length,height:candidate.thickness,angle:candidate.angle});
+      return Boolean(window.MarbleKinetics.contact(candidate, other));
+    });
+  }
   function rodOverlapsGoal(rod, goal) {
     if (rod.type === 'swing') return false;
     if (rod.type === 'magnet') return basketSegments(goal).some(wall => circleTouchesRect(rod, rod.length / 2, basketSegmentBounds(wall)));
@@ -1827,7 +1874,7 @@
         ? options.path.map(node=>({x:x+node.x-(Number.isFinite(options.editorX)?options.editorX:options.path[0].x),
           y:y+node.y-(Number.isFinite(options.editorY)?options.editorY:options.path[0].y)}))
         : [{x,y},{x:x+180,y}], fixedCount:Number(options.fixedCount)||1,
-        pathT:0, pathSpeed:0, editPhase:'length' } : {}),
+        pathT:0, pathSpeed:0, curveBend:Number(options.curveBend)||0, guideOffset:Number(options.guideOffset)||0, editPhase:'length' } : {}),
       angle: Number.isFinite(options.angle) ? options.angle : 0,
       ...(type === 'swing' ? { startAngle: Number.isFinite(options.angle) ? options.angle : 0,
         releaseAngle: Number.isFinite(options.releaseAngle) ? options.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
@@ -1840,6 +1887,10 @@
     if (type === 'zipline') positionZipline(rod);
     if (rodOverlapsAnyGoal(rod)) {
       setHint('골인 바구니와 블록은 겹칠 수 없습니다.');
+      return null;
+    }
+    if (kineticPlacementConflict(rod)) {
+      setHint('회전축·짚라인과 다른 블록은 겹쳐 놓을 수 없습니다.');
       return null;
     }
     if (swingPlacementConflict(rod)) {
@@ -1951,6 +2002,7 @@
 
   function clearAll() {
     if (rods.length === 0 && goals.length === 0 && fields.length === 0) return;
+    silenceMotionAudio();
     pushUndo();
     rods.length = 0;
     goals.length = 0;
@@ -1973,6 +2025,10 @@
   }
 
   function resetGame() {
+    silenceMotionAudio();
+    paused = false;
+    pauseButton.textContent = '멈춤';
+    pauseButton.setAttribute('aria-pressed','false');
     resetSwingState();
     magnetStates.clear();
     pendingRetrievals = [];
@@ -2340,6 +2396,7 @@
   }
 
   function makeEditDrag(pointerId, mode, entity, extra = {}) {
+    silenceMotionAudio();
     const drag = {
       pointerId,
       mode,
@@ -2408,6 +2465,16 @@
       return;
     }
 
+    const directPivot = rods.find(rod => rod !== selected && !(appMode === 'stage' && rod.fixed)
+      && (rod.type === 'rotor' || rod.type === 'zipline')
+      && distanceSquared(point, rod.type === 'rotor' ? {x:rod.pivotX,y:rod.pivotY}
+        : window.MarbleKinetics.curve(rod,rod.pathT||0)) <= handleRadius ** 2);
+    if (directPivot) {
+      selectEntity(directPivot);
+      editDrag = makeEditDrag(event.pointerId, directPivot.type === 'rotor' ? 'rotorPivot' : 'zipPivot', directPivot);
+      event.preventDefault(); return;
+    }
+
     if (appMode !== 'stage') {
       const joint = findElectricLinkAt(point, handleRadius);
       if (joint) {
@@ -2427,6 +2494,16 @@
       }
       if (selected.type === 'zipline') {
         const nodes = selected.path || [];
+        const center = window.MarbleKinetics.curve(selected, window.MarbleKinetics.curve(selected).total/2);
+        if (nodes.length === 2 && distanceSquared(point,center) <= handleRadius ** 2) {
+          editDrag = makeEditDrag(event.pointerId,'zipBend',selected);
+          event.preventDefault(); return;
+        }
+        const guide = window.MarbleKinetics.curve(selected,selected.pathT||0);
+        if (distanceSquared(point,guide) <= handleRadius ** 2 && distanceSquared(point,nodes[0]) > handleRadius ** 2) {
+          editDrag = makeEditDrag(event.pointerId,'zipPivot',selected);
+          event.preventDefault(); return;
+        }
         const index = nodes.findIndex(node => distanceSquared(point,node) <= handleRadius ** 2);
         if (index >= 0) {
           if(index === nodes.length-1 && index < (selected.fixedCount||1) && nodes.length >= 2) {
@@ -2461,7 +2538,8 @@
         if (editDrag) { event.preventDefault(); return; }
       } else {
       const fixedInPlayer = appMode === 'stage' && selected.fixed;
-      const rotatesAroundCenter = fixedInPlayer || (appMode === 'editor' && selected.fixed);
+      const rotatesAroundCenter = fixedInPlayer || (appMode === 'editor' && selected.fixed)
+        || selected.type === 'rotor' || selected.type === 'zipline';
       const angleLockedInPlayer = appMode === 'stage' && selected.angleLocked;
       const startLink = selected.type === 'electric' ? endpointLink(selected.uid, 'start') : null;
       const endLink = selected.type === 'electric' ? endpointLink(selected.uid, 'end') : null;
@@ -2539,6 +2617,16 @@
         entity.pivotOffset = clamp(along,-entity.length/2,entity.length/2);
         entity.pivotX = entity.x+Math.cos(entity.angle)*entity.pivotOffset;
         entity.pivotY = entity.y+Math.sin(entity.angle)*entity.pivotOffset;
+      } else if (editDrag.mode === 'zipPivot') {
+        const next = clamp((point.x-entity.x)*Math.cos(entity.angle)+(point.y-entity.y)*Math.sin(entity.angle),-entity.length/2,entity.length/2);
+        const delta = next-(entity.guideOffset||0);
+        entity.guideOffset = next;
+        entity.path.forEach(node => {node.x += Math.cos(entity.angle)*delta;node.y += Math.sin(entity.angle)*delta;});
+        positionZipline(entity);
+      } else if (editDrag.mode === 'zipBend') {
+        const a=entity.path[0],b=entity.path[1],dx=b.x-a.x,dy=b.y-a.y,length=Math.hypot(dx,dy)||1;
+        entity.curveBend=clamp(4/3*((point.x-(a.x+b.x)/2)*(-dy/length)+(point.y-(a.y+b.y)/2)*(dx/length)),-length,length);
+        positionZipline(entity);
       } else if (editDrag.mode === 'zipAnchor' || editDrag.mode === 'zipDraft') {
         const index=editDrag.nodeIndex;
         if (distanceSquared(point,editDrag.startPoint)>16) editDrag.moved=true;
@@ -2582,7 +2670,11 @@
         entity.swingStarted = false;
         entity.swingBlocked = false;
       } else if (editDrag.mode === 'rotateFixed') {
-        entity.angle = Math.atan2(point.y - entity.y, point.x - entity.x);
+        const anchor = entity.type === 'rotor' ? {x:entity.pivotX,y:entity.pivotY}
+          : entity.type === 'zipline' ? window.MarbleKinetics.curve(entity,entity.pathT||0) : entity;
+        entity.angle = Math.atan2(point.y-anchor.y, point.x-anchor.x);
+        if (entity.type === 'rotor') positionRotor(entity);
+        if (entity.type === 'zipline') positionZipline(entity);
       } else {
         let dx = point.x - editDrag.fixed.x;
         let dy = point.y - editDrag.fixed.y;
@@ -2596,7 +2688,7 @@
           ? Math.atan2(dy, dx)
           : Math.atan2(-dy, -dx);
       }
-      if (entity?.type==='rotor' && editDrag.mode!=='rotorPivot' && editDrag.mode!=='move') {
+      if (entity?.type==='rotor' && editDrag.mode!=='rotorPivot' && editDrag.mode!=='move' && editDrag.mode!=='rotateFixed') {
         entity.pivotX=entity.x+Math.cos(entity.angle)*(entity.pivotOffset||0);
         entity.pivotY=entity.y+Math.sin(entity.angle)*(entity.pivotOffset||0);
       }
@@ -2629,10 +2721,14 @@
         : editDrag.groupOriginal || editDrag.mode === 'joint'
           ? rods.some(rod => rodOverlapsAnyGoal(rod))
           : rodOverlapsAnyGoal(editDrag.entity);
-      const blocked = blockedGoal || swingConflictsInWorld();
+      const blockedKinetic = editDrag.entity.kind === 'rod' && (editDrag.groupOriginal
+        ? editDrag.groupOriginal.some(item => kineticPlacementConflict(item.rod))
+        : kineticPlacementConflict(editDrag.entity));
+      const blocked = blockedGoal || blockedKinetic || swingConflictsInWorld();
       if (blocked) {
         restoreWorld(editDrag.beforeSnapshot);
-        setHint(blockedGoal ? '골인 바구니와 블록은 겹칠 수 없습니다.' : '스윙 점선 회전 범위에는 다른 블록을 놓을 수 없어요.', 3400);
+        setHint(blockedGoal ? '골인 바구니와 블록은 겹칠 수 없습니다.' : blockedKinetic
+          ? '회전축·짚라인과 다른 블록은 겹쳐 놓을 수 없습니다.' : '스윙 점선 회전 범위에는 다른 블록을 놓을 수 없어요.', 3400);
       } else {
         const changed = JSON.stringify(captureWorld()) !== JSON.stringify(editDrag.beforeSnapshot);
         if (changed) {
@@ -2659,6 +2755,8 @@
       angle: Number.isFinite(Number(card.dataset.angle)) ? Number(card.dataset.angle) : 0,
       pivotOffset: Number(card.dataset.pivotOffset) || 0,
       path: card.dataset.path ? JSON.parse(card.dataset.path) : null,
+      curveBend: Number(card.dataset.curveBend) || 0,
+      guideOffset: Number(card.dataset.guideOffset) || 0,
       fixedCount: Number(card.dataset.fixedCount) || 1,
       editorX: Number(card.dataset.editorX), editorY: Number(card.dataset.editorY),
       releaseAngle: card.dataset.releaseAngle === undefined ? undefined : Number(card.dataset.releaseAngle),
@@ -2729,6 +2827,8 @@
         angle: current.angle,
         pivotOffset: current.pivotOffset,
         path: current.path,
+        curveBend: current.curveBend,
+        guideOffset: current.guideOffset,
         fixedCount: current.fixedCount,
         editorX: current.editorX, editorY: current.editorY,
         releaseAngle: current.releaseAngle,
@@ -2792,7 +2892,7 @@
     const rod = rodByUid(ride.rodUid);
     if (!rod || !ball) return false;
     const localX = clamp(ride.distance, 0, rod.length) - rod.length / 2;
-    const localY = -(rod.thickness / 2 + ball.radius + .25);
+    const localY = (ride.side === 'bottom' ? 1 : -1) * (rod.thickness / 2 + ball.radius + .25);
     const cos = Math.cos(rod.angle); const sin = Math.sin(rod.angle);
     ball.x = rod.x + localX * cos - localY * sin;
     ball.y = rod.y + localX * sin + localY * cos;
@@ -2808,21 +2908,20 @@
   function adjacentElectricExit(rod, end, side) {
     // A visually flush, unlinked pair should not act as a reflecting wall.
     // This is a ride-only handoff; it never creates or saves an editor link.
-    if (side !== 'top') return null;
     const point = rodCorner(rod, end, side);
     const matches = [];
     for (const other of rods) {
       if (other.uid === rod.uid || other.type !== 'electric') continue;
       for (const otherEnd of ['start', 'end']) {
         if (endpointLink(other.uid, otherEnd)) continue;
-        const target = rodCorner(other, otherEnd, 'top');
+        const target = rodCorner(other, otherEnd, side);
         if (distanceSquared(point, target) > 8 * 8) continue;
         const towardRod = { x: rod.x - point.x, y: rod.y - point.y };
         const towardOther = { x: other.x - target.x, y: other.y - target.y };
         const dot = towardRod.x * towardOther.x + towardRod.y * towardOther.y;
         const length = Math.hypot(towardRod.x, towardRod.y) * Math.hypot(towardOther.x, towardOther.y);
         if (dot > -length * Math.SQRT1_2) continue; // inside angle must be 135°..180°
-        matches.push({ rodUid: other.uid, end: otherEnd, side: 'top' });
+        matches.push({ rodUid: other.uid, end: otherEnd, side });
       }
     }
     // Do not invent a branch when several platforms meet at one corner.
@@ -2835,7 +2934,9 @@
     // Brief visible roll at the entry, then a strong boost on the same block.
     ride.speed = Math.min(ELECTRIC_MAX_SPEED, ride.speed + ((ride.boostTravel || 0) < 24 ? 10 : ELECTRIC_ACCELERATION) * dt);
     let travel = ride.speed * PIXELS_PER_METER * dt;
-    ride.boostTravel = (ride.boostTravel || 0) + travel;
+    const previousBoostTravel = ride.boostTravel || 0;
+    ride.boostTravel = previousBoostTravel + travel;
+    if (previousBoostTravel < 24 && ride.boostTravel >= 24) playElectricBoostSound();
     let guard = 0;
     while (travel > 0 && guard++ < 12) {
       const rod = rodByUid(ride.rodUid);
@@ -2854,7 +2955,7 @@
       travel -= Math.max(0, available);
       const end = ride.direction > 0 ? 'end' : 'start';
       const link = endpointLink(rod.uid, end);
-      const nextEndpoint = link
+      const nextEndpoint = link && validElectricJoint(link)
         ? link.a.rodUid === rod.uid ? link.b : link.a
         : adjacentElectricExit(rod, end, ride.side);
       if (!nextEndpoint) {
@@ -2866,10 +2967,21 @@
       }
       const nextRod = rodByUid(nextEndpoint.rodUid);
       if (!nextRod) { ball.electricRide = null; return true; }
+      const entryX = ball.x, entryY = ball.y;
       ride.rodUid = nextRod.uid;
-      ride.side = 'top';
       ride.direction = nextEndpoint.end === 'start' ? 1 : -1;
       ride.distance = nextEndpoint.end === 'start' ? 0 : nextRod.length;
+      // The yellow link can connect the inside/bottom corners while the ball
+      // rides the outside/top face. Choose the next physical face by continuity,
+      // not by the link's corner label (which would teleport it through the road).
+      const atEntry = side => {
+        const localX = ride.distance - nextRod.length/2;
+        const localY = (side === 'bottom' ? 1 : -1) * (nextRod.thickness/2 + ball.radius + .25);
+        const c = Math.cos(nextRod.angle), s = Math.sin(nextRod.angle);
+        return distanceSquared({x:entryX,y:entryY},
+          {x:nextRod.x+localX*c-localY*s,y:nextRod.y+localX*s+localY*c});
+      };
+      ride.side = atEntry('top') <= atEntry('bottom') ? 'top' : 'bottom';
     }
     if (placeBallOnElectricRide(ride)) {
       ball.angle += ball.omega * dt;
@@ -2930,7 +3042,7 @@
     const contactVx = ball.vx - ball.omega * ry;
     const contactVy = ball.vy + ball.omega * rx;
     const specialType = rect.material.slime ? 'slime' : rect.material.electric ? 'electric' : null;
-    const specialSurface = specialType === 'slime' || (specialType === 'electric' && nyLocal < -0.25);
+    const specialSurface = specialType === 'slime' || specialType === 'electric';
     const contactKey = specialSurface ? `${specialType}:${rect.blockId}` : null;
     const isFreshContact = Boolean(contactKey && !ball.specialContacts.includes(contactKey));
     if (contactKey) specialContactsThisStep.add(contactKey);
@@ -3009,7 +3121,7 @@
       } else if (specialType === 'electric' && normalSpeed < 0) {
         const incomingSpeed = Math.hypot(incomingVx, incomingVy);
         const angleFromSurface = Math.asin(clamp(Math.max(0, -(incomingVx * nx + incomingVy * ny)) / Math.max(.0001, incomingSpeed), 0, 1));
-        if (angleFromSurface <= ELECTRIC_ATTACH_ANGLE && rect.source) {
+        if (angleFromSurface <= ELECTRIC_ATTACH_ANGLE && rect.source && Math.abs(nyLocal) > .75) {
           const surfaceAngle = rect.surfaceAngle ?? rect.source.angle;
           const tangent = { x: Math.cos(surfaceAngle), y: Math.sin(surfaceAngle) };
           const along = incomingVx * tangent.x + incomingVy * tangent.y;
@@ -3018,7 +3130,7 @@
           const localX = tangent.x * localDx + tangent.y * localDy;
           ball.electricRide = {
             rodUid: rect.source.uid,
-            side: 'top',
+            side: nyLocal < 0 ? 'top' : 'bottom',
             direction: Math.abs(along) > .08 ? Math.sign(along) : 1,
             speed: Math.max(1.5, Math.abs(along)),
             distance: clamp(localX + rect.source.length / 2, 0, rect.source.length),
@@ -3030,6 +3142,7 @@
           ball.vx = (incomingVx - 2 * dot * nx) * ELECTRIC_SPEED_MULTIPLIER;
           ball.vy = (incomingVy - 2 * dot * ny) * ELECTRIC_SPEED_MULTIPLIER;
           ball.fallPeakY = ball.y;
+          playElectricBoostSound();
         }
         if (rect.source) rect.source.electricPulse = 0.45;
         spawnContactParticles(ball.x - nx * ball.radius, ball.y - ny * ball.radius, 'electric', Math.abs(normalSpeed) + 2);
@@ -3450,7 +3563,7 @@
       if (rod.type !== 'magnet') continue;
       const state = magnetStateFor(rod);
       state.elapsed += dt;
-      if (state.phase === 'on' && magnetRepeats && state.elapsed >= rod.onSeconds) {
+      if (state.phase === 'on' && state.seen.size >= rod.triggerCount) {
         state.phase = 'warning'; state.elapsed = 0;
       } else if (state.phase === 'warning' && state.elapsed >= MAGNET_WARNING) {
         state.phase = 'shrinking'; state.elapsed = 0;
@@ -3459,7 +3572,7 @@
         if (state.range <= 0) { state.phase = 'off'; state.elapsed = 0; }
       } else if (state.phase === 'off') {
         const allOutside = activeBalls.every(item => Math.hypot(item.x - rod.x, item.y - rod.y) > originalMagnetRange(rod) + item.radius);
-        if (magnetRepeats ? state.elapsed >= rod.offSeconds : allOutside) {
+        if (allOutside) {
           state.phase = 'expanding'; state.elapsed = 0; state.seen.clear(); state.inside.clear(); state.lastEntryId = null;
         }
       } else if (state.phase === 'expanding') {
@@ -3521,7 +3634,7 @@
       const radius = rod.length / 2 + ball.radius;
       if (afterMove) {
         const inside = distance <= originalMagnetRange(rod) + ball.radius;
-        if (inside && !state.inside.has(ball.soundId) && state.phase === 'on') {
+        if (inside && !state.inside.has(ball.soundId) && (state.phase === 'on' || state.phase === 'expanding')) {
           state.seen.add(ball.soundId);
           state.lastEntryId = ball.soundId;
         }
@@ -3530,10 +3643,7 @@
         const pinned = activeBalls.find(item => item !== ball && item.attachedMagnetUid === rod.uid
           && Math.hypot(item.x - ball.x, item.y - ball.y) <= item.radius + ball.radius + 1);
         const touchingBody = distance <= radius + 1;
-        if (magnetActive(state) && state.phase === 'on' && !magnetRepeats
-          && state.seen.size >= rod.triggerCount && state.lastEntryId === ball.soundId && (touchingBody || pinned)) {
-          state.phase = 'warning'; state.elapsed = 0;
-        }
+
         if (magnetActive(state) && (touchingBody || pinned)) {
           pinToMagnet(rod, pinned && !touchingBody ? distance : radius);
           return true;
@@ -3710,8 +3820,13 @@
   }
 
   function physicsStep(dt) {
+    if (paused) return;
     if (['free', 'stage', 'editor', 'physics-lab'].includes(appMode)) updateMagnetStates(dt);
-    if (['free', 'stage', 'physics-lab'].includes(appMode) && !won && !editDrag) window.MarbleKinetics.advance(rods, dt, PIXELS_PER_METER);
+    if (['free', 'stage', 'physics-lab'].includes(appMode) && !won && !editDrag && !paused) {
+      window.MarbleKinetics.advance(rods, dt, PIXELS_PER_METER, (moving,hit,speed) => {
+        playImpactSoundForContact(`kinetic:${[moving.uid,hit.uid].sort().join(':')}`, 'wood', speed);
+      });
+    }
     magnetPullStrength = 0;
     if (!ball || won || editDrag) { updateMagnetWhoosh(); return; }
     const current = ball;
@@ -3723,7 +3838,8 @@
       ball = item;
       physicsStepOne(dt);
       for (const rod of rods) if (rod.type === 'rotor' || rod.type === 'zipline') {
-        if (window.MarbleKinetics.collideBall(rod, ball, PIXELS_PER_METER)) {
+        if (window.MarbleKinetics.collideBall(rod, ball, PIXELS_PER_METER,
+          speed => playImpactSoundForContact(`rod:${rod.uid}`, 'wood', speed))) {
           rod.touched=true;touchedRodIds.add(rod.id);
         }
       }
@@ -3772,6 +3888,24 @@
       if (rod.type === 'breakable' && rod.hp <= 0) continue;
       // A ball pulled toward a magnet remains inside the same visible reset circle.
       if (rod.type === 'magnet') { radius = Math.max(radius, Math.hypot(rod.x - spawn.x, rod.y - spawn.y) + originalMagnetRange(rod)); continue; }
+      if (rod.type === 'swing') {
+        radius = Math.max(radius, Math.hypot(rod.x-spawn.x,rod.y-spawn.y)+swingRadius(rod));
+        continue;
+      }
+      if (rod.type === 'rotor') {
+        radius = Math.max(radius, Math.hypot(rod.pivotX-spawn.x,rod.pivotY-spawn.y)
+          +rod.length/2+Math.abs(rod.pivotOffset||0)+rod.thickness/2);
+        continue;
+      }
+      if (rod.type === 'zipline') {
+        const total = window.MarbleKinetics.curve(rod).total;
+        for (let distance = 0; distance < total + 8; distance += 8) {
+          const point = window.MarbleKinetics.curve(rod,distance);
+          radius = Math.max(radius, Math.hypot(point.x-spawn.x,point.y-spawn.y)
+            +rod.length/2+Math.abs(rod.guideOffset||0)+rod.thickness/2);
+        }
+        continue;
+      }
       const corners = orientedRectCorners({ x: rod.x, y: rod.y, width: rod.length, height: rod.thickness, angle: rod.angle });
       for (const corner of corners) radius = Math.max(radius, Math.hypot(corner.x - spawn.x, corner.y - spawn.y));
     }
@@ -4092,8 +4226,8 @@
       }
     }
     if (rod.type === 'rotor') {
-      ctx.beginPath(); ctx.arc(rod.pivotOffset || 0, 0, 8, 0, Math.PI*2);
-      ctx.fillStyle = '#e34242'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(rod.pivotOffset || 0, 0, 11, 0, Math.PI*2);
+      ctx.fillStyle = '#e34242'; ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.stroke();
     }
     if (appMode === 'stage' && rod.touched) {
       ctx.fillStyle = '#2fa66f';
@@ -4107,6 +4241,13 @@
       ctx.fillText('✓', 0, -rod.thickness - 9);
     }
     ctx.restore();
+    if (rod.type === 'zipline') {
+      const guide = window.MarbleKinetics.curve(rod,rod.pathT||0);
+      ctx.save(); ctx.globalAlpha=alpha;
+      ctx.beginPath(); ctx.arc(guide.x,guide.y,10,0,Math.PI*2);
+      ctx.fillStyle='#e34242'; ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=3; ctx.stroke();
+      ctx.restore();
+    }
   }
 
   function drawBasket(goal, alpha = 1) {
@@ -4206,6 +4347,10 @@
       }
       if (selected.type === 'zipline') {
         (selected.path || []).forEach((p,i) => drawHandle(p.x,p.y, i < (selected.fixedCount || 1) ? '#e23d42' : '#25a957'));
+        if (selected.path?.length === 2) {
+          const middle = window.MarbleKinetics.curve(selected,window.MarbleKinetics.curve(selected).total/2);
+          drawHandle(middle.x,middle.y,'#9b5ddd');
+        }
       }
       if (selected.type === 'magnet') {
         ctx.beginPath(); ctx.arc(selected.x, selected.y, selected.length / 2 + 7, 0, Math.PI * 2); ctx.stroke();
@@ -4377,9 +4522,9 @@
   function frame(time) {
     const elapsed = Math.min((time - lastTime) / 1000, 0.05);
     lastTime = time;
-    if (autoLaunchArmed && launchMode === 'auto' && ballQueue.length && queueIndex > 0 && queueIndex < ballQueue.length
+    if (!paused && autoLaunchArmed && launchMode === 'auto' && ballQueue.length && queueIndex > 0 && queueIndex < ballQueue.length
       && time >= nextLaunchAt && ['free', 'stage'].includes(appMode) && !won) spawnBall();
-    if (autoLaunchArmed && launchMode === 'auto' && ballQueue.length && queueIndex === 0 && !activeBalls.length
+    if (!paused && autoLaunchArmed && launchMode === 'auto' && ballQueue.length && queueIndex === 0 && !activeBalls.length
       && ['free', 'stage'].includes(appMode) && !queueDialog.open) spawnBall();
     accumulator += elapsed;
     while (accumulator >= FIXED_STEP) {
@@ -4432,11 +4577,7 @@
   });
   document.getElementById('ballIntervalLabel').hidden = true;
   document.getElementById('ballCollisions').addEventListener('change', event => { ballCollisions = event.target.checked; });
-  document.getElementById('magnetRepeats').addEventListener('change', event => {
-    magnetRepeats = event.target.checked;
-    magnetStates.clear();
-    for (const item of activeBalls) item.attachedMagnetUid = null;
-  });
+
   document.getElementById('escapeBehavior').addEventListener('change', event => { escapeBehavior = event.target.value; });
   document.getElementById('closeBallQueue').addEventListener('click', () => {
     ballQueue = ballQueue.filter(id => id === 'normal' || id === 'giant' || window.MarbleBalls.has(id));
@@ -4477,6 +4618,13 @@
     render();
   });
   resetButton.addEventListener('click', resetGame);
+  pauseButton.addEventListener('click', () => {
+    paused = !paused;
+    pauseButton.textContent = paused ? '계속' : '멈춤';
+    pauseButton.setAttribute('aria-pressed',String(paused));
+    if (paused) silenceMotionAudio();
+    else if (autoLaunchArmed) nextLaunchAt = performance.now() + launchInterval*1000;
+  });
   homeButton.addEventListener('click', requestHome);
   document.querySelector('.stage-home-button').addEventListener('click', showHome);
   freeModeButton.addEventListener('click', startFreeMode);
@@ -4564,9 +4712,15 @@
     if(target?.type==='rotor') {
       const length=clamp(Number(document.getElementById('rotorLengthInput').value)||target.length,40,600);
       if(length!==target.length) {
-        pushUndo();target.length=length;
+        const before=captureWorld();
+        const previous=target.length, previousOffset=target.pivotOffset;
+        target.length=length;
         target.pivotOffset=clamp(target.pivotOffset||0,-length/2,length/2);
         positionRotor(target);
+        if (kineticPlacementConflict(target) || rodOverlapsAnyGoal(target)) {
+          target.length=previous;target.pivotOffset=previousOffset;positionRotor(target);
+          setHint('다른 블록이나 바구니와 겹치지 않는 길이로 설정해 주세요.');
+        } else pushUndo(before);
       }
     }
     document.getElementById('rotorLengthDialog').close();editingSettingsTarget=null;
@@ -4718,7 +4872,7 @@
 
       selectedKind: selected?.kind || null,
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
-      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, omega: rod.omega, pivotX: rod.pivotX, pivotY: rod.pivotY, pivotOffset: rod.pivotOffset, path: rod.path ? clone(rod.path) : undefined, fixedCount: rod.fixedCount, editPhase: rod.editPhase, pathT: rod.pathT, pathSpeed: rod.pathSpeed, maxHp: rod.maxHp, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked })),
+      rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, omega: rod.omega, pivotX: rod.pivotX, pivotY: rod.pivotY, pivotOffset: rod.pivotOffset, path: rod.path ? clone(rod.path) : undefined, curveBend: rod.curveBend, guideOffset: rod.guideOffset, fixedCount: rod.fixedCount, editPhase: rod.editPhase, pathT: rod.pathT, pathSpeed: rod.pathSpeed, maxHp: rod.maxHp, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked })),
       magnets: rods.filter(rod => rod.type === 'magnet').map(rod => { const state = magnetStateFor(rod); return { uid: rod.uid, phase: state.phase, range: state.range, seen: state.seen.size, inside: state.inside.size }; }),
       magnetTemplate: { ...toolSettings.magnet },
       antigravityTemplate: { ...toolSettings.antigravity },
@@ -4729,7 +4883,7 @@
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, radius: ball.radius, mass: ball.mass, type: ball.type, omega: ball.omega, fallPeakY: ball.fallPeakY, attachedSwingUid: ball.attachedSwingUid || null, attachedMagnetUid: ball.attachedMagnetUid || null, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
       selectedBallType,
       activeBalls: activeBalls.map(item => ({x:item.x, y:item.y, vx:item.vx, vy:item.vy, omega:item.omega, radius:item.radius, mass:item.mass, type:item.type, attachedSwingUid:item.attachedSwingUid || null, attachedMagnetUid:item.attachedMagnetUid || null})),
-      ballQueue: [...ballQueue], queueIndex, launchMode, launchInterval, ballCollisions, magnetRepeats, escapeBehavior, pendingRetrievals: [...pendingRetrievals],
+      ballQueue: [...ballQueue], queueIndex, launchMode, launchInterval, ballCollisions, escapeBehavior, pendingRetrievals: [...pendingRetrievals],
       lastSwingRelease: lastSwingRelease ? { ...lastSwingRelease } : null,
       won,
       appMode,
