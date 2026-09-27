@@ -73,6 +73,15 @@
       "alpha": true
     },
     {
+      "name": "로봇 팔 (곧은 형태)",
+      "id": "robot-arm-straight",
+      "source": "robot-arm/robot-arm-gray-source.png",
+      "runtime": "robot-arm/robot-arm-gray.png",
+      "size": [142, 1373],
+      "alpha": true,
+      "status": "asset-only; gameplay integration pending"
+    },
+    {
       "name": "깨지는 나무 블록 (HP 6단계)",
       "id": "breakable",
       "source": "breakable/six/source/stage-0-generated.png",
