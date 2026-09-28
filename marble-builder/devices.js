@@ -263,9 +263,9 @@
     return {points,hit:false};
   }
   function releaseRobot(st) {
-    st.grabbed = null; st.grabPoint = null; st.handNormal = null;
+    st.grabbed = null; st.grabPoint = null; st.handNormal = null; st.tension=0;
   }
-  function hoseOutside(node, target, radius) {
+  function hoseOutside(node, target, radius, side = 0) {
     if(target.type==='antigravity'||target.type==='fixedBall') return;
     if(target.radius || target.type==='magnet') {
       const r=(target.radius||target.length/2)+radius;
@@ -281,6 +281,12 @@
     const cx=clamp(x,-hx,hx),cy=clamp(y,-hy,hy);
     let px=x-cx,py=y-cy,d=Math.hypot(px,py);
     if(d>=radius) return;
+    // Preserve the side first touched; switching faces each tick makes a knot.
+    if(side && Math.abs(x)<hx+radius) {
+      const outY=side*(hy+radius+.02);
+      node.x=target.x+x*c-outY*s;node.y=target.y+x*s+outY*c;
+      return;
+    }
     if(d<.001) {
       const sideX=hx-Math.abs(x),sideY=hy-Math.abs(y);
       if(sideX<sideY) {px=x>=0?1:-1;py=0;d=-sideX;}
@@ -288,6 +294,123 @@
     } else {px/=d;py/=d;}
     const outX=x+px*(radius-d+.02),outY=y+py*(radius-d+.02);
     node.x=target.x+outX*c-outY*s;node.y=target.y+outX*s+outY*c;
+  }
+  // Sample the travelled arc by distance: the hose is fed *behind* the hand,
+  // not constructed by relaxing a straight line between the ends.
+  function flightLinks(st, base) {
+    const trail=st.trail, total=trail.at(-1).s;
+    const count=Math.max(2,Math.ceil(total/HOSE_STEP)+1),links=[];
+    let j=1;
+    for(let i=0;i<count;i++) {
+      const s=total*i/(count-1);
+      while(j<trail.length-1 && trail[j].s<s) j++;
+      const a=trail[j-1],b=trail[j],t=clamp((s-a.s)/(b.s-a.s||1),0,1);
+      const x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;
+      links.push({x,y,px:x,py:y});
+    }
+    links[0].x=links[0].px=base.x;links[0].y=links[0].py=base.y;
+    links.at(-1).x=st.head.x;links.at(-1).y=st.head.y;
+    return links;
+  }
+  function routeAroundBlocks(st, rod, rods, base) {
+    const links=st.links;
+    st.wrapFace ||= Object.create(null);
+    // The middle of each tile is tested as well as the joints. Limit the
+    // correction to a single outward pass; iterative projections caused the
+    // old hose to flip violently across a plank at every physics tick.
+    for(let i=1;i<links.length;i++) {
+      const a=links[i-1],b=links[i];
+      for(const other of rods) {
+        if(other===rod || (other===st.grabbed && i>=links.length-2)
+          || (other.type==='wood' && i<=2 && Math.hypot(other.x-base.x,other.y-base.y)<other.length/2+18)) continue;
+        if(i<links.length-1) {
+          const before={x:b.x,y:b.y};
+          hoseOutside(b,other,HOSE_WIDTH/2,st.wrapFace[other.uid]);
+          if(other.uid && !st.wrapFace[other.uid] && Math.hypot(b.x-before.x,b.y-before.y)>.01) {
+            const angle=other.angle||0;
+            const y=-(before.x-other.x)*Math.sin(angle)+(before.y-other.y)*Math.cos(angle);
+            st.wrapFace[other.uid]=y<0?-1:1;
+          }
+        }
+        if(i>1) {
+          const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,mid={x:mx,y:my};
+          hoseOutside(mid,other,HOSE_WIDTH/2,st.wrapFace[other.uid]);
+          const dx=clamp(mid.x-mx,-HOSE_STEP/2,HOSE_STEP/2);
+          const dy=clamp(mid.y-my,-HOSE_STEP/2,HOSE_STEP/2);
+          if(i<links.length-1) {a.x+=dx;b.x+=dx;a.y+=dy;b.y+=dy;}
+          else {a.x+=2*dx;a.y+=2*dy;}
+        }
+      }
+    }
+    // Project again after midpoint corrections so neither adjacent link remains inside.
+    for(let i=2;i<links.length-1;i++) for(const other of rods) {
+      if(other!==rod && other!==st.grabbed) hoseOutside(links[i],other,HOSE_WIDTH/2,st.wrapFace[other.uid]);
+    }
+    // Both ends of a section can be outside opposite faces while its middle
+    // still tunnels through a plank. Insert the outside corners as real hose
+    // links rather than repeatedly shoving the midpoint through the wood.
+    for(let i=1;i<links.length;i++) {
+      const a=links[i-1],b=links[i];
+      for(const other of rods) {
+        if(other===rod || other===st.grabbed || !other.length || !other.thickness
+          || !crossesHoseBlock(a,b,other)) continue;
+        const detour=shortestHoseRoute(a,b,[other],rod,null,st.wrapFace).points;
+        if(detour.length<=2) continue;
+        const corners=detour.slice(1,-1).map(p=>({x:p.x,y:p.y,px:p.x,py:p.y,wrap:true}));
+        links.splice(i,0,...corners);i+=corners.length;
+        break;
+      }
+    }
+    const dir={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
+    if(links.length>2) {
+      const first=links[1],reach=Math.min(HOSE_STEP,st.travel);
+      first.x=base.x+dir.x*reach;first.y=base.y+dir.y*reach;
+    }
+    links[0].x=base.x;links[0].y=base.y;
+    if(st.phase==='out') {links.at(-1).x=st.head.x;links.at(-1).y=st.head.y;}
+  }
+  function crossesHoseBlock(a,b,block) {
+    const angle=block.angle||0,c=Math.cos(angle),s=Math.sin(angle);
+    const local=p=>({x:(p.x-block.x)*c+(p.y-block.y)*s,
+      y:-(p.x-block.x)*s+(p.y-block.y)*c});
+    const p=local(a),q=local(b),dx=q.x-p.x,dy=q.y-p.y;
+    const hx=block.length/2+HOSE_WIDTH/2-.1,hy=block.thickness/2+HOSE_WIDTH/2-.1;
+    let lo=0,hi=1;
+    for(const [v,d,h] of [[p.x,dx,hx],[p.y,dy,hy]]) {
+      if(Math.abs(d)<1e-8) {if(Math.abs(v)>=h) return false;continue;}
+      const t1=(-h-v)/d,t2=(h-v)/d;
+      lo=Math.max(lo,Math.min(t1,t2));hi=Math.min(hi,Math.max(t1,t2));
+    }
+    return lo<hi && hi>0 && lo<1;
+  }
+  // A fixed block stops the winding at the shortest *routed* length, not at
+  // the straight-line distance through its interior.
+  function shortestHoseRoute(base,contact,rods,rod,target,faces) {
+    const points=[base,contact],distance=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
+    for(const block of rods) {
+      if(block===rod||block===target||!block.length||!block.thickness
+        ||block.type==='antigravity'||block.type==='fixedBall') continue;
+      const angle=block.angle||0,c=Math.cos(angle),s=Math.sin(angle);
+      const corner=(x,y)=>({x:block.x+x*c-y*s,y:block.y+x*s+y*c,side:Math.sign(y)});
+      const hx=block.length/2+HOSE_WIDTH/2+.6,hy=block.thickness/2+HOSE_WIDTH/2+.6;
+      const corners=[corner(-hx,-hy),corner(hx,-hy),corner(-hx,hy),corner(hx,hy)];
+      for(let j=1;j<points.length;j++) {
+        const from=points[j-1],to=points[j];
+        if(!crossesHoseBlock(from,to,block)) continue;
+        let chosen=null,best=Infinity;
+        for(const a of corners) for(const b of corners) {
+          if(faces?.[block.uid] && a.side!==faces[block.uid]) continue;
+          if(crossesHoseBlock(from,a,block)||crossesHoseBlock(a,b,block)
+            ||crossesHoseBlock(b,to,block)) continue;
+          const length=distance(from,a)+distance(a,b)+distance(b,to);
+          if(length<best) {best=length;chosen=a===b?[a]:[a,b];}
+        }
+        if(chosen) {points.splice(j,0,...chosen);j+=chosen.length;}
+      }
+    }
+    let length=0;
+    for(let i=1;i<points.length;i++) length+=distance(points[i-1],points[i]);
+    return {length,anchor:points.at(-2),points};
   }
   function tickRobot(rod, st, balls, dt, pixels, rods, gravity, boundary) {
     const base=muzzle(rod), direction={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
@@ -298,18 +421,25 @@
           py:base.y-direction.y*clamp(Number(rod.force)||7,2,20)*.55*pixels*dt}];
       st.head={x:base.x,y:base.y,vx:direction.x*clamp(Number(rod.force)||7,2,20)*.55,
         vy:direction.y*clamp(Number(rod.force)||7,2,20)*.55};
+      st.trail=[{x:base.x,y:base.y,s:0}];
+      st.wrapFace=Object.create(null);
+      st.tension=0;
     }
     if(st.phase==='out') {
       const oldX=st.head.x,oldY=st.head.y;
       advanceHead(st.head,gravity,pixels,dt);
-      st.travel+=Math.hypot(st.head.x-oldX,st.head.y-oldY)+.2;
+      st.travel+=Math.hypot(st.head.x-oldX,st.head.y-oldY);
+      st.trail.push({x:st.head.x,y:st.head.y,s:st.travel});
+      st.links=flightLinks(st,base);
+      routeAroundBlocks(st,rod,rods,base);
     }
     if(st.phase==='hold') {
       st.hold-=dt;
       const target=st.grabbed,p=st.grabPoint;
       const c=Math.cos(target?.angle||0),s=Math.sin(target?.angle||0);
       const grip=target&&p ? {x:target.x+p.x*c-p.y*s,y:target.y+p.x*s+p.y*c} : base;
-      st.travel=Math.max(Math.hypot(grip.x-base.x,grip.y-base.y),st.travel-190*dt);
+      const route=shortestHoseRoute(base,grip,rods,rod,target,st.wrapFace);
+      st.travel=Math.max(route.length,st.travel-190*dt);
       if(st.hold<=0) { st.head={x:grip.x,y:grip.y}; releaseRobot(st); st.phase='back'; }
     }
     if(st.phase==='back') {
@@ -320,42 +450,37 @@
       if(d>.001) {st.head.x=base.x+dx/d*next;st.head.y=base.y+dy/d*next;}
       else {st.head.x=base.x;st.head.y=base.y;}
     }
+    if(st.phase!=='out') {
     // New hose sections are fed from the flat body. No texture or black joint is stretched.
-    while(st.links.length-1 < Math.ceil(st.travel/HOSE_STEP)) {
+    while(st.links.filter(link=>!link.wrap).length-1 < Math.ceil(st.travel/HOSE_STEP)) {
       const first=st.links[1];
       st.links.splice(1,0,{x:base.x+(first.x-base.x)*.35,y:base.y+(first.y-base.y)*.35,
         px:base.x+(first.px-base.x)*.35,py:base.y+(first.py-base.y)*.35});
     }
-    while(st.links.length>2 && st.links.length-2 >= Math.ceil(st.travel/HOSE_STEP)) st.links.splice(1,1);
+    while(st.links.filter(link=>!link.wrap).length>2
+      && st.links.filter(link=>!link.wrap).length-2 >= Math.ceil(st.travel/HOSE_STEP)) {
+      const first=st.links.findIndex((link,i)=>i>0 && i<st.links.length-1 && !link.wrap);
+      if(first<0) break;
+      st.links.splice(first,1);
+    }
     st.links[0].x=st.links[0].px=base.x; st.links[0].y=st.links[0].py=base.y;
-    const segment=st.travel/(st.links.length-1);
+    const segment=st.travel/(st.links.filter(link=>!link.wrap).length-1);
     for(let i=1;i<st.links.length;i++) {
       const link=st.links[i],vx=(link.x-link.px)*.996,vy=(link.y-link.py)*.996;
       link.px=link.x;link.py=link.y;
-      link.x+=vx;link.y+=vy+gravity*pixels*dt*dt;
+      if(link.wrap) continue;
+      link.x+=vx*.88;link.y+=vy*.88+gravity*pixels*dt*dt*.12;
     }
     if(st.phase==='out'||st.phase==='back') {const end=st.links.at(-1);end.x=st.head.x;end.y=st.head.y;}
     for(let iteration=0;iteration<6;iteration++) {
-      for(let i=1;i<st.links.length-1;i++) {
-        const a=st.links[i-1],b=st.links[i];
-        for(const other of rods) {
-          if(other===rod || (other===st.grabbed && i>=st.links.length-2)
-            || (other.type==='wood' && i<=2 && Math.hypot(other.x-base.x,other.y-base.y)<other.length/2+18)) continue;
-          hoseOutside(b,other,HOSE_WIDTH/2);
-          if(i>1) {
-            const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,mid={x:mx,y:my};
-            hoseOutside(mid,other,HOSE_WIDTH/2);
-            const dx=clamp(mid.x-mx,-8,8),dy=clamp(mid.y-my,-8,8);
-            a.x+=dx;b.x+=dx;a.y+=dy;b.y+=dy;
-          }
-        }
-      }
       for(let i=1;i<st.links.length;i++) {
         const a=st.links[i-1],b=st.links[i];
         const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
         if(d<=segment || d<.001) continue;
         const excess=(d-segment)/d;
-        if(i===1) {b.x-=dx*excess;b.y-=dy*excess;}
+        if(a.wrap && b.wrap) continue;
+        if(b.wrap) {a.x+=dx*excess;a.y+=dy*excess;}
+        else if(i===1 || a.wrap) {b.x-=dx*excess;b.y-=dy*excess;}
         else {a.x+=dx*excess*.5;a.y+=dy*excess*.5;b.x-=dx*excess*.5;b.y-=dy*excess*.5;}
       }
       if(st.phase==='out'||st.phase==='back') {
@@ -370,6 +495,8 @@
       const first=st.links[1],reach=Math.min(HOSE_STEP,st.travel);
       first.x=base.x+direction.x*reach;first.y=base.y+direction.y*reach;
       first.px=first.x;first.py=first.y;
+    }
+    routeAroundBlocks(st,rod,rods,base);
     }
     const tip=st.links.at(-1);
     if(st.grabbed && !balls.includes(st.grabbed) && !rods.includes(st.grabbed)) releaseRobot(st);
@@ -387,14 +514,20 @@
           y:-(point.x-target.x)*s+(point.y-target.y)*c};
         st.handNormal={x:point.nx*c+point.ny*s,y:-point.nx*s+point.ny*c};
         st.phase='hold';st.hold=clamp(Number(rod.holdSeconds)||2,.1,30);
+        // The winch engages on the very frame of suction, not one tick later.
+        st.travel=Math.max(shortestHoseRoute(base,point,rods,rod,target,st.wrapFace).length,
+          st.travel-190*dt);
         break;
       }
     }
     if(st.grabbed) {
       const target=st.grabbed,p=st.grabPoint,c=Math.cos(target.angle||0),s=Math.sin(target.angle||0);
       const contact={x:target.x+p.x*c-p.y*s,y:target.y+p.x*s+p.y*c};
-      const rx=contact.x-base.x,ry=contact.y-base.y,d=Math.hypot(rx,ry)||1;
-      const tension=st.travel<=d+4 ? 24 : 0;
+      const route=shortestHoseRoute(base,contact,rods,rod,target,st.wrapFace);
+      const rx=contact.x-route.anchor.x,ry=contact.y-route.anchor.y,d=Math.hypot(rx,ry)||1;
+      const desired=st.travel<=route.length+4 ? 24 : 0;
+      st.tension=(st.tension||0)+(desired-(st.tension||0))*Math.min(1,dt*12);
+      const tension=st.tension;
       const impulse=tension*dt;
       if(target.radius) {
         const m=Math.max(.08,target.mass||.18);
@@ -482,14 +615,12 @@
     const st = state(rod);
     if (rod.type === 'robotArm') {
       const body = images['robot-body'], tile = images['robot-hose'];
-      ctx.save(); ctx.globalAlpha *= alpha;
-      ctx.translate(rod.x, rod.y); ctx.rotate(rod.angle || 0);
-      if (body.complete && body.naturalWidth) ctx.drawImage(body, -rod.length/2, -rod.thickness/2, rod.length, rod.thickness);
-      else { ctx.fillStyle = '#405a73'; ctx.fillRect(-rod.length/2, -rod.thickness/2, rod.length, rod.thickness); }
-      ctx.restore();
       if (st.links && st.travel > 1) {
         for (let i = 1; i < st.links.length; i++) {
-          const a = st.links[i-1], b = st.links[i], length = Math.hypot(b.x-a.x, b.y-a.y);
+          const start=st.links[i-1], b=st.links[i];
+          const a=i===1 ? {x:start.x-Math.cos(rod.angle||0)*6,
+            y:start.y-Math.sin(rod.angle||0)*6} : start;
+          const length = Math.hypot(b.x-a.x, b.y-a.y);
           if (length < .3) continue;
           ctx.save(); ctx.globalAlpha *= alpha;
           ctx.translate(a.x,a.y); ctx.rotate(Math.atan2(b.y-a.y,b.x-a.x)-Math.PI/2);
@@ -515,6 +646,13 @@
         } else { ctx.moveTo(0,-6); ctx.lineTo(0,6); }
         ctx.stroke(); ctx.restore();
       }
+      // The first corrugation is hidden behind the flat housing face: no gap,
+      // projecting collar, or extra nozzle sprite at the outlet.
+      ctx.save(); ctx.globalAlpha *= alpha;
+      ctx.translate(rod.x, rod.y); ctx.rotate(rod.angle || 0);
+      if (body.complete && body.naturalWidth) ctx.drawImage(body, -rod.length/2, -rod.thickness/2, rod.length, rod.thickness);
+      else { ctx.fillStyle = '#405a73'; ctx.fillRect(-rod.length/2, -rod.thickness/2, rod.length, rod.thickness); }
+      ctx.restore();
       return;
     }
     ctx.save(); ctx.globalAlpha *= alpha; ctx.translate(rod.x, rod.y); ctx.rotate(rod.angle || 0);
