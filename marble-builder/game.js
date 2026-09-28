@@ -510,7 +510,8 @@
     stages = stages.filter(stage => stage.id !== 'stage-1');
     const orderedStages = [...stages].sort((a, b) => a.number - b.number);
     if (removedBuiltInStage1 || orderedStages.some((stage, index) => stage.number !== index + 1)) {
-      persistStageOrder(orderedStages);
+      // Migrate only in memory: opening the page must never overwrite saved maps.
+      persistStageOrder(orderedStages, false);
     }
     const storedRecent = readStoredJson(RECENT_TOOLS_STORAGE_KEY, recentTools);
     if (Array.isArray(storedRecent)) {
@@ -528,16 +529,27 @@
     creations = Array.isArray(storedCreations) ? storedCreations.filter(creation => creation && typeof creation === 'object'
       && !Array.isArray(creation)).map(creation => ({
       ...creation,
-      rods: Array.isArray(creation.rods) ? creation.rods.filter(rod => rod && typeof rod === 'object' && rod.type !== 'movable').map(normalizeRodRecord) : []
+      rods: Array.isArray(creation.rods) ? creation.rods.filter(rod => rod && typeof rod === 'object' && rod.type !== 'movable').map(normalizeRodRecord) : [],
+      goals: Array.isArray(creation.goals) ? creation.goals.filter(goal => goal && typeof goal === 'object') : [],
+      fields: Array.isArray(creation.fields) ? creation.fields.filter(field => field && typeof field === 'object') : []
     })) : [];
 
   }
 
+  function backUpRawStorage(key) {
+    const raw = localStorage.getItem(key);
+    const backupKey = `${key}-recovery-v1`;
+    if (raw !== null && localStorage.getItem(backupKey) === null) {
+      localStorage.setItem(backupKey, raw);
+    }
+  }
+
   function persistStages() {
+    backUpRawStorage(STAGES_STORAGE_KEY);
     localStorage.setItem(STAGES_STORAGE_KEY, JSON.stringify(stages));
   }
 
-  function persistStageOrder(ordered) {
+  function persistStageOrder(ordered, save = true) {
     const unlockedIds = new Set(stages.filter(stage => Number(stage.number) <= unlockedStage).map(stage => stage.id));
     stages = ordered.map((stage, index) => ({
       ...stage,
@@ -545,8 +557,11 @@
       name: !stage.name || stage.name === `${stage.number}스테이지` ? `${index + 1}스테이지` : stage.name
     }));
     unlockedStage = Math.max(1, ...stages.filter(stage => unlockedIds.has(stage.id)).map(stage => stage.number));
-    localStorage.setItem(PROGRESS_STORAGE_KEY, String(unlockedStage));
-    persistStages();
+    if (save) {
+      backUpRawStorage(STAGES_STORAGE_KEY);
+      localStorage.setItem(PROGRESS_STORAGE_KEY, String(unlockedStage));
+      persistStages();
+    }
   }
 
   function swapStageNumbers(firstNumber, secondNumber) {
@@ -562,6 +577,7 @@
   }
 
   function persistCreations() {
+    backUpRawStorage(CREATIONS_STORAGE_KEY);
     localStorage.setItem(CREATIONS_STORAGE_KEY, JSON.stringify(creations));
   }
 
