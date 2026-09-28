@@ -84,17 +84,9 @@ window.MarbleKinetics = (() => {
       if (overlap < depth) { const sign = (b.x-a.x)*ux+(b.y-a.y)*uy >= 0 ? 1 : -1;
         depth = overlap; nx = ux*sign; ny = uy*sign; }
     }
-    // Use the midpoint of the actual overlapping support intervals, not an
-    // arbitrary first vertex (which creates a false lever arm on face contacts).
-    const tx=-ny,ty=nx;
-    const faceA=ac.filter(p=>Math.max(...ac.map(v=>v.x*nx+v.y*ny))-(p.x*nx+p.y*ny)<.01);
-    const faceB=bc.filter(p=>(p.x*nx+p.y*ny)-Math.min(...bc.map(v=>v.x*nx+v.y*ny))<.01);
-    const lo=Math.max(Math.min(...faceA.map(p=>p.x*tx+p.y*ty)),Math.min(...faceB.map(p=>p.x*tx+p.y*ty)));
-    const hi=Math.min(Math.max(...faceA.map(p=>p.x*tx+p.y*ty)),Math.max(...faceB.map(p=>p.x*tx+p.y*ty)));
-    const tangent=(lo+hi)/2;
-    const normal=(Math.max(...ac.map(p=>p.x*nx+p.y*ny))+
-      Math.min(...bc.map(p=>p.x*nx+p.y*ny)))/2;
-    const x=nx*normal+tx*tangent, y=ny*normal+ty*tangent;
+    const ap = ac.reduce((u,p) => p.x*nx+p.y*ny > u.x*nx+u.y*ny ? p : u);
+    const bp = bc.reduce((u,p) => p.x*nx+p.y*ny < u.x*nx+u.y*ny ? p : u);
+    const x = (ap.x+bp.x)/2, y = (ap.y+bp.y)/2;
     return {x,y,nx,ny,depth};
   }
   function contactCircle(rod, magnet) {
@@ -156,46 +148,25 @@ window.MarbleKinetics = (() => {
           const old=previous.get(rod);
           rod.angle=old.angle;rod.pathT=old.pathT;position(rod);
           if(inward>.02&&Math.abs(a.jac)>1e-6) {
-            // The wall has infinite mass: reflect the permitted DOF once,
-            // rather than dividing by the lever arm and then multiplying by
-            // it again in push(). The old result left residual wallward speed
-            // at shallow angles and repeatedly restored the previous pose.
-            if(rod.type==='rotor') rod.omega=-(rod.omega||0)*.12;
-            else rod.pathSpeed=-(rod.pathSpeed||0)*.12;
+            push(rod,a,-(1+.12)*inward*a.inertia/a.jac,scale);
             onImpact?.(rod,fixed,inward);
-          } else if(inward>=0) {
-            if(rod.type==='rotor') rod.omega=0;
-            else rod.pathSpeed=0;
-          }
+          } else if(rod.type==='rotor') rod.omega=0;
+          else rod.pathSpeed=0;
           break;
         }
       }
-      // Find the first contact along both bodies' constrained trajectories.
-      // Rolling both back a whole substep on every overlap produces a visible
-      // stick-slip jump, especially when the guide is pushed by a rotor.
+      // Any overlap, including a shallow separating contact, must not be
+      // committed. Exchange momentum at the actual contact then restore the
+      // last non-penetrating positions on each allowed pivot/guide.
       for(let i=0;i<dynamic.length;i++) for(let j=i+1;j<dynamic.length;j++) {
         const a=dynamic[i],b=dynamic[j],hit=contact(a,b);
         if(!hit) continue;
-        const endA={angle:a.angle,pathT:a.pathT},endB={angle:b.angle,pathT:b.pathT};
-        const setAt=t=>{
-          for(const [rod,end] of [[a,endA],[b,endB]]) {
-            const old=previous.get(rod);
-            rod.angle=old.angle+(end.angle-old.angle)*t;
-            rod.pathT=(old.pathT||0)+((end.pathT||0)-(old.pathT||0))*t;
-            position(rod);
-          }
-        };
-        setAt(0);
-        if(contact(a,b)) {
-          // Already overlapped at the start (e.g. editor placement): never
-          // amplify the penetration or inject an arbitrary separation impulse.
-          continue;
+        const speed=collidePair(a,b,scale,hit);
+        for(const rod of [a,b]) {
+          const old=previous.get(rod);
+          rod.angle=old.angle;rod.pathT=old.pathT;
+          position(rod);
         }
-        let lo=0,hi=1;
-        for(let k=0;k<12;k++) {const mid=(lo+hi)/2;setAt(mid);if(contact(a,b)) hi=mid;else lo=mid;}
-        setAt(hi);
-        const speed=collidePair(a,b,scale,contact(a,b));
-        setAt(lo);
         if(speed>.12) onImpact?.(a,b,speed);
       }
     }
