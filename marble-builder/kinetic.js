@@ -155,9 +155,17 @@ window.MarbleKinetics = (() => {
         for(const fixed of solids) {
           const hit=fixed.type==='magnet'?contactCircle(rod,fixed):contact(rod,fixed);
           if(!hit) continue;
+          const old=previous.get(rod);
+          // An editor placement can already overlap its support by a pixel.
+          // Sliding tangentially across it must not be undone every substep:
+          // only newly added penetration is a collision with the fixed body.
+          const end={angle:rod.angle,pathT:rod.pathT};
+          rod.angle=old.angle;rod.pathT=old.pathT;position(rod);
+          const before=fixed.type==='magnet'?contactCircle(rod,fixed):contact(rod,fixed);
+          rod.angle=end.angle;rod.pathT=end.pathT;position(rod);
+          if(before && hit.depth<=before.depth+.01) continue;
           const a=axis(rod,hit.x,hit.y,hit.nx,hit.ny,scale);
           const inward=a.vx*hit.nx+a.vy*hit.ny;
-          const old=previous.get(rod);
           rod.angle=old.angle;rod.pathT=old.pathT;position(rod);
           if(inward>.02&&Math.abs(a.jac)>1e-6) {
             // An immovable wall reflects the one permitted axis velocity.
