@@ -26,7 +26,7 @@ with sync_playwright() as pw:
           const wood=d.addRod('wood',200,310,{length:120,thickness:20});
           const snap=window.MarbleDevices.snap(d.getState().rods,{x:200,y:300});
           const rod=d.addRod('robotArm',380,330,{buttonAnchor:snap,force:9});
-          d.addRod('wood',596,466,{length:80,thickness:32});
+          d.addRod('wood',596,330,{length:80,thickness:32});
           return {wood:wood?.uid,anchor:snap,robot:rod?.uid,
             illegal:d.addRod('fixedBall',380,330),images:Object.fromEntries(Object.entries(window.MarbleDevices.images).map(([k,v])=>[k,v.complete&&v.naturalWidth>0]))};
         }''')

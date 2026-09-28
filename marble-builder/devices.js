@@ -239,322 +239,143 @@
     return d<=HOSE_WIDTH/2+3 ? {...near,nx:d>.001?dx/d:Math.cos(target.angle||0),
       ny:d>.001?dy/d:Math.sin(target.angle||0)} : null;
   }
-  // Preview and the launched hand share an identical fixed-step projectile.
-  function advanceHead(head,gravity,pixels,dt) {
-    head.vy+=gravity*dt;
-    head.x+=head.vx*pixels*dt;head.y+=head.vy*pixels*dt;
+  // The guide and the real harpoon use the same accelerating, gravity-free step.
+  function advanceHead(head,force,pixels,dt) {
+    head.speed=Math.min(Math.max(18,force*3),head.speed+Math.max(22,force*5)*dt);
+    head.travel+=head.speed*pixels*dt;
+    head.x=head.base.x+head.dir.x*head.travel;
+    head.y=head.base.y+head.dir.y*head.travel;
   }
-  function robotPath(rod, targets, gravity, pixels, boundary) {
-    const base=muzzle(rod), dir={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
-    const head={x:base.x,y:base.y,vx:dir.x*clamp(Number(rod.force)||7,2,20)*.55,
-      vy:dir.y*clamp(Number(rod.force)||7,2,20)*.55};
-    const points=[{x:head.x,y:head.y}];
+  function robotPath(rod,targets,gravity,pixels,boundary) {
+    const base=muzzle(rod),dir={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
+    const force=clamp(Number(rod.force)||7,2,20);
+    const head={base,dir,x:base.x,y:base.y,travel:0,speed:force*.7};
+    const points=[{x:base.x,y:base.y}];
     for(let i=0;i<720;i++) {
-      advanceHead(head,gravity,pixels,1/120);
-      const {x,y}=head;
-      if(i%6===0) points.push({x,y});
-      if(i>2 && targets.some(target=>target!==rod
-        && !(target.type==='wood' && Math.hypot(target.x-base.x,target.y-base.y)<target.length/2+18
-          && Math.hypot(x-base.x,y-base.y)<24)
-        && robotContact(target,{x,y})))
-        return {points,hit:true};
-      if(Math.hypot(x-base.x,y-base.y)>boundary) return {points,hit:false};
+      const old=head.travel;
+      advanceHead(head,force,pixels,1/120);
+      const steps=Math.max(1,Math.ceil((head.travel-old)/3));
+      for(let k=1;k<=steps;k++) {
+        const distance=old+(head.travel-old)*k/steps;
+        const tip={x:base.x+dir.x*distance,y:base.y+dir.y*distance};
+        if(distance>12 && targets.some(target=>target!==rod && target.type!=='fixedBall'
+          && target.type!=='antigravity' && !(target.type==='breakable' && target.hp<=0)
+          && !(target.type==='wood' && distance<24 && Math.hypot(target.x-base.x,target.y-base.y)<target.length/2+18)
+          && robotContact(target,tip))) { points.push(tip);return {points,hit:true}; }
+      }
+      if(i%6===0) points.push({x:head.x,y:head.y});
+      if(head.travel>boundary) {points.push({x:head.x,y:head.y});return {points,hit:false};}
     }
     return {points,hit:false};
   }
   function releaseRobot(st) {
+    if(st.grabbed?.radius) st.grabbed.attachedRobotUid=null;
     st.grabbed = null; st.grabPoint = null; st.handNormal = null; st.tension=0;
   }
-  function hoseOutside(node, target, radius, side = 0) {
-    if(target.type==='antigravity'||target.type==='fixedBall') return;
-    if(target.radius || target.type==='magnet') {
-      const r=(target.radius||target.length/2)+radius;
-      const dx=node.x-target.x,dy=node.y-target.y,d=Math.hypot(dx,dy);
-      if(d<r && d>.001) {node.x=target.x+dx/d*r;node.y=target.y+dy/d*r;}
-      return;
-    }
-    if(!target.length||!target.thickness || Math.hypot(node.x-target.x,node.y-target.y)
-      >target.length/2+target.thickness/2+radius+16) return;
-    const c=Math.cos(target.angle||0),s=Math.sin(target.angle||0);
-    const dx=node.x-target.x,dy=node.y-target.y,x=dx*c+dy*s,y=-dx*s+dy*c;
-    const hx=target.length/2,hy=target.thickness/2;
-    const cx=clamp(x,-hx,hx),cy=clamp(y,-hy,hy);
-    let px=x-cx,py=y-cy,d=Math.hypot(px,py);
-    if(d>=radius) return;
-    // Preserve the side first touched; switching faces each tick makes a knot.
-    if(side && Math.abs(x)<hx+radius) {
-      const outY=side*(hy+radius+.02);
-      node.x=target.x+x*c-outY*s;node.y=target.y+x*s+outY*c;
-      return;
-    }
-    if(d<.001) {
-      const sideX=hx-Math.abs(x),sideY=hy-Math.abs(y);
-      if(sideX<sideY) {px=x>=0?1:-1;py=0;d=-sideX;}
-      else {px=0;py=y>=0?1:-1;d=-sideY;}
-    } else {px/=d;py/=d;}
-    const outX=x+px*(radius-d+.02),outY=y+py*(radius-d+.02);
-    node.x=target.x+outX*c-outY*s;node.y=target.y+outX*s+outY*c;
+  // Straight corrugations: feed complete tiles through the flat housing, not
+  // an elastic image. Only the hand and the object move; the rope has no gravity.
+  function straightLinks(st,base,dir,length,tip) {
+    const count=Math.max(2,Math.ceil(length/HOSE_STEP)+1);
+    st.links=Array.from({length:count},(_,i)=>{
+      const d=length*i/(count-1);
+      return {x:base.x+dir.x*d,y:base.y+dir.y*d};
+    });
+    if(tip) st.links.at(-1).x=tip.x,st.links.at(-1).y=tip.y;
   }
-  // Sample the travelled arc by distance: the hose is fed *behind* the hand,
-  // not constructed by relaxing a straight line between the ends.
-  function flightLinks(st, base) {
-    const trail=st.trail, total=trail.at(-1).s;
-    const count=Math.max(2,Math.ceil(total/HOSE_STEP)+1),links=[];
-    let j=1;
-    for(let i=0;i<count;i++) {
-      const s=total*i/(count-1);
-      while(j<trail.length-1 && trail[j].s<s) j++;
-      const a=trail[j-1],b=trail[j],t=clamp((s-a.s)/(b.s-a.s||1),0,1);
-      const x=a.x+(b.x-a.x)*t,y=a.y+(b.y-a.y)*t;
-      links.push({x,y,px:x,py:y});
-    }
-    links[0].x=links[0].px=base.x;links[0].y=links[0].py=base.y;
-    links.at(-1).x=st.head.x;links.at(-1).y=st.head.y;
-    return links;
-  }
-  function routeAroundBlocks(st, rod, rods, base) {
-    const links=st.links;
-    st.wrapFace ||= Object.create(null);
-    // The middle of each tile is tested as well as the joints. Limit the
-    // correction to a single outward pass; iterative projections caused the
-    // old hose to flip violently across a plank at every physics tick.
-    for(let i=1;i<links.length;i++) {
-      const a=links[i-1],b=links[i];
-      for(const other of rods) {
-        if(other===rod || (other===st.grabbed && i>=links.length-2)
-          || (other.type==='wood' && i<=2 && Math.hypot(other.x-base.x,other.y-base.y)<other.length/2+18)) continue;
-        if(i<links.length-1) {
-          const before={x:b.x,y:b.y};
-          hoseOutside(b,other,HOSE_WIDTH/2,st.wrapFace[other.uid]);
-          if(other.uid && !st.wrapFace[other.uid] && Math.hypot(b.x-before.x,b.y-before.y)>.01) {
-            const angle=other.angle||0;
-            const y=-(before.x-other.x)*Math.sin(angle)+(before.y-other.y)*Math.cos(angle);
-            st.wrapFace[other.uid]=y<0?-1:1;
-          }
-        }
-        if(i>1) {
-          const mx=(a.x+b.x)/2,my=(a.y+b.y)/2,mid={x:mx,y:my};
-          hoseOutside(mid,other,HOSE_WIDTH/2,st.wrapFace[other.uid]);
-          const dx=clamp(mid.x-mx,-HOSE_STEP/2,HOSE_STEP/2);
-          const dy=clamp(mid.y-my,-HOSE_STEP/2,HOSE_STEP/2);
-          if(i<links.length-1) {a.x+=dx;b.x+=dx;a.y+=dy;b.y+=dy;}
-          else {a.x+=2*dx;a.y+=2*dy;}
-        }
-      }
-    }
-    // Project again after midpoint corrections so neither adjacent link remains inside.
-    for(let i=2;i<links.length-1;i++) for(const other of rods) {
-      if(other!==rod && other!==st.grabbed) hoseOutside(links[i],other,HOSE_WIDTH/2,st.wrapFace[other.uid]);
-    }
-    // Both ends of a section can be outside opposite faces while its middle
-    // still tunnels through a plank. Insert the outside corners as real hose
-    // links rather than repeatedly shoving the midpoint through the wood.
-    for(let i=1;i<links.length;i++) {
-      const a=links[i-1],b=links[i];
-      for(const other of rods) {
-        if(other===rod || other===st.grabbed || !other.length || !other.thickness
-          || !crossesHoseBlock(a,b,other)) continue;
-        const detour=shortestHoseRoute(a,b,[other],rod,null,st.wrapFace).points;
-        if(detour.length<=2) continue;
-        const corners=detour.slice(1,-1).map(p=>({x:p.x,y:p.y,px:p.x,py:p.y,wrap:true}));
-        links.splice(i,0,...corners);i+=corners.length;
-        break;
-      }
-    }
-    const dir={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
-    if(links.length>2) {
-      const first=links[1],reach=Math.min(HOSE_STEP,st.travel);
-      first.x=base.x+dir.x*reach;first.y=base.y+dir.y*reach;
-    }
-    links[0].x=base.x;links[0].y=base.y;
-    if(st.phase==='out') {links.at(-1).x=st.head.x;links.at(-1).y=st.head.y;}
-  }
-  function crossesHoseBlock(a,b,block) {
-    const angle=block.angle||0,c=Math.cos(angle),s=Math.sin(angle);
-    const local=p=>({x:(p.x-block.x)*c+(p.y-block.y)*s,
-      y:-(p.x-block.x)*s+(p.y-block.y)*c});
-    const p=local(a),q=local(b),dx=q.x-p.x,dy=q.y-p.y;
-    const hx=block.length/2+HOSE_WIDTH/2-.1,hy=block.thickness/2+HOSE_WIDTH/2-.1;
-    let lo=0,hi=1;
-    for(const [v,d,h] of [[p.x,dx,hx],[p.y,dy,hy]]) {
-      if(Math.abs(d)<1e-8) {if(Math.abs(v)>=h) return false;continue;}
-      const t1=(-h-v)/d,t2=(h-v)/d;
-      lo=Math.max(lo,Math.min(t1,t2));hi=Math.min(hi,Math.max(t1,t2));
-    }
-    return lo<hi && hi>0 && lo<1;
-  }
-  // A fixed block stops the winding at the shortest *routed* length, not at
-  // the straight-line distance through its interior.
-  function shortestHoseRoute(base,contact,rods,rod,target,faces) {
-    const points=[base,contact],distance=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
-    for(const block of rods) {
-      if(block===rod||block===target||!block.length||!block.thickness
-        ||block.type==='antigravity'||block.type==='fixedBall') continue;
-      const angle=block.angle||0,c=Math.cos(angle),s=Math.sin(angle);
-      const corner=(x,y)=>({x:block.x+x*c-y*s,y:block.y+x*s+y*c,side:Math.sign(y)});
-      const hx=block.length/2+HOSE_WIDTH/2+.6,hy=block.thickness/2+HOSE_WIDTH/2+.6;
-      const corners=[corner(-hx,-hy),corner(hx,-hy),corner(-hx,hy),corner(hx,hy)];
-      for(let j=1;j<points.length;j++) {
-        const from=points[j-1],to=points[j];
-        if(!crossesHoseBlock(from,to,block)) continue;
-        let chosen=null,best=Infinity;
-        for(const a of corners) for(const b of corners) {
-          if(faces?.[block.uid] && a.side!==faces[block.uid]) continue;
-          if(crossesHoseBlock(from,a,block)||crossesHoseBlock(a,b,block)
-            ||crossesHoseBlock(b,to,block)) continue;
-          const length=distance(from,a)+distance(a,b)+distance(b,to);
-          if(length<best) {best=length;chosen=a===b?[a]:[a,b];}
-        }
-        if(chosen) {points.splice(j,0,...chosen);j+=chosen.length;}
-      }
-    }
-    let length=0;
-    for(let i=1;i<points.length;i++) length+=distance(points[i-1],points[i]);
-    return {length,anchor:points.at(-2),points};
-  }
-  function tickRobot(rod, st, balls, dt, pixels, rods, gravity, boundary) {
-    const base=muzzle(rod), direction={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
-    if(st.phase === 'idle' && !st.travel) { st.links=null; st.head=null; releaseRobot(st); return; }
-    if(!st.links) {
-      st.links=[{x:base.x,y:base.y,px:base.x,py:base.y},
-        {x:base.x,y:base.y,px:base.x-direction.x*clamp(Number(rod.force)||7,2,20)*.55*pixels*dt,
-          py:base.y-direction.y*clamp(Number(rod.force)||7,2,20)*.55*pixels*dt}];
-      st.head={x:base.x,y:base.y,vx:direction.x*clamp(Number(rod.force)||7,2,20)*.55,
-        vy:direction.y*clamp(Number(rod.force)||7,2,20)*.55};
-      st.trail=[{x:base.x,y:base.y,s:0}];
-      st.wrapFace=Object.create(null);
-      st.tension=0;
-    }
+  function tickRobot(rod,st,balls,dt,pixels,rods,gravity,boundary) {
+    const base=muzzle(rod),dir={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
+    const force=clamp(Number(rod.force)||7,2,20);
+    const reel=clamp(Number(rod.reelSpeed)||1.9,.2,8)*pixels;
+    if(st.phase==='idle') {st.travel=0;st.links=null;st.head=null;releaseRobot(st);return;}
     if(st.phase==='out') {
-      const oldX=st.head.x,oldY=st.head.y;
-      advanceHead(st.head,gravity,pixels,dt);
-      st.travel+=Math.hypot(st.head.x-oldX,st.head.y-oldY);
-      st.trail.push({x:st.head.x,y:st.head.y,s:st.travel});
-      st.links=flightLinks(st,base);
-      routeAroundBlocks(st,rod,rods,base);
+      if(!st.head) st.head={base,dir,x:base.x,y:base.y,travel:0,speed:force*.7};
+      const old=st.travel;
+      advanceHead(st.head,force,pixels,dt);
+      let struck=false;
+      const steps=Math.max(1,Math.ceil((st.head.travel-old)/3));
+      for(let k=1;k<=steps && !struck;k++) {
+        const distance=old+(st.head.travel-old)*k/steps;
+        const tip={x:base.x+dir.x*distance,y:base.y+dir.y*distance};
+        for(const target of [...balls,...rods]) {
+          if(target===rod||target.type==='fixedBall'||target.type==='antigravity'
+            || target.type==='breakable' && target.hp<=0
+            || target.attachedRobotUid||target.attachedMagnetUid||target.attachedSwingUid) continue;
+          if(target.type==='wood' && distance<24 && Math.hypot(target.x-base.x,target.y-base.y)<target.length/2+18) continue;
+          const point=robotContact(target,tip);
+          if(!point) continue;
+          const a=target.radius?0:target.angle||0,c=Math.cos(a),s=Math.sin(a);
+          st.grabbed=target;
+          st.grabPoint={x:(point.x-target.x)*c+(point.y-target.y)*s,
+            y:-(point.x-target.x)*s+(point.y-target.y)*c};
+          st.handNormal={x:point.nx*c+point.ny*s,y:-point.nx*s+point.ny*c};
+          st.phase='hold';st.hold=clamp(Number(rod.holdSeconds)||2,.1,30);
+          st.travel=Math.max(0,(point.x-base.x)*dir.x+(point.y-base.y)*dir.y);
+          st.head.x=point.x;st.head.y=point.y;
+          st.lastGripDistance=st.travel;st.stall=0;
+          if(target.radius) {target.attachedRobotUid=rod.uid;target.vx=0;target.vy=0;}
+          struck=true;break;
+        }
+      }
+      if(!struck) {
+        st.travel=st.head.travel;
+        if(st.travel>boundary) st.phase='back';
+      }
     }
     if(st.phase==='hold') {
-      st.hold-=dt;
-      const target=st.grabbed,p=st.grabPoint;
-      const c=Math.cos(target?.angle||0),s=Math.sin(target?.angle||0);
-      const grip=target&&p ? {x:target.x+p.x*c-p.y*s,y:target.y+p.x*s+p.y*c} : base;
-      const route=shortestHoseRoute(base,grip,rods,rod,target,st.wrapFace);
-      st.travel=Math.max(route.length,st.travel-190*dt);
-      if(st.hold<=0) { st.head={x:grip.x,y:grip.y}; releaseRobot(st); st.phase='back'; }
+      const target=st.grabbed;
+      if(!target || !balls.includes(target) && !rods.includes(target)) {
+        releaseRobot(st);st.phase='back';
+      } else {
+        st.hold-=dt;
+        const a=target.radius?0:target.angle||0,c=Math.cos(a),s=Math.sin(a),p=st.grabPoint;
+        const grip={x:target.x+p.x*c-p.y*s,y:target.y+p.x*s+p.y*c};
+        const distance=Math.hypot(grip.x-base.x,grip.y-base.y);
+        const fixed=target.type==='wood'||target.type==='breakable'||target.type==='magnet'||target.type==='robotArm'||target.type==='punch';
+        const minimum=target.radius?target.radius+HOSE_WIDTH+8:0;
+        // The drum cannot shorten through an immovable obstacle or past the
+        // constrained body's actual position. Eight pixels of cable compliance
+        // are enough to build tension without allowing visible penetration.
+        st.travel=Math.max(minimum,fixed?distance:Math.max(distance-8,st.travel-reel*dt));
+        const shortening=st.lastGripDistance-distance;
+        if(!fixed && (target.type==='rotor'||target.type==='zipline'||target.type==='swing')) {
+          st.stall=shortening>.08?0:(st.stall||0)+dt;
+          if(st.stall>.25) st.travel=Math.max(st.travel,distance);
+        }
+        st.lastGripDistance=distance;
+        const nx=(grip.x-base.x)/(distance||1),ny=(grip.y-base.y)/(distance||1);
+        const error=Math.max(0,distance-st.travel);
+        if(target.radius) {
+          // While suction holds a marble, the motor owns its movement. World
+          // gravity resumes on release; no spring/ballistic orbit can form.
+          const next=Math.max(minimum,Math.min(distance,st.travel));
+          const contact={x:base.x+nx*next,y:base.y+ny*next};
+          target.x=contact.x-p.x;target.y=contact.y-p.y;
+          target.vx=-nx*Math.min(reel/pixels,(distance-next)/pixels/Math.max(dt,1e-6));
+          target.vy=-ny*Math.min(reel/pixels,(distance-next)/pixels/Math.max(dt,1e-6));
+        } else if(error>.01 && !fixed) {
+          const power=clamp(8+error*.9,8,38)*dt;
+          if(target.type==='rotor'||target.type==='zipline')
+            window.MarbleKinetics.applyImpulse(target,grip,-nx*power,-ny*power,pixels);
+          else if(target.type==='swing') {
+            const armX=(grip.x-target.x)/pixels,armY=(grip.y-target.y)/pixels;
+            const inertia=Math.max(.05,.7*(target.length/pixels)**2/3);
+            target.swingOmega=clamp((target.swingOmega||0)+(armY*nx-armX*ny)*power/inertia,-16,16);
+            target.swingStarted=true;
+          }
+        }
+        if(target.radius) {grip.x=target.x+p.x;grip.y=target.y+p.y;}
+        st.head.x=grip.x;st.head.y=grip.y;
+        if(st.hold<=0) {releaseRobot(st);st.phase='back';}
+      }
     }
     if(st.phase==='back') {
-      st.travel=Math.max(0,st.travel-190*dt);
-      if(!st.travel) {st.phase='idle';st.links=null;st.head=null;return;}
-      const dx=st.head.x-base.x,dy=st.head.y-base.y,d=Math.hypot(dx,dy);
-      const next=Math.min(st.travel,Math.max(0,d-190*dt));
-      if(d>.001) {st.head.x=base.x+dx/d*next;st.head.y=base.y+dy/d*next;}
-      else {st.head.x=base.x;st.head.y=base.y;}
+      st.travel=Math.max(0,st.travel-reel*dt);
+      if(st.travel<=0) {st.phase='idle';st.head=null;st.links=null;return;}
+      st.head={x:base.x+dir.x*st.travel,y:base.y+dir.y*st.travel};
     }
-    if(st.phase!=='out') {
-    // New hose sections are fed from the flat body. No texture or black joint is stretched.
-    while(st.links.filter(link=>!link.wrap).length-1 < Math.ceil(st.travel/HOSE_STEP)) {
-      const first=st.links[1];
-      st.links.splice(1,0,{x:base.x+(first.x-base.x)*.35,y:base.y+(first.y-base.y)*.35,
-        px:base.x+(first.px-base.x)*.35,py:base.y+(first.py-base.y)*.35});
-    }
-    while(st.links.filter(link=>!link.wrap).length>2
-      && st.links.filter(link=>!link.wrap).length-2 >= Math.ceil(st.travel/HOSE_STEP)) {
-      const first=st.links.findIndex((link,i)=>i>0 && i<st.links.length-1 && !link.wrap);
-      if(first<0) break;
-      st.links.splice(first,1);
-    }
-    st.links[0].x=st.links[0].px=base.x; st.links[0].y=st.links[0].py=base.y;
-    const segment=st.travel/(st.links.filter(link=>!link.wrap).length-1);
-    for(let i=1;i<st.links.length;i++) {
-      const link=st.links[i],vx=(link.x-link.px)*.996,vy=(link.y-link.py)*.996;
-      link.px=link.x;link.py=link.y;
-      if(link.wrap) continue;
-      link.x+=vx*.88;link.y+=vy*.88+gravity*pixels*dt*dt*.12;
-    }
-    if(st.phase==='out'||st.phase==='back') {const end=st.links.at(-1);end.x=st.head.x;end.y=st.head.y;}
-    for(let iteration=0;iteration<6;iteration++) {
-      for(let i=1;i<st.links.length;i++) {
-        const a=st.links[i-1],b=st.links[i];
-        const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy);
-        if(d<=segment || d<.001) continue;
-        const excess=(d-segment)/d;
-        if(a.wrap && b.wrap) continue;
-        if(b.wrap) {a.x+=dx*excess;a.y+=dy*excess;}
-        else if(i===1 || a.wrap) {b.x-=dx*excess;b.y-=dy*excess;}
-        else {a.x+=dx*excess*.5;a.y+=dy*excess*.5;b.x-=dx*excess*.5;b.y-=dy*excess*.5;}
-      }
-      if(st.phase==='out'||st.phase==='back') {
-        const end=st.links.at(-1);end.x=st.head.x;end.y=st.head.y;
-        for(let i=st.links.length-1;i>1;i--) {
-          const a=st.links[i-1],b=st.links[i],dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy);
-          if(d>segment && d>.001) {a.x=b.x+dx/d*segment;a.y=b.y+dy/d*segment;}
-        }
-      }
-    }
-    if(st.links.length>2) {
-      const first=st.links[1],reach=Math.min(HOSE_STEP,st.travel);
-      first.x=base.x+direction.x*reach;first.y=base.y+direction.y*reach;
-      first.px=first.x;first.py=first.y;
-    }
-    routeAroundBlocks(st,rod,rods,base);
-    }
-    const tip=st.links.at(-1);
-    if(st.grabbed && !balls.includes(st.grabbed) && !rods.includes(st.grabbed)) releaseRobot(st);
-    if(st.phase==='out' && st.travel>12) {
-      for(const target of [...balls,...rods]) {
-        if(target===rod || target.type==='fixedBall' || target.type==='antigravity'
-          || target.attachedRobotUid || target.attachedMagnetUid || target.attachedSwingUid) continue;
-        if(target.type==='wood' && Math.hypot(target.x-base.x,target.y-base.y)<target.length/2+18
-          && Math.hypot(tip.x-base.x,tip.y-base.y)<24) continue;
-        const point=robotContact(target,tip);
-        if(!point) continue;
-        const angle=target.angle||0,c=Math.cos(angle),s=Math.sin(angle);
-        st.grabbed=target;
-        st.grabPoint={x:(point.x-target.x)*c+(point.y-target.y)*s,
-          y:-(point.x-target.x)*s+(point.y-target.y)*c};
-        st.handNormal={x:point.nx*c+point.ny*s,y:-point.nx*s+point.ny*c};
-        st.phase='hold';st.hold=clamp(Number(rod.holdSeconds)||2,.1,30);
-        // The winch engages on the very frame of suction, not one tick later.
-        st.travel=Math.max(shortestHoseRoute(base,point,rods,rod,target,st.wrapFace).length,
-          st.travel-190*dt);
-        break;
-      }
-    }
-    if(st.grabbed) {
-      const target=st.grabbed,p=st.grabPoint,c=Math.cos(target.angle||0),s=Math.sin(target.angle||0);
-      const contact={x:target.x+p.x*c-p.y*s,y:target.y+p.x*s+p.y*c};
-      const route=shortestHoseRoute(base,contact,rods,rod,target,st.wrapFace);
-      const rx=contact.x-route.anchor.x,ry=contact.y-route.anchor.y,d=Math.hypot(rx,ry)||1;
-      const desired=st.travel<=route.length+4 ? 24 : 0;
-      st.tension=(st.tension||0)+(desired-(st.tension||0))*Math.min(1,dt*12);
-      const tension=st.tension;
-      const impulse=tension*dt;
-      if(target.radius) {
-        const m=Math.max(.08,target.mass||.18);
-        target.vx-=rx/d*impulse/m;target.vy-=ry/d*impulse/m;
-      } else if(target.type==='rotor'||target.type==='zipline') {
-        const mass=Math.max(.15,target.length*target.thickness/3600*.7);
-        window.MarbleKinetics.applyImpulse(target,{x:target.x,y:target.y},0,mass*gravity*dt,pixels);
-        window.MarbleKinetics.applyImpulse(target,contact,-rx/d*impulse,-ry/d*impulse,pixels);
-      } else if(target.type==='swing') {
-        const leverX=(contact.x-target.x)/pixels,leverY=(contact.y-target.y)/pixels;
-        const inertia=Math.max(.05,.7*(target.length/pixels)**2/3);
-        target.swingOmega=clamp((target.swingOmega||0)+(leverX*(-ry/d)-leverY*(-rx/d))*impulse/inertia,-16,16);
-        target.swingStarted=true;
-      }
-      // A joint follows its actual contact; target velocity is never overwritten.
-      tip.x=contact.x;tip.y=contact.y;
-      const localNormal=st.handNormal || {x:1,y:0};
-      const normal={x:localNormal.x*c-localNormal.y*s,
-        y:localNormal.x*s+localNormal.y*c};
-      if(st.links.length>2) {
-        const before=st.links.at(-2);
-        before.x=contact.x+normal.x*Math.min(HOSE_STEP,st.travel/(st.links.length-1));
-        before.y=contact.y+normal.y*Math.min(HOSE_STEP,st.travel/(st.links.length-1));
-      }
-    } else if(st.phase==='out' && Math.hypot(tip.x-base.x,tip.y-base.y)>boundary) {
-      st.phase='back';
-    }
+    const span=st.phase==='hold' ? Math.hypot(st.head.x-base.x,st.head.y-base.y) : st.travel;
+    const line=st.phase==='hold' && span>0 ? {x:(st.head.x-base.x)/span,y:(st.head.y-base.y)/span} : dir;
+    straightLinks(st,base,line,span);
   }
   function resolveBox(ball, box, friction = 0) {
     const c = Math.cos(box.angle), s = Math.sin(box.angle);
@@ -616,16 +437,15 @@
     if (rod.type === 'robotArm') {
       const body = images['robot-body'], tile = images['robot-hose'];
       if (st.links && st.travel > 1) {
-        for (let i = 1; i < st.links.length; i++) {
-          const start=st.links[i-1], b=st.links[i];
-          const a=i===1 ? {x:start.x-Math.cos(rod.angle||0)*6,
-            y:start.y-Math.sin(rod.angle||0)*6} : start;
-          const length = Math.hypot(b.x-a.x, b.y-a.y);
-          if (length < .3) continue;
+        const start=st.links[0],b=st.links.at(-1);
+        const origin={x:start.x-Math.cos(rod.angle||0)*6,
+          y:start.y-Math.sin(rod.angle||0)*6};
+        const length=Math.hypot(b.x-origin.x,b.y-origin.y);
+        if(length>.3) {
           ctx.save(); ctx.globalAlpha *= alpha;
-          ctx.translate(a.x,a.y); ctx.rotate(Math.atan2(b.y-a.y,b.x-a.x)-Math.PI/2);
+          ctx.translate(origin.x,origin.y); ctx.rotate(Math.atan2(b.y-origin.y,b.x-origin.x)-Math.PI/2);
           if (tile.complete && tile.naturalWidth) {
-            // Repeat a single corrugation at fixed scale, never stretch the full hose.
+            // Feed complete corrugations at fixed scale; only the last tile is cropped.
             for(let at=0;at<length;at+=HOSE_STEP) {
               const piece=Math.min(HOSE_STEP,length-at);
               ctx.drawImage(tile,0,21,tile.naturalWidth,15*piece/HOSE_STEP,

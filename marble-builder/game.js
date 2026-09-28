@@ -353,7 +353,7 @@
     rotor: { length: 150, thickness: ELECTRIC_PLATFORM_THICKNESS },
     zipline: { length: 120, thickness: ELECTRIC_PLATFORM_THICKNESS },
     punch: { length: 70, thickness: 42, force: 7 },
-    robotArm: { length: 70, thickness: 42, force: 7, holdSeconds: 2 },
+    robotArm: { length: 70, thickness: 42, force: 7, reelSpeed: 1.9, holdSeconds: 2 },
     fixedBall: { length: 36, thickness: 36 },
 
     slime: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
@@ -436,7 +436,7 @@
       ...(type === 'rotor' ? { pivotOffset: Number(rod.pivotOffset) || 0, pivotX: Number.isFinite(rod.pivotX) ? rod.pivotX : rod.x, pivotY: Number.isFinite(rod.pivotY) ? rod.pivotY : rod.y, omega: Number(rod.omega) || 0, restAngle: Number.isFinite(rod.restAngle) ? rod.restAngle : rod.angle || 0 } : {}),
       ...(type === 'zipline' ? { path: Array.isArray(rod.path) ? clone(rod.path) : [{x:rod.x,y:rod.y},{x:rod.x+180,y:rod.y}], fixedCount: Math.max(1,Number(rod.fixedCount)||1), pathT: Number(rod.pathT) || 0, pathSpeed: Number(rod.pathSpeed) || 0, curveBend: Number(rod.curveBend) || 0, guideOffset: Number(rod.guideOffset) || 0 } : {}),
       ...(type === 'punch' || type === 'robotArm' ? { buttonAnchor: rod.buttonAnchor ? clone(rod.buttonAnchor) : null, force: clamp(Number(rod.force) || 7, 2, 20),
-        ...(type === 'robotArm' ? { holdSeconds: clamp(Number(rod.holdSeconds) || 2, .1, 30) } : {}) } : {}),
+        ...(type === 'robotArm' ? { reelSpeed: clamp(Number(rod.reelSpeed) || 1.9, .2, 8), holdSeconds: clamp(Number(rod.holdSeconds) || 2, .1, 30) } : {}) } : {}),
       ...(type === 'fixedBall' ? { length: BALL_RADIUS * 2, thickness: BALL_RADIUS * 2 } : {}),
       ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
         releaseAngle: Number.isFinite(rod.releaseAngle) ? rod.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
@@ -1308,9 +1308,14 @@
     document.getElementById('deviceSettingsDialog').dataset.deviceType = type;
     const values = target || toolSettings[type];
     document.getElementById('deviceSettingsTitle').textContent = type === 'robotArm' ? '버튼+로봇 팔 설정' : '버튼+펀치 설정';
+    document.getElementById('deviceForceLabel').textContent = type === 'robotArm' ? '작살 발사 힘·가속' : '펀치 힘·속도';
     document.getElementById('deviceForce').value = String(values.force || 7);
     document.getElementById('robotHoldLabel').hidden = type !== 'robotArm';
-    if (type === 'robotArm') document.getElementById('robotHoldSeconds').value = String(values.holdSeconds || 2);
+    document.getElementById('robotReelLabel').hidden = type !== 'robotArm';
+    if (type === 'robotArm') {
+      document.getElementById('robotHoldSeconds').value = String(values.holdSeconds || 2);
+      document.getElementById('robotReelSpeed').value = String(values.reelSpeed || 1.9);
+    }
     document.getElementById('deviceSettingsDialog').showModal();
   }
 
@@ -1939,7 +1944,7 @@
         onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
       ...(type === 'breakable' ? { maxHp: BREAKABLE_HP, hp: BREAKABLE_HP } : {}),
       ...(window.MarbleDevices.isDevice({ type }) ? { buttonAnchor: options.buttonAnchor ? clone(options.buttonAnchor) : null, force: Number(options.force) || toolSettings[type].force,
-        ...(type === 'robotArm' ? { holdSeconds: clamp(Number(options.holdSeconds) || toolSettings.robotArm.holdSeconds, .1, 30) } : {}) } : {}),
+        ...(type === 'robotArm' ? { reelSpeed: clamp(Number(options.reelSpeed) || toolSettings.robotArm.reelSpeed || 1.9, .2, 8), holdSeconds: clamp(Number(options.holdSeconds) || toolSettings.robotArm.holdSeconds, .1, 30) } : {}) } : {}),
       ...(type === 'fixedBall' ? { length: BALL_RADIUS * 2, thickness: BALL_RADIUS * 2 } : {}),
       ...(type === 'rotor' ? { pivotOffset:Number(options.pivotOffset)||0,
         pivotX:x+Math.cos(options.angle||0)*(Number(options.pivotOffset)||0),
@@ -3804,6 +3809,11 @@
   }
   function physicsStepOne(dt) {
     if (!ball || won || editDrag) return;
+    if (ball.attachedRobotUid) {
+      const arm=rods.find(rod=>rod.uid===ball.attachedRobotUid);
+      if(arm && window.MarbleDevices.state(arm).grabbed===ball) return;
+      ball.attachedRobotUid=null;
+    }
     if (updateMagnetBall(dt)) return;
     if (ball.attachedSwingUid) {
       const rod = rods.find(item => item.uid === ball.attachedSwingUid);
@@ -4957,6 +4967,7 @@
       ? clamp(Number(raw), 2, 20) : target.force;
     input.value = String(force);
     const next = type === 'robotArm' ? { force,
+      reelSpeed: clamp(Number(document.getElementById('robotReelSpeed').value) || target.reelSpeed || 1.9, .2, 8),
       holdSeconds: clamp(Number(document.getElementById('robotHoldSeconds').value) || target.holdSeconds || 2, .1, 30) } : { force };
     if (Object.keys(next).some(key => target[key] !== next[key])) {
       pushUndo();

@@ -102,57 +102,72 @@ window.MarbleKinetics = (() => {
     return {x:rod.x+c*px-s*py,y:rod.y+s*px+c*py,
       nx:c*nx-s*ny,ny:s*nx+c*ny,depth:magnet.length/2-distance};
   }
-  function collidePair(a,b,scale) {
-    const hit = contact(a,b);
-    if (!hit) return 0;
-    const {x,y,nx,ny} = hit;
-    const av = axis(a,x,y,nx,ny,scale), bv = axis(b,x,y,nx,ny,scale);
-    const approach = (bv.vx-av.vx)*nx+(bv.vy-av.vy)*ny;
-    const denom = av.jac**2/av.inertia + bv.jac**2/bv.inertia;
-    if (approach >= 0 || denom < 1e-8) return 0;
-    const impulse = -(1+.08)*approach/denom;
-    push(a,av,-impulse,scale); push(b,bv,impulse,scale);
-    return -approach;
-  }
-  function advance(rods,dt,scale,onImpact) {
-    const dynamic = rods.filter(r => r.type === 'rotor' || r.type === 'zipline');
-    const solids = rods.filter(r => r.type !== 'rotor' && r.type !== 'zipline' && r.type !== 'swing' && r.type !== 'fixedBall' && (r.type !== 'breakable' || r.hp > 0));
-    for (const rod of dynamic) {
-      const old = {angle:rod.angle,pathT:rod.pathT};
-      if (rod.type === 'rotor') {
-        rod.omega = (rod.omega || 0)*Math.exp(-.28*dt);
-        rod.angle += rod.omega*dt;
-      } else {
-        rod.pathSpeed = (rod.pathSpeed || 0)*Math.exp(-.45*dt);
-        const target = (rod.pathT || 0) + rod.pathSpeed*dt;
-        rod.pathT = clamp(target, 0, curve(rod).total);
-        if (target !== rod.pathT) rod.pathSpeed = 0;
-      }
-      position(rod);
-      for (const fixed of solids) {
-        const hit = fixed.type === 'magnet' ? contactCircle(rod,fixed) : contact(rod,fixed);
-        if (!hit) continue;
-        const a = axis(rod,hit.x,hit.y,hit.nx,hit.ny,scale);
-        const inward = a.vx*hit.nx+a.vy*hit.ny;
-        rod.angle=old.angle; rod.pathT=old.pathT; position(rod);
-        if (inward > .02 && Math.abs(a.jac) > 1e-6) {
-          push(rod,a,-(1+.12)*inward*a.inertia/a.jac,scale);
-          onImpact?.(rod,fixed,inward);
-        } else if (rod.type === 'rotor') rod.omega=0;
-        else rod.pathSpeed=0;
-        break;
-      }
+  function collidePair(a,b,scale,hit=contact(a,b)) {
+    if(!hit) return null;
+    const {x,y,nx,ny}=hit;
+    const av=axis(a,x,y,nx,ny,scale),bv=axis(b,x,y,nx,ny,scale);
+    const approach=(bv.vx-av.vx)*nx+(bv.vy-av.vy)*ny;
+    const denom=av.jac**2/av.inertia+bv.jac**2/bv.inertia;
+    if(approach<0 && denom>1e-8) {
+      const impulse=-(1+.08)*approach/denom;
+      push(a,av,-impulse,scale);push(b,bv,impulse,scale);
     }
-    for (let i = 0; i < dynamic.length; i++) for (let j = i+1; j < dynamic.length; j++) {
-      const speed = collidePair(dynamic[i],dynamic[j],scale);
-      if (speed > .12) {
-        onImpact?.(dynamic[i],dynamic[j],speed);
-        // Let the exchanged impulse drive the following step, not a penetrated pose.
-        for (const r of [dynamic[i],dynamic[j]]) {
-          if (r.type === 'rotor') r.angle -= r.omega*dt;
-          else r.pathT = clamp(r.pathT-r.pathSpeed*dt,0,curve(r).total);
-          position(r);
+    return -Math.min(0,approach);
+  }
+  // All constrained bodies advance together in small swept increments. Rolling
+  // a penetrated pair back *after* a full frame used to let thin rotors cross.
+  function advance(rods,dt,scale,onImpact) {
+    const dynamic=rods.filter(r=>r.type==='rotor'||r.type==='zipline');
+    if(!dynamic.length) return;
+    const solids=rods.filter(r=>r.type!=='rotor'&&r.type!=='zipline'&&r.type!=='swing'
+      &&r.type!=='fixedBall'&&(r.type!=='breakable'||r.hp>0));
+    const travel=Math.max(...dynamic.map(r=>r.type==='rotor'
+      ? Math.abs(r.omega||0)*(r.length/2+Math.abs(r.pivotOffset||0))*dt
+      : Math.abs(r.pathSpeed||0)*dt));
+    const count=Math.max(1,Math.min(64,Math.ceil(travel/3)));
+    const step=dt/count;
+    for(let sub=0;sub<count;sub++) {
+      const previous=new Map();
+      for(const rod of dynamic) {
+        previous.set(rod,{angle:rod.angle,pathT:rod.pathT});
+        if(rod.type==='rotor') {
+          rod.omega=(rod.omega||0)*Math.exp(-.28*step);
+          rod.angle+=rod.omega*step;
+        } else {
+          rod.pathSpeed=(rod.pathSpeed||0)*Math.exp(-.45*step);
+          const next=(rod.pathT||0)+rod.pathSpeed*step;
+          rod.pathT=clamp(next,0,curve(rod).total);
+          if(next!==rod.pathT) rod.pathSpeed=0;
         }
+        position(rod);
+        for(const fixed of solids) {
+          const hit=fixed.type==='magnet'?contactCircle(rod,fixed):contact(rod,fixed);
+          if(!hit) continue;
+          const a=axis(rod,hit.x,hit.y,hit.nx,hit.ny,scale);
+          const inward=a.vx*hit.nx+a.vy*hit.ny;
+          const old=previous.get(rod);
+          rod.angle=old.angle;rod.pathT=old.pathT;position(rod);
+          if(inward>.02&&Math.abs(a.jac)>1e-6) {
+            push(rod,a,-(1+.12)*inward*a.inertia/a.jac,scale);
+            onImpact?.(rod,fixed,inward);
+          } else if(rod.type==='rotor') rod.omega=0;
+          else rod.pathSpeed=0;
+          break;
+        }
+      }
+      // Any overlap, including a shallow separating contact, must not be
+      // committed. Exchange momentum at the actual contact then restore the
+      // last non-penetrating positions on each allowed pivot/guide.
+      for(let i=0;i<dynamic.length;i++) for(let j=i+1;j<dynamic.length;j++) {
+        const a=dynamic[i],b=dynamic[j],hit=contact(a,b);
+        if(!hit) continue;
+        const speed=collidePair(a,b,scale,hit);
+        for(const rod of [a,b]) {
+          const old=previous.get(rod);
+          rod.angle=old.angle;rod.pathT=old.pathT;
+          position(rod);
+        }
+        if(speed>.12) onImpact?.(a,b,speed);
       }
     }
   }

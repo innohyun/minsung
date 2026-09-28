@@ -1,4 +1,4 @@
-"""Robot grip projects tension and gravity through marble mass and constrained joints."""
+"""Straight motor pulls marbles and projects force through pivot/guide joints."""
 import os
 from playwright.sync_api import sync_playwright
 
@@ -42,7 +42,7 @@ with sync_playwright() as pw:
     }''')
     print(measurements)
     assert not errors,errors
-    assert abs(measurements['light']['vx']) > abs(measurements['heavy']['vx']) > 0,measurements
+    assert measurements['light']['vx'] < -1 and abs(measurements['light']['vx']-measurements['heavy']['vx']) < .01,measurements
     assert abs(measurements['rotor']['omega'])>0,measurements
     assert abs(measurements['zipline']['pathSpeed'])>0,measurements
     assert abs(measurements['swing']['swingOmega'])>0,measurements

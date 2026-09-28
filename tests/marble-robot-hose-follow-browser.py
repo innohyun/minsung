@@ -1,4 +1,4 @@
-"""Actual launched hose follows the arc; a late mid-span plank must not flip it."""
+"""Straight, gravity-free harpoon: every hose link stays on the launched ray."""
 import os
 from playwright.sync_api import sync_playwright
 
@@ -8,91 +8,34 @@ with sync_playwright() as pw:
     for width,height in ((1280,800),(390,844)):
         page=browser.new_page(viewport={'width':width,'height':height},has_touch=width<500)
         errors=[]
-        page.on('pageerror',lambda e: errors.append(str(e)))
+        page.on('pageerror',lambda e:errors.append(str(e)))
         page.goto(URL,wait_until='networkidle')
         page.locator('#freeModeButton').click()
         data=page.evaluate('''() => {
-          const d=window.MarbleDevices;d.reset();
-          const support={type:'wood',uid:'mount',x:80,y:100,length:100,thickness:20,angle:0};
-          const arm={type:'robotArm',uid:'arc',x:300,y:300,length:70,thickness:42,
-            angle:-.5,force:9,buttonAnchor:{woodUid:'mount',side:'top',offset:0}};
-          const blocker={type:'wood',uid:'middle-only',x:460,y:300,length:50,thickness:22,angle:0};
-          const b=d.button([support,arm],arm),press={x:b.x,y:b.y-16,radius:18,mass:.18,vx:0,vy:0};
-          const projected=[], frames=[];
-          let blockerActive=false,maxArcError=0,maxJump=0,inside=0,midInside=0,checked=0;
-          const bad=[];let activatedAt=0;
-          let old=null;
-          for(let i=0;i<110;i++) {
-            const rods=blockerActive?[support,arm,blocker]:[support,arm];
-            d.tick(rods,[press],1/120,100,null,[],19.35,900);
-            const st=d.state(arm);
-            if(!blockerActive && st.head.x>550) {blockerActive=true;activatedAt=i;}
-            if(st.phase!=='out') break;
-            const p=st.links;
-            if(i>30 && !blockerActive) {
-              const base={x:arm.x+Math.cos(arm.angle)*arm.length/2,
-                y:arm.y+Math.sin(arm.angle)*arm.length/2};
-              for(const node of p.slice(2,-1)) {
-                if(node.x-base.x<30) continue; // the short nozzle section stays rigid
-                const time=(node.x-base.x)/(Math.cos(arm.angle)*arm.force*.55*100);
-                const expected=base.y+Math.sin(arm.angle)*arm.force*.55*100*time
-                  +19.35*100*time*(time+1/120)/2;
-                maxArcError=Math.max(maxArcError,Math.abs(node.y-expected));
-              }
+          const dev=window.MarbleDevices;
+          const mount={type:'wood',uid:'mount',x:80,y:100,length:100,thickness:20,angle:0};
+          const arm={type:'robotArm',uid:'straight',x:300,y:300,length:70,thickness:42,
+            angle:-.5,force:9,reelSpeed:2,holdSeconds:.6,
+            buttonAnchor:{woodUid:'mount',side:'top',offset:0}};
+          const base=dev.muzzle(arm),target={type:'wood',uid:'fixed',x:560,y:157,length:70,thickness:24,angle:0};
+          const b=dev.button([mount,arm,target],arm),press={x:b.x,y:b.y-16,radius:18,mass:.18,vx:0,vy:0};
+          const samples=[],errors=[];
+          dev.reset();
+          for(let i=0;i<140;i++) {
+            dev.tick([mount,arm,target],[press],1/120,100,null,[],50,850);
+            const s=dev.state(arm);
+            if(s.phase==='out'||s.phase==='hold') {
+              const tip=s.links.at(-1),dx=tip.x-base.x,dy=tip.y-base.y,dist=Math.hypot(dx,dy);
+              for(const p of s.links) errors.push(Math.abs((p.x-base.x)*dy-(p.y-base.y)*dx)/(dist||1));
+              if(i%12===0) samples.push({phase:s.phase,travel:s.travel,x:tip.x,y:tip.y});
             }
-            if(blockerActive && i>activatedAt) {
-              const rope=p.slice(2,-1),near=rope.filter(node=>Math.abs(node.x-460)<45);
-              if(old?.length && near.length && i>activatedAt+2) {
-                const a=near[Math.floor(near.length/2)],prior=old[Math.floor(old.length/2)];
-                maxJump=Math.max(maxJump,Math.hypot(a.x-prior.x,a.y-prior.y));
-              }
-              old=near.map(v=>({x:v.x,y:v.y}));
-              for(const node of rope) {
-                if(Math.abs(node.x-460)<25+5 && Math.abs(node.y-300)<11+5) {
-                  inside++;if(bad.length<8) bad.push({i,x:node.x,y:node.y});
-                }
-                checked++;
-              }
-              for(let k=3;k<p.length-1;k++) {
-                const x=(p[k-1].x+p[k].x)/2,y=(p[k-1].y+p[k].y)/2;
-                if(Math.abs(x-460)<25+4 && Math.abs(y-300)<11+4) midInside++;
-              }
-            }
-            if(i%20===0) frames.push({i,tip:{x:st.head.x,y:st.head.y},links:p.length});
           }
-          return {maxArcError,maxJump,inside,midInside,checked,blockerActive,activatedAt,bad,frames};
+          return {samples,maxError:Math.max(0,...errors),fixed:target.x===560,
+            path:dev.robotPath(arm,[mount,arm,target],0,100,850).hit};
         }''')
-        print(width,data)
         assert not errors,errors
-        assert data['maxArcError']<3 and data['blockerActive'] and data['checked']>100,data
-        assert data['inside']==data['midInside']==0 and data['maxJump']<25,data
-        winding=page.evaluate('''() => {
-          const d=window.MarbleDevices;d.reset();
-          const mount={type:'wood',uid:'mount3',x:80,y:100,length:100,thickness:20,angle:0};
-          const arm={type:'robotArm',uid:'winch-route',x:300,y:300,length:70,thickness:42,
-            angle:0,force:9,buttonAnchor:{woodUid:'mount3',side:'top',offset:0}};
-          const block={type:'wood',uid:'wrap',x:475,y:300,length:40,thickness:60,angle:0};
-          const target={type:'wood',uid:'fixed',x:650,y:300,length:70,thickness:30,angle:0};
-          const st=d.state(arm),base={x:335,y:300},contact={x:615,y:300};
-          st.phase='hold';st.travel=350;st.hold=3.5;
-          st.head={x:contact.x,y:contact.y};st.grabbed=target;
-          st.grabPoint={x:-35,y:0};st.handNormal={x:-1,y:0};
-          st.wrapFace={wrap:-1};
-          st.links=Array.from({length:31},(_,i)=>{
-            const x=base.x+(contact.x-base.x)*i/30;
-            const y=300-55*Math.sin(Math.PI*i/30);
-            return {x,y,px:x,py:y};
-          });
-          let min=Infinity,max=0;
-          for(let i=0;i<180;i++) {
-            d.tick([mount,arm,block,target],[],1/120,100,null,[],19.35,900);
-            min=Math.min(min,st.travel);max=Math.max(max,st.travel);
-          }
-          return {travel:st.travel,straight:280,initial:max,min,unchanged:target.x===650,
-            phase:st.phase,links:st.links?.length};
-        }''')
-        assert winding['unchanged'] and winding['phase']=='hold',winding
-        assert winding['straight']+3<winding['travel']<winding['initial']-5,winding
-        print('WINCH',width,winding)
+        assert data['path'] and data['fixed'] and data['maxError']<.001,data
+        assert any(x['phase']=='out' for x in data['samples']) and any(x['phase']=='hold' for x in data['samples']),data
+        print('PASS straight hose',width,'max offset',data['maxError'])
         page.close()
     browser.close()
