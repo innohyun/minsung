@@ -286,7 +286,7 @@
     const base=muzzle(rod),dir={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
     const force=clamp(Number(rod.force)||7,2,20);
     const reel=clamp(Number(rod.reelSpeed)||1.9,.2,8)*pixels;
-    if(st.phase==='idle') {st.travel=0;st.links=null;st.head=null;releaseRobot(st);return;}
+    if(st.phase==='idle') {st.travel=0;st.links=null;st.head=null;st.returnDir=null;releaseRobot(st);return;}
     if(st.phase==='out') {
       if(!st.head) st.head={base,dir,x:base.x,y:base.y,travel:0,speed:force*.7};
       const old=st.travel;
@@ -318,12 +318,16 @@
       }
       if(!struck) {
         st.travel=st.head.travel;
-        if(st.travel>boundary) st.phase='back';
+        if(st.travel>boundary) {st.returnDir=null;st.phase='back';}
       }
     }
     if(st.phase==='hold') {
       const target=st.grabbed;
       if(!target || !balls.includes(target) && !rods.includes(target)) {
+        // If a grabbed body disappears, reel from the visible hand position.
+        const span=Math.hypot(st.head.x-base.x,st.head.y-base.y);
+        st.returnDir=span>1e-6?{x:(st.head.x-base.x)/span,y:(st.head.y-base.y)/span}:dir;
+        st.travel=span;
         releaseRobot(st);st.phase='back';
       } else {
         st.hold-=dt;
@@ -365,16 +369,25 @@
         }
         if(target.radius) {grip.x=target.x+p.x;grip.y=target.y+p.y;}
         st.head.x=grip.x;st.head.y=grip.y;
-        if(st.hold<=0) {releaseRobot(st);st.phase='back';}
+        if(st.hold<=0) {
+          // Capture the held hose's angle and real length, not the original
+          // launch axis or the motor's (possibly shorter) target length.
+          const span=Math.hypot(st.head.x-base.x,st.head.y-base.y);
+          st.returnDir=span>1e-6?{x:(st.head.x-base.x)/span,y:(st.head.y-base.y)/span}:dir;
+          st.travel=span;
+          releaseRobot(st);st.phase='back';
+        }
       }
     }
     if(st.phase==='back') {
       st.travel=Math.max(0,st.travel-reel*dt);
       if(st.travel<=0) {st.phase='idle';st.head=null;st.links=null;return;}
-      st.head={x:base.x+dir.x*st.travel,y:base.y+dir.y*st.travel};
+      const returnDir=st.returnDir||dir;
+      st.head={x:base.x+returnDir.x*st.travel,y:base.y+returnDir.y*st.travel};
     }
     const span=st.phase==='hold' ? Math.hypot(st.head.x-base.x,st.head.y-base.y) : st.travel;
-    const line=st.phase==='hold' && span>0 ? {x:(st.head.x-base.x)/span,y:(st.head.y-base.y)/span} : dir;
+    const line=st.phase==='hold' && span>0 ? {x:(st.head.x-base.x)/span,y:(st.head.y-base.y)/span}
+      : st.phase==='back'&&st.returnDir ? st.returnDir : dir;
     straightLinks(st,base,line,span);
   }
   function resolveBox(ball, box, friction = 0) {

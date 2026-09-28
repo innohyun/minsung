@@ -54,8 +54,8 @@ with sync_playwright() as pw:
                     for selector in ('#freeModeButton', '#stageModeButton'):
                         response = page.goto(URL, wait_until='networkidle')
                         assert response.status == 200, response.status
-                        assert page.evaluate('''() => [...document.scripts].some(s => s.src.endsWith('devices.js?v=13'))
-                          && [...document.scripts].some(s => s.src.endsWith('kinetic.js?v=10'))
+                        assert page.evaluate('''() => [...document.scripts].some(s => s.src.endsWith('devices.js?v=14'))
+                          && [...document.scripts].some(s => s.src.endsWith('kinetic.js?v=11'))
                           && [...document.scripts].some(s => s.src.endsWith('game.js?v=77'))''')
                         assert page.evaluate('typeof window.MarbleDevices?.setSwingMagnetContact === "function"'), errors
                         assert page.evaluate('window.marbleBuilderReady === true'), errors
@@ -102,7 +102,7 @@ with sync_playwright() as pw:
                 context = browser.new_context()
                 try:
                     page = context.new_page()
-                    page.route('**/marble-builder/devices.js?v=13', lambda route: route.fulfill(
+                    page.route('**/marble-builder/devices.js?v=14', lambda route: route.fulfill(
                         status=200, content_type='text/javascript', body='window.MarbleDevices = {};'))
                     page.goto(URL, wait_until='networkidle')
                     page.locator('#gameStartupError:visible').wait_for(timeout=5000)
