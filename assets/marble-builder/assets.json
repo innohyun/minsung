@@ -79,7 +79,23 @@
       "runtime": "robot-arm/robot-arm-gray.png",
       "size": [142, 1373],
       "alpha": true,
-      "status": "asset-only; gameplay integration pending"
+      "status": "gameplay sprite and hose reference"
+    },
+    {
+      "name": "로봇 팔 평면 본체",
+      "id": "robot-arm-body",
+      "source": "robot-arm/robot-body-source.png",
+      "runtime": "robot-arm/robot-body.png",
+      "size": [552, 251],
+      "alpha": true
+    },
+    {
+      "name": "로봇 팔 주름 호스 조각",
+      "id": "robot-hose-tile",
+      "source": "robot-arm/robot-arm-gray.png",
+      "runtime": "robot-arm/robot-hose-tile.png",
+      "size": [55, 68],
+      "alpha": true
     },
     {
       "name": "깨지는 나무 블록 (HP 6단계)",

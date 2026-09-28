@@ -116,7 +116,7 @@ window.MarbleKinetics = (() => {
   }
   function advance(rods,dt,scale,onImpact) {
     const dynamic = rods.filter(r => r.type === 'rotor' || r.type === 'zipline');
-    const solids = rods.filter(r => r.type !== 'rotor' && r.type !== 'zipline' && r.type !== 'swing' && (r.type !== 'breakable' || r.hp > 0));
+    const solids = rods.filter(r => r.type !== 'rotor' && r.type !== 'zipline' && r.type !== 'swing' && r.type !== 'fixedBall' && (r.type !== 'breakable' || r.hp > 0));
     for (const rod of dynamic) {
       const old = {angle:rod.angle,pathT:rod.pathT};
       if (rod.type === 'rotor') {
@@ -156,7 +156,7 @@ window.MarbleKinetics = (() => {
       }
     }
   }
-  function collideBall(rod,ball,scale,onImpact) {
+  function collideBall(rod,ball,scale,onImpact,options={}) {
     if (!ball) return;
     const c = Math.cos(rod.angle), s = Math.sin(rod.angle), dx = ball.x-rod.x, dy = ball.y-rod.y;
     const lx = c*dx+s*dy, ly = -s*dx+c*dy;
@@ -168,16 +168,40 @@ window.MarbleKinetics = (() => {
     const wx = c*nx-s*ny, wy = s*nx+c*ny;
     const px = rod.x+c*cx-s*cy, py = rod.y+s*cx+c*cy;
     const ax = axis(rod,px,py,wx,wy,scale);
+    const rx=-wx*ball.radius/scale, ry=-wy*ball.radius/scale;
     const invBall = ball.attachedMagnetUid || ball.attachedSwingUid || ball.electricRide ? 0 : 1/ball.mass;
     const denom = invBall + ax.jac**2/ax.inertia;
     if (denom < 1e-8) return;
     if (invBall) { ball.x += wx*(ball.radius-d+.01); ball.y += wy*(ball.radius-d+.01); }
     const approach = (ball.vx-ax.vx)*wx+(ball.vy-ax.vy)*wy;
-    if (approach >= 0) return true;
-    const impulse = -(1+.18)*approach/denom;
-    if (invBall) { ball.vx += wx*impulse*invBall; ball.vy += wy*impulse*invBall; }
-    push(rod,ax,-impulse,scale);
-    onImpact?.(-approach);
+    const impulse = approach < 0 ? -(1+.18)*approach/denom : 0;
+    if (impulse) {
+      if (invBall) { ball.vx += wx*impulse*invBall; ball.vy += wy*impulse*invBall; }
+      push(rod,ax,-impulse,scale);
+      onImpact?.(-approach);
+    }
+    if (invBall && options.friction) {
+      const tx=-wy,ty=wx,radius=ball.radius/scale;
+      const spinInertia=Math.max(.0001,.4*ball.mass*radius*radius);
+      const tangent=axis(rod,px,py,tx,ty,scale);
+      const crossT=rx*ty-ry*tx;
+      const relative=(ball.vx-ball.omega*ry-tangent.vx)*tx
+        +(ball.vy+ball.omega*rx-tangent.vy)*ty;
+      const tangentDenom=invBall+crossT*crossT/spinInertia+tangent.jac*tangent.jac/tangent.inertia;
+      // Wood's Coulomb coefficient also acts on a resting ball's gravity load.
+      const support=ball.mass*(options.gravity||0)*(options.dt||0)*Math.max(0,-wy);
+      const friction=clamp(-relative/tangentDenom,-options.friction*(impulse+support),options.friction*(impulse+support));
+      ball.vx+=tx*friction*invBall; ball.vy+=ty*friction*invBall;
+      ball.omega+=crossT*friction/spinInertia;
+      push(rod,tangent,-friction,scale);
+      if (support && options.rollingResistance) {
+        const speed=ball.vx*tx+ball.vy*ty;
+        const maxSlow=(options.gravity||0)*options.rollingResistance*(options.dt||0);
+        const slow=clamp(speed,-maxSlow,maxSlow);
+        ball.vx-=tx*slow;ball.vy-=ty*slow;
+        ball.omega*=Math.exp(-options.rollingResistance*12*(options.dt||0));
+      }
+    }
     return true;
   }
   return { curve,position,advance,collideBall,contact,applyImpulse };

@@ -158,9 +158,10 @@
   const MATERIALS = {
     wood: { label: '나무 길', color: '#a96c36', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
     breakable: { label: '깨지는 블록', color: '#bd7840', edge: '#70401f', friction: 0.20, restitution: 0.23, rollingResistance: 0.04 * (0.20 / 0.38) },
-    rotor: { label: '회전축 블록', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0 },
-    zipline: { label: '곡선 짚라인', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0 },
+    rotor: { label: '회전축 블록', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0.04 * (0.20 / 0.38) },
+    zipline: { label: '곡선 짚라인', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0.04 * (0.20 / 0.38) },
     punch: { label: '버튼+펀치', color: '#435974', edge: '#1d3148', friction: .20, restitution: .23, rollingResistance: 0 },
+    robotArm: { label: '버튼+로봇 팔', color: '#435974', edge: '#1d3148', friction: .20, restitution: .23, rollingResistance: 0 },
 
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
@@ -176,6 +177,8 @@
     { type: 'rotor', label: '회전축 블록', detail: '공의 힘으로 베어링 회전' },
     { type: 'zipline', label: '곡선 짚라인', detail: '공의 힘으로 곡선을 따라 이동' },
     { type: 'punch', label: '버튼+펀치', detail: '공이 누르면 밀어내는 블록' },
+    { type: 'robotArm', label: '버튼+로봇 팔', detail: '펀치 버튼과 똑같이 눌러 줄을 뻗어요' },
+    { type: 'fixedBall', label: '고정 구슬', detail: '닿기 전에는 중력이 작용하지 않아요' },
 
 
     { type: 'slime', label: '슬라임 길', detail: '낙하 높이의 2/3 반동' },
@@ -230,6 +233,7 @@
   let followBall = false;
   let selectedBallType = 'normal';
   const activeBalls = [];
+  const activatedFixedBalls = new Set();
   let ballQueue = [];
   let queueIndex = 0;
   let launchMode = 'manual';
@@ -349,6 +353,8 @@
     rotor: { length: 150, thickness: ELECTRIC_PLATFORM_THICKNESS },
     zipline: { length: 120, thickness: ELECTRIC_PLATFORM_THICKNESS },
     punch: { length: 70, thickness: 42, force: 7 },
+    robotArm: { length: 70, thickness: 42, force: 7, holdSeconds: 2 },
+    fixedBall: { length: 36, thickness: 36 },
 
     slime: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
     electric: { length: 180, thickness: ELECTRIC_PLATFORM_THICKNESS },
@@ -429,7 +435,9 @@
         onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
       ...(type === 'rotor' ? { pivotOffset: Number(rod.pivotOffset) || 0, pivotX: Number.isFinite(rod.pivotX) ? rod.pivotX : rod.x, pivotY: Number.isFinite(rod.pivotY) ? rod.pivotY : rod.y, omega: Number(rod.omega) || 0, restAngle: Number.isFinite(rod.restAngle) ? rod.restAngle : rod.angle || 0 } : {}),
       ...(type === 'zipline' ? { path: Array.isArray(rod.path) ? clone(rod.path) : [{x:rod.x,y:rod.y},{x:rod.x+180,y:rod.y}], fixedCount: Math.max(1,Number(rod.fixedCount)||1), pathT: Number(rod.pathT) || 0, pathSpeed: Number(rod.pathSpeed) || 0, curveBend: Number(rod.curveBend) || 0, guideOffset: Number(rod.guideOffset) || 0 } : {}),
-      ...(type === 'punch' ? { buttonAnchor: rod.buttonAnchor ? clone(rod.buttonAnchor) : null, force: clamp(Number(rod.force) || 7, 2, 20) } : {}),
+      ...(type === 'punch' || type === 'robotArm' ? { buttonAnchor: rod.buttonAnchor ? clone(rod.buttonAnchor) : null, force: clamp(Number(rod.force) || 7, 2, 20),
+        ...(type === 'robotArm' ? { holdSeconds: clamp(Number(rod.holdSeconds) || 2, .1, 30) } : {}) } : {}),
+      ...(type === 'fixedBall' ? { length: BALL_RADIUS * 2, thickness: BALL_RADIUS * 2 } : {}),
       ...(type === 'swing' ? { startAngle: Number.isFinite(rod.startAngle) ? rod.startAngle : (rod.angle || 0),
         releaseAngle: Number.isFinite(rod.releaseAngle) ? rod.releaseAngle : DEFAULT_SWING_RELEASE_ANGLE,
         swingStarted: false, swingOmega: 0, releaseRequested: false } : {}) };
@@ -504,7 +512,7 @@
     }
     const storedRecent = readStoredJson(RECENT_TOOLS_STORAGE_KEY, recentTools);
     if (Array.isArray(storedRecent)) {
-      const allowed = new Set(['wood', 'breakable', 'slime', 'electric', 'swing', 'antigravity', 'magnet', 'rotor', 'zipline', 'punch']);
+      const allowed = new Set(['wood', 'breakable', 'slime', 'electric', 'swing', 'antigravity', 'magnet', 'rotor', 'zipline', 'punch', 'robotArm', 'fixedBall']);
       recentTools = [...new Set(storedRecent.map(key => {
         if (key === 'goal') return 'goal';
         const type = normalizeRodType(String(key).split(':')[0]);
@@ -584,6 +592,7 @@
     silenceMotionAudio();
     pendingPunch = null;
     window.MarbleDevices.reset();
+    activatedFixedBalls.clear();
     magnetStates.clear();
     rods.splice(0, rods.length, ...clone(snapshot.rods).filter(rod => rod.type !== 'movable').map(normalizeRodRecord));
     selectedBallType = snapshot.ballType === 'giant' ? 'giant' : 'normal';
@@ -1179,7 +1188,7 @@
       card.dataset.editorY = String(descriptor.editorY ?? descriptor.y);
     }
     if (settings.thickness) card.dataset.thickness = String(settings.thickness);
-    if (descriptor.type === 'punch') card.dataset.force = String(settings.force || toolSettings.punch.force);
+    if (window.MarbleDevices.isDevice({ type: descriptor.type })) card.dataset.force = String(settings.force || toolSettings.punch.force);
     if (settings.width) card.dataset.width = String(settings.width);
     if (settings.height) card.dataset.height = String(settings.height);
     if (settings.direction) card.dataset.direction = settings.direction;
@@ -1258,7 +1267,7 @@
       select.addEventListener('click', () => selectCatalogTool(block.type));
       actions.append(select);
       item.append(name, actions);
-      if (block.type !== 'goal') {
+      if (block.type !== 'goal' && block.type !== 'fixedBall') {
         const settings = document.createElement('button');
         settings.type = 'button';
         settings.className = 'catalog-settings';
@@ -1298,8 +1307,10 @@
     editingSettingsTarget = target;
     document.getElementById('deviceSettingsDialog').dataset.deviceType = type;
     const values = target || toolSettings[type];
-    document.getElementById('deviceSettingsTitle').textContent = '버튼+펀치 설정';
+    document.getElementById('deviceSettingsTitle').textContent = type === 'robotArm' ? '버튼+로봇 팔 설정' : '버튼+펀치 설정';
     document.getElementById('deviceForce').value = String(values.force || 7);
+    document.getElementById('robotHoldLabel').hidden = type !== 'robotArm';
+    if (type === 'robotArm') document.getElementById('robotHoldSeconds').value = String(values.holdSeconds || 2);
     document.getElementById('deviceSettingsDialog').showModal();
   }
 
@@ -1398,6 +1409,7 @@
     silenceMotionAudio();
     pendingPunch = null;
     window.MarbleDevices.reset();
+    activatedFixedBalls.clear();
     paused = false;
     pauseButton.textContent = '멈춤';
     pauseButton.setAttribute('aria-pressed','false');
@@ -1616,7 +1628,7 @@
       setHint('블록을 한 개 이상 배치해 주세요.', 3200);
       return;
     }
-    if (rods.some(rod => rod.type === 'punch' && rod.fixed &&
+    if (rods.some(rod => window.MarbleDevices.isDevice(rod) && rod.fixed &&
       !rods.some(wood => wood.uid === rod.buttonAnchor?.woodUid && wood.type === 'wood' && wood.fixed))) {
       setHint('고정 펀치의 버튼은 고정 나무 블록에 붙여야 합니다.', 4200);
       return;
@@ -1668,7 +1680,7 @@
   }
 
   function updateDeleteButton() {
-    selectedSettingsButton.hidden = !selected || (appMode === 'stage' && (selected.fixed || selected.kind === 'field')) || !(selected.kind === 'field' || selected.kind === 'rod' && ['magnet', 'breakable', 'rotor', 'punch'].includes(selected.type));
+    selectedSettingsButton.hidden = !selected || (appMode === 'stage' && (selected.fixed || selected.kind === 'field')) || !(selected.kind === 'field' || selected.kind === 'rod' && ['magnet', 'breakable', 'rotor', 'punch', 'robotArm'].includes(selected.type));
     deleteButton.disabled = !selected || (appMode === 'stage' && (selected?.fixed || selected?.kind === 'field'));
     pinZiplineButton.hidden = selected?.type !== 'zipline' || (appMode === 'stage' && selected.fixed);
     const canToggleFixed = appMode === 'editor' && selected?.kind === 'rod';
@@ -1766,6 +1778,13 @@
           : '전기 발판 꼭짓점이 바깥쪽이거나 떨어져 있어요. 결합을 고쳐 주세요.', 4700);
       return false;
     }
+    const robots = rods.filter(rod => rod.type === 'robotArm');
+    if (robots.length && robots.every(rod => !window.MarbleDevices.robotPath(rod,
+      [...rods, {x:spawn.x,y:spawn.y,radius:BALL_RADIUS}], activeGravity(), PIXELS_PER_METER,
+      resetBoundaryRadius() + 50).hit)) {
+      setHint('로봇 팔이 아무것도 잡지 못한 채 경계를 벗어나요. 각도나 블록 위치를 바꾼 뒤 공을 만드세요.', 4300);
+      return false;
+    }
     const queued = ['free', 'stage'].includes(appMode) && ballQueue.length > 0;
     const retrieval = pendingRetrievals.length > 0;
     if (queued && queueIndex >= ballQueue.length && !retrieval) { setHint('정한 순서의 공을 모두 발사했어요. 공 설정에서 다시 정해 주세요.'); return false; }
@@ -1787,7 +1806,7 @@
       type: kind
     };
     if (queued && !retrieval) { queueIndex += 1; nextLaunchAt = performance.now() + launchInterval * 1000; updateBallTypeButton(); }
-    if (!queued && !retrieval) activeBalls.length = 0;
+    if (!queued && !retrieval) activeBalls.splice(0, activeBalls.length, ...activeBalls.filter(item => item.fixedSourceUid));
     activeBalls.push(ball);
     won = false;
     goalHoldTime = 0;
@@ -1801,7 +1820,7 @@
   }
 
   function rodBounds(rod) {
-    if (rod.type === 'magnet') { const r = rod.length / 2; return { left: rod.x - r, right: rod.x + r, top: rod.y - r, bottom: rod.y + r }; }
+    if (rod.type === 'magnet' || rod.type === 'fixedBall') { const r = rod.length / 2; return { left: rod.x - r, right: rod.x + r, top: rod.y - r, bottom: rod.y + r }; }
     const cos = Math.abs(Math.cos(rod.angle || 0));
     const sin = Math.abs(Math.sin(rod.angle || 0));
     const halfWidth = cos * rod.length / 2 + sin * rod.thickness / 2;
@@ -1859,6 +1878,19 @@
 
   function kineticPlacementConflict(candidate) {
     return rods.some(other => {
+      if (other !== candidate && (candidate.type === 'fixedBall' || other.type === 'fixedBall')) {
+        const bead = candidate.type === 'fixedBall' ? candidate : other;
+        const block = bead === candidate ? other : candidate;
+        if (block.type === 'swing') {
+          return magnetContact(block, bead, bead.length / 2) !== null
+            || pointSegmentDistanceSquared(bead, block, swingPoint(block, -(block.length+5))).distance
+              < (bead.length/2 + 3) ** 2;
+        }
+        if (block.type === 'fixedBall' || block.type === 'magnet')
+          return Math.hypot(bead.x-block.x,bead.y-block.y) < (bead.length+block.length)/2;
+        return circleTouchesRect(bead, bead.length/2,
+          {x:block.x,y:block.y,width:block.length,height:block.thickness,angle:block.angle});
+      }
       if (other === candidate || (other.type === 'breakable' && other.hp <= 0)
         || (candidate.type !== 'rotor' && candidate.type !== 'zipline' && !window.MarbleDevices.isDevice(candidate)
           && other.type !== 'rotor' && other.type !== 'zipline' && !window.MarbleDevices.isDevice(other))) return false;
@@ -1872,6 +1904,8 @@
   }
   function rodOverlapsGoal(rod, goal) {
     if (rod.type === 'swing') return false;
+    if (rod.type === 'fixedBall') return basketSegments(goal).some(wall =>
+      circleTouchesRect(rod, rod.length / 2, basketSegmentBounds(wall)));
     if (rod.type === 'magnet') return basketSegments(goal).some(wall => circleTouchesRect(rod, rod.length / 2, basketSegmentBounds(wall)));
     const rodPolygon = orientedRectCorners({ x: rod.x, y: rod.y, width: rod.length, height: rod.thickness, angle: rod.angle });
     return basketSegments(goal).some(wall => polygonsOverlap(rodPolygon, orientedRectCorners(basketSegmentBounds(wall))));
@@ -1886,7 +1920,7 @@
   }
 
   function addRod(type, x, y, options = {}) {
-    if (type === 'punch' && (!options.buttonAnchor || !rods.some(other =>
+    if (window.MarbleDevices.isDevice({ type }) && (!options.buttonAnchor || !rods.some(other =>
       other.type === 'wood' && other.uid === options.buttonAnchor.woodUid))) {
       setHint('먼저 나무 블록에 버튼을 붙여야 펀치를 놓을 수 있어요.');
       return null;
@@ -1904,7 +1938,9 @@
         triggerCount: clamp(Math.floor(Number(options.triggerCount) || toolSettings.magnet.triggerCount), 1, 20),
         onSeconds: MAGNET_ON_SECONDS, offSeconds: MAGNET_OFF_SECONDS } : {}),
       ...(type === 'breakable' ? { maxHp: BREAKABLE_HP, hp: BREAKABLE_HP } : {}),
-      ...(type === 'punch' ? { buttonAnchor: options.buttonAnchor ? clone(options.buttonAnchor) : null, force: Number(options.force) || toolSettings.punch.force } : {}),
+      ...(window.MarbleDevices.isDevice({ type }) ? { buttonAnchor: options.buttonAnchor ? clone(options.buttonAnchor) : null, force: Number(options.force) || toolSettings[type].force,
+        ...(type === 'robotArm' ? { holdSeconds: clamp(Number(options.holdSeconds) || toolSettings.robotArm.holdSeconds, .1, 30) } : {}) } : {}),
+      ...(type === 'fixedBall' ? { length: BALL_RADIUS * 2, thickness: BALL_RADIUS * 2 } : {}),
       ...(type === 'rotor' ? { pivotOffset:Number(options.pivotOffset)||0,
         pivotX:x+Math.cos(options.angle||0)*(Number(options.pivotOffset)||0),
         pivotY:y+Math.sin(options.angle||0)*(Number(options.pivotOffset)||0), omega:0, restAngle:options.angle||0 } : {}),
@@ -2010,7 +2046,7 @@
       && (previous.a.rodUid === entity.uid || previous.b.rodUid === entity.uid)
       ? previous.id : connected.length === 1 ? connected[0].id : null;
     updateDeleteButton();
-    selectedSettingsButton.hidden = !entity || (appMode === 'stage' && (entity.fixed || entity.kind === 'field')) || !(entity.kind === 'field' || entity.kind === 'rod' && ['magnet', 'breakable', 'rotor', 'punch'].includes(entity.type));
+    selectedSettingsButton.hidden = !entity || (appMode === 'stage' && (entity.fixed || entity.kind === 'field')) || !(entity.kind === 'field' || entity.kind === 'rod' && ['magnet', 'breakable', 'rotor', 'punch', 'robotArm'].includes(entity.type));
   }
 
   function deleteSelected() {
@@ -2023,13 +2059,15 @@
     const list = selected.kind === 'rod' ? rods : selected.kind === 'field' ? fields : goals;
     if (selected.kind === 'rod') {
       if (selected.type === 'swing') releaseSwingBall(selected);
+      activeBalls.forEach(item => { if (item.attachedRobotUid === selected.uid) item.attachedRobotUid = null; });
       electricLinks.splice(0, electricLinks.length, ...electricLinks.filter(link => link.a.rodUid !== selected.uid && link.b.rodUid !== selected.uid));
     }
     const index = list.indexOf(selected);
     if (index >= 0) list.splice(index, 1);
     if (selected.type === 'wood') {
       for (let i = rods.length - 1; i >= 0; i--) {
-        if (rods[i].type === 'punch' && rods[i].buttonAnchor?.woodUid === selected.uid) {
+        if (window.MarbleDevices.isDevice(rods[i]) && rods[i].buttonAnchor?.woodUid === selected.uid) {
+          activeBalls.forEach(item => { if (item.attachedRobotUid === rods[i].uid) item.attachedRobotUid = null; });
           const supply = stageSupplies.find(item => item.supplyId === rods[i].supplyId);
           if (supply) supply.used = false;
           rods.splice(i, 1);
@@ -2054,6 +2092,7 @@
     pendingPunch = null;
     window.MarbleDevices.reset();
     pushUndo();
+    activatedFixedBalls.clear();
     rods.length = 0;
     goals.length = 0;
     fields.length = 0;
@@ -2078,6 +2117,7 @@
     silenceMotionAudio();
     pendingPunch = null;
     window.MarbleDevices.reset();
+    activatedFixedBalls.clear();
     paused = false;
     pauseButton.textContent = '멈춤';
     pauseButton.setAttribute('aria-pressed','false');
@@ -2374,7 +2414,7 @@
   }
 
   function pointInRod(point, rod, padding = 11 / camera.zoom) {
-    if (rod.type === 'magnet') return Math.hypot(point.x - rod.x, point.y - rod.y) <= rod.length / 2 + padding;
+    if (rod.type === 'magnet' || rod.type === 'fixedBall') return Math.hypot(point.x - rod.x, point.y - rod.y) <= rod.length / 2 + padding;
     if (rod.type === 'swing') {
       const dx = point.x - rod.x; const dy = point.y - rod.y;
       const localX = Math.cos(rod.angle) * dx + Math.sin(rod.angle) * dy;
@@ -2406,7 +2446,7 @@
 
   function findEntity(point) {
     for (let i = rods.length - 1; i >= 0; i--) {
-      if (rods[i].type !== 'punch') continue;
+      if (!window.MarbleDevices.isDevice(rods[i])) continue;
       const b = window.MarbleDevices.button(rods, rods[i]);
       if (b && Math.hypot(point.x - b.x, point.y - b.y) < 19 / camera.zoom) return rods[i];
     }
@@ -2462,6 +2502,11 @@
       original: { x: entity.x, y: entity.y, angle: entity.angle || 0 },
       ...extra
     };
+    if (mode === 'rotateFixed' && extra.grabPoint) {
+      const anchor = entity.type === 'rotor' ? {x:entity.pivotX,y:entity.pivotY}
+        : entity.type === 'zipline' ? window.MarbleKinetics.curve(entity,entity.pathT||0) : entity;
+      drag.gripAngleOffset = (entity.angle || 0) - Math.atan2(extra.grabPoint.y-anchor.y,extra.grabPoint.x-anchor.x);
+    }
     if (mode === 'move' && entity.kind === 'rod' && entity.type === 'electric') {
       const connected = connectedRodUids(entity.uid);
       if (connected.size > 1) {
@@ -2478,9 +2523,9 @@
       const inGame = screen.y >= view.playTop + 5 && screen.y < view.dockTop - 5;
       if (inGame) {
         const point = screenToWorld(screen);
-        const placed = addRod('punch', point.x, point.y, { buttonAnchor: pendingPunch.anchor,
+        const placed = addRod(pendingPunch.type || 'punch', point.x, point.y, { buttonAnchor: pendingPunch.anchor,
           force: pendingPunch.force, fixed: pendingPunch.fixed, supplyId: pendingPunch.supplyId });
-        if (placed) { pendingPunch = null; setHint('버튼과 떨어진 곳에 펀치를 연결했어요. 공으로 버튼을 눌러 보세요.'); }
+        if (placed) { pendingPunch = null; setHint('버튼과 본체를 연결했어요. 공으로 버튼을 눌러 보세요.'); }
       }
       event.preventDefault();
       return;
@@ -2538,8 +2583,10 @@
       && distanceSquared(point, rod.type === 'rotor' ? {x:rod.pivotX,y:rod.pivotY}
         : window.MarbleKinetics.curve(rod,rod.pathT||0)) <= handleRadius ** 2);
     if (directPivot) {
-      selectEntity(directPivot);
-      editDrag = makeEditDrag(event.pointerId, directPivot.type === 'rotor' ? 'rotorPivot' : 'zipPivot', directPivot);
+      // Hold the unselected axis before dragging; do not select the block.
+      editDrag = makeEditDrag(event.pointerId, 'pivotPending', directPivot,
+        {startPoint:point, startedAt:performance.now(), originalOffset:directPivot.type === 'rotor'
+          ? directPivot.pivotOffset || 0 : directPivot.guideOffset || 0});
       event.preventDefault(); return;
     }
 
@@ -2557,21 +2604,23 @@
 
     if (selected?.kind === 'rod' && !(appMode === 'stage' && selected.fixed)) {
       if (selected.type === 'rotor' && distanceSquared(point, {x:selected.pivotX,y:selected.pivotY}) <= handleRadius ** 2) {
-        editDrag = makeEditDrag(event.pointerId, 'rotorPivot', selected);
+        // A selected block's pivot is locked; deselect to hold-and-drag it.
         event.preventDefault(); return;
       }
       if (selected.type === 'zipline') {
         const nodes = selected.path || [];
+        const guide = window.MarbleKinetics.curve(selected,selected.pathT||0);
+        if (distanceSquared(point,guide) <= handleRadius ** 2) {
+          // The guide can coincide with the first path node at pathT=0.
+          // Neither that node nor the guide may move via a selected axis tap.
+          event.preventDefault(); return;
+        }
         const center = window.MarbleKinetics.curve(selected, window.MarbleKinetics.curve(selected).total/2);
         if (nodes.length === 2 && distanceSquared(point,center) <= handleRadius ** 2) {
           editDrag = makeEditDrag(event.pointerId,'zipBend',selected);
           event.preventDefault(); return;
         }
-        const guide = window.MarbleKinetics.curve(selected,selected.pathT||0);
-        if (distanceSquared(point,guide) <= handleRadius ** 2 && distanceSquared(point,nodes[0]) > handleRadius ** 2) {
-          editDrag = makeEditDrag(event.pointerId,'zipPivot',selected);
-          event.preventDefault(); return;
-        }
+
         const index = nodes.findIndex(node => distanceSquared(point,node) <= handleRadius ** 2);
         if (index >= 0) {
           if(index === nodes.length-1 && index < (selected.fixedCount||1) && nodes.length >= 2) {
@@ -2615,13 +2664,13 @@
         editDrag = startLink ? null : endLink
           ? makeEditDrag(event.pointerId, 'electricOuter', selected, { movingEnd: 'start', linkedEnd: 'end', linkId: endLink.id })
           : rotatesAroundCenter
-            ? makeEditDrag(event.pointerId, 'rotateFixed', selected)
+            ? makeEditDrag(event.pointerId, 'rotateFixed', selected, {grabPoint:point})
             : angleLockedInPlayer ? null : makeEditDrag(event.pointerId, 'start', selected, { fixed: ends.end });
       } else if (distanceSquared(point, ends.end) <= handleRadius * handleRadius) {
         editDrag = endLink ? null : startLink
           ? makeEditDrag(event.pointerId, 'electricOuter', selected, { movingEnd: 'end', linkedEnd: 'start', linkId: startLink.id })
           : rotatesAroundCenter
-            ? makeEditDrag(event.pointerId, 'rotateFixed', selected)
+            ? makeEditDrag(event.pointerId, 'rotateFixed', selected, {grabPoint:point})
             : angleLockedInPlayer ? null : makeEditDrag(event.pointerId, 'end', selected, { fixed: ends.start });
       } else if (!fixedInPlayer && distanceSquared(point, selected) <= handleRadius * handleRadius) {
         editDrag = makeEditDrag(event.pointerId, 'move', selected, { offsetX: point.x - selected.x, offsetY: point.y - selected.y });
@@ -2680,13 +2729,18 @@
     if (editDrag?.pointerId === event.pointerId) {
       const point = screenToWorld(screen);
       const entity = editDrag.entity;
+      if (editDrag.mode === 'pivotPending') {
+        if (performance.now() - editDrag.startedAt < 300) { event.preventDefault(); return; }
+        editDrag.mode = entity.type === 'rotor' ? 'rotorPivot' : 'zipPivot';
+      }
       if (editDrag.mode === 'rotorPivot') {
-        const along = (point.x-entity.x)*Math.cos(entity.angle)+(point.y-entity.y)*Math.sin(entity.angle);
-        entity.pivotOffset = clamp(along,-entity.length/2,entity.length/2);
+        const along = (point.x-editDrag.startPoint.x)*Math.cos(entity.angle)+(point.y-editDrag.startPoint.y)*Math.sin(entity.angle);
+        entity.pivotOffset = clamp(editDrag.originalOffset+along,-entity.length/2,entity.length/2);
         entity.pivotX = entity.x+Math.cos(entity.angle)*entity.pivotOffset;
         entity.pivotY = entity.y+Math.sin(entity.angle)*entity.pivotOffset;
       } else if (editDrag.mode === 'zipPivot') {
-        const next = clamp((point.x-entity.x)*Math.cos(entity.angle)+(point.y-entity.y)*Math.sin(entity.angle),-entity.length/2,entity.length/2);
+        const along = (point.x-editDrag.startPoint.x)*Math.cos(entity.angle)+(point.y-editDrag.startPoint.y)*Math.sin(entity.angle);
+        const next = clamp(editDrag.originalOffset+along,-entity.length/2,entity.length/2);
         const delta = next-(entity.guideOffset||0);
         entity.guideOffset = next;
         entity.path.forEach(node => {node.x += Math.cos(entity.angle)*delta;node.y += Math.sin(entity.angle)*delta;});
@@ -2740,7 +2794,7 @@
       } else if (editDrag.mode === 'rotateFixed') {
         const anchor = entity.type === 'rotor' ? {x:entity.pivotX,y:entity.pivotY}
           : entity.type === 'zipline' ? window.MarbleKinetics.curve(entity,entity.pathT||0) : entity;
-        entity.angle = Math.atan2(point.y-anchor.y, point.x-anchor.x);
+        entity.angle = Math.atan2(point.y-anchor.y, point.x-anchor.x) + editDrag.gripAngleOffset;
         if (entity.type === 'rotor') positionRotor(entity);
         if (entity.type === 'zipline') positionZipline(entity);
       } else {
@@ -2852,7 +2906,7 @@
     updateDeleteButton();
     try { card.setPointerCapture?.(event.pointerId); } catch { /* cancelled or synthetic pointer */ }
     event.preventDefault();
-    if (placement.dragging) setHint(placement.tool === 'punch' ? '버튼을 나무 블록의 면 가까이 가져가세요.' : '게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
+    if (placement.dragging) setHint(window.MarbleDevices.isDevice({ type: placement.tool }) ? '버튼을 나무 블록의 면 가까이 가져가세요.' : '게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
   }
 
   function updatePlacement(event) {
@@ -2865,7 +2919,7 @@
       if (!clearlyDraggingUp && !clearlyScrolling) return;
       placement.mode = clearlyDraggingUp ? 'drag' : 'scroll';
       placement.dragging = placement.mode === 'drag';
-      if (placement.dragging) setHint(placement.tool === 'punch' ? '버튼을 나무 블록의 면 가까이 가져가세요.' : '게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
+      if (placement.dragging) setHint(window.MarbleDevices.isDevice({ type: placement.tool }) ? '버튼을 나무 블록의 면 가까이 가져가세요.' : '게임 화면의 원하는 위치에서 손을 놓아 배치하세요.', 0);
     }
     if (placement.mode === 'scroll') {
       toolList.scrollLeft -= event.clientX - placement.lastX;
@@ -2889,11 +2943,11 @@
       && screen.y >= view.playTop + 5 && screen.y < view.dockTop - 5;
     if (valid) {
       const point = screenToWorld(screen);
-      if (current.tool === 'punch') {
+      if (window.MarbleDevices.isDevice({ type: current.tool })) {
         const anchor = window.MarbleDevices.snap(rods, point);
         if (anchor) {
-          pendingPunch = { anchor, force: current.force || toolSettings.punch.force, fixed: current.fixed, supplyId: current.supplyId, x: point.x, y: point.y };
-          setHint('버튼을 나무에 붙였어요. 이제 게임 화면을 눌러 펀치 본체를 놓으세요.', 0);
+          pendingPunch = { type: current.tool, anchor, force: current.force || toolSettings[current.tool].force, fixed: current.fixed, supplyId: current.supplyId, x: point.x, y: point.y };
+          setHint(`버튼을 나무에 붙였어요. 이제 게임 화면을 눌러 ${current.tool === 'robotArm' ? '로봇 팔' : '펀치'} 본체를 놓으세요.`, 0);
         } else setHint('버튼은 나무 블록의 면에만 붙일 수 있어요. 나무 가까이에 놓으세요.', 3500);
       }
       else if (current.tool === 'goal') addGoal(point.x, point.y);
@@ -3437,6 +3491,9 @@
       return magnetSolidAt(shape, local.x, local.y);
     });
   }
+  window.MarbleDevices.setSwingMagnetContact((rod, head) => magnetTouchesRect(rod, {
+    x: head.x, y: head.y, width: head.length, height: head.thickness, angle: head.angle
+  }));
   function pointSegmentDistanceSquared(point, start, end) {
     const dx = end.x - start.x; const dy = end.y - start.y;
     const fraction = clamp(((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
@@ -3795,7 +3852,7 @@
     supportContacts.length = 0;
     for (const rod of rods) {
       if (rod.type === 'breakable' && rod.hp <= 0) continue;
-      if (rod.type === 'magnet' || rod.type === 'rotor' || rod.type === 'zipline') continue;
+      if (rod.type === 'magnet' || rod.type === 'rotor' || rod.type === 'zipline' || rod.type === 'fixedBall') continue;
       if (rod.type === 'swing') {
         resolveSwingContact(rod);
         if (ball.attachedSwingUid) break;
@@ -3867,8 +3924,8 @@
     if (distanceSq >= minDistance * minDistance) return;
     const distance = Math.sqrt(distanceSq), nx = distance > 1e-8 ? dx / distance : 1;
     const ny = distance > 1e-8 ? dy / distance : 0;
-    const fixedA = Boolean(a.attachedSwingUid || a.attachedMagnetUid || a.electricRide);
-    const fixedB = Boolean(b.attachedSwingUid || b.attachedMagnetUid || b.electricRide);
+    const fixedA = Boolean(a.attachedSwingUid || a.attachedMagnetUid || a.attachedRobotUid || a.electricRide);
+    const fixedB = Boolean(b.attachedSwingUid || b.attachedMagnetUid || b.attachedRobotUid || b.electricRide);
     const invA = fixedA ? 0 : 1 / a.mass, invB = fixedB ? 0 : 1 / b.mass;
     const inverseSum = invA + invB;
     if (!inverseSum) return;
@@ -3899,6 +3956,37 @@
     if (!fixedB) b.omega -= radiusB * friction / inertiaB;
   }
 
+  function activateFixedBalls() {
+    if (appMode === 'editor') return;
+    for (const marker of rods) {
+      if (marker.type !== 'fixedBall' || activatedFixedBalls.has(marker.uid)) continue;
+      const radius = marker.length / 2;
+      const touching = activeBalls.find(item => Math.hypot(item.x-marker.x,item.y-marker.y) <= item.radius+radius);
+      const moving = rods.find(other => other !== marker && (
+        (other.type === 'rotor' || other.type === 'zipline') && circleTouchesRect(marker,radius,
+          {x:other.x,y:other.y,width:other.length,height:other.thickness,angle:other.angle})
+        || other.type === 'swing' && (magnetContact(other,marker,radius)
+          || pointSegmentDistanceSquared(marker,other,swingPoint(other,-(other.length+5))).distance < (radius+2)**2)
+        || other.type === 'punch' && window.MarbleDevices.state(other).travel > 0
+          && window.MarbleDevices.contact(other,{...marker,radius},window.MarbleDevices.state(other).travel)
+        || other.type === 'robotArm' && window.MarbleDevices.state(other).travel > 0
+          && (window.MarbleDevices.state(other).links || []).some(link =>
+            Math.hypot(marker.x-link.x,marker.y-link.y) <= radius + 5)));
+      if (!touching && !moving) continue;
+      const mobile = { x:marker.x,y:marker.y,vx:0,vy:0,angle:0,omega:0,
+        fallPeakY:marker.y,specialContacts:[],soundId:nextBallSoundId++,radius,mass:BALL_MASS,
+        type:'normal',fixedSourceUid:marker.uid };
+      if (moving) {
+        mobile.vx = (moving.type === 'punch' ? Math.cos(moving.angle) * moving.force : 0);
+        mobile.vy = (moving.type === 'punch' ? Math.sin(moving.angle) * moving.force : 0);
+      }
+      activatedFixedBalls.add(marker.uid);
+      marker.touched = true; touchedRodIds.add(marker.id);
+      activeBalls.push(mobile);
+      ball = mobile;
+      if (touching) resolveBallPair(touching,mobile);
+    }
+  }
   function physicsStep(dt) {
     if (paused) return;
     if (['free', 'stage', 'editor', 'physics-lab'].includes(appMode)) updateMagnetStates(dt);
@@ -3908,6 +3996,7 @@
       });
     }
     magnetPullStrength = 0;
+    if (!ball && !won && !editDrag) activateFixedBalls();
     if (!ball || won || editDrag) { updateMagnetWhoosh(); return; }
     const current = ball;
     rollingRequests = [];
@@ -3916,22 +4005,28 @@
     advanceSwings(dt);
     window.MarbleDevices.tick(rods, activeBalls.length ? activeBalls : [current], dt, PIXELS_PER_METER,
       (device, target, speed) => playImpactSoundForContact(`device:${device.uid}:${target.uid || target.goalId || target.soundId}`, 'wood', speed),
-      goals.flatMap(basketSegments));
+      goals.flatMap(basketSegments), activeGravity(), resetBoundaryRadius() + 50);
+    activateFixedBalls();
     for (const item of activeBalls.length ? activeBalls : [current]) {
       ball = item;
       physicsStepOne(dt);
       for (const rod of rods) if (rod.type === 'rotor' || rod.type === 'zipline') {
         if (window.MarbleKinetics.collideBall(rod, ball, PIXELS_PER_METER,
-          speed => playImpactSoundForContact(`rod:${rod.uid}`, 'wood', speed))) {
+          speed => playImpactSoundForContact(`rod:${rod.uid}`, 'wood', speed),
+          {friction: materialForType('wood').friction,
+            rollingResistance: materialForType('wood').rollingResistance, gravity:activeGravity(), dt})) {
           rod.touched=true;touchedRodIds.add(rod.id);
         }
       }
       if (won) break;
     }
     updateMagnetWhoosh();
-    if (ballCollisions && !won && activeBalls.length > 1) {
+    if (!won && activeBalls.length > 1) {
       for (let i = 0; i < activeBalls.length; i++) {
-        for (let j = i + 1; j < activeBalls.length; j++) resolveBallPair(activeBalls[i], activeBalls[j]);
+        for (let j = i + 1; j < activeBalls.length; j++) {
+          if (ballCollisions || activeBalls[i].fixedSourceUid || activeBalls[j].fixedSourceUid)
+            resolveBallPair(activeBalls[i], activeBalls[j]);
+        }
       }
     }
     const audible = rollingRequests.filter(request => (request.type === 'wood' || request.type === 'breakable')
@@ -3948,7 +4043,15 @@
     if (appMode === 'free' || appMode === 'stage') {
       const radius = resetBoundaryRadius();
       for (const item of [...activeBalls]) {
+        if (item.fixedSourceUid && !rods.some(rod => rod.uid === item.fixedSourceUid)) {
+          activeBalls.splice(activeBalls.indexOf(item), 1); continue;
+        }
         if (Math.hypot(item.x - spawn.x, item.y - spawn.y) <= radius + item.radius + 24) continue;
+        if (item.fixedSourceUid) {
+          activatedFixedBalls.delete(item.fixedSourceUid);
+          activeBalls.splice(activeBalls.indexOf(item), 1);
+          continue;
+        }
         if (escapeBehavior === 'remove') {
           pendingRetrievals.push(item.type);
           activeBalls.splice(activeBalls.indexOf(item), 1);
@@ -4199,6 +4302,14 @@
   }
   function drawRod(rod, alpha = 1) {
     if (window.MarbleDevices.isDevice(rod)) { window.MarbleDevices.draw(ctx, rod, alpha); return; }
+    if (rod.type === 'fixedBall') {
+      if (!activatedFixedBalls.has(rod.uid)) {
+        const previous = ball;
+        ball = { x:rod.x,y:rod.y,radius:rod.length/2,angle:0,type:'normal' };
+        ctx.save(); ctx.globalAlpha *= alpha; drawBall(); ctx.restore(); ball = previous;
+      }
+      return;
+    }
     if (rod.type === 'breakable' && rod.hp <= 0) return;
     if (rod.type === 'magnet') {
       ctx.save();
@@ -4442,6 +4553,11 @@
         ctx.restore();
         return;
       }
+      if (selected.type === 'fixedBall') {
+        ctx.beginPath(); ctx.arc(selected.x, selected.y, selected.length / 2 + 7, 0, Math.PI * 2); ctx.stroke();
+        if (appMode !== 'stage' || !selected.fixed) drawHandle(selected.x, selected.y, '#2674d9');
+        ctx.restore(); return;
+      }
       const fixedInPlayer = appMode === 'stage' && selected.fixed;
       const angleLockedInPlayer = appMode === 'stage' && selected.angleLocked;
       if (!angleLockedInPlayer) {
@@ -4542,20 +4658,20 @@
 
   function drawPlacementGhost() {
     if (pendingPunch) {
-      const preview = { type: 'punch', x: pendingPunch.x, y: pendingPunch.y,
-        length: toolSettings.punch.length, thickness: toolSettings.punch.thickness,
+      const preview = { type: pendingPunch.type || 'punch', x: pendingPunch.x, y: pendingPunch.y,
+        length: toolSettings[pendingPunch.type || 'punch'].length, thickness: toolSettings[pendingPunch.type || 'punch'].thickness,
         angle: 0, buttonAnchor: pendingPunch.anchor };
       window.MarbleDevices.drawButton(ctx, rods, preview, .85);
       window.MarbleDevices.draw(ctx, preview, .55);
     }
     if (!placement?.dragging) return;
     const point = screenToWorld(clientToCanvasPoint(placement.x, placement.y));
-    if (placement.tool === 'punch') {
+    if (window.MarbleDevices.isDevice({ type: placement.tool })) {
       const anchor = window.MarbleDevices.snap(rods, point);
-      if (anchor) window.MarbleDevices.drawButton(ctx, rods, { type: 'punch', buttonAnchor: anchor }, .75);
+      if (anchor) window.MarbleDevices.drawButton(ctx, rods, { type: placement.tool, buttonAnchor: anchor }, .75);
       return;
     }
-    if (placement.tool === 'goal') {
+    if (window.MarbleDevices.isDevice({ type: placement.tool })) {
       drawBasket({ x: point.x, y: point.y + 42, width: 126, height: 84, thickness: 11 }, .48);
     } else if (placement.tool === 'antigravity') {
       drawField({ x: point.x, y: point.y, width: placement.width, height: placement.height, direction: placement.direction }, .7);
@@ -4588,7 +4704,16 @@
 
     rods.filter(rod => rod.type === 'swing').forEach(rod => drawSwingSweep(rod, .78));
     rods.forEach(rod => drawRod(rod, appMode === 'editor' && !rod.fixed ? 0.42 : 1));
-    rods.filter(rod => rod.type === 'punch').forEach(rod => window.MarbleDevices.drawButton(ctx, rods, rod, appMode === 'editor' && !rod.fixed ? .42 : 1));
+    rods.filter(rod => window.MarbleDevices.isDevice(rod)).forEach(rod => window.MarbleDevices.drawButton(ctx, rods, rod, appMode === 'editor' && !rod.fixed ? .42 : 1));
+    if (selected?.type === 'robotArm') {
+      const path = window.MarbleDevices.robotPath(selected,
+        [...rods, {x:spawn.x,y:spawn.y,radius:BALL_RADIUS}], activeGravity(), PIXELS_PER_METER,
+        resetBoundaryRadius() + 50);
+      ctx.save();ctx.setLineDash([3,7]);ctx.strokeStyle=path.hit?'#23885a':'#dc4b3e';
+      ctx.lineWidth=2;ctx.beginPath();
+      path.points.forEach((point,index)=>index ? ctx.lineTo(point.x,point.y) : ctx.moveTo(point.x,point.y));
+      ctx.stroke();ctx.restore();
+    }
     drawElectricJoints();
     goals.forEach(goal => drawBasket(goal));
     const latestBall = ball;
@@ -4820,11 +4945,19 @@
     event.preventDefault();
     const dialog = document.getElementById('deviceSettingsDialog');
     const type = dialog.dataset.deviceType;
-    if (type !== 'punch') return;
+    if (!window.MarbleDevices.isDevice({ type })) return;
     const installed = editingSettingsTarget?.type === type && editingSettingsTarget.uid
       ? rodByUid(editingSettingsTarget.uid) : null;
     const target = installed || toolSettings[type];
-    const next = { force: clamp(Number(document.getElementById('deviceForce').value) || 7, 2, 20) };
+    const input = document.getElementById('deviceForce');
+    const raw = input.value.trim();
+    // Clearing the number while editing is not a request to set power to 0.
+    // Keep the installed object's last valid value and restore the field.
+    const force = raw !== '' && Number.isFinite(Number(raw))
+      ? clamp(Number(raw), 2, 20) : target.force;
+    input.value = String(force);
+    const next = type === 'robotArm' ? { force,
+      holdSeconds: clamp(Number(document.getElementById('robotHoldSeconds').value) || target.holdSeconds || 2, .1, 30) } : { force };
     if (Object.keys(next).some(key => target[key] !== next[key])) {
       pushUndo();
       Object.assign(target, next);
@@ -4966,7 +5099,9 @@
       if (event.shiftKey) redoLastAction(); else undoLastAction();
       return;
     }
-    if ((event.key === 'Delete' || event.key === 'Backspace') && selected) deleteSelected();
+    const typing = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement
+      || event.target instanceof HTMLSelectElement || event.target?.isContentEditable;
+    if ((event.key === 'Delete' || event.key === 'Backspace') && selected && !typing && !document.querySelector('dialog[open]')) deleteSelected();
     if (event.code === 'Space' && ['free', 'stage', 'editor', 'physics-lab'].includes(appMode)) {
       event.preventDefault();
       spawnBall();
@@ -5003,7 +5138,8 @@
       selected: selected ? { kind: selected.kind, x: selected.x, y: selected.y, angle: selected.angle ?? null, fixed: Boolean(selected.fixed) } : null,
       rods: rods.map(rod => ({ id: rod.id, uid: rod.uid, type: rod.type, x: rod.x, y: rod.y, angle: rod.angle, omega: rod.omega, pivotX: rod.pivotX, pivotY: rod.pivotY, pivotOffset: rod.pivotOffset, path: rod.path ? clone(rod.path) : undefined, curveBend: rod.curveBend, guideOffset: rod.guideOffset, fixedCount: rod.fixedCount, editPhase: rod.editPhase, pathT: rod.pathT, pathSpeed: rod.pathSpeed, maxHp: rod.maxHp, length: rod.length, thickness: rod.thickness, triggerCount: rod.triggerCount, onSeconds: rod.onSeconds, offSeconds: rod.offSeconds, hp: rod.hp, damageStage: rod.type === 'breakable' ? breakableStage(rod.hp ?? BREAKABLE_HP) : null, electricPulse: rod.electricPulse || 0, fixed: rod.fixed, angleLocked: rod.angleLocked, supplyId: rod.supplyId, startAngle: rod.startAngle, releaseAngle: rod.releaseAngle, releaseRequested: rod.releaseRequested, swingOmega: rod.swingOmega, swingStarted: rod.swingStarted, swingBlocked: rod.swingBlocked, buttonAnchor: rod.buttonAnchor ? clone(rod.buttonAnchor) : null, force: rod.force, device: window.MarbleDevices.isDevice(rod) ? (() => { const s=window.MarbleDevices.state(rod); return { phase:s.phase, depth:s.depth, travel:s.travel }; })() : null })),
       pendingPunch: pendingPunch ? clone(pendingPunch) : null,
-      deviceTemplates: { punch: { ...toolSettings.punch } },
+      deviceTemplates: { punch: { ...toolSettings.punch }, robotArm: { ...toolSettings.robotArm } },
+      activatedFixedBalls: [...activatedFixedBalls],
       magnets: rods.filter(rod => rod.type === 'magnet').map(rod => { const state = magnetStateFor(rod); return { uid: rod.uid, phase: state.phase, range: state.range, seen: state.seen.size, inside: state.inside.size }; }),
       magnetTemplate: { ...toolSettings.magnet },
       antigravityTemplate: { ...toolSettings.antigravity },
@@ -5013,7 +5149,7 @@
       recentTools: [...recentTools],
       ball: ball ? { x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy, radius: ball.radius, mass: ball.mass, type: ball.type, omega: ball.omega, fallPeakY: ball.fallPeakY, attachedSwingUid: ball.attachedSwingUid || null, attachedMagnetUid: ball.attachedMagnetUid || null, electricRide: ball.electricRide ? clone(ball.electricRide) : null } : null,
       selectedBallType,
-      activeBalls: activeBalls.map(item => ({x:item.x, y:item.y, vx:item.vx, vy:item.vy, omega:item.omega, radius:item.radius, mass:item.mass, type:item.type, attachedSwingUid:item.attachedSwingUid || null, attachedMagnetUid:item.attachedMagnetUid || null})),
+      activeBalls: activeBalls.map(item => ({x:item.x, y:item.y, vx:item.vx, vy:item.vy, omega:item.omega, radius:item.radius, mass:item.mass, type:item.type, fixedSourceUid:item.fixedSourceUid || null, attachedRobotUid:item.attachedRobotUid || null, attachedSwingUid:item.attachedSwingUid || null, attachedMagnetUid:item.attachedMagnetUid || null})),
       ballQueue: [...ballQueue], queueIndex, launchMode, launchInterval, ballCollisions, escapeBehavior, pendingRetrievals: [...pendingRetrievals],
       lastSwingRelease: lastSwingRelease ? { ...lastSwingRelease } : null,
       won,
@@ -5058,7 +5194,7 @@
     selectRod: index => selectEntity(rods[index] || null),
     selectField: index => selectEntity(fields[index] || null),
     setBallState: state => {
-      if (!ball) spawnBall();
+      if (!ball && !spawnBall()) return null;
       Object.assign(ball, state);
       ball.specialContacts ||= [];
       return ball;

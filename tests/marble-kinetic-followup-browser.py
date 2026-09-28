@@ -50,6 +50,22 @@ with sync_playwright() as pw:
         }''')
         assert physics['sound'] > 0 and physics['overlaps'] == 0, physics
         assert physics['zsound'] > 0 and physics['zoverlaps'] == 0, physics
+        friction = page.evaluate('''() => {
+          const k=window.MarbleKinetics;
+          return ['rotor','zipline'].map(type => {
+            const readings=[];
+            for(const mu of [0,.20]) {
+              const rod={type,x:300,y:300,pivotX:300,pivotY:300,length:160,thickness:20,
+                angle:0,omega:0,path:[{x:200,y:300},{x:400,y:300}],pathT:100,pathSpeed:0};
+              const ball={x:330,y:272.2,radius:18,mass:.18,vx:3,vy:.15,omega:0};
+              k.collideBall(rod,ball,100,null,{friction:mu,
+                rollingResistance:mu?0.04*(.20/.38):0,gravity:19.35,dt:1/120});
+              readings.push({vx:ball.vx,omega:ball.omega});
+            }
+            return {type,without:readings[0],wood:readings[1]};
+          });
+        }''')
+        assert all(t['wood']['vx'] < t['without']['vx'] and abs(t['wood']['omega']) > abs(t['without']['omega']) for t in friction), friction
         # No new/ordinary block can be placed in the current footprint of the other.
         rx, ry = (150, 280) if width < 500 else (300, 280)
         zx, zy = (285, 360) if width < 500 else (590, 280)
@@ -76,20 +92,48 @@ with sync_playwright() as pw:
         page.mouse.move(sx,sy);page.mouse.down();page.mouse.move(sx,sy+48,steps=8);page.mouse.up()
         curved=page.evaluate(f'{D}.getState().rods[1]')
         assert abs(curved['curveBend']) > 15 and len(curved['path']) == 2, curved
-        # The axial guide can be moved without translating the whole block.
+        # A selected axis is locked. Hold an unselected axis to move it without selecting.
         page.evaluate(f'{D}.selectRod(0)')
         before=page.evaluate(f'{D}.getState().rods[0]')
         sx,sy=screen(before['pivotX'],before['pivotY'])
         page.mouse.move(sx,sy);page.mouse.down();page.mouse.move(sx+24,sy,steps=6);page.mouse.up()
+        assert page.evaluate(f'{D}.getState().rods[0].pivotOffset') == before['pivotOffset']
+        page.evaluate(f'{D}.selectRod(1)')
+        page.mouse.move(sx,sy);page.mouse.down();page.wait_for_timeout(340);page.mouse.move(sx+24,sy,steps=6);page.mouse.up()
         pivot=page.evaluate(f'{D}.getState().rods[0]')
         assert abs(pivot['x']-before['x'])<.01 and pivot['pivotOffset']>10, (before,pivot)
+        # Drag the longer side of an offset rotor: the grabbed end must remain
+        # under the pointer instead of swapping to the short side on first move.
         page.evaluate(f'{D}.selectRod(0)')
+        long_end=pivot['x']-pivot['length']/2
+        ex,ey=screen(long_end,pivot['y'])
+        page.mouse.move(ex,ey);page.mouse.down();page.mouse.move(ex+2,ey-20,steps=6);page.mouse.up()
+        turned=page.evaluate(f'{D}.getState().rods[0]')
+        left=turned['x']-turned['length']/2*math.cos(turned['angle'])
+        top=turned['y']-turned['length']/2*math.sin(turned['angle'])
+        assert math.hypot(left-(long_end+2),top-(pivot['y']-20))<9,(pivot,turned,left,top)
         guide = page.evaluate('(r)=>window.MarbleKinetics.curve(r,r.pathT||0)',curved)
         before = page.evaluate(f'{D}.getState().rods[1]')
+        page.evaluate(f'{D}.selectRod(1)')
         sx,sy=screen(guide['x'],guide['y'])
         page.mouse.move(sx,sy);page.mouse.down();page.mouse.move(sx+24,sy,steps=6);page.mouse.up()
+        assert page.evaluate(f'{D}.getState().rods[1].guideOffset') == before['guideOffset']
+        page.evaluate(f'{D}.selectRod(0)')
+        page.mouse.move(sx,sy);page.mouse.down();page.wait_for_timeout(340);page.mouse.move(sx+24,sy,steps=6);page.mouse.up()
         shifted=page.evaluate(f'{D}.getState().rods[1]')
         assert abs(shifted['x']-before['x'])<.01 and shifted['guideOffset']>10,(before,shifted)
+        if width < 500:
+            # Real touch hold on the unselected rotor pivot (not a mouse gesture).
+            page.evaluate(f'{D}.selectRod(1)')
+            rotor=page.evaluate(f'{D}.getState().rods[0]')
+            sx,sy=screen(rotor['pivotX'],rotor['pivotY'])
+            cdp=page.context.new_cdp_session(page)
+            cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':sx,'y':sy,'id':1}]})
+            page.wait_for_timeout(340)
+            cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':sx+18,'y':sy,'id':1}]})
+            cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+            touched=page.evaluate(f'{D}.getState().rods[0]')
+            assert touched['pivotOffset'] > rotor['pivotOffset']+8,(rotor,touched)
         # The selected magnet changes alone; the dock's template and neighbor survive.
         page.evaluate(f'''() => {{const d={D};d.clearAll();d.addRod('magnet',340,300,{{triggerCount:2}});
           d.addRod('magnet',680,300,{{triggerCount:2}});d.selectRod(0)}}''')

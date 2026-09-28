@@ -16,7 +16,7 @@ for width, height in ((1280, 800), (390, 844)):
         assert page.evaluate('Boolean(window.MarbleDevices && window.__marbleBuilderDebug)'), errors
         page.locator('#toolList .more-card').click()
         assert page.locator('#blockCatalogGrid').get_by_text('버튼+펀치').count() > 0
-        assert page.locator('#blockCatalogGrid').get_by_text('버튼+로봇팔').count() == 0
+        assert page.locator('#blockCatalogGrid').get_by_text('버튼+로봇 팔').count() > 0
         page.locator('#blockCatalogGrid .catalog-item').filter(has_text='버튼+펀치').get_by_text('설정').click()
         page.locator('#deviceForce').fill('13')
         page.locator('#deviceSettingsForm button[type=submit]').click()
@@ -112,6 +112,26 @@ for width, height in ((1280, 800), (390, 844)):
         assert all(abs(t['velocity']) > .01 for t in interaction['results']), interaction
         assert all(0 < t['max'] < 100 for t in interaction['results']), interaction
         assert 48 <= interaction['basketMax'] <= 50, interaction
+        swing_gap = page.evaluate('''() => {
+          const d=window.__marbleBuilderDebug,p=window.MarbleDevices,k=window.MarbleKinetics;
+          const rod=d.getState().rods.find(r=>r.type==='punch');
+          const x=rod.x+rod.length/2+92;
+          const swing={type:'swing',x,y:rod.y+130,length:130,angle:0,swingOmega:0};
+          const box={x,y:rod.y-23.5,length:84,thickness:59,angle:0};
+          for(const offset of [-48,-42,-35,-25,-10,0]) {
+            const probe={...rod,y:rod.y+offset};
+            let transparent=false,solid=false;
+            for(let travel=38;travel<=75;travel++) {
+              const head={x:probe.x+probe.length/2+travel+3,y:probe.y,length:12,thickness:probe.thickness*.88,angle:0};
+              const old=k.contact(head,box)!=null,actual=p.contact(probe,swing,travel)!=null;
+              if(old&&!actual) transparent=true;
+              if(actual) solid=true;
+            }
+            if(transparent&&solid) return {transparent,solid,offset};
+          }
+          return {transparent:false,solid:false};
+        }''')
+        assert swing_gap['transparent'] and swing_gap['solid'], swing_gap
         assert interaction['integrated'] > 0, interaction
         boundaries = page.evaluate('''() => {
           const d=window.__marbleBuilderDebug,p=window.MarbleDevices,s=d.getState();
@@ -174,6 +194,12 @@ for width, height in ((1280, 800), (390, 844)):
           return p.state(r).travel;
         }''')
         assert 3 < installed_speed < 4, installed_speed
+        # A cleared numeric field must not silently change the installed force.
+        page.locator('#selectedSettingsButton').click()
+        page.locator('#deviceForce').fill('')
+        page.locator('#deviceSettingsForm button[type=submit]').click()
+        blank_state = page.evaluate('window.__marbleBuilderDebug.getState()')
+        assert blank_state['rods'][1]['force'] == 4 and blank_state['rods'][1]['buttonAnchor']['woodUid'] == setup['uid'], blank_state
         page.wait_for_timeout(70)
         assert page.evaluate('window.__punchDraws') > 0, 'installed punch stopped rendering after force settings'
         page.evaluate('window.__marbleBuilderDebug.undoLastAction()')
