@@ -24,7 +24,9 @@ with sync_playwright() as pw:
           for(let i=0;i<80;i++) {
             d.tick([support,arm],[press],1/120,100,null,[],19.35,900);
             const s=d.state(arm),tip=s.links?.at(-1);
-            if(i%6===0 && tip && s.phase==='out') {
+            // The aim samples stop at the supplied visible range; the actual
+            // launch now continues past that range rather than recoiling.
+            if(i%6===0 && tip && s.phase==='out' && i/6<path.points.length-2) {
               const expected=path.points[1+i/6];
               const error=Math.hypot(tip.x-expected.x,tip.y-expected.y);
               maxError=Math.max(maxError,error);samples++;

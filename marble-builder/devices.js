@@ -251,7 +251,9 @@
     const force=clamp(Number(rod.force)||7,2,20);
     const head={base,dir,x:base.x,y:base.y,travel:0,speed:force*.7};
     const points=[{x:base.x,y:base.y}];
-    for(let i=0;i<720;i++) {
+    // Preview only the visible distance, regardless of the map's reset circle.
+    // The launched hand itself has no artificial travel limit.
+    for(let i=0;i<20000 && head.travel<=boundary;i++) {
       const old=head.travel;
       advanceHead(head,force,pixels,1/120);
       const steps=Math.max(1,Math.ceil((head.travel-old)/3));
@@ -264,8 +266,8 @@
           && robotContact(target,tip))) { points.push(tip);return {points,hit:true}; }
       }
       if(i%6===0) points.push({x:head.x,y:head.y});
-      if(head.travel>boundary) {points.push({x:head.x,y:head.y});return {points,hit:false};}
     }
+    points.push({x:base.x+dir.x*boundary,y:base.y+dir.y*boundary});
     return {points,hit:false};
   }
   function releaseRobot(st) {
@@ -275,7 +277,8 @@
   // Straight corrugations: feed complete tiles through the flat housing, not
   // an elastic image. Only the hand and the object move; the rope has no gravity.
   function straightLinks(st,base,dir,length,tip) {
-    const count=Math.max(2,Math.ceil(length/HOSE_STEP)+1);
+    // Keep collision geometry bounded on a flight through empty infinite space.
+    const count=Math.max(2,Math.min(1025,Math.ceil(length/HOSE_STEP)+1));
     st.links=Array.from({length:count},(_,i)=>{
       const d=length*i/(count-1);
       return {x:base.x+dir.x*d,y:base.y+dir.y*d};
@@ -318,7 +321,7 @@
       }
       if(!struck) {
         st.travel=st.head.travel;
-        if(st.travel>boundary) {st.returnDir=null;st.phase='back';}
+        // No texture-length or map-boundary limit on the straight launch.
       }
     }
     if(st.phase==='hold') {
@@ -330,9 +333,17 @@
         st.travel=span;
         releaseRobot(st);st.phase='back';
       } else {
-        st.hold-=dt;
+        st.hold=Math.max(0,st.hold-dt);
         const a=target.radius?0:target.angle||0,c=Math.cos(a),s=Math.sin(a),p=st.grabPoint;
         const grip={x:target.x+p.x*c-p.y*s,y:target.y+p.x*s+p.y*c};
+        if(st.hold===0) {
+          // Stop pulling on the expiration tick, including constrained bodies.
+          st.head.x=grip.x;st.head.y=grip.y;
+          const span=Math.hypot(st.head.x-base.x,st.head.y-base.y);
+          st.returnDir=span>1e-6?{x:(st.head.x-base.x)/span,y:(st.head.y-base.y)/span}:dir;
+          st.travel=span;
+          releaseRobot(st);st.phase='back';
+        } else {
         const distance=Math.hypot(grip.x-base.x,grip.y-base.y);
         const fixed=target.type==='wood'||target.type==='breakable'||target.type==='magnet'||target.type==='robotArm'||target.type==='punch';
         const minimum=target.radius?target.radius+HOSE_WIDTH+8:0;
@@ -369,13 +380,6 @@
         }
         if(target.radius) {grip.x=target.x+p.x;grip.y=target.y+p.y;}
         st.head.x=grip.x;st.head.y=grip.y;
-        if(st.hold<=0) {
-          // Capture the held hose's angle and real length, not the original
-          // launch axis or the motor's (possibly shorter) target length.
-          const span=Math.hypot(st.head.x-base.x,st.head.y-base.y);
-          st.returnDir=span>1e-6?{x:(st.head.x-base.x)/span,y:(st.head.y-base.y)/span}:dir;
-          st.travel=span;
-          releaseRobot(st);st.phase='back';
         }
       }
     }
@@ -408,13 +412,33 @@
     ball.y += wy * (ball.radius - distance + .01);
     const inward = ball.vx*wx + ball.vy*wy;
     if (inward < 0) { ball.vx -= inward*wx; ball.vy -= inward*wy; }
-    if(friction) {
+    if(friction && typeof friction === 'object') {
+      // Same contact-normal, tangential Coulomb and rolling model as wood.
+      // The hose's segment angle supplies the actual surface normal.
+      const mass=Math.max(.08,ball.mass||.18),radius=ball.radius/(friction.pixels||100);
+      const tx=-wy,ty=wx,spinInertia=Math.max(.0001,.5*mass*radius*radius);
+      const crossT=-radius;
+      const relative=ball.vx*tx+ball.vy*ty+(ball.omega||0)*crossT;
+      const impulse=Math.max(0,-inward)*mass;
+      const support=mass*(friction.gravity||0)*(friction.dt||0)*Math.max(0,-wy);
+      const amount=clamp(-relative/(1/mass+crossT*crossT/spinInertia),
+        -friction.friction*(impulse+support),friction.friction*(impulse+support));
+      ball.vx+=tx*amount/mass;ball.vy+=ty*amount/mass;
+      ball.omega=(ball.omega||0)+crossT*amount/spinInertia;
+      if(support && friction.rollingResistance) {
+        const slow=clamp(ball.vx*tx+ball.vy*ty,
+          -(friction.gravity||0)*friction.rollingResistance*friction.dt,
+          (friction.gravity||0)*friction.rollingResistance*friction.dt);
+        ball.vx-=tx*slow;ball.vy-=ty*slow;
+        ball.omega*=Math.exp(-friction.rollingResistance*12*friction.dt);
+      }
+    } else if(friction) {
       const tx=-wy,ty=wx,tangent=ball.vx*tx+ball.vy*ty;
       ball.vx-=tx*tangent*friction;ball.vy-=ty*tangent*friction;
     }
     return true;
   }
-  function resolveBall(rods, ball) {
+  function resolveBall(rods, ball, woodContact) {
     if (!ball || ball.attachedMagnetUid || ball.attachedSwingUid || ball.electricRide) return;
     for (const rod of rods) {
       if (!isDevice(rod)) continue;
@@ -429,7 +453,7 @@
         for (let i = 1; i < st.links.length; i++) {
           const a = st.links[i-1], b = st.links[i], length = Math.hypot(b.x-a.x,b.y-a.y);
           if (length > .3) resolveBox(ball,{x:(a.x+b.x)/2,y:(a.y+b.y)/2,
-            angle:Math.atan2(b.y-a.y,b.x-a.x),length,thickness:HOSE_WIDTH},.05);
+            angle:Math.atan2(b.y-a.y,b.x-a.x),length,thickness:HOSE_WIDTH},woodContact || .05);
         }
       }
       const b = button(rods, rod);
@@ -445,7 +469,7 @@
     if (img.complete && img.naturalWidth) ctx.drawImage(img, x, y, w, h);
     else { ctx.fillStyle = name === 'button' ? '#e53120' : '#4d637a'; ctx.fillRect(x, y, w, h); }
   }
-  function draw(ctx, rod, alpha = 1) {
+  function draw(ctx, rod, alpha = 1, visible = null) {
     const st = state(rod);
     if (rod.type === 'robotArm') {
       const body = images['robot-body'], tile = images['robot-hose'];
@@ -459,7 +483,19 @@
           ctx.translate(origin.x,origin.y); ctx.rotate(Math.atan2(b.y-origin.y,b.x-origin.x)-Math.PI/2);
           if (tile.complete && tile.naturalWidth) {
             // Feed complete corrugations at fixed scale; only the last tile is cropped.
-            for(let at=0;at<length;at+=HOSE_STEP) {
+            // Do not issue thousands of off-screen tiles on an endless flight.
+            let first=0,last=length;
+            if(visible) {
+              const axis={x:(b.x-origin.x)/length,y:(b.y-origin.y)/length};
+              const projection=[{x:visible.x,y:visible.y},
+                {x:visible.x+visible.width,y:visible.y},
+                {x:visible.x,y:visible.y+visible.height},
+                {x:visible.x+visible.width,y:visible.y+visible.height}]
+                .map(p=>(p.x-origin.x)*axis.x+(p.y-origin.y)*axis.y);
+              first=Math.max(0,Math.floor((Math.min(...projection)-HOSE_STEP*2)/HOSE_STEP)*HOSE_STEP);
+              last=Math.min(length,Math.max(...projection)+HOSE_STEP*2);
+            }
+            for(let at=first;at<last;at+=HOSE_STEP) {
               const piece=Math.min(HOSE_STEP,length-at);
               ctx.drawImage(tile,0,21,tile.naturalWidth,15*piece/HOSE_STEP,
                 -HOSE_WIDTH/2,at,HOSE_WIDTH,piece+.4);

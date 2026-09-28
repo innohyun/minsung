@@ -43,6 +43,23 @@ with sync_playwright() as pw:
             prevGuide=guide.x;
             if(i%30===0) samples.push({i,x:guide.x,omega:driver.omega,speed:guide.pathSpeed});
           }
+          // Slight editor overlap must still transfer sustained ball force,
+          // without waiting until the ball is reset or the pair separates.
+          const touchingGuide={type:'zipline',uid:'touching-guide',angle:0,length:64,thickness:20,
+            path:[{x:400,y:275},{x:640,y:275}],pathT:0,pathSpeed:0,guideOffset:0};
+          const touchingRotor={type:'rotor',uid:'touching-rotor',pivotX:300,pivotY:300,
+            x:300,y:300,length:160,thickness:20,angle:-.45,omega:0};
+          k.position(touchingGuide);
+          const initiallyTouching=!!k.contact(touchingRotor,touchingGuide);
+          const pressing={x:350,y:206,radius:18,mass:.18,vx:0,vy:0,omega:0};
+          let firstPress=-1,moveWhilePressing=0,pressHits=0;
+          for(let i=0;i<100;i++) {
+            k.advance([touchingRotor,touchingGuide],dt,px);
+            pressing.vy+=19.35*dt;pressing.x+=pressing.vx*px*dt;pressing.y+=pressing.vy*px*dt;
+            k.collideBall(touchingRotor,pressing,px,()=>{pressHits++;if(firstPress<0)firstPress=i},
+              {friction:.2,gravity:19.35,dt});
+            if(firstPress>=0) moveWhilePressing=Math.max(moveWhilePressing,touchingGuide.x-400);
+          }
           const wallRotor={type:'rotor',uid:'wall-rotor',pivotX:300,pivotY:300,
             x:300,y:300,length:160,thickness:20,angle:0,omega:6};
           const wall={type:'wood',uid:'wall',x:366,y:335,length:65,thickness:16,angle:0};
@@ -79,12 +96,14 @@ with sync_playwright() as pw:
           }
           return {base,held,first,firstLinks,direction,maxStep,angleError,
             guideMove:guide.x-410,maxGuideStep,hitCount,ballHits,samples,
-            maxWallStep,wallOverlap,wallHits,launched,caught,released,releaseStep};
+            maxWallStep,wallOverlap,wallHits,launched,caught,released,releaseStep,
+            initiallyTouching,firstPress,pressHits,moveWhilePressing,pressOmega:touchingRotor.omega,pressAngle:touchingRotor.angle,pressSpeed:touchingGuide.pathSpeed,pressY:pressing.y};
         }''')
         print(width,result,flush=True)
         assert result['maxStep'] < 3 and result['angleError'] < .02 and abs(result['direction']['y']) > .6, result
         assert result['hitCount'] > 0 and result['ballHits'] > 0, result
         assert result['guideMove'] > 50 and result['maxGuideStep'] < 2, result
+        assert result['initiallyTouching'] and result['firstPress'] >= 0 and result['moveWhilePressing'] > 5, result
         assert result['wallHits'] > 0 and result['wallOverlap'] == 0 and result['maxWallStep'] < .1, result
         assert result['launched'] and result['caught'] and result['released'] and result['releaseStep'] < 3, result
         assert not errors,errors

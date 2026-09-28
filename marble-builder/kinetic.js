@@ -188,8 +188,34 @@ window.MarbleKinetics = (() => {
             position(rod);
           }
         };
+        const resting=(()=>{at(0);const hit=contact(a,b);at(1);return hit;})();
+        if(resting) {
+          // Resolve the current velocity without rewinding the bodies to the
+          // same original overlap on every frame; that discarded all motion.
+          const current=contact(a,b);
+          const speed=collidePair(a,b,scale,current||resting);
+          if(current && current.depth>resting.depth+.01) {
+            // Remove only the NEW penetration along the actual bearing/rail
+            // coordinates. Never reset both positions to the previous frame.
+            const da=axis(a,current.x,current.y,current.nx,current.ny,scale);
+            const db=axis(b,current.x,current.y,current.nx,current.ny,scale);
+            const ja=da.jac*(a.type==='rotor'?scale:1);
+            const jb=db.jac*(b.type==='rotor'?scale:1);
+            const wa=1/da.inertia,wb=1/db.inertia;
+            const denom=ja*ja*wa+jb*jb*wb;
+            if(denom>1e-8) {
+              const delta=Math.min(current.depth-resting.depth,2);
+              if(a.type==='rotor') a.angle-=clamp(delta*ja*wa/denom,-.025,.025);
+              else a.pathT-=clamp(delta*ja*wa/denom,-2,2);
+              if(b.type==='rotor') b.angle+=clamp(delta*jb*wb/denom,-.025,.025);
+              else b.pathT+=clamp(delta*jb*wb/denom,-2,2);
+              position(a);position(b);
+            }
+          }
+          if(speed>.12) onImpact?.(a,b,speed);
+          continue;
+        }
         at(0);
-        if(contact(a,b)) continue; // Preserve already-overlapping editor placements.
         let lo=0,hi=1;
         for(let n=0;n<12;n++) {
           const mid=(lo+hi)/2;

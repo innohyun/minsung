@@ -161,7 +161,7 @@
     rotor: { label: '회전축 블록', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0.04 * (0.20 / 0.38) },
     zipline: { label: '곡선 짚라인', color: '#a96c36', edge: '#70401f', friction: .20, restitution: .23, rollingResistance: 0.04 * (0.20 / 0.38) },
     punch: { label: '버튼+펀치', color: '#435974', edge: '#1d3148', friction: .20, restitution: .23, rollingResistance: 0 },
-    robotArm: { label: '버튼+로봇 팔', color: '#435974', edge: '#1d3148', friction: .20, restitution: .23, rollingResistance: 0 },
+    robotArm: { label: '버튼+로봇 팔', color: '#435974', edge: '#1d3148', friction: .20, restitution: .23, rollingResistance: 0.04 * (0.20 / 0.38) },
 
 
     slime: { label: '슬라임 길', color: '#65cf63', edge: '#278f42', friction: 0.62, restitution: 0.1, rollingResistance: 0.095, slime: true },
@@ -1802,13 +1802,7 @@
           : '전기 발판 꼭짓점이 바깥쪽이거나 떨어져 있어요. 결합을 고쳐 주세요.', 4700);
       return false;
     }
-    const robots = rods.filter(rod => rod.type === 'robotArm');
-    if (robots.length && robots.every(rod => !window.MarbleDevices.robotPath(rod,
-      [...rods, {x:spawn.x,y:spawn.y,radius:BALL_RADIUS}], activeGravity(), PIXELS_PER_METER,
-      resetBoundaryRadius() + 50).hit)) {
-      setHint('로봇 팔이 아무것도 잡지 못한 채 경계를 벗어나요. 각도나 블록 위치를 바꾼 뒤 공을 만드세요.', 4300);
-      return false;
-    }
+
     const queued = ['free', 'stage'].includes(appMode) && ballQueue.length > 0;
     const retrieval = pendingRetrievals.length > 0;
     if (queued && queueIndex >= ballQueue.length && !retrieval) { setHint('정한 순서의 공을 모두 발사했어요. 공 설정에서 다시 정해 주세요.'); return false; }
@@ -3903,7 +3897,11 @@
     }
     // The visible extended head, shaft and separate wood-mounted button are
     // colliders too; the normal rod rectangle only covers the machine housing.
-    window.MarbleDevices.resolveBall(rods, ball);
+    window.MarbleDevices.resolveBall(rods, ball, {
+      friction:materialForType('wood').friction,
+      rollingResistance:materialForType('wood').rollingResistance,
+      gravity:activeGravity(), dt, pixels:PIXELS_PER_METER
+    });
     if (ball.electricRide) {
       ball.specialContacts = [...specialContactsThisStep];
       finishImpactSoundContacts();
@@ -4330,7 +4328,12 @@
     ctx.restore();
   }
   function drawRod(rod, alpha = 1) {
-    if (window.MarbleDevices.isDevice(rod)) { window.MarbleDevices.draw(ctx, rod, alpha); return; }
+    if (window.MarbleDevices.isDevice(rod)) {
+      window.MarbleDevices.draw(ctx, rod, alpha, {
+        x:camera.x,y:camera.y,width:view.width/camera.zoom,height:view.height/camera.zoom
+      });
+      return;
+    }
     if (rod.type === 'fixedBall') {
       if (!activatedFixedBalls.has(rod.uid)) {
         const previous = ball;
@@ -4735,9 +4738,16 @@
     rods.forEach(rod => drawRod(rod, appMode === 'editor' && !rod.fixed ? 0.42 : 1));
     rods.filter(rod => window.MarbleDevices.isDevice(rod)).forEach(rod => window.MarbleDevices.drawButton(ctx, rods, rod, appMode === 'editor' && !rod.fixed ? .42 : 1));
     if (selected?.type === 'robotArm') {
+      const aim=Math.cos(selected.angle||0),rise=Math.sin(selected.angle||0);
+      const nozzle=window.MarbleDevices.muzzle(selected);
+      const corners=[{x:camera.x,y:camera.y},
+        {x:camera.x+view.width/camera.zoom,y:camera.y},
+        {x:camera.x,y:camera.y+view.height/camera.zoom},
+        {x:camera.x+view.width/camera.zoom,y:camera.y+view.height/camera.zoom}];
+      const visibleDistance=Math.max(0,...corners.map(p=>(p.x-nozzle.x)*aim+(p.y-nozzle.y)*rise))+30/camera.zoom;
       const path = window.MarbleDevices.robotPath(selected,
         [...rods, {x:spawn.x,y:spawn.y,radius:BALL_RADIUS}], activeGravity(), PIXELS_PER_METER,
-        resetBoundaryRadius() + 50);
+        visibleDistance);
       ctx.save();ctx.setLineDash([3,7]);ctx.strokeStyle=path.hit?'#23885a':'#dc4b3e';
       ctx.lineWidth=2;ctx.beginPath();
       path.points.forEach((point,index)=>index ? ctx.lineTo(point.x,point.y) : ctx.moveTo(point.x,point.y));

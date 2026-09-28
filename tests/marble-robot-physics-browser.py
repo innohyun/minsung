@@ -55,7 +55,8 @@ with sync_playwright() as pw:
             configured:robot.holdSeconds,phase:dev.state(robot).phase};
         }''')
         print('TRACE',width,result)
-        assert result['noTarget'] is False and result['noBalls']==0,result
+        # A launch is no longer blocked merely because the hose passes the old map boundary.
+        assert result['noTarget'] is True and result['noBalls']==1,result
         assert result['yesTarget'] is True and result['pathHit'],result
         assert result['configured']==1.2 and result['maxLinks']>12,result
         assert result['grabbed'] and result['tautError']<.1 and result['handAlignment']>.99,result
