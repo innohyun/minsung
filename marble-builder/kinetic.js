@@ -117,7 +117,22 @@ window.MarbleKinetics = (() => {
   function collidePair(a,b,scale,hit=contact(a,b)) {
     if(!hit) return null;
     const {x,y,nx,ny}=hit;
-    const av=axis(a,x,y,nx,ny,scale),bv=axis(b,x,y,nx,ny,scale);
+    const constrainedAxis=(rod,sign)=>{
+      const motion=axis(rod,x,y,nx,ny,scale);
+      if(rod.type!=='zipline') return motion;
+      const distance=rod.pathT||0,total=curve(rod).total;
+      const outward=sign*motion.jac;
+      const speed=rod.pathSpeed||0;
+      if((distance<=.001 && outward<0 && speed<=0)
+        ||(distance>=total-.001 && outward>0 && speed>=0)) {
+        // The guide's hard endpoint cannot store an outward impulse and then
+        // silently throw it away on the next advance. Treat that DOF as locked
+        // for this normal impulse; the other body must receive the reaction.
+        return {...motion,jac:0,vx:0,vy:0};
+      }
+      return motion;
+    };
+    const av=constrainedAxis(a,-1),bv=constrainedAxis(b,1);
     const approach=(bv.vx-av.vx)*nx+(bv.vy-av.vy)*ny;
     const denom=av.jac**2/av.inertia+bv.jac**2/bv.inertia;
     if(approach<0 && denom>1e-8) {
