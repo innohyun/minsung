@@ -5,7 +5,7 @@ URL=os.getenv('MARBLE_URL','https://minsung.classaimate.com/marble-builder/')
 CHROME='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 with sync_playwright() as pw:
     browser=pw.chromium.launch(headless=True,executable_path=CHROME)
-    for mobile,damaged in ((False,False),(True,False),(False,True),(True,True),(False,'saved'),(True,'saved')):
+    for mobile,damaged in ((False,False),(True,False),(False,True),(True,True),(False,'saved'),(True,'saved'),(False,'legacy'),(True,'legacy')):
         context=browser.new_context(viewport={'width':390 if mobile else 1280,'height':844},is_mobile=mobile,has_touch=mobile)
         if damaged=='saved':
             context.add_init_script("""if (location.pathname.includes('/marble-builder/')) {
@@ -14,6 +14,14 @@ with sync_playwright() as pw:
                   {id:'custom-recover',number:4,fixedBlocks:[{type:'wood',x:100,y:200,length:120,thickness:20}],supplyBlocks:[],goals:[]} ]));
                 if (localStorage.getItem('marble-builder-creations-v1') === null) localStorage.setItem('marble-builder-creations-v1', JSON.stringify([
                   {id:'saved-map',name:'이전 맵',updatedAt:3,rods:[{type:'wood',x:120,y:220,length:90,thickness:20}]}]));
+            }""")
+        elif damaged=='legacy':
+            context.add_init_script("""if (location.pathname.includes('/marble-builder/')) {
+                if (localStorage.getItem('marble-builder-stages-v1') === null) localStorage.setItem('marble-builder-stages-v1', JSON.stringify([
+                  {id:'stage-1',number:1,rods:[null,{type:'wood',x:100,y:200}]},
+                  {id:'legacy-map',number:2,fixedBlocks:[null,{type:'wood',x:200,y:300}],supplyBlocks:[null,{type:'slime',x:300,y:400}]}]));
+                if (localStorage.getItem('marble-builder-creations-v1') === null) localStorage.setItem('marble-builder-creations-v1', JSON.stringify([
+                  {id:'legacy-creation',name:'예전 작품',rods:[null,{type:'wood',x:120,y:220}],goals:null,fields:null}]));
             }""")
         elif damaged:
             context.add_init_script("""if (location.pathname.includes('/marble-builder/')) {
@@ -31,14 +39,15 @@ with sync_playwright() as pw:
             savedCreations:localStorage.getItem('marble-builder-creations-v1'),
             creations:[...document.querySelectorAll('.creation-card strong')].map(x=>x.textContent),
             scripts:[...document.scripts].map(x=>x.getAttribute('src')).filter(Boolean)})''')
-        if damaged=='saved':
-            assert '이전 맵' in before['creations'],(before,errors)
-            assert 'stage-1' in before['savedStages'] and 'custom-recover' in before['savedStages'],before
+        if damaged in ('saved','legacy'):
+            assert ('이전 맵' if damaged=='saved' else '예전 작품') in before['creations'],(before,errors)
+            assert 'stage-1' in before['savedStages'],before
             open_button=page.locator('.creation-card button').first
             if mobile: open_button.tap()
             else: open_button.click()
             loaded=page.evaluate('window.__marbleBuilderDebug.getState()')
             assert loaded['appMode']=='free' and len(loaded['rods'])==1,loaded['appMode']
+        assert 'game.js?v=72' in before['scripts'],before['scripts']
         results=[]
         for selector in ('#freeModeButton','#stageModeButton'):
             page.goto(URL,wait_until='networkidle')
