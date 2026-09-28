@@ -3873,6 +3873,7 @@
     ball.vx *= drag;
     ball.vy *= drag;
     ball.omega *= Math.exp(-0.08 * dt);
+    const beforeDeviceMove={x:ball.x,y:ball.y};
     ball.x += ball.vx * PIXELS_PER_METER * dt;
     ball.y += ball.vy * PIXELS_PER_METER * dt;
     ball.angle += ball.omega * dt;
@@ -3903,7 +3904,7 @@
     }
     // The visible extended head, shaft and separate wood-mounted button are
     // colliders too; the normal rod rectangle only covers the machine housing.
-    window.MarbleDevices.resolveBall(rods, ball);
+    window.MarbleDevices.resolveBall(rods, ball, beforeDeviceMove);
     if (ball.electricRide) {
       ball.specialContacts = [...specialContactsThisStep];
       finishImpactSoundContacts();

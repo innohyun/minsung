@@ -282,11 +282,104 @@
     });
     if(tip) st.links.at(-1).x=tip.x,st.links.at(-1).y=tip.y;
   }
+  function pathLength(points) {
+    let total=0;
+    for(let i=1;i<points.length;i++) total+=Math.hypot(points[i].x-points[i-1].x,points[i].y-points[i-1].y);
+    return total;
+  }
+  function samplePath(points,length) {
+    const result=[{...points[0]}];
+    let remaining=length;
+    for(let i=1;i<points.length && remaining>0;i++) {
+      const a=points[i-1],b=points[i],segment=Math.hypot(b.x-a.x,b.y-a.y);
+      if(segment<1e-8) continue;
+      const t=Math.min(1,remaining/segment);
+      result.push({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
+      remaining-=segment;
+    }
+    return result;
+  }
+  function spacedLinks(points) {
+    const total=pathLength(points),links=[];
+    for(let at=0;at<total;at+=HOSE_STEP) links.push(samplePath(points,at).at(-1));
+    links.push({...points.at(-1)});
+    return links;
+  }
+  function routedPath(base,tip,rods,grabbed,self) {
+    // Visibility graph around one solid obstacle. Expand its outline by the
+    // hose radius so the visible tube, not merely its centreline, stays clear.
+    for(const obstacle of rods) {
+      if(obstacle===self||obstacle===grabbed||!['wood','breakable','punch','robotArm'].includes(obstacle.type)
+        || obstacle.type==='breakable'&&obstacle.hp<=0) continue;
+      const c=Math.cos(obstacle.angle||0),s=Math.sin(obstacle.angle||0);
+      const local=p=>({x:(p.x-obstacle.x)*c+(p.y-obstacle.y)*s,
+        y:-(p.x-obstacle.x)*s+(p.y-obstacle.y)*c});
+      const world=p=>({x:obstacle.x+p.x*c-p.y*s,y:obstacle.y+p.x*s+p.y*c});
+      // The grip is on the marble surface, so account for the offset from
+      // suction point to its centre as well as the marble's own radius.
+      const clearance=Math.max(HOSE_WIDTH/2,(grabbed.radius||0)*2)+2;
+      const start=local(base),end=local(tip),hx=obstacle.length/2+clearance,
+        hy=obstacle.thickness/2+clearance;
+      const inside=p=>Math.abs(p.x)<hx-1&&Math.abs(p.y)<hy-1;
+      if(inside(start)||inside(end)) continue;
+      const clear=(a,b)=>{
+        const steps=Math.max(8,Math.ceil(Math.hypot(a.x-b.x,a.y-b.y)/4));
+        for(let i=1;i<steps;i++) if(inside({x:a.x+(b.x-a.x)*i/steps,
+          y:a.y+(b.y-a.y)*i/steps})) return false;
+        return true;
+      };
+      if(clear(start,end)) continue;
+      const nodes=[start,{x:-hx,y:-hy},{x:hx,y:-hy},
+        {x:hx,y:hy},{x:-hx,y:hy},end];
+      const distances=nodes.map(()=>Infinity),routes=nodes.map(()=>null),visited=new Set();
+      distances[0]=0;routes[0]=[0];
+      for(let iter=0;iter<nodes.length;iter++) {
+        let i=-1;
+        for(let j=0;j<nodes.length;j++) if(!visited.has(j)&&(i<0||distances[j]<distances[i])) i=j;
+        if(i<0||!Number.isFinite(distances[i])) break;
+        visited.add(i);
+        for(let j=0;j<nodes.length;j++) {
+          if(visited.has(j)||!clear(nodes[i],nodes[j])) continue;
+          const next=distances[i]+Math.hypot(nodes[i].x-nodes[j].x,nodes[i].y-nodes[j].y);
+          if(next<distances[j]) {distances[j]=next;routes[j]=[...routes[i],j];}
+        }
+      }
+      if(routes[5]) return routes[5].map(i=>world(nodes[i]));
+    }
+    return [base,tip];
+  }
+  function beginReturn(st,base) {
+    const points=st.links?.length>1 ? st.links.map(p=>({...p})) : [base,{x:st.head.x,y:st.head.y}];
+    points[0]={...base};
+    points[points.length-1]={x:st.head.x,y:st.head.y};
+    st.returnPath=points;
+    st.travel=pathLength(points);
+    st.phase='back';
+    releaseRobot(st);
+  }
+  function tooSharpForWinch(target, base, grip) {
+    if (target.type !== 'zipline') return false;
+    const guide = window.MarbleKinetics.curve(target, target.pathT || 0);
+    const ahead = window.MarbleKinetics.curve(target, (target.pathT || 0) + 18);
+    const behind = window.MarbleKinetics.curve(target, (target.pathT || 0) - 18);
+    const bend = ahead.tx * behind.tx + ahead.ty * behind.ty;
+    const dx = grip.x - base.x, dy = grip.y - base.y;
+    const span = Math.hypot(dx, dy) || 1;
+    // A sharply bent guide or a cable nearly perpendicular to the local rail
+    // cannot be pulled through its turn by a straight, non-bending nozzle.
+    const alignment = Math.abs((guide.tx * dx + guide.ty * dy) / span);
+    const path = target.path || [];
+    const chord = path.length > 1 ? Math.hypot(path[path.length-1].x-path[0].x,
+      path[path.length-1].y-path[0].y) : 0;
+    const deepTurn = chord > 0 && Math.abs(target.curveBend || 0) > chord * .45;
+    const middle = (target.pathT || 0) > guide.total * .2 && (target.pathT || 0) < guide.total * .8;
+    return bend < .5 || alignment < .3 || deepTurn && middle && alignment < .62;
+  }
   function tickRobot(rod,st,balls,dt,pixels,rods,gravity,boundary) {
     const base=muzzle(rod),dir={x:Math.cos(rod.angle||0),y:Math.sin(rod.angle||0)};
     const force=clamp(Number(rod.force)||7,2,20);
     const reel=clamp(Number(rod.reelSpeed)||1.9,.2,8)*pixels;
-    if(st.phase==='idle') {st.travel=0;st.links=null;st.head=null;releaseRobot(st);return;}
+    if(st.phase==='idle') {st.travel=0;st.links=null;st.head=null;st.returnPath=null;releaseRobot(st);return;}
     if(st.phase==='out') {
       if(!st.head) st.head={base,dir,x:base.x,y:base.y,travel:0,speed:force*.7};
       const old=st.travel;
@@ -318,45 +411,57 @@
       }
       if(!struck) {
         st.travel=st.head.travel;
-        if(st.travel>boundary) st.phase='back';
+        if(st.travel>boundary) beginReturn(st,base);
       }
     }
     if(st.phase==='hold') {
       const target=st.grabbed;
       if(!target || !balls.includes(target) && !rods.includes(target)) {
-        releaseRobot(st);st.phase='back';
+        beginReturn(st,base);
       } else {
-        st.hold-=dt;
         const a=target.radius?0:target.angle||0,c=Math.cos(a),s=Math.sin(a),p=st.grabPoint;
         const grip={x:target.x+p.x*c-p.y*s,y:target.y+p.x*s+p.y*c};
-        const distance=Math.hypot(grip.x-base.x,grip.y-base.y);
+        const route=routedPath(base,grip,rods,target,rod);
+        const distance=pathLength(route);
         const fixed=target.type==='wood'||target.type==='breakable'||target.type==='magnet'||target.type==='robotArm'||target.type==='punch';
-        const minimum=target.radius?target.radius+HOSE_WIDTH+8:0;
+        // Grip is measured at the marble surface: zero cable puts the marble's
+        // surface at the flat housing face, rather than leaving a visible gap.
+        const minimum=0;
+        const blocked=tooSharpForWinch(target,base,grip);
+        if(blocked && target.type==='zipline') target.pathSpeed=0;
         // The drum cannot shorten through an immovable obstacle or past the
         // constrained body's actual position. Eight pixels of cable compliance
         // are enough to build tension without allowing visible penetration.
-        st.travel=Math.max(minimum,fixed?distance:Math.max(distance-8,st.travel-reel*dt));
+        st.travel=Math.max(minimum,fixed||blocked?distance:Math.max(distance-8,st.travel-reel*dt));
         const shortening=st.lastGripDistance-distance;
         if(!fixed && (target.type==='rotor'||target.type==='zipline'||target.type==='swing')) {
           st.stall=shortening>.08?0:(st.stall||0)+dt;
           if(st.stall>.25) st.travel=Math.max(st.travel,distance);
         }
         st.lastGripDistance=distance;
-        const nx=(grip.x-base.x)/(distance||1),ny=(grip.y-base.y)/(distance||1);
-        const error=Math.max(0,distance-st.travel);
+        const nx=(grip.x-base.x)/(Math.hypot(grip.x-base.x,grip.y-base.y)||1);
+        const ny=(grip.y-base.y)/(Math.hypot(grip.x-base.x,grip.y-base.y)||1);
+        const error=blocked?0:Math.max(0,distance-st.travel);
         if(target.radius) {
           // While suction holds a marble, the motor owns its movement. World
           // gravity resumes on release; no spring/ballistic orbit can form.
-          const next=Math.max(minimum,Math.min(distance,st.travel));
-          const contact={x:base.x+nx*next,y:base.y+ny*next};
+          const next=Math.max(minimum,distance-Math.min(reel*dt,Math.max(0,distance-st.travel)));
+          const contact=samplePath(route,next).at(-1);
           target.x=contact.x-p.x;target.y=contact.y-p.y;
-          target.vx=-nx*Math.min(reel/pixels,(distance-next)/pixels/Math.max(dt,1e-6));
-          target.vy=-ny*Math.min(reel/pixels,(distance-next)/pixels/Math.max(dt,1e-6));
+          const last=route.at(-1),before=route.at(-2),segment=Math.hypot(last.x-before.x,last.y-before.y)||1;
+          target.vx=-(last.x-before.x)/segment*Math.min(reel/pixels,(distance-next)/pixels/Math.max(dt,1e-6));
+          target.vy=-(last.y-before.y)/segment*Math.min(reel/pixels,(distance-next)/pixels/Math.max(dt,1e-6));
         } else if(error>.01 && !fixed) {
-          const power=clamp(8+error*.9,8,38)*dt;
-          if(target.type==='rotor'||target.type==='zipline')
+          // A fixed-strength motor must not pump ever more energy into a pivot
+          // merely because the object cannot follow the cable.
+          const power=clamp(force*1.1,2,20)*dt;
+          if(target.type==='rotor'||target.type==='zipline') {
+            const priorOmega=target.omega||0;
             window.MarbleKinetics.applyImpulse(target,grip,-nx*power,-ny*power,pixels);
-          else if(target.type==='swing') {
+            // A motor is not allowed to spin a captured bearing without limit.
+            // Preserve faster momentum that came from other collisions.
+            if(target.type==='rotor') target.omega=clamp(target.omega,-Math.max(4,Math.abs(priorOmega)),Math.max(4,Math.abs(priorOmega)));
+          } else if(target.type==='swing') {
             const armX=(grip.x-target.x)/pixels,armY=(grip.y-target.y)/pixels;
             const inertia=Math.max(.05,.7*(target.length/pixels)**2/3);
             target.swingOmega=clamp((target.swingOmega||0)+(armY*nx-armX*ny)*power/inertia,-16,16);
@@ -365,17 +470,29 @@
         }
         if(target.radius) {grip.x=target.x+p.x;grip.y=target.y+p.y;}
         st.head.x=grip.x;st.head.y=grip.y;
-        if(st.hold<=0) {releaseRobot(st);st.phase='back';}
+        st.links=spacedLinks(route);
+        // The hold setting starts *after* a marble reaches the mouth; releasing
+        // on a timer while it is still travelling stranded distant marbles.
+        if(!target.radius || distance<=1.5 || blocked) st.hold-=dt;
+        if(st.hold<=0) {
+          if(st.links?.length) st.links[st.links.length-1]={...st.head};
+          beginReturn(st,base);
+        }
       }
     }
     if(st.phase==='back') {
       st.travel=Math.max(0,st.travel-reel*dt);
-      if(st.travel<=0) {st.phase='idle';st.head=null;st.links=null;return;}
+      if(st.travel<=0) {st.phase='idle';st.head=null;st.links=null;st.returnPath=null;return;}
+      if(st.returnPath) {
+        st.links=samplePath(st.returnPath,st.travel);
+        st.head={...st.links.at(-1)};
+        return;
+      }
       st.head={x:base.x+dir.x*st.travel,y:base.y+dir.y*st.travel};
     }
     const span=st.phase==='hold' ? Math.hypot(st.head.x-base.x,st.head.y-base.y) : st.travel;
     const line=st.phase==='hold' && span>0 ? {x:(st.head.x-base.x)/span,y:(st.head.y-base.y)/span} : dir;
-    straightLinks(st,base,line,span);
+    if(st.phase!=='hold' || !st.links) straightLinks(st,base,line,span);
   }
   function resolveBox(ball, box, friction = 0) {
     const c = Math.cos(box.angle), s = Math.sin(box.angle);
@@ -401,7 +518,31 @@
     }
     return true;
   }
-  function resolveBall(rods, ball) {
+  function resolveHose(ball,a,b,previous) {
+    const length=Math.hypot(b.x-a.x,b.y-a.y);
+    if(length<.3) return;
+    const box={x:(a.x+b.x)/2,y:(a.y+b.y)/2,
+      angle:Math.atan2(b.y-a.y,b.x-a.x),length,thickness:HOSE_WIDTH};
+    if(previous && Math.hypot(ball.x-previous.x,ball.y-previous.y)>1) {
+      const nx=-(b.y-a.y)/length,ny=(b.x-a.x)/length;
+      const before=(previous.x-a.x)*nx+(previous.y-a.y)*ny;
+      const after=(ball.x-a.x)*nx+(ball.y-a.y)*ny;
+      const clearance=ball.radius+HOSE_WIDTH/2;
+      if(Math.abs(before)>clearance && before*after<0) {
+        const t=(before-Math.sign(before)*clearance)/(before-after);
+        const x=previous.x+(ball.x-previous.x)*t,y=previous.y+(ball.y-previous.y)*t;
+        const along=((x-a.x)*(b.x-a.x)+(y-a.y)*(b.y-a.y))/length;
+        if(along>=-ball.radius && along<=length+ball.radius) {
+          ball.x=x+nx*Math.sign(before)*.02;
+          ball.y=y+ny*Math.sign(before)*.02;
+          const inward=(ball.vx*nx+ball.vy*ny)*Math.sign(before);
+          if(inward<0) {ball.vx-=nx*inward*Math.sign(before);ball.vy-=ny*inward*Math.sign(before);}
+        }
+      }
+    }
+    resolveBox(ball,box,.20);
+  }
+  function resolveBall(rods, ball, previous) {
     if (!ball || ball.attachedMagnetUid || ball.attachedSwingUid || ball.electricRide) return;
     for (const rod of rods) {
       if (!isDevice(rod)) continue;
@@ -414,9 +555,7 @@
       if (rod.type === 'punch') resolveBox(ball, headRect(rod, st.travel));
       if (rod.type === 'robotArm' && st.travel > 1 && st.grabbed !== ball && st.links) {
         for (let i = 1; i < st.links.length; i++) {
-          const a = st.links[i-1], b = st.links[i], length = Math.hypot(b.x-a.x,b.y-a.y);
-          if (length > .3) resolveBox(ball,{x:(a.x+b.x)/2,y:(a.y+b.y)/2,
-            angle:Math.atan2(b.y-a.y,b.x-a.x),length,thickness:HOSE_WIDTH},.05);
+          resolveHose(ball,st.links[i-1],st.links[i],previous);
         }
       }
       const b = button(rods, rod);
@@ -437,21 +576,32 @@
     if (rod.type === 'robotArm') {
       const body = images['robot-body'], tile = images['robot-hose'];
       if (st.links && st.travel > 1) {
-        const start=st.links[0],b=st.links.at(-1);
+        const start=st.links[0];
         const origin={x:start.x-Math.cos(rod.angle||0)*6,
           y:start.y-Math.sin(rod.angle||0)*6};
-        const length=Math.hypot(b.x-origin.x,b.y-origin.y);
-        if(length>.3) {
+        const points=[origin,...st.links.slice(1)];
+        if(pathLength(points)>.3) {
           ctx.save(); ctx.globalAlpha *= alpha;
-          ctx.translate(origin.x,origin.y); ctx.rotate(Math.atan2(b.y-origin.y,b.x-origin.x)-Math.PI/2);
           if (tile.complete && tile.naturalWidth) {
-            // Feed complete corrugations at fixed scale; only the last tile is cropped.
-            for(let at=0;at<length;at+=HOSE_STEP) {
-              const piece=Math.min(HOSE_STEP,length-at);
-              ctx.drawImage(tile,0,21,tile.naturalWidth,15*piece/HOSE_STEP,
-                -HOSE_WIDTH/2,at,HOSE_WIDTH,piece+.4);
+            let distance=0;
+            for(let i=1;i<points.length;i++) {
+              const a=points[i-1],b=points[i],length=Math.hypot(b.x-a.x,b.y-a.y);
+              if(length<.3) continue;
+              ctx.save();ctx.translate(a.x,a.y);ctx.rotate(Math.atan2(b.y-a.y,b.x-a.x)-Math.PI/2);
+              for(let at=0;at<length;) {
+                const tileOffset=(distance+at)%HOSE_STEP,piece=Math.min(length-at,HOSE_STEP-tileOffset);
+                ctx.drawImage(tile,0,21+15*tileOffset/HOSE_STEP,tile.naturalWidth,15*piece/HOSE_STEP,
+                  -HOSE_WIDTH/2,at,HOSE_WIDTH,piece+.4);
+                at+=piece;
+              }
+              ctx.restore();distance+=length;
             }
-          } else { ctx.fillStyle = '#79818a'; ctx.fillRect(-HOSE_WIDTH/2, 0, HOSE_WIDTH, length + 1); }
+          } else {
+            ctx.strokeStyle='#79818a';ctx.lineWidth=HOSE_WIDTH;ctx.lineJoin='round';
+            ctx.beginPath();ctx.moveTo(points[0].x,points[0].y);
+            for(const p of points.slice(1)) ctx.lineTo(p.x,p.y);
+            ctx.stroke();
+          }
           ctx.restore();
         }
         const tip = st.links.at(-1);
