@@ -4822,7 +4822,8 @@
   }, { passive: false });
   window.addEventListener('resize', resize);
   window.visualViewport?.addEventListener('resize', resize);
-  new ResizeObserver(resize).observe(gameShell);
+  // Older Safari can lack ResizeObserver; window/visualViewport resize still work.
+  if (typeof ResizeObserver === 'function') new ResizeObserver(resize).observe(gameShell);
   spawnButton.addEventListener('click', () => { if (spawnBall() && launchMode === 'auto') autoLaunchArmed = true; });
   ballTypeButton.addEventListener('click', () => {
     if (appMode === 'editor') {
