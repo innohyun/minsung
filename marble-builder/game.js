@@ -259,7 +259,7 @@
     drawQueueEditor(); updateBallTypeButton();
   }
   function drawQueueEditor() {
-    ballChoices.replaceChildren(); queueList.replaceChildren();
+    ballChoices.textContent = ''; queueList.textContent = '';
     for (const id of ['normal', 'giant', ...window.MarbleBalls.list()]) {
       const button = document.createElement('button'); button.type = 'button'; button.textContent = labelForBall(id);
       if (window.MarbleBalls.has(id)) button.style.backgroundImage = `url("${window.MarbleBalls.getImage(id).src}")`;
@@ -664,7 +664,7 @@
   }
 
   function renderCreations() {
-    creationsList.replaceChildren();
+    creationsList.textContent = '';
     creationsEmpty.hidden = creations.length > 0;
     [...creations].sort((a, b) => b.updatedAt - a.updatedAt).forEach(creation => {
       const card = document.createElement('article');
@@ -1047,7 +1047,7 @@
     }
     if (recordedRollingAudio) recordedRollingAudio.gain.gain.setTargetAtTime(.0001, audio.currentTime, .06);
     if (!rollingAudio) {
-      rollingNoiseBuffer ||= makeSoftNoiseBuffer(audio, 1.8, .94);
+      if (!rollingNoiseBuffer) rollingNoiseBuffer = makeSoftNoiseBuffer(audio, 1.8, .94);
       const noise = audio.createBufferSource();
       const filter = audio.createBiquadFilter();
       const gain = audio.createGain();
@@ -1235,7 +1235,7 @@
   }
 
   function renderToolDock() {
-    toolList.replaceChildren();
+    toolList.textContent = '';
     toolList.scrollLeft = 0;
     if (appMode === 'stage') {
       stageSupplies.filter(item => !item.used).forEach(item => toolList.append(createToolCard(item)));
@@ -1271,7 +1271,7 @@
   }
 
   function openBlockCatalog() {
-    blockCatalogGrid.replaceChildren();
+    blockCatalogGrid.textContent = '';
     BLOCK_CATALOG.forEach(block => {
       const item = document.createElement('article');
       item.className = 'catalog-item';
@@ -1493,7 +1493,7 @@
   }
 
   function renderStageList() {
-    stageList.replaceChildren();
+    stageList.textContent = '';
     swapStagesButton.hidden = !developerEnabled;
     const ordered = [...stages].sort((a, b) => a.number - b.number);
     ordered.forEach(stage => {
@@ -4095,7 +4095,7 @@
         item.specialContacts = [];
       }
     }
-    ball = activeBalls.at(-1) || null;
+    ball = activeBalls[activeBalls.length - 1] || null;
   }
   function resetBoundaryRadius() {
     let radius = 0;
@@ -4852,7 +4852,7 @@
   pinZiplineButton.addEventListener('click', () => {
     if(selected?.type!=='zipline' || (appMode==='stage' && selected.fixed))return;
     if((selected.fixedCount||1)>=selected.path.length) {setHint('빨간 끝점을 끌어 다음 녹색 점을 만드세요.');return;}
-    const end=selected.path.at(-1),prev=selected.path.at(-2);
+    const end=selected.path[selected.path.length-1],prev=selected.path[selected.path.length-2];
     if(Math.hypot(end.x-prev.x,end.y-prev.y)<20) {setHint('녹색 점을 더 멀리 움직인 뒤 고정하세요.');return;}
     pushUndo();selected.fixedCount=selected.path.length;selected.editPhase='length';
     updateDeleteButton();setHint('끝점이 고정됐어요. 빨간 끝점을 끌어 다음 곡선을 이어 주세요.');
@@ -5227,7 +5227,7 @@
     setBallState: state => {
       if (!ball && !spawnBall()) return null;
       Object.assign(ball, state);
-      ball.specialContacts ||= [];
+      if (!ball.specialContacts) ball.specialContacts = [];
       return ball;
     },
     setActiveBallState: (index, state) => { const item = activeBalls[index]; if (item) Object.assign(item, state); return item || null; },
@@ -5328,4 +5328,5 @@
   updateDeleteButton();
   showHome();
   requestAnimationFrame(frame);
+  window.marbleBuilderReady = true;
 })();

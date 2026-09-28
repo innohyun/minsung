@@ -1,4 +1,4 @@
-"""Safeguard Safari mode entry when ResizeObserver is unavailable.
+"""Safeguard mode entry without newer Safari browser APIs.
 
 Run against a local or public MARBLE_URL. WebKit is optional; no existing
 browser profile or user storage is touched.
@@ -22,15 +22,18 @@ with sync_playwright() as pw:
             print('WebKit unavailable:', str(exc).splitlines()[0], flush=True)
             continue
         try:
-            for mobile, missing_observer, saved in (
-                (True, False, False), (False, False, False),
-                (True, True, False), (False, True, False),
-                (True, True, True), (False, True, True),
+            for mobile, missing_observer, missing_replace_children, saved in (
+                (True, False, False, False), (False, False, False, False),
+                (True, True, False, False), (False, True, False, False),
+                (True, False, True, False), (False, False, True, False),
+                (True, False, True, True), (False, False, True, True),
             ):
                 context = browser.new_context(viewport={'width': 390 if mobile else 1280, 'height': 844},
                                               is_mobile=mobile, has_touch=mobile)
                 if missing_observer:
                     context.add_init_script('window.ResizeObserver = undefined')
+                if missing_replace_children:
+                    context.add_init_script('Element.prototype.replaceChildren = undefined')
                 if saved:
                     context.add_init_script("""if (location.pathname.includes('/marble-builder/')) {
                       if (localStorage.getItem('marble-builder-stages-v1') === null)
@@ -48,6 +51,8 @@ with sync_playwright() as pw:
                     for selector in ('#freeModeButton', '#stageModeButton'):
                         response = page.goto(URL, wait_until='networkidle')
                         assert response.status == 200, response.status
+                        assert page.evaluate('window.marbleBuilderReady === true'), errors
+                        assert page.locator('#gameStartupError').is_hidden(), errors
                         original = page.evaluate('''() => ({stages:localStorage.getItem('marble-builder-stages-v1'),
                           creations:localStorage.getItem('marble-builder-creations-v1')})''')
                         target = page.locator(selector)
@@ -71,8 +76,20 @@ with sync_playwright() as pw:
                             assert page.evaluate('''() => ({stages:localStorage.getItem('marble-builder-stages-v1'),
                               creations:localStorage.getItem('marble-builder-creations-v1')})''') == original
                         print(name, 'phone' if mobile else 'desktop', 'missing-observer' if missing_observer else 'normal',
+                              'missing-replaceChildren' if missing_replace_children else 'normal-dom',
                               'saved' if saved else 'fresh', selector, 'OK', flush=True)
                     assert not errors, errors
+                finally:
+                    context.close()
+            if name == 'chromium':
+                context = browser.new_context()
+                try:
+                    page = context.new_page()
+                    page.route('**/marble-builder/game.js?v=74', lambda route: route.abort())
+                    page.goto(URL, wait_until='networkidle')
+                    page.locator('#gameStartupError:visible').wait_for(timeout=5000)
+                    assert '파일 불러오기' in page.locator('#gameStartupError').inner_text()
+                    print('missing game script reports startup error', flush=True)
                 finally:
                     context.close()
         finally:
