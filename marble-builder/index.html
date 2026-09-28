@@ -154,7 +154,7 @@
   </main>
   <script src="balls.js?v=4"></script>
   <script src="kinetic.js?v=7"></script>
-  <script src="devices.js?v=9"></script>
+  <script src="devices.js?v=10"></script>
   <script>
     (function () {
       var failureCode = '시작 중단';
@@ -165,6 +165,8 @@
       window.addEventListener('load', function () {
         setTimeout(function () {
           if (window.marbleBuilderReady) return;
+          if (!window.MarbleDevices || typeof window.MarbleDevices.setSwingMagnetContact !== 'function')
+            failureCode = '장치 파일이 준비되지 않음';
           var message = document.getElementById('gameStartupError');
           message.textContent = '게임 준비에 실패했어요 (' + failureCode + '). 저장된 맵은 그대로 있어요. 이 문구를 알려 주세요.';
           message.hidden = false;
@@ -172,6 +174,6 @@
       });
     })();
   </script>
-  <script src="game.js?v=74"></script>
+  <script src="game.js?v=75"></script>
 </body>
 </html>

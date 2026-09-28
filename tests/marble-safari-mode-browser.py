@@ -30,6 +30,9 @@ with sync_playwright() as pw:
             ):
                 context = browser.new_context(viewport={'width': 390 if mobile else 1280, 'height': 844},
                                               is_mobile=mobile, has_touch=mobile)
+                # Old Safari may keep a previous same-version device script. Neither old URL may be used.
+                context.route('**/marble-builder/devices.js?v=9', lambda route: route.abort())
+                context.route('**/marble-builder/game.js?v=74', lambda route: route.abort())
                 if missing_observer:
                     context.add_init_script('window.ResizeObserver = undefined')
                 if missing_replace_children:
@@ -51,6 +54,9 @@ with sync_playwright() as pw:
                     for selector in ('#freeModeButton', '#stageModeButton'):
                         response = page.goto(URL, wait_until='networkidle')
                         assert response.status == 200, response.status
+                        assert page.evaluate('''() => [...document.scripts].some(s => s.src.endsWith('devices.js?v=10'))
+                          && [...document.scripts].some(s => s.src.endsWith('game.js?v=75'))''')
+                        assert page.evaluate('typeof window.MarbleDevices?.setSwingMagnetContact === "function"'), errors
                         assert page.evaluate('window.marbleBuilderReady === true'), errors
                         assert page.locator('#gameStartupError').is_hidden(), errors
                         original = page.evaluate('''() => ({stages:localStorage.getItem('marble-builder-stages-v1'),
@@ -85,11 +91,22 @@ with sync_playwright() as pw:
                 context = browser.new_context()
                 try:
                     page = context.new_page()
-                    page.route('**/marble-builder/game.js?v=74', lambda route: route.abort())
+                    page.route('**/marble-builder/game.js?v=75', lambda route: route.abort())
                     page.goto(URL, wait_until='networkidle')
                     page.locator('#gameStartupError:visible').wait_for(timeout=5000)
                     assert '파일 불러오기' in page.locator('#gameStartupError').inner_text()
                     print('missing game script reports startup error', flush=True)
+                finally:
+                    context.close()
+                context = browser.new_context()
+                try:
+                    page = context.new_page()
+                    page.route('**/marble-builder/devices.js?v=10', lambda route: route.fulfill(
+                        status=200, content_type='text/javascript', body='window.MarbleDevices = {};'))
+                    page.goto(URL, wait_until='networkidle')
+                    page.locator('#gameStartupError:visible').wait_for(timeout=5000)
+                    assert '장치 파일이 준비되지 않음' in page.locator('#gameStartupError').inner_text()
+                    print('old device script reports exact dependency failure', flush=True)
                 finally:
                     context.close()
         finally:

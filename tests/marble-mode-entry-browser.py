@@ -47,7 +47,7 @@ with sync_playwright() as pw:
             else: open_button.click()
             loaded=page.evaluate('window.__marbleBuilderDebug.getState()')
             assert loaded['appMode']=='free' and len(loaded['rods'])==1,loaded['appMode']
-        assert 'game.js?v=74' in before['scripts'],before['scripts']
+        assert 'game.js?v=75' in before['scripts'] and 'devices.js?v=10' in before['scripts'],before['scripts']
         results=[]
         for selector in ('#freeModeButton','#stageModeButton'):
             page.goto(URL,wait_until='networkidle')
