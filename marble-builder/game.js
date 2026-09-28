@@ -458,13 +458,13 @@
 
   function normalizeStage(stage) {
     const normalized = clone(stage);
-    const legacyRods = Array.isArray(normalized.rods) ? normalized.rods.filter(rod => rod.type !== 'movable') : [];
-    normalized.fixedBlocks = (normalized.fixedBlocks || legacyRods.filter(rod => rod.fixed)).filter(rod => rod.type !== 'movable').map(rod => ({
+    const legacyRods = Array.isArray(normalized.rods) ? normalized.rods.filter(rod => rod && typeof rod === 'object' && rod.type !== 'movable') : [];
+    normalized.fixedBlocks = (Array.isArray(normalized.fixedBlocks) ? normalized.fixedBlocks : legacyRods.filter(rod => rod.fixed)).filter(rod => rod && typeof rod === 'object' && rod.type !== 'movable').map(rod => ({
       ...normalizeRodRecord(rod),
       uid: rod.uid || makeRodUid(),
       fixed: true
     }));
-    normalized.supplyBlocks = (normalized.supplyBlocks || legacyRods.filter(rod => !rod.fixed).map((rod, index) => ({
+    normalized.supplyBlocks = (Array.isArray(normalized.supplyBlocks) ? normalized.supplyBlocks : legacyRods.filter(rod => !rod.fixed).map((rod, index) => ({
       supplyId: `${normalized.id}-legacy-${index}`,
       type: rod.type === 'fixed' ? 'wood' : rod.type,
       angle: rod.angle || 0,
@@ -472,7 +472,7 @@
       editorY: rod.y,
       length: rod.length,
       thickness: rod.thickness
-    }))).filter(block => block.type !== 'movable').map((block, index) => ({
+    }))).filter(block => block && typeof block === 'object' && block.type !== 'movable').map((block, index) => ({
       ...normalizeRodRecord(block),
       uid: block.uid || makeRodUid(),
       supplyId: block.supplyId || `${normalized.id}-supply-${index}`
@@ -500,8 +500,10 @@
   }
 
   function loadPersistentState() {
-    stages = readStoredJson(STAGES_STORAGE_KEY, null);
-    if (!Array.isArray(stages)) stages = clone(DEFAULT_STAGES);
+    const storedStages = readStoredJson(STAGES_STORAGE_KEY, null);
+    stages = Array.isArray(storedStages) ? storedStages.filter(stage => stage && typeof stage === 'object'
+      && !Array.isArray(stage) && stage.id && Number.isFinite(Number(stage.number))) : [];
+    if (!stages.length) stages = clone(DEFAULT_STAGES);
     stages = stages.map(normalizeStage);
     unlockedStage = Number(localStorage.getItem(PROGRESS_STORAGE_KEY)) || 1;
     const removedBuiltInStage1 = stages.some(stage => stage.id === 'stage-1');
@@ -523,9 +525,10 @@
     developerEnabled = localStorage.getItem(DEVELOPER_STORAGE_KEY) === 'true';
 
     const storedCreations = readStoredJson(CREATIONS_STORAGE_KEY, []);
-    creations = Array.isArray(storedCreations) ? storedCreations.map(creation => ({
+    creations = Array.isArray(storedCreations) ? storedCreations.filter(creation => creation && typeof creation === 'object'
+      && !Array.isArray(creation)).map(creation => ({
       ...creation,
-      rods: Array.isArray(creation.rods) ? creation.rods.filter(rod => rod.type !== 'movable').map(normalizeRodRecord) : []
+      rods: Array.isArray(creation.rods) ? creation.rods.filter(rod => rod && typeof rod === 'object' && rod.type !== 'movable').map(normalizeRodRecord) : []
     })) : [];
 
   }
