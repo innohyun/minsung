@@ -54,8 +54,9 @@ with sync_playwright() as pw:
                     for selector in ('#freeModeButton', '#stageModeButton'):
                         response = page.goto(URL, wait_until='networkidle')
                         assert response.status == 200, response.status
-                        assert page.evaluate('''() => [...document.scripts].some(s => s.src.endsWith('devices.js?v=10'))
-                          && [...document.scripts].some(s => s.src.endsWith('game.js?v=75'))''')
+                        assert page.evaluate('''() => [...document.scripts].some(s => s.src.endsWith('devices.js?v=13'))
+                          && [...document.scripts].some(s => s.src.endsWith('kinetic.js?v=10'))
+                          && [...document.scripts].some(s => s.src.endsWith('game.js?v=77'))''')
                         assert page.evaluate('typeof window.MarbleDevices?.setSwingMagnetContact === "function"'), errors
                         assert page.evaluate('window.marbleBuilderReady === true'), errors
                         assert page.locator('#gameStartupError').is_hidden(), errors
@@ -91,7 +92,7 @@ with sync_playwright() as pw:
                 context = browser.new_context()
                 try:
                     page = context.new_page()
-                    page.route('**/marble-builder/game.js?v=75', lambda route: route.abort())
+                    page.route('**/marble-builder/game.js?v=77', lambda route: route.abort())
                     page.goto(URL, wait_until='networkidle')
                     page.locator('#gameStartupError:visible').wait_for(timeout=5000)
                     assert '파일 불러오기' in page.locator('#gameStartupError').inner_text()
@@ -101,7 +102,7 @@ with sync_playwright() as pw:
                 context = browser.new_context()
                 try:
                     page = context.new_page()
-                    page.route('**/marble-builder/devices.js?v=10', lambda route: route.fulfill(
+                    page.route('**/marble-builder/devices.js?v=13', lambda route: route.fulfill(
                         status=200, content_type='text/javascript', body='window.MarbleDevices = {};'))
                     page.goto(URL, wait_until='networkidle')
                     page.locator('#gameStartupError:visible').wait_for(timeout=5000)
