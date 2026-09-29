@@ -137,6 +137,15 @@
 
   const RECENT_TOOLS_STORAGE_KEY = 'marble-builder-recent-tools-v1';
   const CREATIONS_STORAGE_KEY = 'marble-builder-creations-v1';
+  const FREE_DRAFT_KEY = 'marble-builder-free-draft-v1';
+  const resumeDraftButton = document.getElementById('resumeDraftButton');
+  const draftStatus = document.getElementById('draftStatus');
+  const sceneTimeline = document.getElementById('sceneTimeline');
+  const sceneScrubber = document.getElementById('sceneScrubber');
+  const sceneTime = document.getElementById('sceneTime');
+  let lastDraftJson = '';
+  let draftWriteFailed = false;
+  let sceneFrames = [], sceneTick = 0, previewFrame = null;
 
   const MAX_RECENT_TOOLS = 8;
   const MAX_UNDO = 50;
@@ -592,6 +601,44 @@
       spawn: { ...spawn },
       toolSettings: clone(toolSettings)
     };
+  }
+
+  function persistFreeDraft() {
+    if (appMode !== 'free' || placement) return;
+    try {
+      const payload = JSON.stringify({version:1,mode:'free',activeCreationId,
+        world:captureWorld(),camera:{...camera}});
+      if (payload === lastDraftJson) return;
+      localStorage.setItem(FREE_DRAFT_KEY,payload);
+      lastDraftJson=payload;
+      draftWriteFailed=false;
+      draftStatus.textContent='자동 저장됨';
+      resumeDraftButton.hidden=false;
+    } catch (_) {
+      if (!draftWriteFailed) setHint('자동 저장에 실패했어요. 저장 공간을 확인하세요.',5000);
+      draftWriteFailed=true;
+      draftStatus.textContent='자동 저장 실패';
+    }
+  }
+  function readFreeDraft() {
+    const draft=readStoredJson(FREE_DRAFT_KEY,null);
+    return draft?.version===1 && draft.mode==='free' && Array.isArray(draft.world?.rods)
+      && Array.isArray(draft.world?.goals) && draft.world.spawn ? draft : null;
+  }
+  function resumeFreeDraft() {
+    const draft=readFreeDraft();
+    if(!draft) return false;
+    currentStage=null;editorStageId=null;
+    clearWorldState();
+    activeCreationId=draft.activeCreationId||null;
+    restoreWorld(draft.world);
+    Object.assign(camera,draft.camera || {x:0,y:0,zoom:MAX_ZOOM});
+    setAppMode('free');
+    freeModeDirty=true;
+    lastDraftJson=JSON.stringify(draft);
+    draftStatus.textContent='자동 저장됨';
+    setHint('작업 중이던 맵을 복원했습니다.');
+    return true;
   }
 
   function updateUndoButton() {
@@ -1410,6 +1457,8 @@
     stageScreen.hidden = mode !== 'stage-list';
     swapStagesButton.hidden = mode !== 'stage-list' || !developerEnabled;
     physicsLabPanel.hidden = mode !== 'physics-lab';
+    sceneTimeline.hidden = mode !== 'free';
+    if(mode === 'free') draftStatus.textContent=draftWriteFailed?'자동 저장 실패':'자동 저장 중';
     saveStageButton.hidden = mode !== 'editor';
     cancelEditorButton.hidden = mode !== 'editor';
     toggleFixedButton.hidden = mode !== 'editor';
@@ -1430,6 +1479,7 @@
   }
 
   function clearWorldState() {
+    clearSceneFrames();
     silenceMotionAudio();
     pendingPunch = null;
     window.MarbleDevices.reset();
@@ -1472,6 +1522,7 @@
   }
 
   function showHome() {
+    if(appMode==='free') persistFreeDraft();
     clearWorldState();
     currentStage = null;
     editorStageId = null;
@@ -1481,13 +1532,14 @@
     physicsLabButton.hidden = !developerEnabled;
     stageProgressText.textContent = `${unlockedStage}스테이지까지 도전 가능`;
     renderCreations();
+    resumeDraftButton.hidden=!readFreeDraft();
     setAppMode('home');
   }
 
   function requestHome() {
-    if (appMode === 'free' && freeModeDirty) {
-      unsavedDialog.showModal();
-      return;
+    if (appMode === 'free') {
+      persistFreeDraft();
+      freeModeDirty=false;
     }
     showHome();
   }
@@ -1535,6 +1587,7 @@
   }
 
   function showStageList() {
+    if(appMode==='free') persistFreeDraft();
     clearWorldState();
     renderStageList();
     setAppMode('stage-list');
@@ -1595,6 +1648,7 @@
   }
 
   function startFreeMode() {
+    if(readFreeDraft()) { resumeFreeDraft(); return; }
     currentStage = null;
     editorStageId = null;
     activeCreationId = null;
@@ -1747,7 +1801,9 @@
     if (canvas.width !== bitmapWidth) canvas.width = bitmapWidth;
     if (canvas.height !== bitmapHeight) canvas.height = bitmapHeight;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    view.dockTop = toolDock.getBoundingClientRect().top - rect.top;
+    const dockRect = toolDock.getBoundingClientRect();
+    view.dockTop = dockRect.top - rect.top;
+    sceneTimeline.style.setProperty('--dock-height',`${dockRect.height}px`);
     const controlsBottom = appMode === 'physics-lab' ? physicsLabPanel.getBoundingClientRect().bottom : topPanel.getBoundingClientRect().bottom;
     view.playTop = controlsBottom - rect.top;
 
@@ -1804,6 +1860,9 @@
     }
 
     const queued = ['free', 'stage'].includes(appMode) && ballQueue.length > 0;
+    if(appMode==='free' && (!queued || !activeBalls.length)) {
+      clearSceneFrames();paused=false;pauseButton.textContent='멈춤';pauseButton.setAttribute('aria-pressed','false');
+    }
     const retrieval = pendingRetrievals.length > 0;
     if (queued && queueIndex >= ballQueue.length && !retrieval) { setHint('정한 순서의 공을 모두 발사했어요. 공 설정에서 다시 정해 주세요.'); return false; }
     const kind = retrieval ? pendingRetrievals.shift() : queued ? ballQueue[queueIndex] : selectedBallType;
@@ -2132,6 +2191,7 @@
   }
 
   function resetGame() {
+    clearSceneFrames();
     silenceMotionAudio();
     pendingPunch = null;
     window.MarbleDevices.reset();
@@ -2535,6 +2595,7 @@
   }
 
   function beginCanvasInteraction(event) {
+    if(previewFrame) { setHint('장면 보기를 끝내려면 계속 버튼을 누르세요.'); return; }
     if (placement || event.button > 0) return;
     const screen = screenPoint(event);
     if (pendingPunch) {
@@ -4047,6 +4108,7 @@
       }
       if (won) break;
     }
+    window.MarbleKinetics.resolveContacts(rods, PIXELS_PER_METER);
     updateMagnetWhoosh();
     if (!won && activeBalls.length > 1) {
       for (let i = 0; i < activeBalls.length; i++) {
@@ -4780,6 +4842,37 @@
     ctx.restore();
   }
 
+  function clearSceneFrames() {
+    sceneFrames=[];sceneTick=0;previewFrame=null;
+    sceneScrubber.value='0';sceneScrubber.max='0';sceneTime.textContent='0:00';
+  }
+  function recordSceneFrame() {
+    if(appMode!=='free' || !activeBalls.length || paused || ++sceneTick%3) return;
+    sceneFrames.push({time:sceneTick/60,rods:rods.map(rod=>({id:rod.id,x:rod.x,y:rod.y,
+      angle:rod.angle,omega:rod.omega,pathT:rod.pathT,pathSpeed:rod.pathSpeed,hp:rod.hp})),
+      balls:clone(activeBalls),camera:{...camera}});
+    if(sceneFrames.length>1200) sceneFrames.shift();
+    sceneScrubber.max=String(sceneFrames.length-1);
+    sceneScrubber.value=sceneScrubber.max;
+    sceneTime.textContent=`${Math.floor(sceneTick/3600)}:${String(Math.floor(sceneTick/60)%60).padStart(2,'0')}`;
+  }
+  function renderScenePreview(snapshot) {
+    const prior=rods.map(rod=>({x:rod.x,y:rod.y,angle:rod.angle,omega:rod.omega,
+      pathT:rod.pathT,pathSpeed:rod.pathSpeed,hp:rod.hp}));
+    const originalBalls=[...activeBalls],originalBall=ball,originalCamera={...camera};
+    try {
+      snapshot.rods.forEach((state,index)=>{if(rods[index]?.id===state.id) Object.assign(rods[index],state)});
+      activeBalls.splice(0,activeBalls.length,...snapshot.balls);
+      ball=activeBalls[activeBalls.length-1]||null;
+      Object.assign(camera,snapshot.camera);
+      render();
+    } finally {
+      rods.forEach((rod,index)=>Object.assign(rod,prior[index]));
+      activeBalls.splice(0,activeBalls.length,...originalBalls);
+      ball=originalBall;
+      Object.assign(camera,originalCamera);
+    }
+  }
   function frame(time) {
     const elapsed = Math.min((time - lastTime) / 1000, 0.05);
     lastTime = time;
@@ -4793,13 +4886,14 @@
       accumulator -= FIXED_STEP;
     }
     updateParticles(elapsed);
-    if (followBall && ball && (appMode === 'free' || appMode === 'stage' || appMode === 'editor' || appMode === 'physics-lab')) {
+    if (!previewFrame && followBall && ball && (appMode === 'free' || appMode === 'stage' || appMode === 'editor' || appMode === 'physics-lab')) {
       const targetX = ball.x - view.width / (2 * camera.zoom);
       const targetY = ball.y - view.height / (2 * camera.zoom);
       camera.x += (targetX - camera.x) * 0.14;
       camera.y += (targetY - camera.y) * 0.14;
     }
-    render();
+    recordSceneFrame();
+    if(previewFrame) renderScenePreview(previewFrame); else render();
     requestAnimationFrame(frame);
   }
 
@@ -4888,8 +4982,45 @@
     camera.y = spawn.y - view.height / (2 * camera.zoom);
     render();
   });
+  resumeDraftButton.addEventListener('click',resumeFreeDraft);
+  sceneScrubber.addEventListener('input',()=>{
+    if(appMode!=='free' || !sceneFrames.length) return;
+    paused=true;
+    pauseButton.textContent='계속';pauseButton.setAttribute('aria-pressed','true');
+    silenceMotionAudio();
+    previewFrame=sceneFrames[Number(sceneScrubber.value)] || sceneFrames[0];
+    const seconds=Math.floor(previewFrame.time);
+    sceneTime.textContent=`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;
+  });
+  let sceneHold=null;
+  sceneScrubber.addEventListener('pointerdown',event=>{
+    event.preventDefault();
+    sceneScrubber.setPointerCapture(event.pointerId);
+    sceneHold={id:event.pointerId,ready:false};
+    sceneHold.timer=setTimeout(()=>{if(sceneHold?.id===event.pointerId) sceneHold.ready=true;},220);
+  });
+  sceneScrubber.addEventListener('pointermove',event=>{
+    if(!sceneHold?.ready || sceneHold.id!==event.pointerId) return;
+    const box=sceneScrubber.getBoundingClientRect();
+    const ratio=Math.max(0,Math.min(1,(event.clientX-box.left)/box.width));
+    const value=Math.round(ratio*Number(sceneScrubber.max));
+    if(String(value)!==sceneScrubber.value) {
+      sceneScrubber.value=String(value);
+      sceneScrubber.dispatchEvent(new Event('input',{bubbles:true}));
+    }
+  });
+  const finishSceneHold=event=>{
+    if(sceneHold?.id!==event.pointerId) return;
+    clearTimeout(sceneHold.timer);sceneHold=null;
+  };
+  sceneScrubber.addEventListener('pointerup',finishSceneHold);
+  sceneScrubber.addEventListener('pointercancel',finishSceneHold);
+  setInterval(persistFreeDraft,350);
+  window.addEventListener('pagehide',persistFreeDraft);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden') persistFreeDraft();});
   resetButton.addEventListener('click', resetGame);
   pauseButton.addEventListener('click', () => {
+    if(previewFrame) { previewFrame=null; sceneScrubber.value=sceneScrubber.max; }
     paused = !paused;
     pauseButton.textContent = paused ? '계속' : '멈춤';
     pauseButton.setAttribute('aria-pressed',String(paused));
@@ -5284,6 +5415,8 @@
     redoLastAction,
     loadCreation,
     saveCreation,
+    getSceneTimelineState: () => ({frames:sceneFrames.length,previewBall:previewFrame?.balls?.[0]
+      ? {x:previewFrame.balls[0].x,y:previewFrame.balls[0].y}:null,liveBall:ball?{x:ball.x,y:ball.y}:null}),
     physicsStep,
     reboundSpeed,
     playImpactSound,
@@ -5337,6 +5470,7 @@
   resize();
   updateDeleteButton();
   showHome();
+  if(readFreeDraft()) resumeFreeDraft();
   requestAnimationFrame(frame);
   window.marbleBuilderReady = true;
 })();

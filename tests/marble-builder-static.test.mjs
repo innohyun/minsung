@@ -11,8 +11,9 @@ const assetManifest = JSON.parse(readFileSync(new URL('../assets/marble-builder/
 
 test('marble builder uses the current cache-busted game script', () => {
     assert.match(html, /balls\.js\?v=4/);
-    assert.match(html, /game\.js\?v=78/);
-    assert.match(html, /styles\.css\?v=30/);
+    assert.match(html, /game\.js\?v=81/);
+    assert.match(html, /kinetic\.js\?v=17/);
+    assert.match(html, /styles\.css\?v=37/);
     assert.match(html, /rel="icon" href="data:,"/);
 });
 

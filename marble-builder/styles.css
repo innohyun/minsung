@@ -102,6 +102,14 @@ button { font: inherit; }
 .physics-lab-actions #physicsLabRespawnButton { border-color: transparent; background: var(--blue); color: #fff; }
 body.is-physics-lab .hint { top: 187px; }
 
+.scene-timeline { position:absolute; left:50%; bottom:calc(max(12px, env(safe-area-inset-bottom)) + var(--dock-height, 130px) + 8px); transform:translateX(-50%); width:min(940px,calc(100% - 20px)); min-height:42px; z-index:9; display:flex; align-items:center; gap:10px; padding:5px 12px; border-radius:13px; background:rgba(255,250,250,.96); color:#73313a; font-size:.75rem; font-weight:800; box-shadow:0 3px 15px #17324d22; }
+.scene-timeline[hidden] { display:none; }
+.scene-timeline input { flex:1; min-width:40px; height:40px; accent-color:#e12b37; touch-action:none; cursor:grab; }
+.scene-timeline input:active { cursor:grabbing; }
+.scene-timeline output { font-variant-numeric:tabular-nums; }
+.scene-timeline #draftStatus { color:#31627c; font-size:.68rem; white-space:nowrap; }
+@media(max-width:720px) { .scene-timeline { gap:6px; padding:3px 9px; } .scene-timeline #draftStatus { font-size:.59rem; } }
+
 .tool-dock {
   position: absolute;
   left: 50%; bottom: max(12px, env(safe-area-inset-bottom));

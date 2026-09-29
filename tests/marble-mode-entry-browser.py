@@ -47,10 +47,12 @@ with sync_playwright() as pw:
             else: open_button.click()
             loaded=page.evaluate('window.__marbleBuilderDebug.getState()')
             assert loaded['appMode']=='free' and len(loaded['rods'])==1,loaded['appMode']
-        assert 'game.js?v=78' in before['scripts'] and 'devices.js?v=15' in before['scripts'] and 'kinetic.js?v=14' in before['scripts'],before['scripts']
+        assert 'game.js?v=81' in before['scripts'] and 'devices.js?v=15' in before['scripts'] and 'kinetic.js?v=17' in before['scripts'],before['scripts']
         results=[]
         for selector in ('#freeModeButton','#stageModeButton'):
             page.goto(URL,wait_until='networkidle')
+            if page.evaluate("window.__marbleBuilderDebug.getState().appMode")=='free':
+                page.locator('#homeButton').click()
             if mobile:
                 page.locator(selector).tap(timeout=5000)
             else:
@@ -79,6 +81,8 @@ with sync_playwright() as pw:
                 assert raw['stages']==before['savedStages'] and raw['creations']==before['savedCreations'],raw
         if damaged=='saved':
             page.goto(URL,wait_until='networkidle')
+            if page.evaluate("window.__marbleBuilderDebug.getState().appMode")=='free':
+                page.locator('#homeButton').click()
             page.locator('.creation-card button').first.click()
             page.locator('#saveMapButton').click()
             page.locator('#saveCreationForm button[type=submit]').click()

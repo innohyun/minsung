@@ -55,13 +55,15 @@ with sync_playwright() as pw:
                         response = page.goto(URL, wait_until='networkidle')
                         assert response.status == 200, response.status
                         assert page.evaluate('''() => [...document.scripts].some(s => s.src.endsWith('devices.js?v=15'))
-                          && [...document.scripts].some(s => s.src.endsWith('kinetic.js?v=14'))
-                          && [...document.scripts].some(s => s.src.endsWith('game.js?v=78'))''')
+                          && [...document.scripts].some(s => s.src.endsWith('kinetic.js?v=17'))
+                          && [...document.scripts].some(s => s.src.endsWith('game.js?v=81'))''')
                         assert page.evaluate('typeof window.MarbleDevices?.setSwingMagnetContact === "function"'), errors
                         assert page.evaluate('window.marbleBuilderReady === true'), errors
                         assert page.locator('#gameStartupError').is_hidden(), errors
                         original = page.evaluate('''() => ({stages:localStorage.getItem('marble-builder-stages-v1'),
                           creations:localStorage.getItem('marble-builder-creations-v1')})''')
+                        if page.evaluate("window.__marbleBuilderDebug.getState().appMode") == 'free':
+                            page.locator('#homeButton').click()
                         target = page.locator(selector)
                         if mobile:
                             target.tap(timeout=5000)
@@ -92,7 +94,7 @@ with sync_playwright() as pw:
                 context = browser.new_context()
                 try:
                     page = context.new_page()
-                    page.route('**/marble-builder/game.js?v=78', lambda route: route.abort())
+                    page.route('**/marble-builder/game.js?v=81', lambda route: route.abort())
                     page.goto(URL, wait_until='networkidle')
                     page.locator('#gameStartupError:visible').wait_for(timeout=5000)
                     assert '파일 불러오기' in page.locator('#gameStartupError').inner_text()

@@ -73,14 +73,16 @@ window.MarbleKinetics = (() => {
     const c = Math.cos(r.angle), s = Math.sin(r.angle), w = r.length/2, h = r.thickness/2;
     return [[-w,-h],[w,-h],[w,h],[-w,h]].map(([x,y]) => ({x:r.x+c*x-s*y,y:r.y+s*x+c*y}));
   }
-  function contact(a,b) {
+  function contact(a,b,skin=0) {
     const ac = corners(a), bc = corners(b);
     let depth = Infinity, nx = 0, ny = 0;
     for (const theta of [a.angle,a.angle+Math.PI/2,b.angle,b.angle+Math.PI/2]) {
       const ux = Math.cos(theta), uy = Math.sin(theta);
       const aa = ac.map(p => p.x*ux+p.y*uy), bb = bc.map(p => p.x*ux+p.y*uy);
       const overlap = Math.min(Math.max(...aa),Math.max(...bb))-Math.max(Math.min(...aa),Math.min(...bb));
-      if (overlap <= 0) return null;
+      // A small contact skin is for moving bodies only; editor placement
+      // still permits exactly adjacent rectangles and rejects real overlap.
+      if (skin ? overlap < -skin : overlap <= 0) return null;
       if (overlap < depth) { const sign = (b.x-a.x)*ux+(b.y-a.y)*uy >= 0 ? 1 : -1;
         depth = overlap; nx = ux*sign; ny = uy*sign; }
     }
@@ -114,7 +116,7 @@ window.MarbleKinetics = (() => {
     return {x:rod.x+c*px-s*py,y:rod.y+s*px+c*py,
       nx:c*nx-s*ny,ny:s*nx+c*ny,depth:magnet.length/2-distance};
   }
-  function collidePair(a,b,scale,hit=contact(a,b)) {
+  function collidePair(a,b,scale,hit=contact(a,b,.05)) {
     if(!hit) return null;
     const {x,y,nx,ny}=hit;
     const constrainedAxis=(rod,sign)=>{
@@ -200,7 +202,7 @@ window.MarbleKinetics = (() => {
       // friction. Locate the first touch rather than undoing a whole substep
       // after every overlap (which looks like stick-slip or a small teleport).
       for(let i=0;i<dynamic.length;i++) for(let j=i+1;j<dynamic.length;j++) {
-        const a=dynamic[i],b=dynamic[j],hit=contact(a,b);
+        const a=dynamic[i],b=dynamic[j],hit=contact(a,b,.05);
         if(!hit) continue;
         const endA={angle:a.angle,pathT:a.pathT},endB={angle:b.angle,pathT:b.pathT};
         const at=t=>{
@@ -211,11 +213,11 @@ window.MarbleKinetics = (() => {
             position(rod);
           }
         };
-        const resting=(()=>{at(0);const hit=contact(a,b);at(1);return hit;})();
+        const resting=(()=>{at(0);const hit=contact(a,b,.05);at(1);return hit;})();
         if(resting) {
           // Resolve the current velocity without rewinding the bodies to the
           // same original overlap on every frame; that discarded all motion.
-          const current=contact(a,b);
+          const current=contact(a,b,.05);
           const speed=collidePair(a,b,scale,current||resting);
           if(current && current.depth>resting.depth+.01) {
             // Remove only the NEW penetration along the actual bearing/rail
@@ -243,13 +245,31 @@ window.MarbleKinetics = (() => {
         for(let n=0;n<12;n++) {
           const mid=(lo+hi)/2;
           at(mid);
-          if(contact(a,b)) hi=mid; else lo=mid;
+          if(contact(a,b,.05)) hi=mid; else lo=mid;
         }
         at(hi);
-        const speed=collidePair(a,b,scale,contact(a,b));
+        const speed=collidePair(a,b,scale,contact(a,b,.05));
         at(lo);
         if(speed>.12) onImpact?.(a,b,speed);
       }
+    }
+  }
+  function resolveContacts(rods,scale) {
+    // Ball loading happens after advance(). Propagate its impulse through the
+    // whole touching chain in the same physics tick; never add tangent friction.
+    const dynamic=rods.filter(r=>r.type==='rotor'||r.type==='zipline');
+    for(let pass=0;pass<Math.min(6,dynamic.length+1);pass++) {
+      let changed=false;
+      for(let i=0;i<dynamic.length;i++) for(let j=i+1;j<dynamic.length;j++) {
+        const a=dynamic[i],b=dynamic[j],hit=contact(a,b,.05);
+        if(!hit) continue;
+        const beforeA=a.type==='rotor'?a.omega:a.pathSpeed;
+        const beforeB=b.type==='rotor'?b.omega:b.pathSpeed;
+        collidePair(a,b,scale,hit);
+        if(beforeA!==(a.type==='rotor'?a.omega:a.pathSpeed)
+          ||beforeB!==(b.type==='rotor'?b.omega:b.pathSpeed)) changed=true;
+      }
+      if(!changed) break;
     }
   }
   function collideBall(rod,ball,scale,onImpact,options={}) {
@@ -300,5 +320,5 @@ window.MarbleKinetics = (() => {
     }
     return true;
   }
-  return { curve,position,advance,collideBall,contact,applyImpulse };
+  return { curve,position,advance,collideBall,contact,applyImpulse,resolveContacts };
 })();
