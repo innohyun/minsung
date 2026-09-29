@@ -55,7 +55,7 @@ with sync_playwright() as pw:
                         response = page.goto(URL, wait_until='networkidle')
                         assert response.status == 200, response.status
                         assert page.evaluate('''() => [...document.scripts].some(s => s.src.endsWith('devices.js?v=15'))
-                          && [...document.scripts].some(s => s.src.endsWith('kinetic.js?v=20'))
+                          && [...document.scripts].some(s => s.src.endsWith('kinetic.js?v=21'))
                           && [...document.scripts].some(s => s.src.endsWith('game.js?v=84'))''')
                         assert page.evaluate('typeof window.MarbleDevices?.setSwingMagnetContact === "function"'), errors
                         assert page.evaluate('window.marbleBuilderReady === true'), errors

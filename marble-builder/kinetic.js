@@ -229,6 +229,51 @@ window.MarbleKinetics = (() => {
         at(hi);
         collideRotors(a,b,scale,contact(a,b,.05));
         at(lo);
+        // Do not discard the remainder of the step after transferring the
+        // impulse. Repeated first-touch rollbacks stored angular speed while
+        // the second rotor's visible angle stayed frozen under pressure.
+        const left=step*(1-lo);
+        const touchA=a.angle,touchB=b.angle;
+        const restingAfter=contact(a,b,.005);
+        a.angle+=a.omega*left;b.angle+=b.omega*left;
+        position(a);position(b);
+        const newHit=contact(a,b,.005);
+        if(newHit && newHit.depth>(restingAfter?.depth||0)+.005) {
+          const endAfterA=a.angle,endAfterB=b.angle;
+          let low=0,high=1;
+          for(let n=0;n<12;n++) {
+            const mid=(low+high)/2;
+            a.angle=touchA+(endAfterA-touchA)*mid;
+            b.angle=touchB+(endAfterB-touchB)*mid;
+            position(a);position(b);
+            const overlap=contact(a,b,.005);
+            if(overlap && overlap.depth>(restingAfter?.depth||0)+.005)high=mid;
+            else low=mid;
+          }
+          a.angle=touchA+(endAfterA-touchA)*low;
+          b.angle=touchB+(endAfterB-touchB)*low;
+          position(a);position(b);
+        }
+        // Pair motion must not bypass the wall constraint that ran earlier
+        // in this same substep. Limit only the new pair-contact remainder.
+        for(const [rod,touch] of [[a,touchA],[b,touchB]]) for(const wall of solids) {
+          const end=rod.angle;
+          rod.angle=touch;position(rod);
+          const before=contact(rod,wall,.005);
+          rod.angle=end;position(rod);
+          const after=contact(rod,wall,.005);
+          if(!after || after.depth<=(before?.depth||0)+.005) continue;
+          let low=0,high=1;
+          for(let n=0;n<12;n++) {
+            const mid=(low+high)/2;
+            rod.angle=touch+(end-touch)*mid;position(rod);
+            const overlap=contact(rod,wall,.005);
+            if(overlap && overlap.depth>(before?.depth||0)+.005) high=mid;
+            else low=mid;
+          }
+          rod.angle=touch+(end-touch)*low;position(rod);
+          rod.omega=0;
+        }
       }
     }
   }

@@ -1,4 +1,4 @@
-"""Rotor-to-rotor pressure uses the pre-rollback pair response, only for rotor pairs."""
+"""Sustained rotor-pair pressure must move both bodies, unlike old rollback."""
 import os
 import subprocess
 from pathlib import Path
@@ -38,15 +38,55 @@ with sync_playwright() as pw:
             }
             return {first,maxDepth,maxStep,angle:b.angle,samples};
           };
+          const sustained=k=>{
+            const a={type:'rotor',x:300,y:300,pivotX:300,pivotY:300,
+              angle:0,omega:1.5,length:160,thickness:20};
+            const b={type:'rotor',x:455,y:340,pivotX:455,pivotY:340,
+              angle:.4,omega:0,length:160,thickness:20};
+            const ball={x:350,y:273,radius:18,mass:.18,vx:0,vy:5,omega:0};
+            let maxDepth=0;
+            const samples=[];
+            for(let i=0;i<100;i++) {
+              k.advance([a,b],1/120,100);
+              ball.vy+=19.35/120;
+              ball.x+=ball.vx*100/120;ball.y+=ball.vy*100/120;
+              k.collideBall(a,ball,100,null,{friction:.2,gravity:19.35,dt:1/120});
+              if(k.resolveRotorContacts) k.resolveRotorContacts([a,b],100);
+              else if(k.resolveContacts) k.resolveContacts([a,b],100);
+              maxDepth=Math.max(maxDepth,k.contact(a,b)?.depth||0);
+              if(i%20===0)samples.push([i,+b.angle.toFixed(4),+b.omega.toFixed(2)]);
+            }
+            return {angle:b.angle,omega:b.omega,maxDepth,samples};
+          };
+          const wallPair=k=>{
+            const a={type:'rotor',x:300,y:300,pivotX:300,pivotY:300,
+              angle:0,omega:2,length:160,thickness:20};
+            const b={type:'rotor',x:410,y:370,pivotX:410,pivotY:370,
+              angle:.5,omega:0,length:160,thickness:20};
+            const wall={type:'wood',x:380,y:395,length:60,thickness:20,angle:0};
+            let maxDepth=0;
+            for(let i=0;i<100;i++){
+              k.advance([a,b,wall],1/120,100);
+              k.resolveRotorContacts([a,b,wall],100);
+              maxDepth=Math.max(maxDepth,k.contact(a,wall)?.depth||0,
+                k.contact(b,wall)?.depth||0);
+            }
+            return {angle:b.angle,maxDepth};
+          };
           return {current:simulate(window.pairCurrent),
             previous:simulate(window.pairBeforeRollback),
-            interim:simulate(window.pairInterim)};
+            interim:simulate(window.pairInterim),
+            sustained:{current:sustained(window.pairCurrent),previous:sustained(window.pairBeforeRollback)},
+            wall:wallPair(window.pairCurrent)};
         }''')
         print(width,trace,flush=True)
         assert trace['current']['first']>=0 and trace['current']['maxDepth']<.3,trace
         assert .5-trace['current']['angle']>.4 and trace['current']['maxStep']<.03,trace
-        assert trace['current']['samples']==trace['previous']['samples'],trace
-        assert abs(trace['current']['angle']-trace['previous']['angle'])<1e-8,trace
+        assert abs(trace['current']['angle']-trace['previous']['angle'])<.03,trace
+        assert trace['sustained']['current']['angle']<-.3,trace
+        assert trace['sustained']['current']['maxDepth']<.1,trace
+        assert trace['sustained']['previous']['angle']>.39,trace
+        assert trace['wall']['maxDepth']<.1 and trace['wall']['angle']<.2,trace
         page.evaluate('window.MarbleKinetics=window.pairCurrent')
         page.locator('#freeModeButton').click()
         integrated=page.evaluate('''() => {
@@ -62,4 +102,30 @@ with sync_playwright() as pw:
         assert .5-integrated['angle']>.4,integrated
         assert not errors,errors
         page.close()
+        live=browser.new_page(viewport={'width':width,'height':844})
+        live_errors=[]
+        live.on('pageerror',lambda error:live_errors.append(str(error)))
+        live.goto(url,wait_until='networkidle')
+        live.locator('#freeModeButton').click()
+        pressed=live.evaluate('''() => {
+          const d=window.__marbleBuilderDebug,k=window.MarbleKinetics;
+          const a=d.addRod('rotor',300,300,{length:160,thickness:20});
+          const b=d.addRod('rotor',455,340,{length:160,thickness:20,angle:.4});
+          if(!a||!b)return {placed:false};
+          a.omega=1.5;
+          d.setBallState({x:350,y:273,vx:0,vy:5});
+          let maxDepth=0,ballWhileMoving=false;
+          for(let i=0;i<100;i++) {
+            d.stepPhysics();
+            maxDepth=Math.max(maxDepth,k.contact(a,b)?.depth||0);
+            if(i<70 && b.angle<.3 && !!d.getState().ball) ballWhileMoving=true;
+          }
+          return {placed:true,angle:b.angle,maxDepth,ballWhileMoving,
+            mode:d.getState().appMode};
+        }''')
+        print(width,'free-mode ball pressure',pressed,flush=True)
+        assert pressed['placed'] and pressed['mode']=='free' and pressed['ballWhileMoving'],pressed
+        assert pressed['angle']<-.3 and pressed['maxDepth']<.1,pressed
+        assert not live_errors,live_errors
+        live.close()
     browser.close()
