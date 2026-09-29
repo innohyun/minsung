@@ -139,7 +139,9 @@ window.MarbleKinetics = (() => {
     const travel=Math.max(...dynamic.map(r=>r.type==='rotor'
       ? Math.abs(r.omega||0)*(r.length/2+Math.abs(r.pivotOffset||0))*dt
       : Math.abs(r.pathSpeed||0)*dt));
-    const count=Math.max(1,Math.min(96,Math.ceil(travel/2)));
+    const rotorOnly=!solids.length && dynamic.every(r=>r.type==='rotor');
+    const count=Math.max(1,Math.min(rotorOnly?64:96,
+      Math.ceil(travel/(rotorOnly?3:2))));
     const step=dt/count;
     for(let sub=0;sub<count;sub++) {
       const previous=new Map();
@@ -191,24 +193,42 @@ window.MarbleKinetics = (() => {
       for(let i=0;i<dynamic.length;i++) for(let j=i+1;j<dynamic.length;j++) {
         const a=dynamic[i],b=dynamic[j];
         if(a.type!=='rotor'||b.type!=='rotor') {collidePair(a,b,scale);continue;}
-        const hit=contact(a,b,.005);
+        const hit=contact(a,b,.05);
         if(!hit) continue;
         const startA=previous.get(a),startB=previous.get(b);
         const endA=a.angle,endB=b.angle;
         const at=t=>{a.angle=startA+(endA-startA)*t;
           b.angle=startB+(endB-startB)*t;position(a);position(b);};
-        at(0);const before=contact(a,b,.005);at(1);
-        if(!before || hit.depth>before.depth+.005) {
-          const allowed=before?before.depth+.005:0;
-          let lo=0,hi=1;
-          for(let n=0;n<16;n++) {
-            const mid=(lo+hi)/2;at(mid);
-            const test=contact(a,b,.005);
-            if(test && test.depth>allowed) hi=mid;else lo=mid;
+        at(0);const resting=contact(a,b,.05);at(1);
+        if(resting) {
+          const current=contact(a,b,.05);
+          collideRotors(a,b,scale,current||resting);
+          if(current && current.depth>resting.depth+.01) {
+            // Restore the pre-rollback rotor-pair solver: correct only newly
+            // added overlap in the two bearing coordinates, not the whole step.
+            const da=axis(a,current.x,current.y,current.nx,current.ny,scale);
+            const db=axis(b,current.x,current.y,current.nx,current.ny,scale);
+            const ja=da.jac*scale,jb=db.jac*scale;
+            const wa=1/da.inertia,wb=1/db.inertia;
+            const denom=ja*ja*wa+jb*jb*wb;
+            if(denom>1e-8) {
+              const delta=Math.min(current.depth-resting.depth,2);
+              a.angle-=clamp(delta*ja*wa/denom,-.025,.025);
+              b.angle+=clamp(delta*jb*wb/denom,-.025,.025);
+              position(a);position(b);
+            }
           }
-          at(lo);
+          continue;
         }
-        collideRotors(a,b,scale,hit);
+        at(0);
+        let lo=0,hi=1;
+        for(let n=0;n<12;n++) {
+          const mid=(lo+hi)/2;at(mid);
+          if(contact(a,b,.05)) hi=mid;else lo=mid;
+        }
+        at(hi);
+        collideRotors(a,b,scale,contact(a,b,.05));
+        at(lo);
       }
     }
   }
@@ -234,6 +254,22 @@ window.MarbleKinetics = (() => {
     }
     for (let i = 0; i < dynamic.length; i++) for (let j = i+1; j < dynamic.length; j++) {
       collidePair(dynamic[i],dynamic[j],scale);
+    }
+  }
+  function resolveRotorContacts(rods,scale) {
+    // Pre-rollback same-tick impulse exchange, restricted to rotor pairs.
+    // The original rotor-to-zipline path is intentionally unchanged.
+    const rotors=rods.filter(r=>r.type==='rotor');
+    for(let pass=0;pass<Math.min(6,rotors.length+1);pass++) {
+      let changed=false;
+      for(let i=0;i<rotors.length;i++) for(let j=i+1;j<rotors.length;j++) {
+        const a=rotors[i],b=rotors[j],hit=contact(a,b,.05);
+        if(!hit) continue;
+        const beforeA=a.omega,beforeB=b.omega;
+        collideRotors(a,b,scale,hit);
+        if(a.omega!==beforeA||b.omega!==beforeB) changed=true;
+      }
+      if(!changed) break;
     }
   }
   function collideBall(rod,ball,scale,onImpact,options={}) {
@@ -284,5 +320,5 @@ window.MarbleKinetics = (() => {
     }
     return true;
   }
-  return { curve,position,advance,collideBall,contact,applyImpulse };
+  return { curve,position,advance,collideBall,contact,applyImpulse,resolveRotorContacts };
 })();
