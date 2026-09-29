@@ -4110,7 +4110,6 @@
       }
       if (won) break;
     }
-    window.MarbleKinetics.resolveContacts(rods, PIXELS_PER_METER);
     updateMagnetWhoosh();
     if (!won && activeBalls.length > 1) {
       for (let i = 0; i < activeBalls.length; i++) {
