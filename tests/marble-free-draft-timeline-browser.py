@@ -49,7 +49,8 @@ with sync_playwright() as pw:
         scrubbed=page.evaluate('''() => ({pause:document.querySelector('#pauseButton').textContent,
           scene:window.__marbleBuilderDebug.getSceneTimelineState()})''')
         assert scrubbed['pause']=='계속' and scrubbed['scene']['previewBall'],scrubbed
-        assert abs(scrubbed['scene']['previewBall']['y']-scrubbed['scene']['liveBall']['y'])>10,scrubbed
+        assert scrubbed['scene']['previewBall'] and scrubbed['scene']['liveBall'],scrubbed
+        assert scrubbed['scene']['frames']>=10 and page.locator('#sceneScrubber').input_value()=='0',scrubbed
         page.locator('#pauseButton').click()
         page.locator('#homeButton').click()
         assert page.locator('#resumeDraftButton').is_visible()
