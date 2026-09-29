@@ -56,6 +56,18 @@ with sync_playwright() as pw:
         assert page.locator('#resumeDraftButton').is_visible()
         page.locator('#resumeDraftButton').click()
         assert page.evaluate('window.__marbleBuilderDebug.getState().appMode')=='free'
+        page.evaluate('''() => {
+          window._originalSetItem=Storage.prototype.setItem;
+          Storage.prototype.setItem=function(key,value){
+            if(key==='marble-builder-free-draft-v1') throw new DOMException('Storage full','QuotaExceededError');
+            return window._originalSetItem.call(this,key,value);
+          };
+          window.__marbleBuilderDebug.addRod('wood',500,340,{length:70,thickness:20});
+        }''')
+        page.locator('#homeButton').click()
+        assert page.evaluate("window.__marbleBuilderDebug.getState().appMode")=='free'
+        assert page.evaluate("window.__marbleBuilderDebug.getState().rodCount")==2
+        page.evaluate('() => { Storage.prototype.setItem=window._originalSetItem; }')
         page.locator('#homeButton').click()
         page.locator('#stageModeButton').click()
         page.evaluate("window.__marbleBuilderDebug.startEditor(null,{number:7})")

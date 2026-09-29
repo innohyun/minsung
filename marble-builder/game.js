@@ -604,20 +604,22 @@
   }
 
   function persistFreeDraft() {
-    if (appMode !== 'free' || placement) return;
+    if (appMode !== 'free' || placement) return false;
     try {
       const payload = JSON.stringify({version:1,mode:'free',activeCreationId,
         world:captureWorld(),camera:{...camera}});
-      if (payload === lastDraftJson) return;
+      if (payload === lastDraftJson) return true;
       localStorage.setItem(FREE_DRAFT_KEY,payload);
       lastDraftJson=payload;
       draftWriteFailed=false;
       draftStatus.textContent='자동 저장됨';
       resumeDraftButton.hidden=false;
+      return true;
     } catch (_) {
       if (!draftWriteFailed) setHint('자동 저장에 실패했어요. 저장 공간을 확인하세요.',5000);
       draftWriteFailed=true;
       draftStatus.textContent='자동 저장 실패';
+      return false;
     }
   }
   function readFreeDraft() {
@@ -1538,7 +1540,7 @@
 
   function requestHome() {
     if (appMode === 'free') {
-      persistFreeDraft();
+      if(!persistFreeDraft()) return;
       freeModeDirty=false;
     }
     showHome();
