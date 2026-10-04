@@ -111,7 +111,7 @@ Workers/D1/DNS는 변경하지 않습니다. Node/SQLite/WebSocket 백엔드는 
 배포 후 반환된 URL과 프로덕션 URL에서 HTTP 200, 기존 첫 화면 해시, 게임 실행·저장 복원·
 소스 다운로드, 대시보드 링크를 확인합니다. 다른 Cloudflare 프로젝트는 변경하지 않습니다.
 
-## 실제 배포 결과 · 2026-10-04
+## v0.2.0 실제 배포 결과 · 2026-10-04
 
 - 구현 커밋: `bae5585d24505ef6fb794051003a5d8171e2b2fa` (`main` push 완료).
 - Wrangler 배포 성공: `eb59dc78-81f8-4db3-a2f0-2ed4d4e4decd`, Production / main.
@@ -130,3 +130,25 @@ Workers/D1/DNS는 변경하지 않습니다. Node/SQLite/WebSocket 백엔드는 
   기능 검사를 완료했다고 표현하지 않습니다.
 - 기존 로컬 DB 해시는 변경되지 않았습니다. 토큰 권한·DNS·Workers·D1과 다른
   Pages 프로젝트는 변경하지 않았습니다.
+
+## v0.3.0 실제 배포 결과 · 2026-10-04
+
+- 구현 커밋: `3635a3d1d82a71ec9461d18dc66f4f43fc526732` (`main` push 완료).
+- Wrangler 배포 성공: `0792a940-2671-4db2-9176-3c558118abf3`.
+- Cloudflare 프로젝트 API의 canonical_deployment: Production / main / deploy success,
+  위 구현 커밋과 일치합니다.
+- 게임: https://minsung.pages.dev/piggy-quest/
+- 배포별 게임: https://0792a940.minsung.pages.dev/piggy-quest/
+- 최종 산출물: `/workspace/builds/minsung-pages-piggy-v030-20261004`.
+- 게임 SHA-256: `b78dd7036909db86c9f5eaacfd4653de0a980d4dc3a83a7123ee46c7a8f95a97`.
+- 공개 첫 화면·게임·대시보드·소스 진입·배포별 게임 모두 HTTP 200이며 산출물과
+  바이트 단위로 일치합니다. 기존 첫 화면의 `37a05e00…` 해시도 유지합니다.
+- 최종 단일 파일 산출물의 로컬 HTTP 브라우저 검사 10개 통과: 실제 저장 재로딩,
+  소스 원본/ZIP CRC 일치, 대시보드 게스트 링크를 포함합니다.
+- 변경 관련 Node 29개, 기존 게임 브라우저 46개, 새 HTTP 회귀 검사 20개 통과.
+  전체 기존 테스트 77 통과/6 실패는 반복하지 않았습니다.
+- 공개 HTTPS Chromium 검사는 기존 VM CA 제한이 남아 있습니다. 로컬 브라우저 검사와
+  공개 HTTPS 파일 검증을 구분하며 실제 iPad/Safari에서 검증했다고 주장하지 않습니다.
+- 순차 자산 업로드/해시 등록 후 Wrangler가 캐시된 95개 파일로 정상 배포했습니다.
+  기존 Pages 프로젝트만 갱신했으며 계정 권한·DNS·Workers·D1은 변경하지 않았습니다.
+- 기존 `.local/minsung.sqlite`의 수정 전 SHA-256은 그대로 유지합니다.
