@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "provenance": "Original code-authored SVG prototype art; not final painted or generated animation assets.",
+  "assets": {
+    "pig": {
+      "file": "assets/pig.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "slime": {
+      "file": "assets/slime.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "boar": {
+      "file": "assets/boar.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "rock": {
+      "file": "assets/rock.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "bat": {
+      "file": "assets/bat.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "boss": {
+      "file": "assets/boss.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "chest": {
+      "file": "assets/chest.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "coin": {
+      "file": "assets/coin.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "potion": {
+      "file": "assets/potion.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    },
+    "repair": {
+      "file": "assets/repair.svg",
+      "type": "svg",
+      "anchor": "bottom-center"
+    }
+  }
+}

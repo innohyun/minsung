@@ -1,0 +1,12 @@
+{
+  "name": "piggy-quest",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Offline-first side-scrolling piggy-bank escort game with its own source viewer",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/rules.test.cjs",
+    "build": "python scripts/build.py"
+  },
+  "engines": { "node": ">=20" }
+}
