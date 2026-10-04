@@ -37,6 +37,14 @@ VM 검증: 게임 규칙 20개, 첨부 브라우저 상호작용 46개, 실제 H
 VM의 기본 Python User-Agent 요청은 Cloudflare 1010 응답이므로 브라우저/일반 브라우저
 User-Agent로 HTTP 점검합니다. 사이트 보안 설정을 변경하지 않습니다.
 
+이번 VM에서 Wrangler의 묶음 자산 업로드는 프록시 인증 401로 실패했습니다.
+같은 HTTPS 프록시·임시 업로드 토큰을 통한 순차 업로드와 해시 등록은 성공했습니다.
+필요하면 아래 보조 명령 후 Wrangler 배포를 실행합니다. CLI와 TLS 검증은 변경하지 않습니다.
+
+```sh
+python3 scripts/preupload-pages-assets.py --directory /workspace/builds/minsung-pages-NEW_BUILD
+```
+
 ```sh
 cd /workspace/minsung/piggy-quest
 python3 scripts/build.py
@@ -68,3 +76,23 @@ Workers/D1/DNS는 변경하지 않습니다. Node/SQLite/WebSocket 백엔드는 
 
 배포 후 반환된 URL과 프로덕션 URL에서 HTTP 200, 기존 첫 화면 해시, 게임 실행·저장 복원·
 소스 다운로드, 대시보드 링크를 확인합니다. 다른 Cloudflare 프로젝트는 변경하지 않습니다.
+
+## 실제 배포 결과 · 2026-10-04
+
+- 구현 커밋: `bae5585d24505ef6fb794051003a5d8171e2b2fa` (`main` push 완료).
+- Wrangler 배포 성공: `eb59dc78-81f8-4db3-a2f0-2ed4d4e4decd`, Production / main.
+- 게임: https://minsung.pages.dev/piggy-quest/
+- 대시보드: https://minsung.pages.dev/dashboard.html
+- 배포별 주소: https://eb59dc78.minsung.pages.dev/piggy-quest/
+- 공개 프로덕션 첫 화면·게임·대시보드·소스 진입이 모두 HTTP 200이며 최종 빌드 파일과
+  바이트 단위로 일치합니다. 배포별 게임 URL도 확인했습니다.
+- 첫 화면 SHA-256: `37a05e005b7ecb26d1ea3250df67cd8b357713b2d607895898412b9b011b03a1`.
+- 게임 SHA-256: `f61d2ba838d82b53790721da5d6dfa301a0e60b34a265b0f7e9c745843af7492`.
+- 최종 산출물의 로컬 HTTP 브라우저 검사 10개가 통과했습니다. 공개 주소의 Chromium
+  검사는 VM CA 신뢰 문제(`ERR_CERT_AUTHORITY_INVALID`)로 실행하지 못했습니다.
+  기존 Chromium 신뢰 DB에 시스템 CA를 추가하는 작업은 자동 승인 검토에서 거부됐습니다.
+  여러 CA를 영구 추가하는 보안 설정 변경이 현재 승인 범위를 넘는다는 이유입니다.
+  인증서 검증을 끄거나 거부된 작업을 우회하지 않았습니다. 공개 주소에서의 브라우저
+  기능 검사를 완료했다고 표현하지 않습니다.
+- 기존 로컬 DB 해시는 변경되지 않았습니다. 토큰 권한·DNS·Workers·D1과 다른
+  Pages 프로젝트는 변경하지 않았습니다.
