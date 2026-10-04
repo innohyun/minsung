@@ -43,6 +43,7 @@
       p.visited=unique(r.visited,Object.keys(map.rooms));if(!p.visited.includes('main'))p.visited.unshift('main');
       if(Array.isArray(r.drops))p.drops=r.drops.slice(0,300).filter(d=>map.rooms[d?.room]).map((d,i)=>({id:String(d.id||i).slice(0,100),room:d.room,x:number(d.x,180,0,map.rooms[d.room].width),value:integer(d.value,1,1,1000)}));
     }
+    for(let i=0;i<P.MAPS.length-1;i++)if(s.progress[P.MAPS[i].id].cleared&&!s.unlocked.includes(P.MAPS[i+1].id))s.unlocked.push(P.MAPS[i+1].id);
     s.stats.kills=integer(raw.stats?.kills,0);s.stats.runs=integer(raw.stats?.runs,0);
     return s;
   }

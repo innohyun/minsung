@@ -1,8 +1,8 @@
 /** Gameplay data. Keep balance values and permanent IDs here, not in rendering. */
 (function (P) {
   'use strict';
-  P.VERSION = '0.2.0';
-  P.CONFIG = { width:1280, height:720, ground:548, fixedStep:1/60,
+  P.VERSION = '0.3.0';
+  P.CONFIG = { width:1280, height:720, ground:600, roadTop:550, roadBottom:650, carryHeight:196, fixedStep:1/60,
     walkSpeed:230, gravity:1600, jumpSpeed:590, guardRadius:240,
     punchCooldown:.5, kickCooldown:1, reviveSeconds:10, reviveFraction:.5,
     saveKey:'piggy-quest-save-v2', sourceDate:'2026-10-04' };
@@ -49,6 +49,28 @@
           chests:[{id:'a-c3',x:2160,coins:200,potion:2}],portals:[{x:120,target:'main',label:'돌길로 돌아가기',spawn:3180}]}
       }}
   ];
+  P.MAPS[1].subtitle='무너진 아치와 잠든 창고를 지나 황혼의 파수꾼에게';
+  P.MAPS[1].boss={asset:'boss-amber',hp:720,w:168,h:210,attack:17,speed:49,coins:230,wave:200,cooldown:2.5};
+  P.MAPS.push({id:'brook',name:'물안개 길',tag:'03',subtitle:'오래된 물레방아와 맑은 샘을 찾아가는 원정',theme:'brook',bossName:'물안개 파수꾼',scale:1.7,
+    boss:{asset:'boss-brook',hp:800,w:150,h:198,attack:18,speed:64,coins:280,wave:240,cooldown:2.2},
+    rooms:{
+      main:{name:'물가의 큰길',width:9800,enemies:monsters('brook-main',[820,1320,1550,2210,2700,3100,3650,4030,4500,4880,5410,5880,6450,6980,7510,8080],['slime','bat','boar','rock']),
+        chests:[{id:'b-c1',x:1850,coins:140,potion:1},{id:'b-c2',x:5240,coins:180,repair:1}],
+        portals:[{x:2860,target:'spring',label:'샘물 옆 · 샛길',spawn:180},{x:6370,target:'mill',label:'물레방아 뒤 · 숨겨진 길',spawn:180}],bossX:9330},
+      spring:{name:'맑은 샘터',width:2700,enemies:monsters('brook-spring',[700,1330,2040],['slime','rock','bat']),
+        chests:[{id:'b-c3',x:2450,coins:180,potion:2}],portals:[{x:120,target:'main',label:'물가의 큰길로',spawn:2950}]},
+      mill:{name:'잊힌 물레방앗간',width:2850,enemies:monsters('brook-mill',[720,1440,2150],['boar','bat','rock']),
+        chests:[{id:'b-c4',x:2540,coins:210,repair:2}],portals:[{x:120,target:'main',label:'큰길로 돌아가기',spawn:6460}]}
+    }});
+  const scenery={
+    wind:{main:[{x:370,kind:'sign',label:'바람숲 캠프'},{x:1600,kind:'pond'},{x:2460,kind:'hollow'},{x:3850,kind:'bridge'},{x:5600,kind:'pond'},{x:7180,kind:'arch'},{x:9650,kind:'tower'}],
+      hollow:[{x:470,kind:'hollow'},{x:1330,kind:'pond'},{x:2160,kind:'hollow'}],cave:[{x:480,kind:'crystal'},{x:1140,kind:'arch'},{x:1840,kind:'crystal'},{x:2480,kind:'crystal'}]},
+    amber:{main:[{x:370,kind:'sign',label:'노을의 돌길'},{x:1300,kind:'arch'},{x:2940,kind:'tower'},{x:4450,kind:'bridge'},{x:6020,kind:'arch'},{x:7760,kind:'tower'}],
+      vault:[{x:500,kind:'tower'},{x:1210,kind:'crystal'},{x:2040,kind:'arch'}]},
+    brook:{main:[{x:370,kind:'sign',label:'물안개 길'},{x:1400,kind:'pond'},{x:2570,kind:'bridge'},{x:3890,kind:'pond'},{x:5400,kind:'bridge'},{x:6500,kind:'mill'},{x:8030,kind:'pond'},{x:9120,kind:'arch'}],
+      spring:[{x:530,kind:'pond'},{x:1240,kind:'crystal'},{x:2230,kind:'pond'}],mill:[{x:500,kind:'bridge'},{x:1420,kind:'mill'},{x:2440,kind:'arch'}]}
+  };
+  for(const map of P.MAPS)for(const [id,room] of Object.entries(map.rooms))room.landmarks=scenery[map.id][id];
   P.mapById = id=>P.MAPS.find(m=>m.id===id);
   P.allEnemies = map=>Object.values(map.rooms).flatMap(r=>r.enemies);
   P.helperById = id=>P.HELPERS.find(h=>h.id===id);

@@ -1,8 +1,12 @@
 # 게시용 구성과 현재 상태
 
-**현재 실제 온라인 게시: 수행하지 않음. 실제 chatgpt.site 주소: 없음.**
-이 대화에서 사이트를 생성/게시하는 도구를 사용할 수 없었습니다.
-다른 사이트 주소를 임의 생성하거나 기존 사용자 사이트를 덮어쓰지 않았습니다.
+**공개 경로: https://minsung.pages.dev/piggy-quest/**
+기존 Cloudflare Pages 프로젝트에 추가했으며 원래 첫 화면은 보존합니다.
+버전별 커밋·배포 ID·HTTP 검증은 상위 `docs/piggy-quest-integration.md`에 기록합니다.
+ChatGPT Sites 게시 도구가 이 환경에 제공되지 않아 chatgpt.site 주소는 없습니다.
+VM Chromium의 공개 HTTPS 검사는 CA 신뢰 문제로 제한됩니다. 시스템 CA 신뢰 DB 변경은
+자동 승인 검토가 거부했습니다. TLS 검증을 끄지 않고 로컬 HTTP 기능 검사와 공개 HTTPS
+파일 해시 비교를 구분해 기록합니다.
 
 ## 게시할 파일
 

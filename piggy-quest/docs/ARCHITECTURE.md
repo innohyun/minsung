@@ -3,7 +3,7 @@
 ## Runtime
 
 No framework, CDN or server is required. Namespace `globalThis.PIGGY` connects plain scripts.
-config → state → art/audio → game → export → ui → main.
+config → motion/state → art/audio → game → export → ui → main.
 Canvas logical resolution is 1280×720. Device-pixel ratio is capped at 2.
 Game simulation uses 1/60 second steps, capped frame accumulation after inactive periods.
 All damage, attacks, projectiles, knockback, invulnerability and revival use simulation delta.
@@ -11,8 +11,11 @@ The only wall-clock timeouts are notifications and revoking generated download U
 
 ## Visuals
 
-Background: procedural multilayer forest/ruins, independent parallax factors, foreground rocks.
-Actors: joint-based stick figure, interpolated movement, separate punch/kick/carry/air/hit poses.
+Background: forest/ruins/brook layers, fixed world feature IDs, independent parallax factors,
+foreground rocks and per-room landmarks. Camera changes do not reseed shapes.
+Actors: fixed-length joint rigs from motion.js, distance-driven planted feet, counter-swinging
+shoulders, alternating punches and 45ms snap kicks; separate carry/air/hit poses.
+All ground actors stand at y=600, the midpoint of the visible 550–650 dirt road.
 Monsters/items: original SVG files as Image objects, with transform-based bounce/wing/attack feedback.
 Changing final art does not require changing enemy balance data.
 
@@ -20,6 +23,7 @@ Changing final art does not require changing enemy balance data.
 
 State rules contain all serializable progression. The game snapshots player/pig position and HP.
 Map IDs and enemy/chest IDs are stable. Live room enemies are filtered using saved dead IDs.
+Schema 2 saves add default progress for new maps and unlock the successor of already cleared maps.
 Uncollected coins persist in drops. Chest opening and enemy death are persisted immediately.
 Periodic snapshots run about every 0.8 simulation seconds; pagehide/visibility suspend also snapshot.
 Same-origin localStorage does not provide account security or multi-device synchronization.

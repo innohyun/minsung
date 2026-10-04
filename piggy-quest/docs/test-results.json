@@ -1,18 +1,17 @@
 {
-  "version": "0.2.0",
+  "version": "0.3.0",
   "date": "2026-10-04",
-  "published": false,
   "unit_tests": {
-    "passed": 20,
+    "passed": 29,
     "failed": 0,
-    "command": "node --test tests/rules.test.cjs"
+    "command": "npm test"
   },
   "browser": {
-    "version": "0.2.0",
-    "method": "Chromium set_content + in-memory Storage adapter; actual HTTP navigation blocked by environment policy",
+    "version": "0.3.0",
+    "method": "Chromium set_content + in-memory Storage adapter; use the parent HTTP suite for actual origin persistence",
     "results": [
       {
-        "name": "Bundled HTML boots with all 10 SVG assets",
+        "name": "Bundled HTML boots with all 12 SVG assets",
         "passed": true,
         "detail": ""
       },
@@ -302,48 +301,401 @@
     "failed": 0,
     "javascript_errors": []
   },
-  "loopback_http": [
-    {
-      "path": "/",
-      "status": 200,
-      "bytes": 5937,
-      "mime": "text/html; charset=utf-8",
-      "passed": true
-    },
-    {
-      "path": "/src/game.js",
-      "status": 200,
-      "bytes": 22220,
-      "mime": "application/javascript; charset=utf-8",
-      "passed": true
-    },
-    {
-      "path": "/assets/pig.svg",
-      "status": 200,
-      "bytes": 1237,
-      "mime": "image/svg+xml",
-      "passed": true
-    },
-    {
-      "path": "/source.html",
-      "status": 200,
-      "bytes": 326,
-      "mime": "text/html; charset=utf-8",
-      "passed": true
-    },
-    {
-      "path": "/dist/index.html",
-      "status": 200,
-      "bytes": 289718,
-      "mime": "text/html; charset=utf-8",
-      "passed": true
-    }
-  ],
+  "http_revision": {
+    "url": "http://127.0.0.1:4173/piggy-quest/index.html",
+    "passed": 20,
+    "failed": 0,
+    "checks": [
+      "Real HTTP game responds",
+      "Updated game boots",
+      "Text selection disabled and Safari callout rule included",
+      "Source copy button still copies exact code",
+      "Player stands in the dirt road center",
+      "Walking advances the distance-driven full-body gait",
+      "Restart waits for explicit confirmation and freezes combat",
+      "Cancel preserves progress and resumes expedition",
+      "Restart downloads the complete previous progress",
+      "Confirmed restart resets progression and retains settings",
+      "Fresh game persists through actual origin reload",
+      "wind: connected rooms, reachable boss and settlement",
+      "wind: correct unique boss art",
+      "amber: connected rooms, reachable boss and settlement",
+      "amber: correct unique boss art",
+      "brook: connected rooms, reachable boss and settlement",
+      "brook: correct unique boss art",
+      "amber: warning, pause and one hit per shockwave",
+      "brook: warning, pause and one hit per shockwave",
+      "No browser JavaScript exceptions: []"
+    ]
+  },
+  "http_storage_source_dashboard": {
+    "passed": 10,
+    "failed": 0,
+    "command": "PIGGY_DASHBOARD_URL=http://127.0.0.1:4173/ python3 tests/piggy-quest-browser-smoke.py"
+  },
+  "repository_baseline": {
+    "passed": 77,
+    "failed": 6,
+    "rerun": false
+  },
+  "local_database": {
+    "existing_sha256_preserved": true
+  },
+  "deployment_record": "../docs/piggy-quest-integration.md in the parent minsung repository",
   "limits": [
-    "No public URL created or visited",
-    "set_content rather than browser URL navigation",
-    "Memory Storage adapter, not real origin persistence",
-    "Mobile emulation, not physical-device testing",
-    "Boundary-condition cases may set state directly"
-  ]
+    "Chromium set_content suite uses a memory Storage adapter; HTTP suites use real origin localStorage.",
+    "Map gate and boss conditions use reproducible state setup, not a full manual playthrough.",
+    "file:// navigation blocked by VM policy.",
+    "Public HTTPS Chromium navigation limited by CA trust; verify public HTTPS bytes separately.",
+    "Actual iPad/Safari and long-term balance not tested."
+  ],
+  "imported_v020_results": {
+    "version": "0.2.0",
+    "date": "2026-10-04",
+    "published": false,
+    "unit_tests": {
+      "passed": 20,
+      "failed": 0,
+      "command": "node --test tests/rules.test.cjs"
+    },
+    "browser": {
+      "version": "0.2.0",
+      "method": "Chromium set_content + in-memory Storage adapter; actual HTTP navigation blocked by environment policy",
+      "results": [
+        {
+          "name": "Bundled HTML boots with all 10 SVG assets",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "No horizontal overflow on desktop",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Keyboard movement changes world position",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Carried pig follows player",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Carry blocks punch but allows kick",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Punch has two damage events",
+          "passed": true,
+          "detail": {
+            "hp": 10,
+            "drops": 3,
+            "coins": 12,
+            "dead": true
+          }
+        },
+        {
+          "name": "Enemy drops ground coins and walking collects them",
+          "passed": true,
+          "detail": {
+            "hp": 10,
+            "drops": 3,
+            "coins": 12,
+            "dead": true
+          }
+        },
+        {
+          "name": "Manual return banks collected coins",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Killed monster stays dead on re-entry",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Player death keeps money without healing",
+          "passed": true,
+          "detail": {
+            "safe": 203,
+            "run": 0,
+            "hp": 0,
+            "active": false
+          }
+        },
+        {
+          "name": "Dead player is directed to treatment rather than starting",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Drag-and-drop consumes one potion and restores 50 HP",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Pig death loses only expedition balance",
+          "passed": true,
+          "detail": {
+            "safe": 120,
+            "run": 0,
+            "hp": 0,
+            "active": false
+          }
+        },
+        {
+          "name": "Click alternative repairs pig without natural recovery",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Source viewer pauses revival and simulation",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Companion revives after 10 simulation seconds at 50% by the pig",
+          "passed": true,
+          "detail": {
+            "before": 0,
+            "after": 40,
+            "distance": 9
+          }
+        },
+        {
+          "name": "Q toggles companion guarding",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Chest grants coins and medicine with a contents dialog",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Opened chest cannot grant its reward twice",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Branch portal moves player, pig and helpers to a saved sub-area",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Hidden helper registers immediately",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "All regular monsters gate the boss and clear unlocks next map",
+          "passed": true,
+          "detail": {
+            "locked": true,
+            "open": true,
+            "cleared": true,
+            "unlocked": true
+          }
+        },
+        {
+          "name": "Explicit replay resets completed map",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Skill shop actually charges coins and learns jump",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Purchased jump moves player off ground",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "All five special actions activate, with hand-use carry restriction",
+          "passed": true,
+          "detail": {
+            "spin": true,
+            "dash": true,
+            "fire": true,
+            "fly": true,
+            "gun": true,
+            "carryBlocked": true
+          }
+        },
+        {
+          "name": "Saved expedition restores health, coins and dead enemy record, paused",
+          "passed": true,
+          "detail": "Memory Storage adapter; not real browser-origin persistence"
+        },
+        {
+          "name": "Source viewer shows the exact executing original module",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Public ZIP passes CRC and includes runnable sources and handoff",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "ZIP excludes individual save data",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Downloaded game source matches original byte-for-byte",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Per-file download matches visible source",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Unsupported save import leaves current state untouched",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Valid save import requests confirmation before replacing data",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Confirmed import backs up old data and restores selected save",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Mobile landscape fits viewport without horizontal scrolling",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Mobile control visible: [data-hold=\"a\"]",
+          "passed": true,
+          "detail": {
+            "x": 130.78125,
+            "y": 368.296875,
+            "width": 59,
+            "height": 61
+          }
+        },
+        {
+          "name": "Mobile control visible: [data-hold=\"d\"]",
+          "passed": true,
+          "detail": {
+            "x": 197.78125,
+            "y": 368.296875,
+            "width": 59,
+            "height": 61
+          }
+        },
+        {
+          "name": "Mobile control visible: #punch-btn",
+          "passed": true,
+          "detail": {
+            "x": 641.21875,
+            "y": 363.296875,
+            "width": 65,
+            "height": 66
+          }
+        },
+        {
+          "name": "Mobile control visible: #kick-btn",
+          "passed": true,
+          "detail": {
+            "x": 715.21875,
+            "y": 349.296875,
+            "width": 74,
+            "height": 80
+          }
+        },
+        {
+          "name": "Real touch press moves player and release clears held input",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Portrait home fits viewport without horizontal overflow",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Portrait home exposes all four navigation destinations",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Portrait navigation opens companion collection",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "Portrait navigation opens skill shop",
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "name": "No browser JavaScript exceptions during suite",
+          "passed": true,
+          "detail": []
+        }
+      ],
+      "passed": 46,
+      "failed": 0,
+      "javascript_errors": []
+    },
+    "loopback_http": [
+      {
+        "path": "/",
+        "status": 200,
+        "bytes": 5937,
+        "mime": "text/html; charset=utf-8",
+        "passed": true
+      },
+      {
+        "path": "/src/game.js",
+        "status": 200,
+        "bytes": 22220,
+        "mime": "application/javascript; charset=utf-8",
+        "passed": true
+      },
+      {
+        "path": "/assets/pig.svg",
+        "status": 200,
+        "bytes": 1237,
+        "mime": "image/svg+xml",
+        "passed": true
+      },
+      {
+        "path": "/source.html",
+        "status": 200,
+        "bytes": 326,
+        "mime": "text/html; charset=utf-8",
+        "passed": true
+      },
+      {
+        "path": "/dist/index.html",
+        "status": 200,
+        "bytes": 289718,
+        "mime": "text/html; charset=utf-8",
+        "passed": true
+      }
+    ],
+    "limits": [
+      "No public URL created or visited",
+      "set_content rather than browser URL navigation",
+      "Memory Storage adapter, not real origin persistence",
+      "Mobile emulation, not physical-device testing",
+      "Boundary-condition cases may set state directly"
+    ]
+  }
 }

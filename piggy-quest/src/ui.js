@@ -43,6 +43,7 @@
     pause(){
       if(!P.state.active)return;P.game.snapshot();P.game.mode='pause';P.game.clearInput();resumeAfter=false;
       UI.open('잠깐, 숨 고르기','시간이 멈췄어요. 조수의 부활 시간도 함께 멈춥니다.',`<div class="dialog-content"><div class="result-hero"><span class="symbol">☷</span><div class="result-coins"><small>현재 저금통 안의 코인</small>${fmt(P.state.runCoins)}<span style="font-size:20px"> ◉</span></div><p class="smallnote">홈에 보관한 ${fmt(P.state.coins)}코인은 이번 원정과 별개예요.</p></div><div class="button-row"><button class="primary" id="continue">계속하기</button><button class="secondary" id="return-home">홈으로 돌아가기</button></div><p class="smallnote" style="text-align:center">지금 귀환하면 ${fmt(P.state.runCoins)}코인을 모두 가져갑니다. 처치 기록은 유지돼요.</p></div>`,{kind:'pause',eyebrow:'TAKE A LITTLE BREAK'});
+      const reset=document.createElement('button');reset.className='secondary';reset.textContent='처음부터 시작';reset.id='restart-pause';reset.onclick=()=>UI.newGame();$('continue').parentElement.append(reset);
       resumeAfter=true;$('continue').onclick=()=>UI.close();$('return-home').onclick=()=>{resumeAfter=false;P.game.finish('return');};
     },
     result(r){
@@ -57,7 +58,7 @@
       UI.open('보물상자를 열었어요','평범한 나무 상자 속 작은 선물. 아이템을 가방에 담았습니다.',`<div class="dialog-content">${rows}<div class="button-row"><button class="primary" id="loot-close">탐험 계속하기</button></div></div>`,{eyebrow:'A LITTLE DISCOVERY'});$('loot-close').onclick=()=>UI.close();
     },
     foundHelper(def){UI.open('새로운 동료, '+esc(def.name),'조수 모음집에 바로 등록했어요. 다음 출발 전에 동행 조수로 선택하세요.',`<div class="dialog-content"><div class="result-hero"><canvas class="helper-image" id="found-art" width="250" height="140"></canvas><h3 style="margin-top:20px">${esc(def.name)}</h3><p>${esc(def.description)}</p></div><div class="button-row"><button id="found-close" class="primary">계속 탐험하기</button></div></div>`,{eyebrow:'HELLO, NEW FRIEND'});UI.drawHelper($('found-art'),def);$('found-close').onclick=()=>UI.close();},
-    drawHelper(canvas,def){const c=canvas.getContext('2d');c.clearRect(0,0,canvas.width,canvas.height);c.save();c.translate(canvas.width/2,canvas.height-10);P.Art.stick(c,0,0,{color:def.color,band:'#ccb879',shield:def.id==='shield',scale:.92});c.restore();},
+    drawHelper(canvas,def){const c=canvas.getContext('2d');c.clearRect(0,0,canvas.width,canvas.height);c.save();c.translate(canvas.width/2,canvas.height-10);P.Art.stick(c,0,0,{color:def.color,band:'#ccb879',shield:def.id==='shield',scale:Math.min(.74,(canvas.height-20)/184)});c.restore();},
     campOnly(){if(P.state.active){UI.toast('귀환한 뒤 홈에서 정비할 수 있어요.');return false;}return true;},
     helpers(){
       if(!UI.campOnly())return;const s=P.state;
@@ -109,6 +110,16 @@
       $('download-file').onclick=()=>P.Export.download(new Blob([files[currentSource]],{type:'text/plain;charset=utf-8'}),currentSource.split('/').pop());
       $('copy-handoff').onclick=async()=>UI.toast(await P.Export.copy(files['CODEX_PROMPT.md']||files['HANDOFF.md'])?'코덱스 전달문을 복사했어요.':'파일 저장으로 전달문을 가져가세요.');$('open-handoff').onclick=()=>show('HANDOFF.md');
     },
+    newGame(){
+      UI.open('처음부터 시작할까요?','코인, 조수, 기술, 모든 맵의 진행을 초기화합니다. 현재 기록은 먼저 백업 파일로 내려받습니다.',`<div class="dialog-content"><p class="warn">지금까지의 모험을 새 게임으로 바꿉니다. 백업 파일은 저장 관리에서 다시 불러올 수 있어요.</p><div class="button-row"><button class="primary" id="confirm-new-game">백업하고 처음부터 시작</button><button class="secondary" id="cancel-new-game">취소 · 기록 유지</button></div></div>`,{eyebrow:'A BRAND NEW ADVENTURE'});
+      $('cancel-new-game').onclick=()=>UI.close();
+      $('confirm-new-game').onclick=()=>{
+        try{P.Export.download(new Blob([JSON.stringify(P.state,null,2)],{type:'application/json'}),'Piggy_Quest_Before_New_Game.json');}
+        catch{UI.toast('백업을 내려받지 못해 기록을 유지했어요.');return;}
+        const settings={...P.state.settings};P.state=P.State.fresh();P.state.settings=settings;
+        if(!P.State.save(P.state))UI.storageWarning();UI.home();UI.toast('새 원정을 처음부터 시작합니다.');
+      };
+    },
     saveTools(){
       UI.open('저장 관리','진행 기록은 이 브라우저에만 저장돼요. 다른 기기로 옮기거나 안전하게 보관하려면 파일로 내보내세요.',`<div class="dialog-content"><div class="button-row"><button class="primary" id="export-save">내 저장 파일 내려받기</button><button class="secondary" id="select-import">저장 파일 불러오기</button></div><p class="warn">저장 파일은 소스코드와 별개입니다. 공개 사이트나 공개 저장소에 올리지 마세요. 불러오기는 현재 진행을 교체합니다.</p><label class="checkline"><input id="reduce-motion" type="checkbox" ${P.state.settings.reducedMotion?'checked':''}> 화면 흔들림과 붉은 깜빡임 줄이기</label><p class="smallnote">브라우저 데이터를 지우면 자동 저장도 사라집니다. 다른 탭에서 동시에 플레이하면 마지막 저장이 우선하므로 한 탭에서 사용하세요.</p></div>`,{eyebrow:'KEEP YOUR ADVENTURE SAFE'});
       $('export-save').onclick=()=>{if(P.state.active)P.game.snapshot();P.Export.download(new Blob([JSON.stringify(P.state,null,2)],{type:'application/json'}),'Piggy_Quest_Save.json');};
@@ -135,7 +146,7 @@
       document.querySelectorAll('[data-skill]').forEach(b=>{let id=P.state.equipped[Number(b.dataset.skill)],t=P.skillById(id),r=p.skills[id]||0;b.classList.toggle('cooling',r>0);b.style.setProperty('--cd',t?r/t.cd:0);});
     },
     init(){
-      $('brand').onclick=()=>P.state.active?UI.pause():UI.home();$('source-btn').onclick=()=>UI.sources();$('help').onclick=()=>UI.help();$('save-tools').onclick=()=>UI.saveTools();
+      $('brand').onclick=()=>P.state.active?UI.pause():UI.home();$('source-btn').onclick=()=>UI.sources();$('help').onclick=()=>UI.help();$('save-tools').onclick=()=>UI.saveTools();$('new-game').onclick=()=>UI.newGame();
       $('depart').onclick=()=>UI.depart(P.state.selectedMap,P.state.progress[P.state.selectedMap].cleared);
       $('map-select').onclick=()=>UI.maps();$('world-map').onclick=()=>UI.worldMap();$('pause').onclick=()=>UI.pause();$('command').onclick=()=>P.game.command();
       document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{if(b.dataset.view==='camp'){if(P.state.active)UI.pause();else UI.home();}else UI[b.dataset.view]();});

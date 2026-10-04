@@ -51,6 +51,18 @@
       "file": "assets/repair.svg",
       "type": "svg",
       "anchor": "bottom-center"
+    },
+    "boss-amber": {
+      "file": "assets/boss-amber.svg",
+      "type": "svg",
+      "anchor": "bottom-center",
+      "provenance": "Original vector guardian for this map"
+    },
+    "boss-brook": {
+      "file": "assets/boss-brook.svg",
+      "type": "svg",
+      "anchor": "bottom-center",
+      "provenance": "Original vector guardian for this map"
     }
   }
 }

@@ -30,7 +30,7 @@ def build():
     html=re.sub(r'<script src="([^"]+)"></script>',inline,html)
     dist=ROOT/'dist';dist.mkdir(exist_ok=True)
     (dist/'index.html').write_text(html,encoding='utf-8')
-    info={'version':'0.2.0','source_file_count':len(files),'html_bytes':len(html.encode()),'sha256':hashlib.sha256(html.encode()).hexdigest(),'network_required':False,'published':False}
+    info={'version':json.loads(files['package.json'])['version'],'source_file_count':len(files),'html_bytes':len(html.encode()),'sha256':hashlib.sha256(html.encode()).hexdigest(),'network_required':False,'published':False}
     (dist/'build-info.json').write_text(json.dumps(info,indent=2)+'\n')
     print(json.dumps(info,indent=2))
 

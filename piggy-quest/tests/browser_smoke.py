@@ -29,7 +29,7 @@ with sync_playwright() as pw:
     browser=pw.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox'])
     try:
         ctx,page=ready(browser)
-        check('Bundled HTML boots with all 10 SVG assets',page.evaluate('Object.values(PIGGY.Art.images).every(i=>i.complete&&i.naturalWidth>0)'))
+        check('Bundled HTML boots with all 12 SVG assets',page.evaluate('Object.keys(PIGGY.Art.images).length===12&&Object.values(PIGGY.Art.images).every(i=>i.complete&&i.naturalWidth>0)'))
         check('No horizontal overflow on desktop',page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
         page.screenshot(path=str(OUT/'home.png'))
         page.locator('#depart').click();x=page.evaluate('PIGGY.game.player.x');page.keyboard.down('d');page.wait_for_timeout(400);page.keyboard.up('d')
@@ -40,7 +40,7 @@ with sync_playwright() as pw:
         values=page.evaluate('''()=>{const g=PIGGY.game;g.player.punch=0;g.player.kick=0;g.punch();g.kick();const r=[g.player.punch,g.player.kick];g.mode='pause';return r;}''')
         check('Carry blocks punch but allows kick',values[0]==0 and values[1]>0)
         fresh(page)
-        values=page.evaluate('''()=>{const P=PIGGY,g=P.game;P.state.party=[];g.helpers=[];g.enemies=[g.makeEnemy({id:'wind-main-0',x:g.player.x+80,type:'slime'})];const e=g.enemies[0];e.active=true;g.punch();for(let i=0;i<13;i++)g.tick(1/60);const hp=e.hp;g.kick();const drops=g.progress.drops.length;g.player.x=e.x;g.tick(1/60);const coins=P.state.runCoins;g.mode='pause';return {hp,drops,coins,dead:g.progress.dead.includes('wind-main-0')};}''')
+        values=page.evaluate('''()=>{const P=PIGGY,g=P.game;P.state.party=[];g.helpers=[];g.enemies=[g.makeEnemy({id:'wind-main-0',x:g.player.x+80,type:'slime'})];const e=g.enemies[0];e.active=true;g.punch();for(let i=0;i<13;i++)g.tick(1/60);const hp=e.hp;g.kick();for(let i=0;i<3;i++)g.tick(1/60);const drops=g.progress.drops.length;g.player.x=e.x;g.tick(1/60);const coins=P.state.runCoins;g.mode='pause';return {hp,drops,coins,dead:g.progress.dead.includes('wind-main-0')};}''')
         check('Punch has two damage events',values['hp']==10,values)
         check('Enemy drops ground coins and walking collects them',values['drops']==3 and values['coins']==12 and values['dead'],values)
         page.evaluate("PIGGY.game.mode='play';PIGGY.game.finish('return');PIGGY.UI.home()")
@@ -154,6 +154,6 @@ with sync_playwright() as pw:
         ctx.close();ctxm.close();ctxp.close()
     finally:
         browser.close()
-        output={'version':'0.2.0','method':'Chromium set_content + in-memory Storage adapter; actual HTTP navigation blocked by environment policy','results':results,'passed':sum(r['passed'] for r in results),'failed':sum(not r['passed'] for r in results),'javascript_errors':errors}
+        output={'version':json.loads((ROOT/'package.json').read_text())['version'],'method':'Chromium set_content + in-memory Storage adapter; use the parent HTTP suite for actual origin persistence','results':results,'passed':sum(r['passed'] for r in results),'failed':sum(not r['passed'] for r in results),'javascript_errors':errors}
         (OUT/'browser-results.json').write_text(json.dumps(output,ensure_ascii=False,indent=2))
         print(json.dumps({'passed':output['passed'],'failed':output['failed'],'errors':errors},ensure_ascii=False))

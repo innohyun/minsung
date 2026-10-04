@@ -19,5 +19,5 @@ for name,body in shapes.items():
  view='0 0 120 80' if name=='pig' else '0 0 100 80'
  svg=f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view}"><defs><linearGradient id="p" x2="0" y2="1"><stop stop-color="#f4c3c0"/><stop offset="1" stop-color="#df95a7"/></linearGradient><linearGradient id="s" x2="0" y2="1"><stop stop-color="#c8d993"/><stop offset="1" stop-color="#91b26d"/></linearGradient></defs>{body}</svg>'
  (root/f'{name}.svg').write_text(svg)
-manifest={'version':1,'provenance':'Original code-authored SVG prototype art; not final painted or generated animation assets.', 'assets':{k:{'file':f'assets/{k}.svg','type':'svg','anchor':'bottom-center'} for k in shapes}}
+manifest={'version':1,'provenance':'Original code-authored SVG prototype art; not final painted or generated animation assets.', 'assets':{k:{'file':f'assets/{k}.svg','type':'svg','anchor':'bottom-center'} for k in sorted(p.stem for p in root.glob('*.svg'))}}
 (root/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
