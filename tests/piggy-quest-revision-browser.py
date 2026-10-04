@@ -23,7 +23,7 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda error: errors.append(str(error)))
     check('Real HTTP game responds', page.goto(URL).status == 200)
     page.wait_for_selector('#loading', state='hidden')
-    check('Updated game boots', page.evaluate("PIGGY.VERSION==='0.3.0'"))
+    check('Updated game boots', page.evaluate("PIGGY.VERSION==='0.4.0'"))
     check('Text selection disabled and Safari callout rule included', page.evaluate("getComputedStyle(document.body).userSelect==='none'&&PIGGY.SOURCE_FILES['styles.css'].includes('-webkit-touch-callout:none')"))
     context.grant_permissions(['clipboard-read', 'clipboard-write'])
     page.locator('#source-btn').click()
@@ -113,7 +113,7 @@ with sync_playwright() as pw:
       const c=canvas.getContext('2d');c.fillStyle='#eef0e6';c.fillRect(0,0,1280,600);
       c.fillStyle='#cfc38a';c.fillRect(0,218,1280,82);c.fillRect(0,500,1280,85);
       for(let i=0;i<8;i++){PIGGY.Art.stick(c,75+i*158,260,{walkBlend:1,phase:i/8});PIGGY.Art.label(c,'걷기 '+i,75+i*158,286,14);}
-      const poses=[{pose:'idle'},{pose:'punch',age:.055},{pose:'punch',age:.215},{pose:'kick',age:.045},{pose:'kick',age:.17},{carrying:true}];
+      const poses=[{pose:'idle'},{pose:'punch',age:.09},{pose:'punch',age:.29},{pose:'kick',age:.045},{pose:'kick',age:.17},{carrying:true}];
       poses.forEach((p,i)=>{PIGGY.Art.stick(c,96+i*211,546,p);PIGGY.Art.label(c,['서기','앞 주먹','반대 주먹','빠른 발차기','회수','운반'][i],96+i*211,579,14);});
     }""")
     page.locator('#pose-sheet').screenshot(path=str(OUT / 'pose-sheet.png'))

@@ -12,7 +12,7 @@
     return {schema:2,version:P.VERSION,coins:120,runCoins:0,active:false,selectedMap:'wind',unlocked:['wind'],
       player:{hp:100,max:100,attackLevel:0},pig:{hp:180,max:180},
       helpers:{sprout:{hp:80,revive:0}},party:['sprout'],slots:1,mode:'follow',
-      inventory:{potion:3,repair:2},skills:{},equipped:[],settings:{sound:false,reducedMotion:false},
+      inventory:{potion:3,repair:2},skills:{},equipped:[],settings:{sound:true,soundExplicit:false,reducedMotion:false},
       progress:Object.fromEntries(P.MAPS.map(m=>[m.id,freshProgress(m)])),stats:{kills:0,runs:0},updatedAt:''};
   }
   function normalize(raw) {
@@ -31,9 +31,11 @@
     s.slots=integer(raw.slots,1,1,3);s.party=unique(raw.party,Object.keys(s.helpers)).slice(0,s.slots);
     s.mode=raw.mode==='guard'?'guard':'follow';
     s.inventory.potion=integer(raw.inventory?.potion,3,0,999);s.inventory.repair=integer(raw.inventory?.repair,2,0,999);
-    for(const skill of P.SKILLS) {const l=integer(raw.skills?.[skill.id],0,0,skill.max);if(l)s.skills[skill.id]=l;}
+    for(const skill of P.SKILLS) {const l=integer(skill.id==='run'?(raw.skills?.run??raw.skills?.jump):raw.skills?.[skill.id],0,0,skill.max);if(l)s.skills[skill.id]=l;}
     s.equipped=unique(raw.equipped,P.SKILLS.filter(x=>!x.utility&&s.skills[x.id]).map(x=>x.id)).slice(0,3);
-    s.settings.sound=raw.settings?.sound===true;s.settings.reducedMotion=raw.settings?.reducedMotion===true;
+    s.settings.soundExplicit=raw.settings?.soundExplicit===true;
+    s.settings.sound=s.settings.soundExplicit?raw.settings.sound===true:raw.version==='0.4.0'?raw.settings?.sound!==false:true;
+    s.settings.reducedMotion=raw.settings?.reducedMotion===true;
     for(const map of P.MAPS) {
       const r=raw.progress?.[map.id]||{},p=s.progress[map.id];
       p.dead=unique(r.dead,P.allEnemies(map).map(e=>e.id));

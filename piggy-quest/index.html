@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#eef0e6"><meta name="description" content="저금통을 지키며 넓은 숲을 탐험하는 졸라맨 액션. 소스코드와 코덱스 인수인계 문서까지 포함된 실행형 프로토타입.">
 <title>저금통 원정대 · Piggy Quest</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' font-size='50'%3E🐷%3C/text%3E%3C/svg%3E">
@@ -25,12 +25,14 @@
     </div>
     <div class="game-ui" id="game-ui" hidden>
       <div class="health-box"><div><span class="health-symbol">◯</span><label>나의 체력 <small id="player-health-text"></small><progress id="player-health" max="100" value="100"></progress></label></div><div><span class="health-symbol">🐷</span><label>저금통 <small id="pig-health-text"></small><progress id="pig-health" class="pink" max="180" value="180"></progress></label></div></div>
-      <button class="quest-pill" id="world-map"><strong id="room-label">바람숲 · 큰길</strong><span id="kill-count">0 / 24 처치　⌘</span></button>
+      <div class="quest-pill"><strong id="room-label">바람숲 · 큰길</strong><span id="kill-count">0 / 24 처치</span></div>
       <div class="game-top-right"><div class="run-money"><span>◉</span><label>이번 원정<b id="run-coins">0</b></label></div><button id="pause" class="pause-btn" aria-label="일시정지">☰</button></div>
-      <button id="command" class="command-pill">● 조수 · 따라오기 <kbd>Q</kbd></button>
-      <div class="movement"><button data-hold="a" aria-label="왼쪽 이동">‹</button><button data-hold="d" aria-label="오른쪽 이동">›</button><button id="jump-btn" data-action="jump" aria-label="뛰기">↟<small>뛰기</small></button></div>
-      <div class="skills-pad" id="skills-pad"></div>
-      <div class="combat"><button data-action="interact"><kbd>E</kbd><span id="carry-icon">↥</span><small id="carry-label">들기 · 사용</small></button><button data-hold="j" id="punch-btn"><kbd>J</kbd><span>✧</span><small>펀치</small></button><button data-hold="k" id="kick-btn" class="kick"><kbd>K</kbd><span>↗</span><small>발차기</small></button></div>
+      <div class="movement"><button data-hold="a" aria-label="왼쪽 이동">‹</button><button data-hold="d" aria-label="오른쪽 이동">›</button></div>
+      <div class="action-dock" id="action-dock">
+        <div class="utility-actions"><button id="world-map" aria-label="탐험 지도"><span>⌘</span><small>지도</small></button><button id="command" aria-label="조수 명령"><kbd>Q</kbd><span>◉</span><small id="command-label">조수</small></button><button id="run-btn" data-hold="shift" hidden aria-label="달리기"><kbd>⇧</kbd><span>»</span><small>달리기</small></button></div>
+        <div class="skills-pad" id="skills-pad"></div>
+        <div class="combat"><button id="interact-btn" data-action="interact" aria-label="상호작용 E"><kbd>E</kbd><span>E</span><small>상호작용</small></button><button data-hold="j" id="punch-btn"><kbd>J</kbd><span>✧</span><small>펀치</small></button><button data-hold="k" id="kick-btn"><kbd>K</kbd><span>↗</span><small>발차기</small></button></div>
+      </div>
       <div class="progress-track"><i id="distance-progress"></i></div>
     </div>
     <div id="loading" class="loading"><span class="brand-mark">🐷</span><p>원정 가방을 챙기는 중…</p></div>
@@ -42,7 +44,7 @@
     <button data-view="bag">가방 · 치료</button>
   </nav>
 </main>
-<footer><div><span class="live-dot"></span> 원정대 기록 <span class="muted">v0.3.0</span><span class="separator">·</span><button id="help">조작법 · 게임 규칙</button><button id="save-tools">저장 관리</button><button id="new-game">처음부터 시작</button></div><div class="footer-controls"><span>이동 A D · 펀치 J · 발차기 K · 상호작용 E</span><button id="sound" aria-label="효과음 켜기">♪</button><button id="fullscreen" aria-label="전체 화면">⛶</button></div></footer>
+<footer><div><span class="live-dot"></span> 원정대 기록 <span class="muted">v0.4.0</span><span class="separator">·</span><button id="help">조작법 · 게임 규칙</button><button id="save-tools">저장 관리</button><button id="new-game">처음부터 시작</button></div><div class="footer-controls"><span>이동 A D · 펀치 J · 발차기 K · 상호작용 E</span><button id="sound" aria-label="효과음 끄기">♪</button><button id="fullscreen" aria-label="전체 화면">⛶</button></div></footer>
 <p class="rotate-hint">휴대전화는 가로로 돌리면 더 넓게 탐험할 수 있어요.</p>
 </div>
 <dialog id="modal" aria-labelledby="modal-title"><div id="modal-body"></div></dialog>

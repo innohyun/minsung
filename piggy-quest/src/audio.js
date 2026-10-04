@@ -1,5 +1,46 @@
-/** Tiny synthesized sound palette. Nothing is downloaded; silent until an input gesture. */
-(function(P){let context=null;P.Audio={
- unlock(){try{context ||= new (window.AudioContext||window.webkitAudioContext)();context.resume().catch(()=>{});}catch{}},
- play(name){if(!P.state?.settings.sound||!context)return;try{const t=context.currentTime,o=context.createOscillator(),g=context.createGain();o.connect(g);g.connect(context.destination);o.type=name==='hit'?'triangle':'sine';const f={coin:840,hit:160,heal:520,chest:680,warning:240,skill:340}[name]||440;o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(name==='coin'?f*1.5:f*.5,t+.12);g.gain.setValueAtTime(.04,t);g.gain.exponentialRampToValueAtTime(.001,t+.17);o.start(t);o.stop(t+.18);}catch{}}
-};})(globalThis.PIGGY = globalThis.PIGGY || {});
+/** Local Web Audio foley: soil steps, strikes, ceramic clinks and rewards. */
+(function(P){
+  'use strict';
+  let context=null,master=null,analyser=null;
+  function tone(t,f,end,duration,volume=.025,type='sine'){
+    const o=context.createOscillator(),g=context.createGain();o.type=type;
+    o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,end),t+duration);
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(volume,t+.008);
+    g.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(g);g.connect(master);o.start(t);o.stop(t+duration+.01);
+  }
+  function noise(t,duration,frequency,volume=.025){
+    const buffer=context.createBuffer(1,Math.ceil(context.sampleRate*duration),context.sampleRate),data=buffer.getChannelData(0);
+    for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*(1-i/data.length);
+    const src=context.createBufferSource(),f=context.createBiquadFilter(),g=context.createGain();src.buffer=buffer;f.type='lowpass';f.frequency.value=frequency;
+    g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(volume,t+.009);g.gain.exponentialRampToValueAtTime(.0001,t+duration);
+    src.connect(f);f.connect(g);g.connect(master);src.start(t);src.stop(t+duration+.01);
+  }
+  P.Audio={
+    unlock(){
+      try{
+        if(!context){context=new (window.AudioContext||window.webkitAudioContext)();master=context.createGain();master.gain.value=.65;
+          analyser=context.createAnalyser();analyser.fftSize=256;master.connect(analyser);analyser.connect(context.destination);}
+        if(context.state==='suspended')context.resume().catch(()=>{});
+      }catch{}
+    },
+    status(){return context?.state||'locked';},
+    energy(){if(!analyser)return 0;const samples=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(samples);return Math.sqrt(samples.reduce((n,v)=>n+v*v,0)/samples.length);},
+    play(name){
+      if(!P.state?.settings.sound||!context||context.state!=='running')return;
+      try{
+        const t=context.currentTime;
+        if(name==='step'||name==='run-step'){noise(t,.07,650,.024);tone(t,name==='step'?80:105,38,.07,.012,'triangle');}
+        else if(name==='punch'){noise(t,.10,1500,.040);tone(t,130,62,.10,.02,'triangle');}
+        else if(name==='kick'){noise(t,.14,2600,.045);tone(t,98,42,.14,.025,'triangle');}
+        else if(name==='spin'){noise(t,.22,3400,.045);tone(t,165,58,.18,.023,'triangle');}
+        else if(name==='hit'){noise(t,.055,700,.08);tone(t,88,32,.13,.045,'triangle');}
+        else if(name==='coin'){tone(t,960,1160,.15,.024);tone(t+.065,1450,1630,.15,.019);}
+        else if(name==='carry'){tone(t,610,560,.11,.018);tone(t+.025,970,900,.09,.009);}
+        else if(name==='chest'||name==='clear'){[520,690,870].forEach((f,i)=>tone(t+i*.09,f,f*1.02,.23,.018));}
+        else if(name==='heal'){tone(t,440,880,.22,.025);}
+        else if(name==='warning'){tone(t,190,140,.16,.033,'triangle');}
+        else tone(t,340,680,.17,.022);
+      }catch{}
+    }
+  };
+})(globalThis.PIGGY=globalThis.PIGGY||{});

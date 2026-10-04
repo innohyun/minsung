@@ -1,13 +1,13 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "date": "2026-10-04",
   "unit_tests": {
-    "passed": 29,
+    "passed": 34,
     "failed": 0,
     "command": "npm test"
   },
   "browser": {
-    "version": "0.3.0",
+    "version": "0.4.0",
     "method": "Chromium set_content + in-memory Storage adapter; use the parent HTTP suite for actual origin persistence",
     "results": [
       {
@@ -155,12 +155,12 @@
         "detail": ""
       },
       {
-        "name": "Skill shop actually charges coins and learns jump",
+        "name": "Skill shop actually charges coins and learns running",
         "passed": true,
         "detail": ""
       },
       {
-        "name": "Purchased jump moves player off ground",
+        "name": "Purchased running increases speed without jumping",
         "passed": true,
         "detail": ""
       },
@@ -230,40 +230,40 @@
         "name": "Mobile control visible: [data-hold=\"a\"]",
         "passed": true,
         "detail": {
-          "x": 130.78125,
-          "y": 368.296875,
-          "width": 59,
-          "height": 61
+          "x": 12,
+          "y": 419,
+          "width": 49,
+          "height": 49
         }
       },
       {
         "name": "Mobile control visible: [data-hold=\"d\"]",
         "passed": true,
         "detail": {
-          "x": 197.78125,
-          "y": 368.296875,
-          "width": 59,
-          "height": 61
+          "x": 69,
+          "y": 419,
+          "width": 49,
+          "height": 49
         }
       },
       {
         "name": "Mobile control visible: #punch-btn",
         "passed": true,
         "detail": {
-          "x": 641.21875,
-          "y": 363.296875,
-          "width": 65,
-          "height": 66
+          "x": 804,
+          "y": 419,
+          "width": 49,
+          "height": 49
         }
       },
       {
         "name": "Mobile control visible: #kick-btn",
         "passed": true,
         "detail": {
-          "x": 715.21875,
-          "y": 349.296875,
-          "width": 74,
-          "height": 80
+          "x": 859,
+          "y": 419,
+          "width": 49,
+          "height": 49
         }
       },
       {
@@ -300,6 +300,43 @@
     "passed": 46,
     "failed": 0,
     "javascript_errors": []
+  },
+  "http_controls": {
+    "url": "http://127.0.0.1:4173/piggy-quest/index.html",
+    "passed": 29,
+    "failed": 0,
+    "checks": [
+      "HTTP boots with all embedded art including ceramic pig",
+      "Right-facing inert pig asset loads",
+      "Camp header and footer disappear during play",
+      "Gameplay occupies the viewport without scrolling",
+      "No unlearned action or skill placeholder buttons",
+      "Interaction is labeled E",
+      "Keyboard walking works with grounded feet",
+      "Real touch E carries pig immediately at the hand height",
+      "Unusable hand attack is hidden while carrying",
+      "Paused reload restores carried pig above the head",
+      "Shop purchases running with real starting coins",
+      "Learned run button appears in right action dock",
+      "Two-finger move and run accelerate without jumping",
+      "Releasing touch clears both held controls",
+      "E releases pig and restores punching button",
+      "Gesture-unlocked effects emit an actual audio signal",
+      "Normal input combat defeats an encountered enemy",
+      "Rapid repeated attack taps keep viewport scale unchanged",
+      "Selection and browser gesture fallbacks cancel default actions",
+      "Purchased actions appear on the right without empty slots",
+      "Carrying hides fire and gun but retains roundhouse",
+      "Roundhouse starts with a separate knee chamber",
+      "Roundhouse completes and clears its pending strike",
+      "Reachable right control: #world-map",
+      "Reachable right control: #command",
+      "Reachable right control: #run-btn",
+      "Reachable right control: #kick-btn",
+      "Reachable right control: [data-skill=\"0\"]",
+      "No browser JavaScript errors"
+    ],
+    "method": "Real touch/keyboard play; roundhouse shop funding and gate/pose snapshots use explicit test state."
   },
   "http_revision": {
     "url": "http://127.0.0.1:4173/piggy-quest/index.html",
@@ -347,8 +384,26 @@
     "Map gate and boss conditions use reproducible state setup, not a full manual playthrough.",
     "file:// navigation blocked by VM policy.",
     "Public HTTPS Chromium navigation limited by CA trust; verify public HTTPS bytes separately.",
-    "Actual iPad/Safari and long-term balance not tested."
+    "Actual iPad/Safari and long-term balance not tested.",
+    "HTTP controls include real keyboard/touch play and measured Web Audio output; advanced shop funding and gate/pose snapshots also use explicit test state.",
+    "Rapid touch zoom is verified in Chromium emulation; native iPad/Safari magnification and callouts are not device-tested."
   ],
+  "previous_v030_summary": {
+    "version": "0.3.0",
+    "unit_tests": {
+      "passed": 29,
+      "failed": 0,
+      "command": "npm test"
+    },
+    "browser": {
+      "passed": 46,
+      "failed": 0
+    },
+    "http_revision": {
+      "passed": 20,
+      "failed": 0
+    }
+  },
   "imported_v020_results": {
     "version": "0.2.0",
     "date": "2026-10-04",

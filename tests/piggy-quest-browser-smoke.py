@@ -47,7 +47,8 @@ with sync_playwright() as pw, TemporaryDirectory() as temp:
     page.wait_for_selector('#loading', state='hidden')
     check('Actual localStorage survives reload', page.evaluate("PIGGY.state.runCoins===37&&PIGGY.game.player.hp===61&&!PIGGY.game.enemies.some(e=>e.id==='wind-main-0')&&PIGGY.game.mode==='pause'"))
     page.locator('[data-close]').click()
-    page.locator('#source-btn').click()
+    page.locator('#pause').click()
+    page.locator('#pause-source').click()
     page.locator('[data-source="src/game.js"]').click()
     check('Source viewer matches imported module', page.locator('#source-pre').inner_text() == (ROOT / 'piggy-quest/src/game.js').read_text())
     with page.expect_download() as download:

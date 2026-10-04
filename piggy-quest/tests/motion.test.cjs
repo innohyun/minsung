@@ -26,12 +26,46 @@ test('arms rotate at the shoulder and counter-swing the advancing leg',()=>{
   assert.ok(distance(a.frontElbow,b.frontElbow)>20);
 });
 test('two punches extend alternating arms without stretching their bones',()=>{
-  const jab=P.Motion.pose({pose:'punch',age:.055}),cross=P.Motion.pose({pose:'punch',age:.215});
+  const jab=P.Motion.pose({pose:'punch',age:.09}),cross=P.Motion.pose({pose:'punch',age:.29});
   assert.equal(jab.attackArm,'front');assert.equal(cross.attackArm,'rear');
   assert.ok(jab.frontHand[0]>60&&cross.rearHand[0]>60);
-  for(const p of [jab,cross,P.Motion.pose({pose:'punch',age:.055,aimY:-34})]){
-    assert.ok(distance(p.shoulder,p.frontHand)<=62.001);assert.ok(distance(p.shoulder,p.rearHand)<=62.001);
+  for(const p of [jab,cross,P.Motion.pose({pose:'punch',age:.09,aimY:-34})]){
+    for(const side of ['rear','front']){assert.ok(Math.abs(distance(p[side+'Shoulder'],p[side+'Elbow'])-32)<1e-6);assert.ok(Math.abs(distance(p[side+'Elbow'],p[side+'Hand'])-31)<1e-6);}
   }
+});
+test('both walking arms retain the same forward elbow hinge across every phase',()=>{
+  for(let i=0;i<32;i++)for(const running of [false,true]){
+    const p=P.Motion.pose({phase:i/32,speed:230,running});
+    for(const side of ['rear','front']){const s=p[side+'Shoulder'],e=p[side+'Elbow'],h=p[side+'Hand'];
+      const cross=(e[0]-s[0])*(h[1]-e[1])-(e[1]-s[1])*(h[0]-e[0]);assert.ok(cross<0,'elbow reversed: '+side+' '+i);
+      assert.ok(Math.abs(distance(s,e)-32)<1e-6);assert.ok(Math.abs(distance(e,h)-31)<1e-6);
+    }
+  }
+});
+test('carrying keeps elbows outside and the two arm chains do not cross',()=>{
+  const cross=(a,b,c)=>(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
+  const intersects=(a,b,c,d)=>cross(a,b,c)*cross(a,b,d)<0&&cross(c,d,a)*cross(c,d,b)<0;
+  for(const pose of ['idle','kick','spin'])for(let i=0;i<20;i++){
+    const p=P.Motion.pose({carrying:true,pose,age:i/32,phase:i/20,speed:230,running:true});
+    assert.ok(p.rearHand[0]<p.frontHand[0]);
+    assert.equal(p.rearHand[1],-196);assert.equal(p.frontHand[1],-196);
+    const rear=[p.rearShoulder,p.rearElbow,p.rearHand],front=[p.frontShoulder,p.frontElbow,p.frontHand];
+    for(let a=0;a<2;a++)for(let b=0;b<2;b++)assert.ok(!intersects(rear[a],rear[a+1],front[b],front[b+1]));
+  }
+});
+test('walking and running share a continuous phase while speed blends',()=>{
+  const a=P.Motion.pose({phase:.45,walkBlend:1,runBlend:.49}),b=P.Motion.pose({phase:.45,walkBlend:1,runBlend:.51});
+  assert.ok(distance(a.frontFoot,b.frontFoot)<2);assert.ok(distance(a.frontHand,b.frontHand)<2);
+});
+test('roundhouse chambers the knee and pivots before its separate strike and recovery',()=>{
+  const chamber=P.Motion.pose({pose:'spin',age:.13}),contact=P.Motion.pose({pose:'spin',age:.26}),end=P.Motion.pose({pose:'spin',age:.62});
+  assert.ok(chamber.frontKnee[1]<chamber.hip[1]&&chamber.frontFoot[1]<-50);
+  assert.ok(contact.frontFoot[0]>80&&contact.turn>.5&&contact.spinArc>.9);assert.ok(end.frontFoot[1]===0&&end.spinArc===0);
+  assert.notDeepEqual(chamber.frontFoot,P.Motion.pose({pose:'kick',age:.13}).frontFoot);
+});
+test('legacy jump purchase migrates to running without losing its level or coins',()=>{
+  const raw=P.State.fresh();raw.version='0.3.0';raw.skills={jump:2,fire:1};raw.coins=333;
+  const s=P.State.normalize(raw);assert.equal(s.skills.run,2);assert.equal(s.skills.jump,undefined);assert.equal(s.coins,333);assert.equal(s.skills.fire,1);
 });
 test('kick reaches extension in 45ms and retracts with its support foot planted',()=>{
   const peak=P.Motion.pose({pose:'kick',age:.045}),end=P.Motion.pose({pose:'kick',age:.22});

@@ -1,9 +1,9 @@
 /** Gameplay data. Keep balance values and permanent IDs here, not in rendering. */
 (function (P) {
   'use strict';
-  P.VERSION = '0.3.0';
+  P.VERSION = '0.4.0';
   P.CONFIG = { width:1280, height:720, ground:600, roadTop:550, roadBottom:650, carryHeight:196, fixedStep:1/60,
-    walkSpeed:230, gravity:1600, jumpSpeed:590, guardRadius:240,
+    walkSpeed:230, runSpeed:380, gravity:1600, guardRadius:240, bossGateOffset:330,
     punchCooldown:.5, kickCooldown:1, reviveSeconds:10, reviveFraction:.5,
     saveKey:'piggy-quest-save-v2', sourceDate:'2026-10-04' };
   P.HELPERS = [
@@ -13,7 +13,7 @@
     {id:'scout',name:'잎새',role:'동굴에서 만난 친구',description:'비밀 동굴에서 발견하는 민첩한 조수.',color:'#7a9250',hp:95,attack:13,range:115,cooldown:.75,price:null}
   ];
   P.SKILLS = [
-    {id:'jump',name:'뛰기 · 도약',icon:'↟',description:'스페이스 키로 뛰어올라요. 강화하면 더 높이!',price:100,max:3,utility:true},
+    {id:'run',name:'뛰기 · 달리기',icon:'»',description:'이동하면서 Shift 또는 달리기 버튼을 누르세요. 강화하면 더 빨라요!',price:100,max:3,utility:true},
     {id:'spin',name:'돌려차기',icon:'↻',description:'앞뒤의 가까운 적을 한 번에 밀어내요.',price:180,max:3,cd:3.6},
     {id:'dash',name:'돌진',icon:'➜',description:'앞으로 빠르게 돌진하며 부딪힌 적을 밀쳐요.',price:210,max:3,cd:3.3},
     {id:'fire',name:'불 펀치',icon:'♨',description:'전방으로 불꽃 주먹을 날려요. 두 손이 필요해요.',price:290,max:3,cd:3.8,hands:true},

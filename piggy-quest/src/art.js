@@ -44,6 +44,7 @@
   }
   function landmarks(c,room,camera,theme){
     for(const mark of room.landmarks||[]){
+      if(room.bossX&&Math.abs(mark.x-(room.bossX-C.bossGateOffset))<265)continue;
       if(mark.x<camera-350||mark.x>camera+1630)continue;
       c.save();c.translate(mark.x,0);
       const y=C.roadTop;
@@ -79,23 +80,40 @@
   }
   function stick(c,x,y,o={}){
     const rig=P.Motion.pose(o),body=o.color||'#294a40';
-    const {hip,shoulder,head,rearFoot,frontFoot,rearHand,frontHand,rearElbow,frontElbow,rearKnee,frontKnee}=rig;
+    const {hip,shoulder,rearShoulder,frontShoulder,head,rearFoot,frontFoot,rearHand,frontHand,rearElbow,frontElbow,rearKnee,frontKnee}=rig;
     c.save();c.translate(x,y);c.scale((o.scale||1)*(o.dir||1),o.scale||1);
     const limb=(a,mid,b,width=6.5)=>line(c,[a,mid,b],body,width);
-    c.globalAlpha=.7;limb(shoulder,rearElbow,rearHand);limb(hip,rearKnee,rearFoot);c.globalAlpha=1;
+    if(rig.spinArc>0){c.save();c.globalAlpha=rig.spinArc*.35;c.strokeStyle='#c3ad76';c.lineWidth=5;c.beginPath();c.ellipse(hip[0],hip[1]+20,94,45,-.3,-1.1,1.2);c.stroke();c.restore();}
+    c.globalAlpha=.75;limb(hip,rearKnee,rearFoot);c.globalAlpha=1;
     line(c,[hip,[(hip[0]+shoulder[0])*.5,(hip[1]+shoulder[1])*.5],shoulder],body,7);
     line(c,[shoulder,[head[0],head[1]+13]],body,5.5);
-    limb(hip,frontKnee,frontFoot);limb(shoulder,frontElbow,frontHand);
-    for(const foot of [rearFoot,frontFoot])line(c,[[foot[0]-3,foot[1]],[foot[0]+7,foot[1]]],body,6);
+    line(c,[rearShoulder,frontShoulder],body,6);limb(hip,frontKnee,frontFoot);
+    const rearActive=rig.attackArm==='rear';
+    const arm=(anchor,elbow,hand,alpha)=>{c.globalAlpha=alpha;limb(anchor,elbow,hand);if(o.pose==='punch')ellipse(c,hand[0],hand[1],4.4,4.4,body);c.globalAlpha=1;};
+    if(rearActive){arm(frontShoulder,frontElbow,frontHand,.75);arm(rearShoulder,rearElbow,rearHand,1);}
+    else{arm(rearShoulder,rearElbow,rearHand,o.carrying?1:.75);arm(frontShoulder,frontElbow,frontHand,1);}
+    for(const [i,foot] of [rearFoot,frontFoot].entries())line(c,[[foot[0]-3,foot[1]-(i===0?rig.turn*4:0)],[foot[0]+7,foot[1]]],body,6);
     ellipse(c,head[0],head[1],13,13,'#f6f2d9');c.strokeStyle=body;c.lineWidth=4.5;c.beginPath();c.arc(head[0],head[1],13,0,Math.PI*2);c.stroke();
     line(c,[[head[0]-13,head[1]-2],[head[0]+13,head[1]-2]],o.band||'#dbbc70',3);
     line(c,[[head[0]-12,head[1]-2],[head[0]-24,head[1]+1],[head[0]-28,head[1]-2]],o.band||'#dbbc70',2.5);
     if(o.shield){c.fillStyle='#c8d1be';c.strokeStyle=body;c.lineWidth=3;c.beginPath();c.ellipse(frontHand[0],frontHand[1]-7,16,24,-.15,0,Math.PI*2);c.fill();c.stroke();}
     c.restore();
   }
+  function gate(c,x,locked,remaining,name,theme){
+    const y=C.ground,stone=theme==='amber'?'#a89874':'#829780';
+    ellipse(c,x,y+4,102,10,'rgba(48,74,48,.12)');
+    for(const side of [-1,1]){c.fillStyle=stone;c.beginPath();c.roundRect(x+side*78-15,y-156,30,158,[15,15,5,5]);c.fill();ellipse(c,x+side*78,y-145,24,8,'#a3b18c');}
+    c.strokeStyle=stone;c.lineWidth=22;c.lineCap='round';c.beginPath();c.arc(x,y-138,78,Math.PI,Math.PI*2);c.stroke();
+    for(let i=0;i<5;i++){const a=Math.PI+i*Math.PI/4;ellipse(c,x+Math.cos(a)*80,y-140+Math.sin(a)*78,15,8,'#92aa7d');}
+    if(locked){
+      line(c,[[x-75,y-58],[x,y-47],[x+75,y-58]],'#ad9970',5);
+      c.fillStyle='#ddd0a3';c.beginPath();c.roundRect(x-26,y-62,52,30,7);c.fill();label(c,'⌘',x,y-40,16,'#6d7956');
+      label(c,'깊은 곳의 입구',x,y-248,15);label(c,'남은 몬스터 '+remaining+'마리',x,y-227,12);
+    }else label(c,name,x,y-236,15);
+  }
   function bar(c,x,y,value,max,w=70,color='#789f7e'){
     c.fillStyle='rgba(254,250,230,.8)';c.beginPath();c.roundRect(x-w/2,y,w,6,3);c.fill();c.fillStyle=color;c.beginPath();c.roundRect(x-w/2,y,w*clamp(value/max,0,1),6,3);c.fill();
   }
   function label(c,text,x,y,size=14,color='#426457'){c.font=`500 ${size}px system-ui, sans-serif`;c.textAlign='center';c.fillStyle=color;c.fillText(text,x,y);}
-  P.Art={init,image,images,ellipse,line,scenery,landmarks,anchors,stick,bar,label,rock};
+  P.Art={init,image,images,ellipse,line,scenery,landmarks,anchors,stick,gate,bar,label,rock};
 })(globalThis.PIGGY = globalThis.PIGGY || {});

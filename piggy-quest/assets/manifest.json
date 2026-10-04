@@ -1,11 +1,14 @@
 {
   "version": 1,
-  "provenance": "Original code-authored SVG prototype art; not final painted or generated animation assets.",
+  "provenance": "Per-entry provenance: generated ceramic piggy bank and original SVG monster/item designs.",
   "assets": {
     "pig": {
       "file": "assets/pig.svg",
-      "type": "svg",
-      "anchor": "bottom-center"
+      "type": "svg-embedded-png",
+      "anchor": "visible-bottom-center",
+      "provenance": "Original image_gen design, 2026-10-04. Inert right-facing ceramic piggy bank; original PNG bytes embedded without pixel edits.",
+      "direction": "right",
+      "idle_animation": "none"
     },
     "slime": {
       "file": "assets/slime.svg",

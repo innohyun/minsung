@@ -14,16 +14,29 @@ The only wall-clock timeouts are notifications and revoking generated download U
 Background: forest/ruins/brook layers, fixed world feature IDs, independent parallax factors,
 foreground rocks and per-room landmarks. Camera changes do not reseed shapes.
 Actors: fixed-length joint rigs from motion.js, distance-driven planted feet, counter-swinging
-shoulders, alternating punches and 45ms snap kicks; separate carry/air/hit poses.
+shoulders, 90/290ms alternating punches and 45ms snap kicks; separate carry/air/hit poses.
+Walking uses FK elbows with consistent hinge direction. Carry IK uses outward elbows and fixed
+hand anchors. Running blends stride length without resetting gaitPhase. Roundhouse has its own
+620ms chamber/pivot/extension/re-chamber/plant sequence, with damage at 260ms.
 All ground actors stand at y=600, the midpoint of the visible 550–650 dirt road.
 Monsters/items: original SVG files as Image objects, with transform-based bounce/wing/attack feedback.
+pig.svg embeds original generated PNG bytes with a visible-bounds viewBox; it is an inert
+right-facing ceramic prop and has no idle motion or direction flipping.
 Changing final art does not require changing enemy balance data.
+
+## Input and sound
+
+Playing hides camp header/footer and fills the viewport. Action dock renders only learned and
+currently applicable actions; utility/source/save/sound controls live in the pause dialog.
+Touch-action, selection/callout rules and Safari gesture listeners suppress zoom/selection.
+Web Audio starts only after an input gesture; envelopes/noise generate local foley with no downloads.
 
 ## Save boundary
 
 State rules contain all serializable progression. The game snapshots player/pig position and HP.
 Map IDs and enemy/chest IDs are stable. Live room enemies are filtered using saved dead IDs.
 Schema 2 saves add default progress for new maps and unlock the successor of already cleared maps.
+Legacy skills.jump is normalized into skills.run at the same level. Money and map IDs stay unchanged.
 Uncollected coins persist in drops. Chest opening and enemy death are persisted immediately.
 Periodic snapshots run about every 0.8 simulation seconds; pagehide/visibility suspend also snapshot.
 Same-origin localStorage does not provide account security or multi-device synchronization.

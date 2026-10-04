@@ -16,8 +16,13 @@ shapes={
 'repair':'''<path d="M60 7q-24 0-23 25L14 57q-11 14 5 19q5 1 10-6l26-29q24-1 25-24L63 27L50 20Z" fill="#9aafa5" stroke="#577b6f" stroke-width="3"/><circle cx="22" cy="64" r="4" fill="#e5ead6"/>'''
 }
 for name,body in shapes.items():
+ if name=='pig':continue  # Keep the generated right-facing ceramic asset.
  view='0 0 120 80' if name=='pig' else '0 0 100 80'
  svg=f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{view}"><defs><linearGradient id="p" x2="0" y2="1"><stop stop-color="#f4c3c0"/><stop offset="1" stop-color="#df95a7"/></linearGradient><linearGradient id="s" x2="0" y2="1"><stop stop-color="#c8d993"/><stop offset="1" stop-color="#91b26d"/></linearGradient></defs>{body}</svg>'
  (root/f'{name}.svg').write_text(svg)
 manifest={'version':1,'provenance':'Original code-authored SVG prototype art; not final painted or generated animation assets.', 'assets':{k:{'file':f'assets/{k}.svg','type':'svg','anchor':'bottom-center'} for k in sorted(p.stem for p in root.glob('*.svg'))}}
+previous=json.loads((root/'manifest.json').read_text()) if (root/'manifest.json').exists() else {}
+manifest['provenance']=previous.get('provenance',manifest['provenance'])
+for name,meta in previous.get('assets',{}).items():
+ if name in manifest['assets']:manifest['assets'][name].update(meta)
 (root/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
