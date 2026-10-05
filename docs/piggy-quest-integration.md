@@ -19,7 +19,16 @@
 새 모듈: `src/exploration.js`(비밀 구역·객원 조수·고체 발판·배치 저장), `src/pixel.js`(픽셀 아틀라스·배경·소품).
 정산/처치/상자 보존, 저금통 죽음의 원정 코인 손실, 기존 관절/보스/방패 충돌 규칙은 유지합니다.
 
-검증: 게임 단위 53, 번들 46, HTTP 조작 29, 지형/방패/편집 34, 재시작/맵 20, 새 탐험 24개와 최종 산출물 HTTP/소스 ZIP/대시보드 10개가 통과했습니다. 최종 산출물에서도 탐험 24개와 번들 46개를 확인했습니다. 기존 저장소 전체 테스트 baseline 77 통과/6 실패는 보존만 했습니다. 기존 서버 HTTP 200과 로컬 DB 체크섬 보존을 확인했습니다. 이번 배포 결과는 게시 후 이 문서에 기록합니다.
+검증: 게임 단위 53, 번들 46, HTTP 조작 29, 지형/방패/편집 34, 재시작/맵 20, 새 탐험 24개와 최종 산출물 HTTP/소스 ZIP/대시보드 10개가 통과했습니다. 최종 산출물에서도 탐험 24개와 번들 46개를 확인했습니다. 기존 저장소 전체 테스트 baseline 77 통과/6 실패는 보존만 했습니다. 기존 서버 HTTP 200과 로컬 DB 체크섬 보존을 확인했습니다. 게시 완료: https://minsung.pages.dev/piggy-quest/ (v0.6.0).
+
+- 게임 구현 커밋: `d8e981157510e1300a9067d86e4060086505ce50`; 조수 방패까지 적용한 최종 배포 코드: `99a42ef2a993a2ed1941112a8cdc01d3d8631c86`. GitHub main에 push 완료.
+- 최종 Pages production 배포: `cce768cb-922f-45cd-b444-cc52fcffb61a`, https://cce768cb.minsung.pages.dev/piggy-quest/ . API에서 production/main/deploy success 및 위 코드 커밋을 확인했습니다.
+- 산출물: `/workspace/builds/minsung-pages-piggy-v060-20261005-final`, 공개 allowlist 95파일. 게임 HTML SHA-256 `340b97fce49c17642471172145c016471fc37210f802cb5f91f78ee3d19f9460`.
+- 공개 루트·게임·대시보드·소스 진입 페이지·저금통 이미지·배포 URL 게임의 HTTPS HTTP 200 및 로컬 산출물과 바이트 일치를 확인했습니다. 루트는 기존 Marble Builder 첫 화면을 보존했습니다.
+- 원래 첫 화면 SHA-256 `37a05e005b7ecb26d1ea3250df67cd8b357713b2d607895898412b9b011b03a1` 및 `.local/minsung.sqlite` SHA-256 `2aafd39bdb7720eace4078fa8b05421e29b45f73df6b13e4b1e077ed87d735f6` 유지. 기존 Node 서버 HTTP 200. server.mjs와 루트 package.json/lockfile 변경 없음.
+- 계정 소유 토큰의 계정 verify 결과 success=true/status=active, 기존 minsung 프로젝트 조회 성공. 비밀 값/Authorization 헤더는 출력하거나 공개 산출물에 포함하지 않았습니다. 기존 환경 설정·설치 스크립트·시크릿 바인딩 변경 없음. 새 Cloudflare 프로젝트/Workers/D1/DNS 리소스 생성 없음.
+- 브라우저 게임 검증은 VM Chromium의 실제 입력과 격리된 저장/경계 상태를 사용했습니다. 최종 픽셀 조수 방패 수정 후 산출물 HTTP·소스 ZIP·저장 복원 10개를 다시 확인했습니다. 네이티브 iPad/Safari 및 공개 HTTPS의 브라우저 렌더링 검증은 하지 못했습니다. HTTPS 게시 검증은 지원 프록시와 정상 TLS 검증으로 응답/파일 바이트와 Pages API 상태를 확인했습니다.
+
 
 ---
 
