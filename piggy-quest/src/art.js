@@ -98,7 +98,7 @@
     ellipse(c,head[0],head[1],13,13,'#f6f2d9');c.strokeStyle=body;c.lineWidth=4.5;c.beginPath();c.arc(head[0],head[1],13,0,Math.PI*2);c.stroke();
     line(c,[[head[0]-13,head[1]-2],[head[0]+13,head[1]-2]],o.band||'#dbbc70',3);
     line(c,[[head[0]-12,head[1]-2],[head[0]-24,head[1]+1],[head[0]-28,head[1]-2]],o.band||'#dbbc70',2.5);
-    if(o.shield){c.fillStyle='#c8d1be';c.strokeStyle=body;c.lineWidth=3;c.beginPath();c.ellipse(frontHand[0],frontHand[1]-7,16,24,-.15,0,Math.PI*2);c.fill();c.stroke();}
+    if(o.shield)P.Pixel.sprite(c,'shield',frontHand[0],frontHand[1]+24,34,58);
     if(o.playerShield){
       const cy=o.blocking?-83:-112;
       P.Pixel.sprite(c,'shield',42,cy+68,64,140);
