@@ -132,7 +132,7 @@ with sync_playwright() as pw:
         ctxm,pm=ready(browser,{'width':920,'height':480})
         pm.locator('#depart').click();pm.wait_for_timeout(80)
         check('Mobile landscape fits viewport without horizontal scrolling',pm.evaluate('document.documentElement.scrollWidth<=innerWidth'))
-        for selector in ['[data-hold="a"]','[data-hold="d"]','#punch-btn','#kick-btn']:
+        for selector in ['[data-hold="a"]','[data-hold="d"]','#attack-btn','#jump-btn']:
             box=pm.locator(selector).bounding_box();check('Mobile control visible: '+selector,box and box['width']>=40 and box['height']>=40 and box['y']+box['height']<=480,box)
         # A genuine touch sequence exercises pointer capture, not synthetic PointerEvents.
         box=pm.locator('[data-hold="d"]').bounding_box();cdp=ctxm.new_cdp_session(pm)

@@ -107,12 +107,9 @@
     c.restore();
   }
   function gate(c,x,locked,remaining,name,theme){
-    const y=C.ground;P.Pixel.sprite(c,'arch',x,y+8,220,255);
-    if(locked){
-      line(c,[[x-75,y-58],[x,y-47],[x+75,y-58]],'#ad9970',5);
-      c.fillStyle='#ddd0a3';c.beginPath();c.roundRect(x-26,y-62,52,30,7);c.fill();label(c,'⌘',x,y-40,16,'#6d7956');
-      label(c,'깊은 곳의 입구',x,y-248,15);label(c,'남은 몬스터 '+remaining+'마리',x,y-227,12);
-    }else label(c,name,x,y-236,15);
+    const y=C.ground;P.Pixel.sprite(c,'sign',x,y-51,95,150);
+    label(c,locked?'깊은 곳의 입구':name,x,y-215,15);
+    if(locked)label(c,'남은 몬스터 '+remaining+'마리',x,y-237,12);
   }
   function bar(c,x,y,value,max,w=70,color='#789f7e'){
     c.fillStyle='rgba(254,250,230,.8)';c.beginPath();c.roundRect(x-w/2,y,w,6,3);c.fill();c.fillStyle=color;c.beginPath();c.roundRect(x-w/2,y,w*clamp(value/max,0,1),6,3);c.fill();

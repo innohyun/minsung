@@ -10,7 +10,7 @@
       this.resize();window.addEventListener('resize',()=>this.resize());
     }
     resize(){const d=Math.min(window.devicePixelRatio||1,2);this.canvas.width=1280*d;this.canvas.height=720*d;this.ctx.setTransform(d,0,0,d,0,0);}
-    clearInput(){this.keys.clear();P.Controls?.releaseAll();}
+    clearInput(){this.keys.clear();this.attackPending=null;P.Controls?.releaseAll();}
     left(){return this.keys.has('a')||this.keys.has('arrowleft');}
     right(){return this.keys.has('d')||this.keys.has('arrowright');}
     start(mapId,replay=false){
@@ -42,8 +42,15 @@
     spawnBoss(){if(this.room.bossX&&this.remaining()===0&&!this.progress.cleared&&!this.enemies.some(e=>e.type==='boss')){this.enemies.push(this.makeEnemy({id:this.map.id+'-boss',x:this.room.bossX,type:'boss'}));this.toast('all-cleared');}}
     toast(text){if(text==='all-cleared')text='일반 길의 몬스터를 모두 처치했어요. 비밀 구역은 선택이에요. 가장 깊은 곳의 보스를 찾아가세요!';P.UI?.toast(text);}
     nearEnemy(range,center=this.player.x,vertical=140){return this.enemies.filter(e=>e.hp>0&&e.active&&Math.abs(e.x-center)<range&&Math.abs(e.y-this.player.y)<vertical).sort((a,b)=>Math.abs(a.x-center)-Math.abs(b.x-center))[0];}
+    attackTap(){
+      if(this.mode!=='play'||this.travel||this.player.dig>0)return;
+      if(this.attackPending!==null&&this.attackPending!==undefined){
+        this.attackPending=null;this.punch();
+      }else this.attackPending=C.attackTapWindow;
+    }
     punch(){
       if(this.mode!=='play'||this.travel||this.player.dig>0)return;
+      this.attackPending=null;
       const p=this.player;if(P.Exploration.hasHands(this)){this.toast('저금통을 들고 있을 때는 발차기를 사용해요.');return;}if(p.punch>0)return;
       if((p.pose==='kick'&&p.age<.22)||(p.pose==='spin'&&p.age<.62))return;
       p.punch=C.punchCooldown;p.pose='punch';p.age=0;p.firstHit=.09;p.firstPending=true;p.secondHit=.29;p.secondPending=true;
@@ -52,6 +59,7 @@
     }
     kick(){
       if(this.mode!=='play'||this.travel||this.player.dig>0||this.player.kick>0)return;const p=this.player;if(p.pose==='spin'&&p.age<.62)return;p.kick=C.kickCooldown;p.pose='kick';p.age=0;
+      this.attackPending=null;
       p.firstPending=false;p.secondPending=false;p.kickHit=.045;p.kickPending=true;
       const enemy=this.nearEnemy(143);p.kickAimY=enemy?clamp(enemy.y-p.y-this.enemyConfig(enemy).h*.5,-95,-28):-74;if(enemy)p.dir=enemy.x>p.x?1:-1;
     }
@@ -60,7 +68,7 @@
       if(!skill||!level){this.toast('홈에서 기술을 배우고 이 자리에 장착하세요.');return;}
       if(p.pose==='spin'&&p.age<.62)return;
       if((p.skills[id]||0)>0)return;if(skill.hands&&P.Exploration.hasHands(this)){this.toast('이 기술은 저금통을 내려놓아야 사용할 수 있어요.');return;}
-      p.skills[id]=skill.cd/(1+(level-1)*.13);if(id!=='spin')P.Audio.play('skill');
+      this.attackPending=null;p.skills[id]=skill.cd/(1+(level-1)*.13);if(id!=='spin')P.Audio.play('skill');
       if(id==='spin'){p.pose='spin';p.age=0;p.firstPending=false;p.secondPending=false;p.kickPending=false;p.spinPending=true;p.spinHit=.26;p.spinLevel=level;
         const enemy=this.nearEnemy(185+level*15);p.spinAimY=enemy?clamp(-this.enemyConfig(enemy).h*.7,-94,-40):-76;if(enemy)p.dir=enemy.x>p.x?1:-1;}
       if(id==='dash'){p.dash=.28;p.pose='dash';p.age=0;p.dashHits=new Set();}
@@ -79,6 +87,7 @@
     }
     interact(){
       if(this.mode!=='play'||this.travel||this.player.dig>0)return;const p=this.player,s=P.state;
+      this.attackPending=null;
       const digging=P.Exploration.site(this);if(digging&&!this.pig.carrying){P.Exploration.dig(this,digging);return;}
       const chest=this.room.chests.find(c=>!this.progress.opened.includes(c.id)&&Math.abs(c.x-p.x)<100);
       if(chest){this.progress.opened.push(chest.id);s.runCoins+=chest.coins||0;s.inventory.potion=Math.min(999,s.inventory.potion+(chest.potion||0));s.inventory.repair=Math.min(999,s.inventory.repair+(chest.repair||0));this.pig.bounce=.5;this.snapshot();P.Audio.play('chest');P.UI?.loot(chest);return;}
@@ -146,6 +155,7 @@
       if(this.mode!=='play')return;if(this.travel){this.travelTick(dt);return;}
       if(this.mode!=='play'||this.travel)return;
       const p=this.player,s=P.state;this.time+=dt;this.savedAt+=dt;this.roomTitle=Math.max(0,this.roomTitle-dt);
+      if(this.attackPending!==null&&this.attackPending!==undefined){this.attackPending-=dt;if(this.attackPending<=0){this.attackPending=null;this.kick();}}
       p.dig=Math.max(0,p.dig-dt);p.punch=Math.max(0,p.punch-dt);p.kick=Math.max(0,p.kick-dt);p.inv=Math.max(0,p.inv-dt);p.age+=dt;
       for(const id of Object.keys(p.skills))p.skills[id]=Math.max(0,p.skills[id]-dt);
       if(p.age>({dig:.48,punch:.46,kick:.22,spin:.62,dash:.32}[p.pose]||.48))p.pose='idle';

@@ -60,9 +60,34 @@ test('found companion joins current expedition without buying a slot or replacin
 });
 test('individual control sizes clamp independently and legacy global defaults remain intact',()=>{
  const raw=P.State.fresh();raw.settings.controls.sizes={'punch-btn':76,'jump-btn':999,joystick:1,unknown:99};const s=P.State.normalize(raw);
- assert.equal(s.settings.controls.size,56);assert.deepEqual(s.settings.controls.sizes,{'joystick':88,'jump-btn':96,'punch-btn':76});
+ assert.equal(s.settings.controls.size,56);assert.deepEqual(s.settings.controls.sizes,{'joystick':88,'jump-btn':96,'attack-btn':76});
 });
 test('shop offers agree with real purchase charges and affordability',()=>{
  const s=P.State.fresh();for(const t of P.SKILLS){const o=P.State.offer(s,'skill',t.id);assert.equal(o.cost,t.price);assert.equal(o.affordable,t.price<=120);}
  const o=P.State.offer(s,'skill','run');assert.equal(P.State.purchase(s,'skill','run'),'');assert.equal(s.coins,120-o.cost);assert.equal(P.State.offer(s,'skill','woodshield').affordable,false);
+});
+test('room checks require every local enemy and never expose an undiscovered cave',()=>{
+ const g=game();g.player.x=1000;
+ for(const map of P.MAPS){g.map=map;g.room=map.rooms.main;g.progress=P.State.freshProgress(map);
+  assert.ok(!P.World.chart(g).includes('data-cleared-room'));
+  g.progress.dead=map.rooms.main.enemies.slice(0,-1).map(e=>e.id);
+  assert.ok(!P.World.chart(g).includes('data-cleared-room="main"'));
+  g.progress.dead.push(map.rooms.main.enemies.at(-1).id);
+  assert.ok(!P.World.chart(g).includes('data-cleared-room="main"'),'boss still alive');
+  g.progress.cleared=true;assert.ok(P.World.chart(g).includes('data-cleared-room="main"'));
+  const [id,hidden]=Object.entries(map.rooms).find(([,r])=>r.hidden);g.progress.dead.push(...hidden.enemies.map(e=>e.id));
+  assert.ok(!P.World.chart(g).includes('data-cleared-room="'+id+'"'));
+  g.progress.visited.push(id);assert.ok(P.World.chart(g).includes('data-cleared-room="'+id+'"'));
+  const s=P.State.fresh();s.progress[map.id]=g.progress;g.progress=P.State.normalize(s).progress[map.id];
+  assert.ok(P.World.chart(g).includes('data-cleared-room="main"'));
+ }
+});
+test('unified attack layout prefers current settings, then legacy kick, then punch',()=>{
+ const s=P.State.fresh();s.coins=333;s.progress.wind.dead=['wind-main-0'];
+ s.settings.controls.sizes={'kick-btn':72,'punch-btn':80};s.settings.controls.positions={'punch-btn':{x:.7,y:.8}};
+ let n=P.State.normalize(s);assert.equal(n.settings.controls.sizes['attack-btn'],72);assert.deepEqual(n.settings.controls.positions['attack-btn'],{x:.7,y:.8});
+ assert.equal(n.coins,333);assert.deepEqual(n.progress.wind.dead,['wind-main-0']);
+ s.settings.controls.sizes['attack-btn']=60;s.settings.controls.positions['attack-btn']={x:.8,y:.7};n=P.State.normalize(s);
+ assert.equal(n.settings.controls.sizes['attack-btn'],60);assert.deepEqual(n.settings.controls.positions['attack-btn'],{x:.8,y:.7});
+ assert.equal(n.settings.controls.sizes['kick-btn'],undefined);
 });

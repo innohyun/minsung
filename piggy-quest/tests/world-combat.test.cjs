@@ -50,7 +50,7 @@ test('projectile disappears on shield impact without harming player',()=>{
 });
 test('control import clamps size/position and starts sound enabled',()=>{
   const raw=P.State.fresh();raw.settings={sound:false,soundExplicit:true,volume:99,controls:{mode:'bad',size:999,stickSize:1,positions:{'punch-btn':{x:-9,y:4},bad:{x:.5,y:.5}}}};
-  const s=P.State.normalize(raw);assert.equal(s.settings.sound,true);assert.equal(s.settings.controls.size,88);assert.equal(s.settings.controls.stickSize,88);assert.deepEqual(s.settings.controls.positions,{'punch-btn':{x:.02,y:.98}});assert.equal(s.settings.volume,1);
+  const s=P.State.normalize(raw);assert.equal(s.settings.sound,true);assert.equal(s.settings.controls.size,88);assert.equal(s.settings.controls.stickSize,88);assert.deepEqual(s.settings.controls.positions,{'attack-btn':{x:.02,y:.98}});assert.equal(s.settings.volume,1);
 });
 test('every boss cycles multiple telegraphs, projectiles and movement',()=>{
   for(const map of P.MAPS){const g=game();g.map=map;g.room=map.rooms.main;g.hazards=[];g.enemyConfig=()=>({...P.ENEMIES.boss,...map.boss});g.player.x=2000;g.pig.x=1900;

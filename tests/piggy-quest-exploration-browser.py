@@ -17,7 +17,7 @@ with sync_playwright() as pw:
  ctx=b.new_context(viewport={'width':1180,'height':820},has_touch=True)
  p=ctx.new_page();p.on('pageerror',lambda e:errors.append(str(e)))
  check('Actual HTTP responds',p.goto(URL).status==200);p.wait_for_selector('#loading',state='hidden')
- check('Native A atlases load and default sound has no toggle button',p.evaluate("PIGGY.VERSION==='0.7.0'&&PIGGY.Art.images['a-scenery'].naturalWidth===1774&&PIGGY.Art.images['a-props'].naturalWidth===1536&&PIGGY.Art.images['cave-monsters'].naturalWidth===2172&&Object.keys(PIGGY.Pixel.tiles).length===16&&PIGGY.state.settings.sound&&!document.getElementById('sound-play')&&!document.getElementById('sound')"))
+ check('Native A atlases load and default sound has no toggle button',p.evaluate("PIGGY.VERSION==='0.8.0'&&PIGGY.Art.images['a-scenery'].naturalWidth===1774&&PIGGY.Art.images['a-props'].naturalWidth===1536&&PIGGY.Art.images['cave-monsters'].naturalWidth===2172&&Object.keys(PIGGY.Pixel.tiles).length===16&&PIGGY.state.settings.sound&&!document.getElementById('sound-play')&&!document.getElementById('sound')"))
  check('Camp shows three genuinely affordable equipment purchases',p.evaluate("document.querySelectorAll('.camp-shortcuts button').length===3&&document.getElementById('camp-skills-offer').textContent==='구매 가능 3개'"))
  p.locator('.camp-shortcuts [data-view="skills"]').click()
  check('Shovel is affordable and expensive skills stay disabled',p.locator('[data-id="shovel"]').is_enabled() and p.locator('[data-id="spin"]').is_disabled() and p.locator('[data-id="shovel"] .purchase-note').inner_text()=='구매 가능')
@@ -90,14 +90,14 @@ with sync_playwright() as pw:
  p.locator('#found-close').click()
  check('Hidden cave monsters may remain alive when the surface boss becomes available',p.evaluate("()=>{const P=PIGGY,g=P.game;g.progress.dead=P.requiredEnemies(g.map).map(e=>e.id);g.loadRoom('main');return g.remaining()===0&&g.enemies.some(e=>e.type==='boss')&&g.map.rooms.cave.enemies.some(e=>!g.progress.dead.includes(e.id));}"))
  p.evaluate('PIGGY.game.enemies=[]');p.locator('#pause').click();p.locator('#pause-controls').click()
- before=p.locator('#kick-btn').bounding_box()['width']
- p.locator('#control-target').select_option('punch-btn');p.locator('#control-size').fill('76');p.locator('#control-size').dispatch_event('input')
- check('Selected punch size changes independently of kick and joystick',abs(p.locator('#punch-btn').bounding_box()['width']-76)<1 and p.locator('#kick-btn').bounding_box()['width']==before and p.locator('#joystick').bounding_box()['width']==112)
+ before=p.locator('#jump-btn').bounding_box()['width']
+ p.locator('#control-target').select_option('attack-btn');p.locator('#control-size').fill('76');p.locator('#control-size').dispatch_event('input')
+ check('Selected attack size changes independently of jump and joystick',abs(p.locator('#attack-btn').bounding_box()['width']-76)<1 and p.locator('#jump-btn').bounding_box()['width']==before and p.locator('#joystick').bounding_box()['width']==112)
  p.locator('#control-target').select_option('joystick');p.locator('#control-size').fill('138');p.locator('#control-size').dispatch_event('input');p.locator('#control-save').click()
- check('Individual punch and joystick sizes persist without changing global defaults',p.evaluate("PIGGY.state.settings.controls.sizes['punch-btn']===76&&PIGGY.state.settings.controls.sizes.joystick===138&&PIGGY.state.settings.controls.size===56"))
+ check('Individual attack and joystick sizes persist without changing global defaults',p.evaluate("PIGGY.state.settings.controls.sizes['attack-btn']===76&&PIGGY.state.settings.controls.sizes.joystick===138&&PIGGY.state.settings.controls.size===56"))
  p.reload();p.wait_for_selector('#loading',state='hidden')
- check('Guest, discovered cave and individual layout survive actual reload',p.evaluate("PIGGY.game.helpers.some(h=>h.id==='scout')&&PIGGY.game.progress.visited.includes('cave')&&PIGGY.state.settings.controls.sizes.joystick===138&&Math.abs(document.getElementById('punch-btn').getBoundingClientRect().width-76)<1"))
+ check('Guest, discovered cave and individual layout survive actual reload',p.evaluate("PIGGY.game.helpers.some(h=>h.id==='scout')&&PIGGY.game.progress.visited.includes('cave')&&PIGGY.state.settings.controls.sizes.joystick===138&&Math.abs(document.getElementById('attack-btn').getBoundingClientRect().width-76)<1"))
  check('No browser JavaScript exceptions',not errors)
  b.close()
-result={'version':'0.7.0','url':URL,'passed':len(checks),'failed':0,'checks':checks,'method':'Actual HTTP Chromium, real CDP multitouch and keyboard, real purchase and storage reload. Cave AI/shield/boss edge cases use explicit isolated scene setup; not native iPad/Safari or a full manual clear.'}
+result={'version':'0.8.0','url':URL,'passed':len(checks),'failed':0,'checks':checks,'method':'Actual HTTP Chromium, real CDP multitouch and keyboard, real purchase and storage reload. Cave AI/shield/boss edge cases use explicit isolated scene setup; not native iPad/Safari or a full manual clear.'}
 (OUT/'exploration-results.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n');print(json.dumps(result,ensure_ascii=False))

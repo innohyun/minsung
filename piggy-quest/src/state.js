@@ -37,9 +37,10 @@
     s.settings.volume=number(raw.settings?.volume,.8,.1,1);
     const controls=raw.settings?.controls||{};
     s.settings.controls={mode:controls.mode==='buttons'?'buttons':'joystick',size:integer(controls.size,56,44,88),stickSize:integer(controls.stickSize,112,88,150),positions:{},sizes:{}};
-    for(const id of ['joystick','move-a','move-d','world-map','command','run-btn','shield-btn','jump-btn','interact-btn','punch-btn','kick-btn','skill-0','skill-1','skill-2']){
-      if(controls.sizes?.[id]!==undefined)s.settings.controls.sizes[id]=integer(controls.sizes[id],id==='joystick'?112:56,id==='joystick'?88:44,id==='joystick'?150:96);
-      const p=controls.positions?.[id];if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))s.settings.controls.positions[id]={x:clamp(p.x,.02,.98),y:clamp(p.y,.02,.98)};
+    for(const id of ['joystick','move-a','move-d','world-map','command','run-btn','shield-btn','jump-btn','interact-btn','attack-btn','skill-0','skill-1','skill-2']){
+      const size=controls.sizes?.[id]??(id==='attack-btn'?(controls.sizes?.['kick-btn']??controls.sizes?.['punch-btn']):undefined);
+      if(size!==undefined)s.settings.controls.sizes[id]=integer(size,id==='joystick'?112:56,id==='joystick'?88:44,id==='joystick'?150:96);
+      const p=controls.positions?.[id]??(id==='attack-btn'?(controls.positions?.['kick-btn']??controls.positions?.['punch-btn']):undefined);if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))s.settings.controls.positions[id]={x:clamp(p.x,.02,.98),y:clamp(p.y,.02,.98)};
     }
     s.settings.reducedMotion=raw.settings?.reducedMotion===true;
     for(const map of P.MAPS) {

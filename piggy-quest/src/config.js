@@ -1,10 +1,10 @@
 /** Gameplay data. Keep balance values and permanent IDs here, not in rendering. */
 (function (P) {
   'use strict';
-  P.VERSION = '0.7.0';
+  P.VERSION = '0.8.0';
   P.CONFIG = { width:1280, height:720, ground:600, roadTop:550, roadBottom:650, carryHeight:196, fixedStep:1/60,
     walkSpeed:230, runSpeed:380, gravity:1600, guardRadius:240, bossGateOffset:330,
-    punchCooldown:.5, kickCooldown:1, reviveSeconds:10, reviveFraction:.5,
+    punchCooldown:.5, kickCooldown:1, attackTapWindow:.24, reviveSeconds:10, reviveFraction:.5,
     saveKey:'piggy-quest-save-v2', sourceDate:'2026-10-05' };
   P.HELPERS = [
     {id:'sprout',name:'새싹',role:'가벼운 두 주먹',description:'빠른 두 주먹으로 곁을 지키는 첫 동료.',color:'#498c83',hp:80,attack:9,range:88,cooldown:.85,price:0},

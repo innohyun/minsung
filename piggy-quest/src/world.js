@@ -58,6 +58,7 @@
     return room.mapTrack[i].map((v,n)=>v+(room.mapTrack[i+1][n]-v)*t);
   }
   function at(c,room,x,draw){c.save();c.translate(0,height(room,x));draw();c.restore();}
+  function roomCleared(g,id){const r=g.map.rooms[id];return g.progress.visited.includes(id)&&r.enemies.length>0&&r.enemies.every(e=>g.progress.dead.includes(e.id))&&(!r.bossX||g.progress.cleared);}
   function chart(g){
     const esc=s=>String(s).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
     const A=g.map.rooms,seenEdges=new Set(),endLabels=new Map();let edges='',routes='',marks='';
@@ -69,10 +70,11 @@
         const label=seenEdges.size;for(const [point,end] of [[a,"A"],[b,"B"]]){const placeKey=point.map(v=>Math.round(v/12)).join(":");const row=endLabels.get(placeKey)||0;endLabels.set(placeKey,row+1);marks+=`<g data-connector="${esc(key)}" data-end="${end}"><circle cx="${point[0]}" cy="${point[1]}" r="9" fill="#f7efd4" stroke="#637e61" stroke-width="2"/><text x="${point[0]+12}" y="${point[1]-10-row*14}" font-size="12" fill="#385c49">${label}${end}</text></g>`;}
       }
       const title=room.mapTrack[8];marks+=`<text x="${title[0]}" y="${title[1]-24}" text-anchor="middle" fill="#49604e" font-size="16">${esc(room.name)}</text>`;
+      if(roomCleared(g,id)){const p=room.mapTrack[12];marks+=`<g data-cleared-room="${esc(id)}" role="img" aria-label="${esc(room.name)} 몬스터 모두 처치"><circle cx="${p[0]}" cy="${p[1]-28}" r="13" fill="#547e59"/><text x="${p[0]}" y="${p[1]-22}" text-anchor="middle" fill="#fff8df" font-size="19">✓</text></g>`;}
       if(visited){for(const chest of room.chests.filter(c=>!g.progress.opened.includes(c.id))){const p=mapPoint(room,chest.x);marks+=`<rect x="${p[0]-6}" y="${p[1]-6}" width="12" height="12" rx="2" fill="#ba9363" stroke="#f7f2df"/>`;}}
     }
     const here=mapPoint(g.room,g.player.x),boss=mapPoint(A.main,A.main.bossX),camp=mapPoint(A.main,180);
     return `<svg class="route-map" viewBox="0 0 1000 620" role="img" aria-label="${esc(g.map.name)} 연결 지도 · 현재 ${esc(g.room.name)}"><defs><pattern id="map-grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M40 0H0V40" fill="none" stroke="#a5b591" stroke-opacity=".1"/></pattern></defs><rect width="1000" height="620" fill="#edf0d9" rx="18"/><rect width="1000" height="620" fill="url(#map-grid)"/>${edges}${routes}${marks}<text x="${camp[0]}" y="${camp[1]-28}" font-size="17" fill="#536c50">⌂ 캠프</text><text x="${boss[0]}" y="${boss[1]+32}" text-anchor="end" font-size="17" fill="#967458">◈ ${esc(g.map.bossName)}</text><circle cx="${here[0]}" cy="${here[1]}" r="13" fill="#426f61" stroke="#fff9df" stroke-width="4"/><text x="${here[0]}" y="${here[1]+36}" text-anchor="middle" font-size="15" fill="#38594c">현위치</text><text x="925" y="40" font-size="18" fill="#637b5c">N ↑</text></svg>`;
   }
-  P.World={height,mapPoint,at,chart};
+  P.World={height,mapPoint,at,chart,roomCleared};
 })(globalThis.PIGGY=globalThis.PIGGY||{});

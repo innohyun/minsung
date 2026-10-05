@@ -31,7 +31,7 @@
       <div class="action-dock" id="action-dock">
         <div class="utility-actions"><button id="jump-btn" data-action="jump" aria-label="점프 스페이스"><kbd>␣</kbd><span>↑</span><small>점프</small></button><button id="shield-btn" data-action="toggleShield" hidden aria-label="방패 B"><kbd>B</kbd><span>◈</span><small>방패</small></button><button id="world-map" aria-label="탐험 지도"><span>⌘</span><small>지도</small></button><button id="command" aria-label="조수 명령"><kbd>Q</kbd><span>◉</span><small id="command-label">조수</small></button><button id="run-btn" data-hold="shift" hidden aria-label="달리기"><kbd>⇧</kbd><span>»</span><small>달리기</small></button></div>
         <div class="skills-pad" id="skills-pad"></div>
-        <div class="combat"><button id="interact-btn" data-action="interact" aria-label="상호작용 E"><kbd>E</kbd><span>E</span><small>상호작용</small></button><button data-hold="j" id="punch-btn"><kbd>J</kbd><span>✧</span><small>펀치</small></button><button data-hold="k" id="kick-btn"><kbd>K</kbd><span>↗</span><small>발차기</small></button></div>
+        <div class="combat"><button id="interact-btn" data-action="interact" aria-label="상호작용 E"><kbd>E</kbd><span>E</span><small>상호작용</small></button><button data-action="attackTap" id="attack-btn" aria-label="공격: 한 번 발차기, 빠르게 두 번 펀치"><span>↗</span><small>발차기</small><small class="double-punch">2회 펀치</small></button></div>
       </div>
       <div class="progress-track"><i id="distance-progress"></i></div>
     </div>
@@ -44,7 +44,7 @@
     <button data-view="bag">가방 · 치료</button>
   </nav>
 </main>
-<footer><div><span class="live-dot"></span> 원정대 기록 <span class="muted">v0.7.0</span><span class="separator">·</span><button id="help">조작법 · 게임 규칙</button><button id="save-tools">저장 관리</button><button id="new-game">처음부터 시작</button></div><div class="footer-controls"><span>이동 A D · 펀치 J · 발차기 K · 상호작용 E</span><button id="fullscreen" aria-label="전체 화면">⛶</button></div></footer>
+<footer><div><span class="live-dot"></span> 원정대 기록 <span class="muted">v0.8.0</span><span class="separator">·</span><button id="help">조작법 · 게임 규칙</button><button id="save-tools">저장 관리</button><button id="new-game">처음부터 시작</button></div><div class="footer-controls"><span>공격 1회 발차기 · 2회 펀치 · 상호작용 E</span><button id="fullscreen" aria-label="전체 화면">⛶</button></div></footer>
 <p class="rotate-hint">휴대전화는 가로로 돌리면 더 넓게 탐험할 수 있어요.</p>
 </div>
 <dialog id="modal" aria-labelledby="modal-title"><div id="modal-body"></div></dialog>

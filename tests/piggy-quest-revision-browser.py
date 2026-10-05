@@ -23,7 +23,7 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda error: errors.append(str(error)))
     check('Real HTTP game responds', page.goto(URL).status == 200)
     page.wait_for_selector('#loading', state='hidden')
-    check('Updated game boots', page.evaluate("PIGGY.VERSION==='0.7.0'"))
+    check('Updated game boots', page.evaluate("PIGGY.VERSION==='0.8.0'"))
     check('Text selection disabled and Safari callout rule included', page.evaluate("getComputedStyle(document.body).userSelect==='none'&&PIGGY.SOURCE_FILES['styles.css'].includes('-webkit-touch-callout:none')"))
     context.grant_permissions(['clipboard-read', 'clipboard-write'])
     page.locator('#source-btn').click()

@@ -45,8 +45,14 @@
     $('control-save').onclick=()=>finish(true);$('control-cancel').onclick=()=>finish(false);select('joystick');
   }
   function init(){
+    // WebKit's native long-press selection can start despite pointerdown cancellation.
+    // Cancel touch defaults on the actual controls, without swallowing either pointer.
+    for(const type of ['touchstart','touchmove','touchend'])document.addEventListener(type,e=>{
+      if(!e.target.closest?.('.movement,.action-dock'))return;
+      e.preventDefault();window.getSelection()?.removeAllRanges();
+    },{passive:false,capture:true});
     const stick=$('joystick');stick.onpointerdown=e=>{if(editing||P.game.mode!=='play'||stickPointer!==null)return;e.preventDefault();P.Audio.unlock();stickPointer=e.pointerId;stick.setPointerCapture(e.pointerId);move(e);};
-    stick.onpointermove=e=>{if(e.pointerId===stickPointer&&!editing)move(e);};
+    stick.onpointermove=e=>{if(e.pointerId===stickPointer&&!editing){e.preventDefault();move(e);}};
     const end=e=>{if(e.pointerId===stickPointer)release();};stick.onpointerup=end;stick.onpointercancel=end;stick.onlostpointercapture=end;
     document.addEventListener('pointerdown',e=>{
       if(!editing)return;const b=e.target.closest('.movement button,.action-dock button,#joystick');if(!b||b.hidden)return;e.preventDefault();e.stopImmediatePropagation();select(b.id);

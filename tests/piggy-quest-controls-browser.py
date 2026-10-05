@@ -43,13 +43,20 @@ with sync_playwright() as pw:
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchStart', 'touchPoints': [point(selector, 1)]})
         cdp.send('Input.dispatchTouchEvent', {'type': 'touchEnd', 'touchPoints': []})
 
+    def double_attack():
+        pt=point('#attack-btn',1)
+        for n in range(2):
+            cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[pt]})
+            cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+            if n==0: page.wait_for_timeout(65)
+
     x = page.evaluate('PIGGY.game.player.x')
     page.keyboard.down('d'); page.wait_for_timeout(190); page.keyboard.up('d')
     check('Keyboard walking works with grounded feet', page.evaluate(f'PIGGY.game.player.x>{x}+15&&PIGGY.game.player.y===PIGGY.CONFIG.ground'))
     tap('#interact-btn')
     page.wait_for_timeout(120)
     check('Real touch E carries pig immediately at the hand height', page.evaluate('PIGGY.game.pig.carrying&&PIGGY.game.pig.x===PIGGY.game.player.x&&PIGGY.game.pig.y===PIGGY.game.player.y-PIGGY.CONFIG.carryHeight'))
-    check('Unusable hand attack stays visible and grey while carrying', page.locator('#punch-btn').is_visible() and page.locator('#punch-btn').is_disabled() and page.locator('#kick-btn').is_visible())
+    check('Unified attack stays usable for kicks and marks carried punches unavailable', page.locator('#attack-btn').is_enabled() and page.locator('#attack-btn .double-punch').evaluate('b=>getComputedStyle(b).opacity')=='0.35')
     page.screenshot(path=str(OUT/'carry.png'))
     page.reload(); page.wait_for_selector('#loading', state='hidden')
     check('Paused reload restores carried pig above the head', page.evaluate("PIGGY.game.mode==='pause'&&PIGGY.game.pig.carrying&&PIGGY.game.pig.y===PIGGY.game.player.y-PIGGY.CONFIG.carryHeight"))
@@ -71,15 +78,15 @@ with sync_playwright() as pw:
     page.wait_for_function('PIGGY.game.enemies.some(e=>e.hp>0&&e.active&&Math.abs(e.x-PIGGY.game.player.x)<95)', timeout=8000)
     page.keyboard.up('d'); page.keyboard.up('Shift')
     tap('#interact-btn'); page.wait_for_timeout(120)
-    check('E releases pig and restores punching button', not page.evaluate('PIGGY.game.pig.carrying') and page.locator('#punch-btn').is_visible())
-    tap('#punch-btn')
+    check('E releases pig and restores punching button', not page.evaluate('PIGGY.game.pig.carrying') and page.locator('#attack-btn').is_visible())
+    double_attack()
     page.wait_for_function('PIGGY.Audio.energy()>.001', timeout=2000)
     check('Gesture-unlocked effects emit an actual audio signal', page.evaluate("PIGGY.Audio.status()==='running'&&PIGGY.state.settings.sound"))
     page.wait_for_timeout(370)
-    tap('#kick-btn'); page.wait_for_timeout(160)
+    tap('#attack-btn'); page.wait_for_timeout(420)
     check('Normal input combat defeats an encountered enemy', page.evaluate('PIGGY.game.progress.dead.length>0'))
     for _ in range(2):
-        tap('#punch-btn'); page.wait_for_timeout(80)
+        double_attack(); page.wait_for_timeout(80)
     metrics = cdp.send('Page.getLayoutMetrics')
     check('Rapid repeated attack taps keep viewport scale unchanged', abs(metrics['visualViewport']['scale']-1)<.001)
     check('Selection and browser gesture fallbacks cancel default actions', page.evaluate("['selectstart','contextmenu','gesturestart','dblclick'].every(type=>!document.getElementById('game').dispatchEvent(new Event(type,{bubbles:true,cancelable:true})))&&getComputedStyle(document.getElementById('game')).touchAction==='none'"))
@@ -99,7 +106,7 @@ with sync_playwright() as pw:
     check('Roundhouse starts with a separate knee chamber', page.evaluate("PIGGY.game.player.pose==='spin'&&PIGGY.game.player.age<.23&&PIGGY.game.player.spinPending"))
     page.wait_for_timeout(550)
     check('Roundhouse completes and clears its pending strike', page.evaluate("PIGGY.game.player.pose==='idle'&&!PIGGY.game.player.spinPending"))
-    for selector in ['#world-map', '#command', '#run-btn', '#kick-btn', '[data-skill="0"]']:
+    for selector in ['#world-map', '#command', '#run-btn', '#attack-btn', '[data-skill="0"]']:
         box = page.locator(selector).bounding_box()
         check('Reachable right control: '+selector, box and box['x']>460 and box['width']>=44 and box['height']>=44 and box['y']+box['height']<=480)
 
