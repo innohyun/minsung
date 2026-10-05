@@ -68,6 +68,7 @@
       kickExtension=extend;spinArc=extend;
     }
     if(o.pose==='dash'){shoulder[0]+=20;head[0]+=25;}
+    if(o.pose==='dig'){const q=Math.sin(clamp(age/.4,0,1)*Math.PI);shoulder[0]+=q*10;hip[1]+=q*8;shoulder[1]+=q*12;head[1]+=q*12;rearFoot=[-10,0];frontFoot=[10,0];}
     if(o.hit){shoulder[0]-=6;head[0]-=9;}
     if(o.carrying){shoulder[0]*=.15;head[0]*=.15;shoulder[1]=-147+bob*.25;head[1]=-173+bob*.25;}
     if(o.blocking){hip[1]+=32;shoulder[1]+=32;head[1]+=32;rearFoot=[-12,0];frontFoot=[12,0];}
@@ -84,6 +85,7 @@
     }
     if(o.pose==='kick'||o.pose==='spin'){guard();if(o.pose==='spin')rearArm=fkArm(rearShoulder,-.55-turn*.3,.8);}
     if(o.pose==='dash'){rearArm=fkArm(rearShoulder,-1.1,.6);frontArm=fkArm(frontShoulder,.65,.7);}
+    if(o.pose==='dig'){rearArm=aimArm(rearShoulder,[24,-98],-1);frontArm=aimArm(frontShoulder,[47,-102],-1);}
     if(o.carrying){
       // Separate shoulder/hand lanes and outward elbows support the ceramic base without crossing.
       rearArm=aimArm(rearShoulder,[-31,-196],1);frontArm=aimArm(frontShoulder,[31,-196],-1);

@@ -1,7 +1,7 @@
 /** Gameplay data. Keep balance values and permanent IDs here, not in rendering. */
 (function (P) {
   'use strict';
-  P.VERSION = '0.6.0';
+  P.VERSION = '0.7.0';
   P.CONFIG = { width:1280, height:720, ground:600, roadTop:550, roadBottom:650, carryHeight:196, fixedStep:1/60,
     walkSpeed:230, runSpeed:380, gravity:1600, guardRadius:240, bossGateOffset:330,
     punchCooldown:.5, kickCooldown:1, reviveSeconds:10, reviveFraction:.5,
@@ -15,6 +15,7 @@
     {id:'scout',name:'잎새',role:'동굴에서 만난 친구',description:'비밀 동굴에서 발견하는 민첩한 조수.',color:'#7a9250',hp:95,attack:13,range:115,cooldown:.75,price:null}
   ];
   P.SKILLS = [
+    {id:'shovel',name:'탐험 삽',icon:'⚒',description:'다시 덮인 흙의 흔적 앞에서 E로 세 번 파면 지하 통로가 열려요. 선택 탐험용 장비이며 기술 칸을 쓰지 않아요.',price:90,max:1,utility:true},
     {id:'woodshield',name:'나무 방패',icon:'◈',description:'B로 들고 내려요. 멈추면 몸을 낮춰 가드합니다. 앞에서 오는 투사체를 막지만 운반 중에는 사용할 수 없어요.',price:120,max:1,utility:true},
     {id:'run',name:'뛰기 · 달리기',icon:'»',description:'이동하면서 Shift 또는 달리기 버튼을 누르세요. 강화하면 더 빨라요!',price:100,max:3,utility:true},
     {id:'spin',name:'돌려차기',icon:'↻',description:'앞뒤의 가까운 적을 한 번에 밀어내요.',price:180,max:3,cd:3.6},
@@ -24,6 +25,9 @@
     {id:'gun',name:'총',icon:'⌖',description:'멀리 있는 적에게 한 발. 두 손이 필요해요.',price:460,max:3,cd:1.8,hands:true}
   ];
   P.ENEMIES = {
+    'cave-archer':{name:'동굴 궁수',hp:105,attack:17,speed:75,range:390,cooldown:2.4,coins:38,w:80,h:112,asset:'cave-archer'},
+    'cave-charger':{name:'돌갑옷 돌진벌레',hp:155,attack:24,speed:88,range:310,cooldown:2.8,coins:48,w:112,h:84,asset:'cave-charger'},
+    'cave-guard':{name:'수정 바위 파수꾼',hp:190,attack:22,speed:62,range:76,cooldown:1.7,coins:54,w:98,h:122,asset:'cave-guard'},
     slime:{name:'풀방울',hp:30,attack:5,speed:67,range:58,cooldown:1.4,coins:12,w:62,h:57,asset:'slime'},
     boar:{name:'도토리 멧돼지',hp:52,attack:8,speed:100,range:64,cooldown:1.5,coins:20,w:76,h:58,asset:'boar'},
     rock:{name:'돌콩',hp:75,attack:11,speed:49,range:64,cooldown:1.8,coins:27,w:68,h:75,asset:'rock'},

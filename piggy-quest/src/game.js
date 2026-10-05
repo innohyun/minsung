@@ -21,7 +21,7 @@
       if(!s.active){s.runCoins=0;s.stats.runs++;}s.selectedMap=mapId;s.active=true;
       this.map=map;this.progress=s.progress[mapId];this.time=0;this.savedAt=0;this.pendingClear=false;this.travel=null;
       this.player={x:this.progress.x,y:C.ground,vx:0,vy:0,grounded:true,dir:1,hp:s.player.hp,inv:0,pose:'idle',age:0,
-        shieldRaised:!!s.skills.woodshield,punch:0,kick:0,firstHit:0,firstPending:false,secondHit:0,secondPending:false,kickPending:false,spinPending:false,
+        shieldRaised:!!s.skills.woodshield,dig:0,punch:0,kick:0,firstHit:0,firstPending:false,secondHit:0,secondPending:false,kickPending:false,spinPending:false,
         walkDistance:0,walkBlend:0,gaitPhase:0,runBlend:0,stepDistance:0,running:false,skills:{},flight:0,dash:0,dashHits:new Set()};
       this.pig={x:this.progress.carrying?this.player.x:this.progress.pigX,y:this.progress.carrying?C.ground-C.carryHeight:C.ground,hp:s.pig.hp,bounce:0,carrying:this.progress.carrying};
       this.helpers=[...new Set([...s.party,...(this.progress.guests||[])])].map((id,i)=>({id,x:this.player.x-65-i*55,y:C.ground,vx:0,dir:1,pose:'idle',age:0,cd:0,inv:0,walkDistance:0,walkBlend:0}));
@@ -43,7 +43,7 @@
     toast(text){if(text==='all-cleared')text='일반 길의 몬스터를 모두 처치했어요. 비밀 구역은 선택이에요. 가장 깊은 곳의 보스를 찾아가세요!';P.UI?.toast(text);}
     nearEnemy(range,center=this.player.x,vertical=140){return this.enemies.filter(e=>e.hp>0&&e.active&&Math.abs(e.x-center)<range&&Math.abs(e.y-this.player.y)<vertical).sort((a,b)=>Math.abs(a.x-center)-Math.abs(b.x-center))[0];}
     punch(){
-      if(this.mode!=='play'||this.travel)return;
+      if(this.mode!=='play'||this.travel||this.player.dig>0)return;
       const p=this.player;if(P.Exploration.hasHands(this)){this.toast('저금통을 들고 있을 때는 발차기를 사용해요.');return;}if(p.punch>0)return;
       if((p.pose==='kick'&&p.age<.22)||(p.pose==='spin'&&p.age<.62))return;
       p.punch=C.punchCooldown;p.pose='punch';p.age=0;p.firstHit=.09;p.firstPending=true;p.secondHit=.29;p.secondPending=true;
@@ -51,12 +51,12 @@
       if(enemy)p.dir=enemy.x>p.x?1:-1;
     }
     kick(){
-      if(this.mode!=='play'||this.travel||this.player.kick>0)return;const p=this.player;if(p.pose==='spin'&&p.age<.62)return;p.kick=C.kickCooldown;p.pose='kick';p.age=0;
+      if(this.mode!=='play'||this.travel||this.player.dig>0||this.player.kick>0)return;const p=this.player;if(p.pose==='spin'&&p.age<.62)return;p.kick=C.kickCooldown;p.pose='kick';p.age=0;
       p.firstPending=false;p.secondPending=false;p.kickHit=.045;p.kickPending=true;
       const enemy=this.nearEnemy(143);p.kickAimY=enemy?clamp(enemy.y-p.y-this.enemyConfig(enemy).h*.5,-95,-28):-74;if(enemy)p.dir=enemy.x>p.x?1:-1;
     }
     skill(index){
-      if(this.mode!=='play'||this.travel)return;const s=P.state,id=s.equipped[index],skill=P.skillById(id),p=this.player,level=s.skills[id];
+      if(this.mode!=='play'||this.travel||this.player.dig>0)return;const s=P.state,id=s.equipped[index],skill=P.skillById(id),p=this.player,level=s.skills[id];
       if(!skill||!level){this.toast('홈에서 기술을 배우고 이 자리에 장착하세요.');return;}
       if(p.pose==='spin'&&p.age<.62)return;
       if((p.skills[id]||0)>0)return;if(skill.hands&&P.Exploration.hasHands(this)){this.toast('이 기술은 저금통을 내려놓아야 사용할 수 있어요.');return;}
@@ -71,16 +71,15 @@
     command(){if(this.mode!=='play'||this.travel)return;P.state.mode=P.state.mode==='follow'?'guard':'follow';this.toast(P.state.mode==='guard'?'조수들이 저금통 주변을 지킵니다.':'조수들이 다시 따라옵니다.');this.snapshot();}
     interactionLabel(){
       const p=this.player;if(!p||!this.room||this.travel)return '';
-      if(p.carryingObject)return '물건 내려놓기 · 쌓기';
+      const digging=P.Exploration.site(this);if(digging&&!this.pig.carrying)return P.state.skills.shovel?'흙 파기':'흙의 흔적 조사';
       if(this.room.chests.some(c=>!this.progress.opened.includes(c.id)&&Math.abs(c.x-p.x)<100))return '상자 열기';
       if(this.room.helper&&!P.state.helpers[this.room.helper.id]&&Math.abs(this.room.helper.x-p.x)<95)return '조수와 만나기';
       if(this.room.portals.some(portal=>Math.abs(portal.x-p.x)<90&&P.Exploration.accessible(this,portal))&&(this.pig.carrying||Math.abs(this.pig.x-p.x)<=150))return '샛길 이동';
-      if(!this.pig.carrying&&P.Exploration.near(this))return '물건 들기';
       if(this.pig.carrying)return '저금통 내려놓기';if(Math.abs(this.pig.x-p.x)<100)return '저금통 들기';return '';
     }
     interact(){
-      if(this.mode!=='play'||this.travel)return;const p=this.player,s=P.state;
-      if(p.carryingObject){P.Exploration.drop(this);return;}
+      if(this.mode!=='play'||this.travel||this.player.dig>0)return;const p=this.player,s=P.state;
+      const digging=P.Exploration.site(this);if(digging&&!this.pig.carrying){P.Exploration.dig(this,digging);return;}
       const chest=this.room.chests.find(c=>!this.progress.opened.includes(c.id)&&Math.abs(c.x-p.x)<100);
       if(chest){this.progress.opened.push(chest.id);s.runCoins+=chest.coins||0;s.inventory.potion=Math.min(999,s.inventory.potion+(chest.potion||0));s.inventory.repair=Math.min(999,s.inventory.repair+(chest.repair||0));this.pig.bounce=.5;this.snapshot();P.Audio.play('chest');P.UI?.loot(chest);return;}
       const found=this.room.helper;
@@ -88,14 +87,13 @@
       const portal=this.room.portals.filter(x=>Math.abs(x.x-p.x)<90&&P.Exploration.accessible(this,x)).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0];
       if(portal){if(!this.pig.carrying&&Math.abs(this.pig.x-p.x)>150){this.toast('저금통을 가까이 데려오거나 들고 이동하세요.');return;}
         this.travel={portal:{...portal},age:0,duration:1.15,from:this.room.name,to:this.map.rooms[portal.target].name};this.clearInput();this.snapshot();P.Audio.play('step');return;}
-      const object=!this.pig.carrying&&P.Exploration.near(this);if(object){P.Exploration.pickup(this,object);return;}
       if(this.pig.carrying){this.pig.carrying=false;this.pig.x=clamp(p.x+p.dir*38,35,this.room.width-35);this.pig.y=C.ground;}
       else if(Math.abs(this.pig.x-p.x)<100){this.pig.carrying=true;this.pig.x=p.x;this.pig.y=p.y-C.carryHeight;}
       else{this.toast('저금통·상자·샛길 가까이에서 E를 눌러주세요.');return;}
       P.Audio.play('carry');this.snapshot();
     }
     jump(){
-      if(this.mode!=='play'||this.travel)return;const p=this.player;if(p.vy!==0||(!p.grounded&&p.y<C.ground-1))return;
+      if(this.mode!=='play'||this.travel||this.player.dig>0)return;const p=this.player;if(p.vy!==0||(!p.grounded&&p.y<C.ground-1))return;
       p.vy=-610;p.grounded=false;p.firstPending=false;p.secondPending=false;p.pose='idle';P.Audio.play('skill');
     }
     travelTick(dt){
@@ -148,15 +146,15 @@
       if(this.mode!=='play')return;if(this.travel){this.travelTick(dt);return;}
       if(this.mode!=='play'||this.travel)return;
       const p=this.player,s=P.state;this.time+=dt;this.savedAt+=dt;this.roomTitle=Math.max(0,this.roomTitle-dt);
-      p.punch=Math.max(0,p.punch-dt);p.kick=Math.max(0,p.kick-dt);p.inv=Math.max(0,p.inv-dt);p.age+=dt;
+      p.dig=Math.max(0,p.dig-dt);p.punch=Math.max(0,p.punch-dt);p.kick=Math.max(0,p.kick-dt);p.inv=Math.max(0,p.inv-dt);p.age+=dt;
       for(const id of Object.keys(p.skills))p.skills[id]=Math.max(0,p.skills[id]-dt);
-      if(p.age>({punch:.46,kick:.22,spin:.62,dash:.32}[p.pose]||.48))p.pose='idle';
+      if(p.age>({dig:.48,punch:.46,kick:.22,spin:.62,dash:.32}[p.pose]||.48))p.pose='idle';
       if(p.firstPending){p.firstHit-=dt;if(p.firstHit<=0){p.firstPending=false;if(!P.Exploration.hasHands(this)){P.Audio.play('punch');const e=this.nearEnemy(118);if(e)this.hitEnemy(e,10+s.player.attackLevel*3,18*p.dir);}}}
       if(p.secondPending){p.secondHit-=dt;if(p.secondHit<=0){p.secondPending=false;if(!P.Exploration.hasHands(this)){P.Audio.play('punch');const e=this.nearEnemy(118);if(e)this.hitEnemy(e,10+s.player.attackLevel*3,18*p.dir);}}}
       if(p.kickPending){p.kickHit-=dt;if(p.kickHit<=0){p.kickPending=false;P.Audio.play('kick');const e=this.nearEnemy(143);if(e)this.hitEnemy(e,17+s.player.attackLevel*4,190*p.dir);}}
       if(p.spinPending){p.spinHit-=dt;if(p.spinHit<=0){p.spinPending=false;P.Audio.play('spin');for(const e of this.enemies)if(e.hp>0&&e.active&&Math.abs(e.x-p.x)<185+p.spinLevel*15&&Math.abs(e.y-p.y)<150)this.hitEnemy(e,26+p.spinLevel*11,220*(e.x>p.x?1:-1));}}
       const axis=Number(this.right())-Number(this.left());p.running=!!axis&&(p.grounded||p.y>=C.ground-1)&&!!s.skills.run&&this.keys.has('shift');
-      const target=axis*(p.running?C.runSpeed+(s.skills.run-1)*35:C.walkSpeed);p.vx+=(target-p.vx)*Math.min(1,dt*17);
+      const target=(p.pose==='dig'?0:axis)*(p.running?C.runSpeed+(s.skills.run-1)*35:C.walkSpeed);p.vx+=(target-p.vx)*Math.min(1,dt*17);
       if(axis)p.dir=axis;
       if(p.dash>0){p.dash=Math.max(0,p.dash-dt);p.vx=p.dir*690;for(const e of this.enemies)if(e.hp>0&&e.active&&Math.abs(e.x-p.x)<115&&!p.dashHits.has(e.id)){p.dashHits.add(e.id);this.hitEnemy(e,30+(s.skills.dash||1)*9,p.dir*250);}}
       const previousX=p.x,previousY=p.y;p.x+=p.vx*dt;p.x=clamp(p.x,40,this.room.width-60);
@@ -189,7 +187,7 @@
         if(e.hp<=0)continue;const def=this.enemyConfig(e);
         if(e.x+def.w>this.camera&&e.x-def.w<this.camera+1280)e.active=true;
         e.hit=Math.max(0,e.hit-dt);e.stun=Math.max(0,e.stun-dt);e.cd=Math.max(0,e.cd-dt);e.x+=e.kb*dt;e.kb*=Math.max(0,1-dt*8);
-        e.x=clamp(e.x,25,this.room.width-25);if(!e.active)continue;if(e.type==='boss'){P.Combat.bossTick(this,e,dt);continue;}if(e.stun>0)continue;
+        e.x=clamp(e.x,25,this.room.width-25);if(!e.active)continue;if(e.type==='boss'){P.Combat.bossTick(this,e,dt);continue;}if(e.stun>0)continue;if(e.type.startsWith('cave-')){P.Combat.caveTick(this,e,dt);continue;}
         const target=this.targetFor(e);if(!target)continue;let dist=target.x-e.x;e.dir=dist>=0?1:-1;
         if(e.windup>0){e.windup-=dt;if(e.windup<=0&&Math.abs(dist)<def.range+28){
           this.hurt(target,def.attack*this.map.scale,e.x);if(e.type==='boss')this.particles.push({type:'ring',x:e.x,y:C.ground-5,r:30,life:.45,max:.45});}
@@ -250,7 +248,7 @@
       c.save();if(this.shake&&!reduced)c.translate(Math.sin(t*93)*this.shake,Math.cos(t*81)*this.shake*.3);c.translate(-this.camera,-this.cameraY);
       A.landmarks(c,this.room,this.camera,this.map.theme);P.Exploration.draw(c,this);
       for(const portal of this.room.portals.filter(p=>!p.secret||this.progress.visited.includes(p.target)))P.World.sign(c,portal,this.room,this.player.x);
-      for(const chest of this.room.chests)at(chest.x,()=>{const open=this.progress.opened.includes(chest.id);c.save();c.globalAlpha=open?.35:1;P.Pixel.sprite(c,'crate',chest.x,C.ground+2,69,56);c.restore();if(!open&&Math.abs(chest.x-this.player.x)<120)A.label(c,'E · 상자 열기',chest.x,C.ground-67,13);});
+      for(const chest of this.room.chests)at(chest.x,()=>{const open=this.progress.opened.includes(chest.id);c.save();c.globalAlpha=open?.35:1;P.Pixel.sprite(c,'chest',chest.x,C.ground+2,69,56);c.restore();if(!open&&Math.abs(chest.x-this.player.x)<120)A.label(c,'E · 상자 열기',chest.x,C.ground-67,13);});
       const found=this.room.helper;if(found&&!P.state.helpers[found.id])at(found.x,()=>{A.stick(c,found.x,C.ground,{color:P.helperById(found.id).color,time:t,scale:.8});A.label(c,'E · '+P.helperById(found.id).name+'와 만나기',found.x,C.ground-159,13);});
       if(this.room.bossX)at(this.room.bossX-C.bossGateOffset,()=>A.gate(c,this.room.bossX-C.bossGateOffset,this.remaining()>0,this.remaining(),this.map.bossName,this.map.theme));
       if(P.state.mode==='guard'){c.save();c.setLineDash([5,8]);c.strokeStyle='rgba(77,118,92,.3)';c.lineWidth=1.4;c.beginPath();c.ellipse(this.pig.x,C.ground+3+H(this.pig.x),C.guardRadius,32,0,0,Math.PI*2);c.stroke();c.restore();}
@@ -261,10 +259,10 @@
         if(e.type==='bat')c.translate(0,-26-Math.sin(t*10+e.phase)*9);
         if(e.type==='boar')c.rotate(Math.sin(t*9+e.phase)*.025);
         if(e.type==='boss')c.translate(0,Math.sin(t*2)*1.5);
-        if(e.hit>0)c.globalAlpha=.6;A.image(c,def.asset,0,0,def.w,def.h);c.restore();
+        if(e.hit>0)c.globalAlpha=.6;if(e.type.startsWith('cave-'))P.Pixel.monster(c,e.type,0,0,def.w,def.h);else A.image(c,def.asset,0,0,def.w,def.h);c.restore();
         if(e.hp<e.max||e.type==='boss')A.bar(c,e.x,C.ground+(e.bossLift||0)-def.h-(e.type==='bat'?35:12),e.hp,e.max,e.type==='boss'?160:55,'#b88078');
         if(e.type==='boss')A.label(c,this.map.bossName,e.x,C.ground+(e.bossLift||0)-def.h-33,14);
-        if(e.windup>0)A.label(c,e.type==='boss'?e.warning:'!',e.x,C.ground-def.h-(e.type==='boss'?57:24),e.type==='boss'?12:24,'#b97955');
+        if(e.windup>0)A.label(c,e.type==='boss'||e.type.startsWith('cave-')?e.warning:'!',e.x,C.ground-def.h-(e.type==='boss'?57:24),e.type==='boss'||e.type.startsWith('cave-')?12:24,'#b97955');
         if(e.type==='boss'&&e.pattern==='leap'&&e.windup>0)A.ellipse(c,e.aimX,C.ground+H(e.aimX)-H(e.x),60,12,'#c3846c55');
         });
       }
@@ -276,15 +274,17 @@
       if(threat)A.label(c,'! 저금통 주의',this.pig.x,this.pig.y-94,13,'#a86a62');
       for(const id of this.helpers.map(h=>h.id)){const stored=P.state.helpers[id];if(stored.hp<=0)A.label(c,P.helperById(id).name+' 부활 '+Math.ceil(stored.revive)+'초',this.pig.x,this.pig.y-111-P.state.party.indexOf(id)*17,12);}});
       at(this.player.x,()=>{A.ellipse(c,this.player.x,(this.player.grounded?this.player.y:C.ground)+4,23,5,'rgba(39,69,51,.15)');
-      A.stick(c,this.player.x,this.player.y,{time:this.time,speed:this.player.vx,phase:this.player.gaitPhase,walkBlend:this.player.walkBlend,runBlend:this.player.runBlend,dir:this.player.dir,pose:this.player.pose,age:this.player.age,aimY:this.player.aimY,kickAimY:this.player.kickAimY,spinAimY:this.player.spinAimY,carrying:P.Exploration.hasHands(this),air:!this.player.grounded&&this.player.y<C.ground-4,hit:this.player.inv>.35,playerShield:P.Combat.shieldActive(this),blocking:P.Combat.blocking(this),slope:this.pig.carrying?0:Math.atan((H(this.player.x+10)-H(this.player.x-10))/20)});
-      const object=this.objects.find(o=>o.carried);if(object)P.Pixel.sprite(c,object.kind,this.player.x,this.player.y-C.carryHeight+object.h*.12,object.w+12,object.h+12);
+      A.stick(c,this.player.x,this.player.y,{time:this.time,speed:this.player.vx,phase:this.player.gaitPhase,walkBlend:this.player.walkBlend,runBlend:this.player.runBlend,dir:this.player.dir,pose:this.player.pose,age:this.player.age,aimY:this.player.aimY,kickAimY:this.player.kickAimY,spinAimY:this.player.spinAimY,carrying:P.Exploration.hasHands(this),air:!this.player.grounded&&this.player.y<C.ground-4,hit:this.player.inv>.35,playerShield:P.Combat.shieldActive(this),blocking:P.Combat.blocking(this),slope:0});
       A.bar(c,this.player.x,this.player.y-(P.Combat.blocking(this)?174:210),this.player.hp,P.state.player.max,66,this.player.hp/P.state.player.max<.3?'#c85555':'#6d9878');});
       for(const h of this.hazards){
         if(h.age<.35){c.globalAlpha=.6;A.ellipse(c,h.x,C.ground+H(h.x),85,12,'#c5a36e');A.label(c,'충격파 · 뒤로 피하세요',h.x,C.ground-218+H(h.x),13);c.globalAlpha=1;}
         else for(const sign of [-1,1]){A.line(c,[[h.x+sign*h.radius,C.ground+H(h.x+sign*h.radius)],[h.x+sign*h.radius-10,C.ground-22+H(h.x+sign*h.radius)]],this.map.theme==='brook'?'#72a7a1':'#d2a66f',6);}
       }
       for(const b of this.projectiles)at(b.x,()=>{A.ellipse(c,b.x,b.y,b.type==='fire'?12:8,b.type==='fire'?8:3,b.type==='fire'?'#e6a36b':'#e9d7a0');A.line(c,[[b.x-Math.sign(b.vx)*23,b.y],[b.x,b.y]],'#f8dfac',3);});
-      for(const b of this.enemyShots)at(b.x,()=>{A.ellipse(c,b.x,b.y,b.r,b.r,b.theme==='amber'?'#c68357':b.theme==='brook'?'#81b8b2':'#879c60');A.line(c,[[b.x-Math.sign(b.vx)*18,b.y],[b.x,b.y]],'#dfdaba',3);});
+      for(const b of this.enemyShots)at(b.x,()=>{
+        if(b.type==='arrow'){c.save();c.translate(b.x,b.y);c.rotate(Math.atan2(b.vy,b.vx));A.line(c,[[-18,0],[13,0]],'#725d42',2.4);A.line(c,[[8,-4],[16,0],[8,4]],'#b7c3b5',2.5);A.line(c,[[-14,-4],[-9,0],[-14,4]],'#e4dbc3',2);c.restore();}
+        else{A.ellipse(c,b.x,b.y,b.r,b.r,b.theme==='amber'?'#c68357':b.theme==='brook'?'#81b8b2':'#879c60');A.line(c,[[b.x-Math.sign(b.vx)*18,b.y],[b.x,b.y]],'#dfdaba',3);}
+      });
       for(const f of this.coinFlights){let q=f.t,x=f.x+(this.pig.x-f.x)*q,y=f.y+(this.pig.y-35-f.y)*q-Math.sin(q*Math.PI)*90;A.image(c,'coin',x,y+H(x),17,20);}
       for(const f of this.particles){c.save();c.translate(0,H(f.x));c.globalAlpha=Math.max(0,f.life/f.max);
         if(f.type==='ring'){c.strokeStyle='#ebd5a1';c.lineWidth=4;c.beginPath();c.ellipse(f.x,f.y,f.r,f.r*.4,0,0,Math.PI*2);c.stroke();}

@@ -3,28 +3,55 @@ const {test}=require('node:test'),assert=require('node:assert/strict');
 require('../src/config.js');require('../src/world.js');require('../src/exploration.js');require('../src/state.js');
 const P=globalThis.PIGGY;P.Audio={play(){}};
 function game(){P.state=P.State.fresh();const map=P.MAPS[0],progress=P.state.progress.wind;
- const g={map,room:map.rooms.main,roomId:'main',progress,player:{x:1000,y:600,vy:0,dir:1},pig:{carrying:false},helpers:[],snapshot(){P.Exploration.snapshot(this);}};P.Exploration.load(g);return g;}
-test('secret rooms are optional, have companions and require no purchased skill',()=>{
- for(const map of P.MAPS){const hidden=Object.values(map.rooms).filter(r=>r.hidden);assert.equal(hidden.length,1);assert.ok(hidden[0].helper);assert.ok(hidden[0].enemies.length>0);
+ const g={map,room:map.rooms.main,roomId:'main',progress,player:{x:1000,y:600,vy:0,dir:1,grounded:true,dig:0},pig:{carrying:false},helpers:[],particles:[],toast(){},snapshot(){P.Exploration.snapshot(this);}};P.Exploration.load(g);return g;}
+test('hidden cave enemies and companions remain optional for every boss',()=>{
+ for(const map of P.MAPS){const hidden=Object.values(map.rooms).filter(r=>r.hidden);assert.equal(hidden.length,1);assert.ok(hidden[0].helper);
   const required=new Set(P.requiredEnemies(map).map(e=>e.id));assert.ok(hidden[0].enemies.every(e=>!required.has(e.id)));
-  const portal=map.rooms.main.portals.find(p=>p.secret);assert.ok(portal.height>120);assert.ok(map.rooms.main.objects.filter(o=>o.id.startsWith(map.id+'-secret')).length>=3);
+  assert.deepEqual(new Set(hidden[0].enemies.map(e=>e.type)),new Set(['cave-archer','cave-charger','cave-guard']));
+  for(const r of Object.values(map.rooms))assert.deepEqual(r.objects,[]);
  }
+ assert.deepEqual(P.MAPS.map(m=>P.requiredEnemies(m).length),[48,40,46]);
 });
-test('falling player lands on a solid crate rather than falling through it',()=>{
- const g=game();g.objects=[{id:'one',kind:'crate',x:1000,y:600,w:72,h:60,vy:0,carried:false}];g.player.y=544;g.player.vy=80;
- P.Exploration.physics(g,1/60,1000,538);assert.equal(g.player.y,540);assert.equal(g.player.vy,0);assert.ok(g.player.grounded);
+test('obsolete carried objects are cleared without changing current coins, kills or chests',()=>{
+ const g=game();g.progress.dead=['wind-main-0'];g.progress.opened=['w-c1'];P.state.coins=333;
+ g.progress.carriedObject='wind-secret-crate';g.player.carryingObject=g.progress.carriedObject;g.objects=[{id:'old'}];P.Exploration.load(g);
+ assert.deepEqual(g.objects,[]);assert.equal(g.player.carryingObject,'');assert.equal(g.progress.carriedObject,'');
+ const s=P.State.normalize(P.state);assert.equal(s.coins,333);assert.deepEqual(s.progress.wind.dead,['wind-main-0']);assert.deepEqual(s.progress.wind.opened,['w-c1']);
 });
-test('grounded movement is blocked by the side of a solid crate',()=>{
- const g=game();g.objects=[{id:'one',kind:'crate',x:1000,y:600,w:72,h:60,vy:0,carried:false}];g.player.x=967;
- P.Exploration.physics(g,1/60,950,600);assert.ok(g.player.x<960);
+test('free jumping lands on the ground without an old object platform',()=>{
+ const g=game();g.player.y=544;g.player.vy=80;P.Exploration.physics(g);assert.equal(g.player.y,544);assert.equal(g.player.grounded,false);
+ g.player.y=605;P.Exploration.physics(g);assert.equal(g.player.y,600);assert.equal(g.player.vy,0);assert.equal(g.player.grounded,true);
 });
-test('carry, stack, save and normalize preserve stable object IDs and layout',()=>{
- const g=game(),a=g.objects[0],b=g.objects[1];b.x=1100;b.y=600;g.player.x=1100-a.w/2-25;
- assert.ok(P.Exploration.pickup(g,a));assert.ok(a.carried);assert.ok(P.Exploration.drop(g));assert.equal(a.x,b.x);assert.equal(a.y,b.y-b.h);
- const s=P.State.normalize(P.state);assert.deepEqual(s.progress.wind.objects[a.id],{x:a.x,y:a.y});assert.equal(s.progress.wind.carriedObject,'');
+test('sealed soil requires an owned shovel and rejects airborne digging',()=>{
+ const g=game(),q=g.room.portals.find(p=>p.secret);g.player.x=q.x;
+ assert.equal(P.Exploration.site(g),q);P.Exploration.dig(g,q);assert.equal(g.progress.excavations[q.digId],undefined);
+ assert.equal(P.State.purchase(P.state,'skill','shovel'),'');assert.equal(P.state.coins,30);assert.deepEqual(P.state.equipped,[]);
+ g.player.grounded=false;P.Exploration.dig(g,q);assert.equal(g.progress.excavations[q.digId],undefined);
 });
-test('an elevated secret entrance is hidden from ground interaction until entered',()=>{
- const g=game(),portal=g.room.portals.find(p=>p.secret);assert.equal(P.Exploration.accessible(g,portal),false);g.player.y=600-portal.height;assert.ok(P.Exploration.accessible(g,portal));g.player.y=600;g.progress.visited.push(portal.target);assert.ok(P.Exploration.accessible(g,portal));
+test('three separate digs open a passage without revealing it on the map',()=>{
+ const g=game(),q=g.room.portals.find(p=>p.secret);g.player.x=q.x;P.state.skills.shovel=1;
+ for(let n=1;n<=3;n++){
+  g.player.dig=0;P.Exploration.dig(g,q);assert.equal(g.progress.excavations[q.digId],n);
+  P.Exploration.dig(g,q);assert.equal(g.progress.excavations[q.digId],n,'rapid repeated input cannot skip digging recovery');
+  assert.equal(P.Exploration.accessible(g,q),n===3);
+ }
+ assert.equal(g.progress.visited.includes(q.target),false);assert.ok(!P.World.chart(g).includes(g.map.rooms[q.target].name));
+ assert.equal(P.Exploration.site(g),undefined);assert.equal(P.state.coins,120);
+});
+test('partial excavation survives normalization and clamps imported progress',()=>{
+ const g=game(),q=g.room.portals.find(p=>p.secret);g.progress.excavations[q.digId]=2;g.progress.excavations.unknown=99;
+ const s=P.State.normalize(P.state);assert.equal(s.progress.wind.excavations[q.digId],2);assert.equal(s.progress.wind.excavations.unknown,undefined);
+ s.progress.wind.excavations[q.digId]=999;assert.equal(P.State.normalize(s).progress.wind.excavations[q.digId],3);
+});
+test('previously discovered secret rooms remain accessible after save migration',()=>{
+ const g=game(),q=g.room.portals.find(p=>p.secret);g.progress.visited.push(q.target);delete g.progress.excavations;
+ const s=P.State.normalize(P.state);assert.equal(s.progress.wind.excavations[q.digId],3);g.progress=s.progress.wind;
+ assert.ok(P.Exploration.accessible(g,q));assert.ok(P.World.chart(g).includes(g.map.rooms[q.target].name));
+});
+test('every map connection has one matching entry and exit with its actual edge ID',()=>{
+ const g=game();g.progress.visited=Object.keys(g.map.rooms);const chart=P.World.chart(g),edges=new Map();
+ for(const match of chart.matchAll(/data-connector="([^"]+)" data-end="([AB])"/g)){const ends=edges.get(match[1])||[];ends.push(match[2]);edges.set(match[1],ends);}
+ assert.ok(edges.size>=6);for(const [edge,ends] of edges){assert.ok(edge.includes(':'));assert.deepEqual(ends,['A','B']);}
 });
 test('found companion joins current expedition without buying a slot or replacing party',()=>{
  const g=game(),def=P.helperById('scout');P.state.helpers.scout={hp:def.hp,revive:0};P.Exploration.join(g,def);P.Exploration.join(g,def);

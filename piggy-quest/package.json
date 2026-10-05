@@ -1,6 +1,6 @@
 {
   "name": "piggy-quest",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "private": true,
   "description": "Offline-first side-scrolling piggy-bank escort game with its own source viewer",
   "scripts": {

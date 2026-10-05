@@ -30,7 +30,9 @@
       if(!P.state?.settings.sound||!context||context.state!=='running')return;
       try{
         const t=context.currentTime;master.gain.value=(P.state.settings.volume??.8)*3.5;lastPlayed=name;playCount++;
-        if(name==='step'||name==='run-step'){noise(t,.07,650,.024);tone(t,name==='step'?80:105,38,.07,.012,'triangle');}
+        if(name==='dig'){noise(t,.16,900,.07);tone(t,120,42,.16,.028,'triangle');}
+        else if(name==='arrow'){noise(t,.11,3300,.04);tone(t,360,170,.09,.015);}
+        else if(name==='step'||name==='run-step'){noise(t,.07,650,.024);tone(t,name==='step'?80:105,38,.07,.012,'triangle');}
         else if(name==='punch'){noise(t,.10,1500,.040);tone(t,130,62,.10,.02,'triangle');}
         else if(name==='kick'){noise(t,.14,2600,.045);tone(t,98,42,.14,.025,'triangle');}
         else if(name==='spin'){noise(t,.22,3400,.045);tone(t,165,58,.18,.023,'triangle');}

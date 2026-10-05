@@ -23,7 +23,7 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda error: errors.append(str(error)))
     check('Real HTTP game responds', page.goto(URL).status == 200)
     page.wait_for_selector('#loading', state='hidden')
-    check('Updated game boots', page.evaluate("PIGGY.VERSION==='0.6.0'"))
+    check('Updated game boots', page.evaluate("PIGGY.VERSION==='0.7.0'"))
     check('Text selection disabled and Safari callout rule included', page.evaluate("getComputedStyle(document.body).userSelect==='none'&&PIGGY.SOURCE_FILES['styles.css'].includes('-webkit-touch-callout:none')"))
     context.grant_permissions(['clipboard-read', 'clipboard-write'])
     page.locator('#source-btn').click()
@@ -75,7 +75,9 @@ with sync_playwright() as pw:
             rooms.push(g.enemies.every(e=>e.hp===0));
             for(const portal of room.portals){
               g.loadRoom(roomId);g.player.x=portal.x;g.pig.x=portal.x;g.pig.carrying=true;
-              g.player.y=portal.secret?P.CONFIG.ground-portal.height:P.CONFIG.ground;g.interact();for(let n=0;n<72;n++)g.tick(1/60);portals.push(g.roomId===portal.target&&Math.abs(g.player.x-portal.spawn)<1&&g.pig.carrying);
+              // This graph/settlement case explicitly opens optional entrances; the exploration suite tests actual shovel purchase and digging.
+              if(portal.secret)g.progress.excavations[portal.digId]=P.Exploration.DIG_STEPS;
+              g.player.y=P.CONFIG.ground;g.interact();for(let n=0;n<72;n++)g.tick(1/60);portals.push(g.roomId===portal.target&&Math.abs(g.player.x-portal.spawn)<1&&g.pig.carrying);
             }
           }
           g.loadRoom('main');const boss=g.enemies.find(e=>e.type==='boss');

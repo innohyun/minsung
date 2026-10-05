@@ -58,17 +58,46 @@
       P.Audio.play('warning');
     }
   }
+  function caveTick(g,e,dt){
+    const def=g.enemyConfig(e);
+    if(e.charging>0){
+      e.charging=Math.max(0,e.charging-dt);e.x=clamp(e.x+e.chargeDir*470*dt,40,g.room.width-60);
+      const victims=[{kind:'player',x:g.player.x,y:g.player.y,actor:g.player},{kind:'pig',x:g.pig.x,y:g.pig.y,actor:g.pig},...g.helpers.filter(h=>P.state.helpers[h.id].hp>0).map(h=>({kind:'helper',x:h.x,y:h.y,actor:h}))];
+      for(const v of victims){const id=v.kind+(v.actor.id||'');if(!e.chargeHits.has(id)&&Math.abs(v.x-e.x)<65&&v.y>C.ground-def.h+4){e.chargeHits.add(id);g.hurt(v,def.attack*g.map.scale,e.x);}}
+      if(e.charging===0)e.cd=def.cooldown;return;
+    }
+    const target=g.targetFor(e);
+    if(e.windup>0){
+      e.windup=Math.max(0,e.windup-dt);if(e.windup>0)return;
+      if(e.type==='cave-archer'){
+        const x=e.x+e.attackDir*28,y=C.ground-85,T=clamp(Math.abs(e.aimX-x)/450,.55,1.1),gravity=720;
+        g.enemyShots.push({type:'arrow',x,y,vx:(e.aimX-x)/T,vy:(e.aimY-y-.5*gravity*T*T)/T,gravity,r:3,life:2.2,damage:def.attack*g.map.scale,theme:'cave'});P.Audio.play('arrow');e.cd=def.cooldown;
+      }else if(e.type==='cave-charger'){e.charging=.72;e.chargeDir=e.attackDir;e.chargeHits=new Set();}
+      else{if(target&&Math.abs(target.x-e.x)<def.range+25)g.hurt(target,def.attack*g.map.scale,e.x);e.cd=def.cooldown;}
+      return;
+    }
+    if(!target)return;
+    const distance=target.x-e.x;e.dir=distance>=0?1:-1;
+    if(Math.abs(distance)>def.range)e.x+=e.dir*def.speed*dt;
+    else if(e.type==='cave-archer'&&Math.abs(distance)<170)e.x-=e.dir*def.speed*.65*dt;
+    if(Math.abs(distance)<=def.range&&e.cd<=0){
+      e.windup=e.type==='cave-guard'?.5:.7;e.attackDir=e.dir;e.aimX=target.x;e.aimY=target.y-(target.kind==='pig'?28:100);
+      e.warning=e.type==='cave-archer'?'화살 · 점프 또는 방패':e.type==='cave-charger'?'돌진 준비 · 뛰어넘으세요':'내려치기 · 거리 유지';P.Audio.play('warning');
+    }
+  }
   function shotsTick(g,dt){
     for(const shot of g.enemyShots){
-      const previous={x:shot.x,y:shot.y};shot.life-=dt;shot.x+=shot.vx*dt;shot.y+=shot.vy*dt;
+      const previous={x:shot.x,y:shot.y};shot.life-=dt;shot.x+=shot.vx*dt;shot.y+=shot.vy*dt+.5*(shot.gravity||0)*dt*dt;shot.vy+=(shot.gravity||0)*dt;
       if(intercept(g,previous,shot)){shot.life=0;woodHit(g);continue;}
       const p=g.player;
       if(Math.max(previous.x,shot.x)>p.x-15&&Math.min(previous.x,shot.x)<p.x+15&&shot.y>p.y-(blocking(g)?150:185)&&shot.y<p.y+4){
         g.hurt({kind:'player',x:p.x,y:p.y,actor:p},shot.damage,previous.x);shot.life=0;continue;
       }
+      if(shot.type==='arrow')for(const h of g.helpers||[]){if(P.state.helpers[h.id]?.hp>0&&Math.abs(shot.x-h.x)<16&&shot.y>h.y-155&&shot.y<h.y){g.hurt({kind:'helper',x:h.x,y:h.y,actor:h},shot.damage,previous.x);shot.life=0;break;}}
+      if(shot.life<=0)continue;
       if(Math.abs(shot.x-g.pig.x)<32&&shot.y>g.pig.y-60&&shot.y<g.pig.y+4){g.hurt({kind:'pig',x:g.pig.x,y:g.pig.y,actor:g.pig},shot.damage,previous.x);shot.life=0;}
     }
-    g.enemyShots=g.enemyShots.filter(s=>s.life>0&&s.x>0&&s.x<g.room.width);
+    g.enemyShots=g.enemyShots.filter(s=>s.life>0&&s.x>0&&s.x<g.room.width&&(!s.gravity||s.y<C.ground+12));
   }
-  P.Combat={shieldActive,blocking,shieldBox,intercept,woodHit,bossTick,shotsTick};
+  P.Combat={shieldActive,blocking,shieldBox,intercept,woodHit,bossTick,caveTick,shotsTick};
 })(globalThis.PIGGY=globalThis.PIGGY||{});

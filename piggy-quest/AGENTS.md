@@ -23,9 +23,9 @@ Preserve the Korean UI and pale sage / ivory / pig-pink visual direction.
 
 src/config.js: base balance data and stable IDs.
 src/world.js: expanded room graph, projected route geometry and discovery-aware map.
-src/exploration.js: hidden routes, expedition guests, carryable solid platforms and persistence.
-src/pixel.js: generated raster atlas, background/prop/shield rendering.
-src/combat.js: boss patterns and wooden shield/projectile collision.
+src/exploration.js: shovel excavations, optional underground routes, expedition guests and discovery persistence.
+src/pixel.js: user-selected A raster atlases, native-resolution scroll and background/prop/shield rendering.
+src/combat.js: boss/cave attack patterns, ballistic arrows and wooden shield/projectile collision.
 src/controls.js: joystick input and reversible layout editor.
 src/state.js: schema, persistent rules, normalization, purchases and settlement.
 src/art.js: scenery, replaceable SVG assets and stick-figure joint poses.

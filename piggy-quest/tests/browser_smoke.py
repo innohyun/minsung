@@ -29,7 +29,7 @@ with sync_playwright() as pw:
     browser=pw.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox'])
     try:
         ctx,page=ready(browser)
-        check('Bundled HTML boots with all 13 SVG and raster-atlas assets',page.evaluate('Object.keys(PIGGY.Art.images).length===13&&Object.values(PIGGY.Art.images).every(i=>i.complete&&i.naturalWidth>0)'))
+        check('Bundled HTML boots with all 15 SVG and native raster-atlas assets',page.evaluate('Object.keys(PIGGY.Art.images).length===15&&Object.values(PIGGY.Art.images).every(i=>i.complete&&i.naturalWidth>0)'))
         check('No horizontal overflow on desktop',page.evaluate('document.documentElement.scrollWidth<=innerWidth'))
         page.screenshot(path=str(OUT/'home.png'))
         page.locator('#depart').click();x=page.evaluate('PIGGY.game.player.x');page.keyboard.down('d');page.wait_for_timeout(400);page.keyboard.up('d')

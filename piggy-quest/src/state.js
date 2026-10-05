@@ -6,7 +6,7 @@
   const integer=(v,d,a=0,b=1e7)=>Math.floor(number(v,d,a,b));
   const unique=(v,allowed)=>Array.isArray(v)?[...new Set(v.filter(x=>allowed.includes(x)))]:[];
   function freshProgress(map) {
-    return {dead:[],opened:[],drops:[],room:'main',x:180,pigX:225,carrying:false,cleared:false,visited:['main'],objects:{},carriedObject:'',guests:[]};
+    return {dead:[],opened:[],drops:[],room:'main',x:180,pigX:225,carrying:false,cleared:false,visited:['main'],objects:{},carriedObject:'',guests:[],excavations:{}};
   }
   function fresh() {
     return {schema:2,version:P.VERSION,coins:120,runCoins:0,active:false,selectedMap:'wind',unlocked:['wind'],
@@ -50,8 +50,8 @@
       p.pigX=number(r.pigX,p.x+40,30,map.rooms[p.room].width-30);p.carrying=r.carrying===true;p.cleared=r.cleared===true;
       p.visited=unique(r.visited,Object.keys(map.rooms));if(!p.visited.includes('main'))p.visited.unshift('main');if(!p.visited.includes(p.room))p.visited.push(p.room);
       p.guests=unique(r.guests,Object.keys(s.helpers)).filter(id=>!s.party.includes(id));
-      for(const room of Object.values(map.rooms))for(const o of room.objects||[]){const saved=r.objects?.[o.id];if(saved)p.objects[o.id]={x:number(saved.x,o.x,40,room.width-40),y:number(saved.y,600,350,600)};}
-      p.carriedObject=map.rooms[p.room].objects?.some(o=>o.id===r.carriedObject)?r.carriedObject:'';if(p.carrying)p.carriedObject='';
+      for(const room of Object.values(map.rooms))for(const portal of room.portals.filter(p=>p.secret))p.excavations[portal.digId]=p.visited.includes(portal.target)?P.Exploration?.DIG_STEPS||3:integer(r.excavations?.[portal.digId],0,0,3);
+      p.carriedObject='';
       if(Array.isArray(r.drops))p.drops=r.drops.slice(0,300).filter(d=>map.rooms[d?.room]).map((d,i)=>({id:String(d.id||i).slice(0,100),room:d.room,x:number(d.x,180,0,map.rooms[d.room].width),value:integer(d.value,1,1,1000)}));
     }
     for(let i=0;i<P.MAPS.length-1;i++)if(s.progress[P.MAPS[i].id].cleared&&!s.unlocked.includes(P.MAPS[i+1].id))s.unlocked.push(P.MAPS[i+1].id);

@@ -1,0 +1,159 @@
+{
+  "a-scenery": {
+    "width": 1774,
+    "height": 887,
+    "tiles": {
+      "forest": [
+        0,
+        0,
+        887,
+        444
+      ],
+      "amber": [
+        887,
+        0,
+        887,
+        444
+      ],
+      "brook": [
+        0,
+        444,
+        887,
+        443
+      ],
+      "cave": [
+        887,
+        444,
+        887,
+        443
+      ]
+    }
+  },
+  "a-props": {
+    "width": 1536,
+    "height": 1024,
+    "tiles": {
+      "tree": [
+        44,
+        16,
+        307,
+        283
+      ],
+      "bush": [
+        414,
+        104,
+        323,
+        188
+      ],
+      "tent": [
+        781,
+        74,
+        368,
+        219
+      ],
+      "cart": [
+        1187,
+        134,
+        313,
+        154
+      ],
+      "sign": [
+        100,
+        337,
+        181,
+        211
+      ],
+      "log": [
+        401,
+        395,
+        342,
+        143
+      ],
+      "arch": [
+        775,
+        320,
+        375,
+        229
+      ],
+      "well": [
+        1154,
+        321,
+        317,
+        239
+      ],
+      "bridge": [
+        12,
+        592,
+        370,
+        156
+      ],
+      "boat": [
+        386,
+        567,
+        360,
+        172
+      ],
+      "soil": [
+        785,
+        615,
+        351,
+        130
+      ],
+      "hole": [
+        1171,
+        588,
+        348,
+        167
+      ],
+      "shield": [
+        68,
+        768,
+        222,
+        223
+      ],
+      "shovel": [
+        444,
+        761,
+        220,
+        233
+      ],
+      "chest": [
+        800,
+        821,
+        332,
+        168
+      ],
+      "grass": [
+        1197,
+        819,
+        301,
+        173
+      ]
+    }
+  },
+  "cave-monsters": {
+    "width": 2172,
+    "height": 724,
+    "tiles": {
+      "cave-archer": [
+        42,
+        221,
+        680,
+        410
+      ],
+      "cave-charger": [
+        726,
+        209,
+        710,
+        423
+      ],
+      "cave-guard": [
+        1507,
+        80,
+        621,
+        555
+      ]
+    }
+  },
+  "provenance": "Original image_gen A-style artwork, 2026-10-05, based on the user-selected A concept. Original PNG bytes embedded unchanged; alpha bounds and runtime sampling only. No low-resolution downsampling."
+}
