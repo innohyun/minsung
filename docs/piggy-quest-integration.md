@@ -1,5 +1,29 @@
 # 저금통 원정대 · minsung 통합
 
+## v0.5.0 실제 배포 결과 · 2026-10-05
+
+- 구현 커밋: `5b5c4838112cff80b653b6edfe7ab734aaaf2ecb`, GitHub main 반영 완료.
+- 배포 ID: `fa5bd789-b0a3-4145-bc91-35bee13f5ba8`, Production/main/deploy success.
+- 게임: https://minsung.pages.dev/piggy-quest/
+- 배포별 게임: https://fa5bd789.minsung.pages.dev/piggy-quest/
+- 산출물: `/workspace/builds/minsung-pages-piggy-v050-20261005-final`, 공개 파일 95개.
+- 게임 SHA-256: `ed2c796600b687e45ec8ec530b64d92e78ab52a3f0ca1530730c5666ea298a98`.
+- 공개 첫 화면·게임·대시보드·소스 진입·저금통 이미지·배포별 게임 모두 HTTP 200이며
+  검증한 산출물과 바이트가 일치합니다. 계정 Pages API의 canonical_deployment는 위 구현
+  커밋과 일치합니다. 첫 화면의 기존 `37a05e00…` 해시를 유지했습니다.
+- 최종 단일 HTML의 실제 HTTP 저장 재로딩·소스 원본/ZIP CRC·대시보드 검사 10개 통과.
+  게임 관련 Node 45개, 브라우저 46+29+20+34+10개 모두 통과했습니다.
+- 실제 조이스틱·키보드·원형 버튼 편집/저장/취소/초기화·소리 테스트를 브라우저에서
+  조작했습니다. 방패 충돌, 보스 패턴, 지도/포털 경계는 재현용 상태도 사용했습니다.
+- 키보드/터치/모의 가로·세로 Chromium 검증과 공개 HTTPS 파일 검증을 구분합니다.
+  전체 확장 맵 수동 완주·난이도 균형·실제 iPad/Safari는 미검증입니다. 공개 HTTPS
+  Chromium CA 신뢰와 file:// 정책 제한도 변경하지 않았습니다.
+- 기존 로컬 SQLite DB SHA-256과 기존 Node 서버 HTTP 응답을 확인했습니다. 저장소
+  루트 package.json/lockfile, Cloudflare 토큰 권한·시크릿·환경 설정은 변경하지 않았습니다.
+  기존 전체 테스트 77 통과/6 실패 baseline은 기록만 유지합니다.
+- 기존 minsung Pages 프로젝트만 갱신했으며 Workers/D1/DNS와 새 프로젝트는 만들지
+  않았습니다. Node/SQLite 서버를 Pages에 업로드하지 않았습니다.
+
 ## v0.5.0 넓은 곡선 맵·방패·보스·조이스틱 · 2026-10-05
 
 양팔은 몸통의 같은 어깨점에 붙고 걷기의 상체 진동은 1px 미만입니다. 큰길은
