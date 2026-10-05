@@ -19,9 +19,9 @@ test('expanded regions and loop branches are reachable in both directions',()=>{
     assert.ok(map.rooms.main.enemies.some(e=>e.id===map.id+'-main-0'));
   }
 });
-test('road and map position remain continuous at every curve knot',()=>{
+test('road is flat and map distance increases on a horizontal route',()=>{
   for(const map of P.MAPS)for(const room of Object.values(map.rooms)){
-    assert.ok(Math.max(...room.route.map(p=>p.y))-Math.min(...room.route.map(p=>p.y))>40);
+    assert.ok(room.route.every(p=>p.y===0));assert.equal(P.World.height(room,room.width*.5),0);assert.ok(room.mapTrack.every(p=>p[1]===room.mapTrack[0][1]));
     for(const p of room.route){assert.ok(Math.abs(P.World.height(room,p.x-.01)-P.World.height(room,p.x+.01))<.1);}
     assert.notDeepEqual(P.World.mapPoint(room,room.width*.2),P.World.mapPoint(room,room.width*.8));
   }

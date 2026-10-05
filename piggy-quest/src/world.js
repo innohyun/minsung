@@ -1,4 +1,4 @@
-/** Side-view 2.5D route projection. Stable route distance remains the save/collision coordinate. */
+/** Flat side-view route projection. Stable route distance remains the save/collision coordinate. */
 (function(P){
   'use strict';
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v)),seed=n=>{const v=Math.sin(n*127.1+3.1)*43758.5453;return v-Math.floor(v);};
@@ -35,23 +35,19 @@
     }
     for(const [ri,[id,room]] of Object.entries(map.rooms).entries()){
       room.biome ||= id==='main'?['evacuated-forest','ruined-city','riverbank'][mi]:id;
-      room.route=Array.from({length:Math.ceil(room.width/1800)+1},(_,n)=>({x:Math.min(n*1800,room.width),y:n===0?0:(seed(n+ri*19+mi*61)-.5)*(id==='main'?180:240)}));
+      room.route=[{x:0,y:0},{x:room.width,y:0}];
       room.route.at(-1).x=room.width;
       if(!room.landmarks)room.landmarks=[];
       while(room.landmarks.length<3)room.landmarks.push({x:450+room.landmarks.length*1000,kind:mi===1?'arch':mi===2?'pond':'hollow'});
       if(id==='main')for(let n=0;n<4;n++)room.landmarks.push({x:10200+n*1500,kind:mi===1?'tower':mi===2?'mill':'hollow'});
       room.mapTrack=Array.from({length:17},(_,n)=>{
         const x=n/16*room.width;
-        return id==='main'?[80+n/16*840,300+height(room,x)*.35]:[(ri<=2?100:560)+n/16*340,[90,510,160,440,570][ri-1]+Math.sin(n/16*Math.PI*2+ri)*18];
+        return id==='main'?[80+n/16*840,300]:[(ri<=2?100:560)+n/16*340,[90,510,160,440,570][ri-1]];
       });
     }
   }
   function height(room,x){
-    if(!room?.route)return 0;
-    const knots=room.route;x=clamp(x,0,room.width);
-    const index=Math.max(0,knots.findIndex((p,i)=>i>0&&p.x>=x)-1),a=knots[index],b=knots[index+1]||a;
-    const q=b.x===a.x?0:clamp((x-a.x)/(b.x-a.x),0,1),t=q*q*(3-2*q);
-    return a.y+(b.y-a.y)*t;
+    return 0;
   }
   function mapPoint(room,x){
     const q=clamp(x/room.width,0,1)*(room.mapTrack.length-1),i=Math.min(Math.floor(q),room.mapTrack.length-2),t=q-i;
@@ -66,7 +62,7 @@
       if(room.hidden&&!g.progress.visited.includes(id))continue;
       const visited=g.progress.visited.includes(id),points=room.mapTrack.map(p=>p.join(',')).join(' ');
       routes+=`<polyline points="${points}" fill="none" stroke="${visited?'#9b8e67':'#b6ba9f'}" stroke-width="${id==='main'?9:6}" stroke-linecap="round" opacity="${visited?1:.5}"/>`;
-      for(const p of room.portals){if(A[p.target].hidden&&!g.progress.visited.includes(p.target))continue;const key=[id,p.target].sort().join(':');if(seenEdges.has(key))continue;seenEdges.add(key);const a=mapPoint(room,p.x),b=mapPoint(A[p.target],p.spawn);edges+=`<path d="M${a} Q${(a[0]+b[0])/2},${(a[1]+b[1])/2-30} ${b}" fill="none" stroke="#9eaa88" stroke-width="3" stroke-dasharray="5 6"/>`;
+      for(const p of room.portals){if(A[p.target].hidden&&!g.progress.visited.includes(p.target))continue;const key=[id,p.target].sort().join(':');if(seenEdges.has(key))continue;seenEdges.add(key);const a=mapPoint(room,p.x),b=mapPoint(A[p.target],p.spawn);edges+=`<path d="M${a} L${b}" fill="none" stroke="#9eaa88" stroke-width="3" stroke-dasharray="5 6"/>`;
         const label=seenEdges.size;for(const [point,end] of [[a,"A"],[b,"B"]]){const placeKey=point.map(v=>Math.round(v/12)).join(":");const row=endLabels.get(placeKey)||0;endLabels.set(placeKey,row+1);marks+=`<g data-connector="${esc(key)}" data-end="${end}"><circle cx="${point[0]}" cy="${point[1]}" r="9" fill="#f7efd4" stroke="#637e61" stroke-width="2"/><text x="${point[0]+12}" y="${point[1]-10-row*14}" font-size="12" fill="#385c49">${label}${end}</text></g>`;}
       }
       const title=room.mapTrack[8];marks+=`<text x="${title[0]}" y="${title[1]-24}" text-anchor="middle" fill="#49604e" font-size="16">${esc(room.name)}</text>`;

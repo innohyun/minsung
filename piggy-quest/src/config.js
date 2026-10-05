@@ -1,7 +1,7 @@
 /** Gameplay data. Keep balance values and permanent IDs here, not in rendering. */
 (function (P) {
   'use strict';
-  P.VERSION = '0.8.0';
+  P.VERSION = '0.9.0';
   P.CONFIG = { width:1280, height:720, ground:600, roadTop:550, roadBottom:650, carryHeight:196, fixedStep:1/60,
     walkSpeed:230, runSpeed:380, gravity:1600, guardRadius:240, bossGateOffset:330,
     punchCooldown:.5, kickCooldown:1, attackTapWindow:.24, reviveSeconds:10, reviveFraction:.5,
@@ -28,10 +28,10 @@
     'cave-archer':{name:'동굴 궁수',hp:105,attack:17,speed:75,range:390,cooldown:2.4,coins:38,w:80,h:112,asset:'cave-archer'},
     'cave-charger':{name:'돌갑옷 돌진벌레',hp:155,attack:24,speed:88,range:310,cooldown:2.8,coins:48,w:112,h:84,asset:'cave-charger'},
     'cave-guard':{name:'수정 바위 파수꾼',hp:190,attack:22,speed:62,range:76,cooldown:1.7,coins:54,w:98,h:122,asset:'cave-guard'},
-    slime:{name:'풀방울',hp:30,attack:5,speed:67,range:58,cooldown:1.4,coins:12,w:62,h:57,asset:'slime'},
-    boar:{name:'도토리 멧돼지',hp:52,attack:8,speed:100,range:64,cooldown:1.5,coins:20,w:76,h:58,asset:'boar'},
-    rock:{name:'돌콩',hp:75,attack:11,speed:49,range:64,cooldown:1.8,coins:27,w:68,h:75,asset:'rock'},
-    bat:{name:'숲날개',hp:26,attack:5,speed:120,range:85,cooldown:1.2,coins:15,w:65,h:50,asset:'bat'},
+    slime:{name:'후드 발톱 약탈자',hp:30,attack:5,speed:67,range:58,cooldown:1.4,coins:12,w:88,h:110,asset:'slime'},
+    boar:{name:'가시갑옷 짐승',hp:52,attack:8,speed:100,range:150,cooldown:2.1,coins:20,w:112,h:84,asset:'boar'},
+    rock:{name:'철갑 파수병',hp:75,attack:11,speed:49,range:64,cooldown:1.8,coins:27,w:95,h:122,asset:'rock'},
+    bat:{name:'독가루 날개 사냥꾼',hp:26,attack:5,speed:120,range:115,cooldown:2,coins:15,w:112,h:85,asset:'bat'},
     boss:{name:'이끼 거인',hp:650,attack:19,speed:55,range:130,cooldown:1.8,coins:180,w:156,h:196,asset:'boss'}
   };
   function monsters(prefix, positions, types) {
