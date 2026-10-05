@@ -8,6 +8,7 @@ from pathlib import Path
 import argparse
 import hashlib
 import json
+import re
 import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +17,49 @@ PUBLIC_DIRS = ['assets', 'ball', 'guangboo', 'guangboo-v2', 'gravity-flip',
                'marble-builder', 'mario']
 EXTENSIONS = {'.html', '.css', '.js', '.json', '.png', '.jpg', '.jpeg', '.svg',
               '.webp', '.ico', '.wav', '.mp3', '.ogg', '.mp4', '.woff', '.woff2'}
+
+
+def pages_game(out):
+    """Keep the exact offline source payload, in small parser-ordered static files.
+
+    Large single requests fail in the managed proxy's credential path even when
+    the same upload JWT accepts smaller files. No art or runtime code is changed.
+    The original self-contained dist/index.html remains the offline download.
+    """
+    bundle = (ROOT / 'piggy-quest/source-bundle.js').read_text()
+    prefix = 'globalThis.PIGGY=globalThis.PIGGY||{};globalThis.PIGGY.SOURCE_FILES='
+    if not bundle.startswith(prefix) or not bundle.endswith(';\n'):
+        raise SystemExit('Unexpected source bundle format; rebuild the game first.')
+    payload = bundle[len(prefix):-2]
+    sources = json.loads(payload)
+    if not isinstance(sources, dict) or 'src/game.js' not in sources:
+        raise SystemExit('Public source manifest is incomplete.')
+    html = (ROOT / 'piggy-quest/dist/index.html').read_text()
+    inline = '<script>\n' + re.sub(r'</script', r'<\\/script', bundle, flags=re.I) + '\n</script>'
+    if html.count(inline) != 1:
+        raise SystemExit('Source bundle does not match the standalone HTML.')
+    digest = hashlib.sha256(payload.encode()).hexdigest()[:16]
+    scripts = []
+    parts = []
+    target = out / 'piggy-quest/source-parts'
+    target.mkdir(parents=True)
+    for index, start in enumerate(range(0, len(payload), 500_000), 1):
+        part = payload[start:start + 500_000]
+        parts.append(part)
+        name = f'{digest}-{index:02d}.js'
+        js = ('globalThis.__PIGGY_SOURCE_PARTS=globalThis.__PIGGY_SOURCE_PARTS||[];'
+              'globalThis.__PIGGY_SOURCE_PARTS.push(' + json.dumps(part, ensure_ascii=False) + ');\n')
+        if len(js.encode()) > 2_100_000:
+            raise SystemExit('Source part exceeded the reviewed upload size.')
+        (target / name).write_text(js)
+        scripts.append(f'<script src="source-parts/{name}"></script>')
+    if ''.join(parts) != payload:
+        raise SystemExit('Source part reconstruction failed.')
+    scripts.append('<script>globalThis.PIGGY=globalThis.PIGGY||{};'
+                   'globalThis.PIGGY.SOURCE_FILES=JSON.parse(globalThis.__PIGGY_SOURCE_PARTS.join(""));'
+                   'delete globalThis.__PIGGY_SOURCE_PARTS;</script>')
+    (out / 'piggy-quest/index.html').write_text(html.replace(inline, '\n'.join(scripts)))
+    return len(parts)
 
 
 def main():
@@ -50,7 +94,7 @@ def main():
                 raise SystemExit(f'Symlink is not a public build input: {source}')
             if source.is_file() and source.suffix.lower() in EXTENSIONS:
                 copy(source, source.relative_to(ROOT))
-    copy(ROOT / 'piggy-quest/dist/index.html', Path('piggy-quest/index.html'))
+    source_parts = pages_game(out)
     copy(ROOT / 'piggy-quest/source.html', Path('piggy-quest/source.html'))
     copy(ROOT / 'piggy-quest/assets/pig.svg', Path('piggy-quest/assets/pig.svg'))
     files = sorted(p for p in out.rglob('*') if p.is_file())
@@ -63,6 +107,8 @@ def main():
         'file_count': len(files),
         'homepage_sha256': hashlib.sha256((out / 'index.html').read_bytes()).hexdigest(),
         'game_sha256': hashlib.sha256((out / 'piggy-quest/index.html').read_bytes()).hexdigest(),
+        'offline_game_sha256': hashlib.sha256((ROOT / 'piggy-quest/dist/index.html').read_bytes()).hexdigest(),
+        'source_part_count': source_parts,
         'total_bytes': sum(p.stat().st_size for p in files),
     }
     # Keep the manifest beside the output; upload only the dedicated output directory.

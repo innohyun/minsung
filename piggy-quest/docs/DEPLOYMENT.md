@@ -17,6 +17,10 @@ VM Chromium의 공개 HTTPS 검사는 CA 신뢰 문제로 제한됩니다. 시�
 정적 HTML과 JavaScript 실행이 허용되는 웹 환경에서 사용할 수 있습니다.
 빌드한 결과가 크므로 코드 일부만 복사하지 말고 파일 전체 또는 전체 소스 ZIP을 전달하세요.
 
+minsung의 Pages 전용 산출물은 상위 `scripts/build-pages.py`로 만듭니다. 오프라인 단일 HTML은 그대로 두고, 공개 소스 JSON만 작은 `source-parts/*.js`로 나누어 순서대로 읽습니다. 모든 문자열을 연결하면 원래 소스 JSON과 정확히 같습니다. 이미지 픽셀·게임 코드·소스 ZIP을 바꾸지 않으며 압축 해제용 새 브라우저 API를 요구하지 않습니다. Pages에는 index.html과 모든 source-parts를 함께 올려야 합니다.
+
+2026-10-05 VM에서는 같은 유효한 프로젝트 업로드 JWT로 작은 공개 파일 업로드는 성공했지만 9.2MB 단일 HTML 전송은 플랫폼 프록시의 `integration codex-secret-api.cloudflare.com` HTTP 401로 실패했습니다. Cloudflare 공식 Direct Upload의 JWT 절차를 유지하고 파일 크기를 나눕니다. 비밀 값·인증 헤더 출력, 직접 인터넷 우회, TLS 검증 해제나 권한 확대는 하지 않습니다.
+
 ## ChatGPT Sites를 사용할 수 있는 다음 작업 환경
 
 전체 소스 ZIP 또는 단일 실행 HTML과 CODEX_PROMPT.md를 첨부하세요.
