@@ -19,10 +19,10 @@ def ready(browser, viewport=None, seed=None):
     page=context.new_page();page.set_default_timeout(5000)
     page.on('pageerror',lambda e:errors.append(str(e)))
     page.evaluate('''seed=>{window.__testStore={...(seed||{})};Object.defineProperty(window,'localStorage',{configurable:true,value:{getItem:k=>Object.hasOwn(window.__testStore,k)?window.__testStore[k]:null,setItem:(k,v)=>window.__testStore[k]=String(v),removeItem:k=>delete window.__testStore[k],clear:()=>window.__testStore={}}});}''',seed)
-    page.set_content(html,wait_until='load');page.wait_for_selector('#loading',state='hidden');return context,page
+    page.set_content(html,wait_until='load');page.wait_for_selector('#loading',state='hidden');page.evaluate("PIGGY.state.settings.controls.mode='buttons';PIGGY.Controls.apply()");return context,page
 
 def fresh(page,start=True):
-    page.evaluate('''()=>{PIGGY.state=PIGGY.State.fresh();PIGGY.UI.home();PIGGY.State.save(PIGGY.state);}''')
+    page.evaluate('''()=>{PIGGY.state=PIGGY.State.fresh();PIGGY.state.settings.controls.mode="buttons";PIGGY.UI.home();PIGGY.State.save(PIGGY.state);}''')
     if start:page.locator('#depart').click()
 
 with sync_playwright() as pw:

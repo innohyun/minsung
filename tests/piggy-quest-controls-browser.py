@@ -1,4 +1,4 @@
-"""v0.4 controls: real keyboard/touch play plus reproducible pose/gate edge cases.
+"""v0.5 button-mode controls: real keyboard/touch play plus reproducible pose/gate edge cases.
 Only an isolated browser save is changed. No user database or remote resources.
 """
 import json
@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 
-OUT = Path(os.environ.get('PIGGY_TEST_OUTPUT', '/tmp/piggy-v04-controls'))
+OUT = Path(os.environ.get('PIGGY_TEST_OUTPUT', '/tmp/piggy-v05-controls'))
 OUT.mkdir(parents=True, exist_ok=True)
 URL = os.environ.get('PIGGY_URL', 'http://127.0.0.1:4173/piggy-quest/index.html')
 checks, errors = [], []
@@ -25,6 +25,7 @@ with sync_playwright() as pw:
     check('HTTP boots with all embedded art including ceramic pig', page.goto(URL).status == 200)
     page.wait_for_selector('#loading', state='hidden')
     check('Right-facing inert pig asset loads', page.evaluate("Object.values(PIGGY.Art.images).every(i=>i.complete&&i.naturalWidth>0)&&JSON.parse(PIGGY.SOURCE_FILES['assets/manifest.json']).assets.pig.direction==='right'"))
+    page.evaluate("PIGGY.state.settings.controls.mode='buttons';PIGGY.Controls.apply();PIGGY.State.save(PIGGY.state)")
     page.locator('#depart').click()
     check('Camp header and footer disappear during play', page.locator('.site-header').is_hidden() and page.locator('footer').is_hidden() and page.locator('.mobile-nav').is_hidden())
     check('Gameplay occupies the viewport without scrolling', page.evaluate('document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight&&Math.abs(document.getElementById("stage").getBoundingClientRect().height-innerHeight)<2'))
@@ -48,7 +49,7 @@ with sync_playwright() as pw:
     tap('#interact-btn')
     page.wait_for_timeout(120)
     check('Real touch E carries pig immediately at the hand height', page.evaluate('PIGGY.game.pig.carrying&&PIGGY.game.pig.x===PIGGY.game.player.x&&PIGGY.game.pig.y===PIGGY.game.player.y-PIGGY.CONFIG.carryHeight'))
-    check('Unusable hand attack is hidden while carrying', page.locator('#punch-btn').is_hidden() and page.locator('#kick-btn').is_visible())
+    check('Unusable hand attack stays visible and grey while carrying', page.locator('#punch-btn').is_visible() and page.locator('#punch-btn').is_disabled() and page.locator('#kick-btn').is_visible())
     page.screenshot(path=str(OUT/'carry.png'))
     page.reload(); page.wait_for_selector('#loading', state='hidden')
     check('Paused reload restores carried pig above the head', page.evaluate("PIGGY.game.mode==='pause'&&PIGGY.game.pig.carrying&&PIGGY.game.pig.y===PIGGY.game.player.y-PIGGY.CONFIG.carryHeight"))
@@ -93,7 +94,7 @@ with sync_playwright() as pw:
     page.locator('[data-close]').click(); page.locator('#depart').click()
     check('Purchased actions appear on the right without empty slots', page.locator('#action-dock [data-skill]').count() == 3)
     page.keyboard.press('e'); page.wait_for_timeout(100)
-    check('Carrying hides fire and gun but retains roundhouse', page.locator('[data-skill="0"]').is_visible() and page.locator('[data-skill="1"]').is_hidden() and page.locator('[data-skill="2"]').is_hidden())
+    check('Carrying greys hand skills but retains roundhouse', page.locator('[data-skill="0"]').is_enabled() and page.locator('[data-skill="1"]').is_disabled() and page.locator('[data-skill="2"]').is_disabled())
     tap('[data-skill="0"]'); page.wait_for_timeout(100)
     check('Roundhouse starts with a separate knee chamber', page.evaluate("PIGGY.game.player.pose==='spin'&&PIGGY.game.player.age<.23&&PIGGY.game.player.spinPending"))
     page.wait_for_timeout(550)

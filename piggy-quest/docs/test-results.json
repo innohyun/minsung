@@ -1,13 +1,13 @@
 {
-  "version": "0.4.0",
-  "date": "2026-10-04",
+  "version": "0.5.0",
+  "date": "2026-10-05",
   "unit_tests": {
-    "passed": 34,
+    "passed": 45,
     "failed": 0,
     "command": "npm test"
   },
   "browser": {
-    "version": "0.4.0",
+    "version": "0.5.0",
     "method": "Chromium set_content + in-memory Storage adapter; use the parent HTTP suite for actual origin persistence",
     "results": [
       {
@@ -231,39 +231,39 @@
         "passed": true,
         "detail": {
           "x": 12,
-          "y": 419,
-          "width": 49,
-          "height": 49
+          "y": 412,
+          "width": 56,
+          "height": 56
         }
       },
       {
         "name": "Mobile control visible: [data-hold=\"d\"]",
         "passed": true,
         "detail": {
-          "x": 69,
-          "y": 419,
-          "width": 49,
-          "height": 49
+          "x": 76,
+          "y": 412,
+          "width": 56,
+          "height": 56
         }
       },
       {
         "name": "Mobile control visible: #punch-btn",
         "passed": true,
         "detail": {
-          "x": 804,
-          "y": 419,
-          "width": 49,
-          "height": 49
+          "x": 790,
+          "y": 412,
+          "width": 56,
+          "height": 56
         }
       },
       {
         "name": "Mobile control visible: #kick-btn",
         "passed": true,
         "detail": {
-          "x": 859,
-          "y": 419,
-          "width": 49,
-          "height": 49
+          "x": 852,
+          "y": 412,
+          "width": 56,
+          "height": 56
         }
       },
       {
@@ -314,7 +314,7 @@
       "Interaction is labeled E",
       "Keyboard walking works with grounded feet",
       "Real touch E carries pig immediately at the hand height",
-      "Unusable hand attack is hidden while carrying",
+      "Unusable hand attack stays visible and grey while carrying",
       "Paused reload restores carried pig above the head",
       "Shop purchases running with real starting coins",
       "Learned run button appears in right action dock",
@@ -326,7 +326,7 @@
       "Rapid repeated attack taps keep viewport scale unchanged",
       "Selection and browser gesture fallbacks cancel default actions",
       "Purchased actions appear on the right without empty slots",
-      "Carrying hides fire and gun but retains roundhouse",
+      "Carrying greys hand skills but retains roundhouse",
       "Roundhouse starts with a separate knee chamber",
       "Roundhouse completes and clears its pending strike",
       "Reachable right control: #world-map",
@@ -360,8 +360,8 @@
       "amber: correct unique boss art",
       "brook: connected rooms, reachable boss and settlement",
       "brook: correct unique boss art",
-      "amber: warning, pause and one hit per shockwave",
-      "brook: warning, pause and one hit per shockwave",
+      "amber: warning, pause and one hit per shockwave {'telegraph': True, 'frozen': True, 'once': True, 'ended': True}",
+      "brook: warning, pause and one hit per shockwave {'telegraph': True, 'frozen': True, 'once': True, 'ended': True}",
       "No browser JavaScript exceptions: []"
     ]
   },
@@ -386,7 +386,9 @@
     "Public HTTPS Chromium navigation limited by CA trust; verify public HTTPS bytes separately.",
     "Actual iPad/Safari and long-term balance not tested.",
     "HTTP controls include real keyboard/touch play and measured Web Audio output; advanced shop funding and gate/pose snapshots also use explicit test state.",
-    "Rapid touch zoom is verified in Chromium emulation; native iPad/Safari magnification and callouts are not device-tested."
+    "Rapid touch zoom is verified in Chromium emulation; native iPad/Safari magnification and callouts are not device-tested.",
+    "Side-view 2.5D route projection shares a logical ground for collision; this is not free depth movement or platform physics.",
+    "Boss, projectile and map boundary coverage uses isolated reproducible state setup; full enlarged-map manual clear and difficulty balance are not tested."
   ],
   "previous_v030_summary": {
     "version": "0.3.0",
@@ -752,5 +754,97 @@
       "Mobile emulation, not physical-device testing",
       "Boundary-condition cases may set state directly"
     ]
+  },
+  "previous_v040_summary": {
+    "version": "0.4.0",
+    "unit_tests": {
+      "passed": 34,
+      "failed": 0,
+      "command": "npm test"
+    },
+    "browser": {
+      "passed": 46,
+      "failed": 0
+    },
+    "http_controls": {
+      "passed": 29,
+      "failed": 0
+    }
+  },
+  "http_world_combat_controls": {
+    "url": "http://127.0.0.1:4173/piggy-quest/index.html",
+    "passed": 34,
+    "failed": 0,
+    "checks": [
+      "Real HTTP game responds",
+      "Shield shop charges actual starting coins without skill slot",
+      "Default actual joystick visible and directional buttons optional",
+      "Owned shield button is usable",
+      "Real joystick drag moves player and release clears input",
+      "Carrying leaves punch visible, grey and disabled",
+      "Carrying prevents wooden shield use",
+      "Gesture sound test produces audible-level signal",
+      "Control editing freezes simulation without modal blocking drag",
+      "Simulation stays paused during editing",
+      "Dragging and size save actual layout",
+      "Buttons render as circles at configured size",
+      "Saved control layout survives actual origin reload",
+      "Cancel preserves previous control layout",
+      "Reset restores usable default controls",
+      "Front projectile disappears on shield without damage",
+      "Shield triggers wooden impact sound",
+      "B stows shield using real keyboard",
+      "Unblocked projectile damages actual player",
+      "Player world health bar turns red at low health",
+      "wind: larger themed route and real loop branches",
+      "wind: SVG route map displays actual player location",
+      "wind: E enters new branch and connects to another route",
+      "amber: larger themed route and real loop branches",
+      "amber: SVG route map displays actual player location",
+      "amber: E enters new branch and connects to another route",
+      "brook: larger themed route and real loop branches",
+      "brook: SVG route map displays actual player location",
+      "brook: E enters new branch and connects to another route",
+      "wind: boss has multiple attacks, projectiles, movement and pause",
+      "amber: boss has multiple attacks, projectiles, movement and pause",
+      "brook: boss has multiple attacks, projectiles, movement and pause",
+      "Portrait joystick and all learned circle controls stay on screen",
+      "No browser JavaScript errors"
+    ],
+    "boss_patterns": {
+      "wind": {
+        "patterns": [
+          "volley",
+          "charge",
+          "slam"
+        ],
+        "movement": 997.3333333334158,
+        "shots": 3,
+        "frozen": true
+      },
+      "amber": {
+        "patterns": [
+          "leap",
+          "volley",
+          "slam",
+          "charge"
+        ],
+        "movement": 1437.3333333332266,
+        "shots": 3,
+        "frozen": true
+      },
+      "brook": {
+        "patterns": [
+          "volley",
+          "charge",
+          "slam",
+          "leap"
+        ],
+        "movement": 1187.99999999992,
+        "shots": 3,
+        "frozen": true
+      }
+    },
+    "method": "Actual HTTP joystick, shop, keyboard, layout drag/reload and audio signal. Map portal/projectile/boss coverage also uses explicit isolated test state; not a full manual clear or native Safari test."
   }
 }

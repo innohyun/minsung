@@ -12,7 +12,7 @@
     return {schema:2,version:P.VERSION,coins:120,runCoins:0,active:false,selectedMap:'wind',unlocked:['wind'],
       player:{hp:100,max:100,attackLevel:0},pig:{hp:180,max:180},
       helpers:{sprout:{hp:80,revive:0}},party:['sprout'],slots:1,mode:'follow',
-      inventory:{potion:3,repair:2},skills:{},equipped:[],settings:{sound:true,soundExplicit:false,reducedMotion:false},
+      inventory:{potion:3,repair:2},skills:{},equipped:[],settings:{sound:true,soundExplicit:false,volume:.8,controls:{mode:"joystick",size:56,stickSize:112,positions:{}},reducedMotion:false},
       progress:Object.fromEntries(P.MAPS.map(m=>[m.id,freshProgress(m)])),stats:{kills:0,runs:0},updatedAt:''};
   }
   function normalize(raw) {
@@ -34,7 +34,13 @@
     for(const skill of P.SKILLS) {const l=integer(skill.id==='run'?(raw.skills?.run??raw.skills?.jump):raw.skills?.[skill.id],0,0,skill.max);if(l)s.skills[skill.id]=l;}
     s.equipped=unique(raw.equipped,P.SKILLS.filter(x=>!x.utility&&s.skills[x.id]).map(x=>x.id)).slice(0,3);
     s.settings.soundExplicit=raw.settings?.soundExplicit===true;
-    s.settings.sound=s.settings.soundExplicit?raw.settings.sound===true:raw.version==='0.4.0'?raw.settings?.sound!==false:true;
+    s.settings.sound=s.settings.soundExplicit?raw.settings.sound===true:['0.4.0','0.5.0'].includes(raw.version)?raw.settings?.sound!==false:true;
+    s.settings.volume=number(raw.settings?.volume,.8,.1,1);
+    const controls=raw.settings?.controls||{};
+    s.settings.controls={mode:controls.mode==='buttons'?'buttons':'joystick',size:integer(controls.size,56,44,88),stickSize:integer(controls.stickSize,112,88,150),positions:{}};
+    for(const id of ['joystick','move-a','move-d','world-map','command','run-btn','shield-btn','sound-play','interact-btn','punch-btn','kick-btn','skill-0','skill-1','skill-2']){
+      const p=controls.positions?.[id];if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))s.settings.controls.positions[id]={x:clamp(p.x,.02,.98),y:clamp(p.y,.02,.98)};
+    }
     s.settings.reducedMotion=raw.settings?.reducedMotion===true;
     for(const map of P.MAPS) {
       const r=raw.progress?.[map.id]||{},p=s.progress[map.id];

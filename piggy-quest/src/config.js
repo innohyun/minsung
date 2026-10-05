@@ -1,11 +1,11 @@
 /** Gameplay data. Keep balance values and permanent IDs here, not in rendering. */
 (function (P) {
   'use strict';
-  P.VERSION = '0.4.0';
+  P.VERSION = '0.5.0';
   P.CONFIG = { width:1280, height:720, ground:600, roadTop:550, roadBottom:650, carryHeight:196, fixedStep:1/60,
     walkSpeed:230, runSpeed:380, gravity:1600, guardRadius:240, bossGateOffset:330,
     punchCooldown:.5, kickCooldown:1, reviveSeconds:10, reviveFraction:.5,
-    saveKey:'piggy-quest-save-v2', sourceDate:'2026-10-04' };
+    saveKey:'piggy-quest-save-v2', sourceDate:'2026-10-05' };
   P.HELPERS = [
     {id:'sprout',name:'새싹',role:'가벼운 두 주먹',description:'빠른 두 주먹으로 곁을 지키는 첫 동료.',color:'#498c83',hp:80,attack:9,range:88,cooldown:.85,price:0},
     {id:'shield',name:'둥근 방패',role:'가까이서 든든하게',description:'받는 피해를 절반으로 줄이는 방패 조수.',color:'#6a789c',hp:150,attack:12,range:90,cooldown:1.05,price:340},
@@ -13,6 +13,7 @@
     {id:'scout',name:'잎새',role:'동굴에서 만난 친구',description:'비밀 동굴에서 발견하는 민첩한 조수.',color:'#7a9250',hp:95,attack:13,range:115,cooldown:.75,price:null}
   ];
   P.SKILLS = [
+    {id:'woodshield',name:'나무 방패',icon:'◈',description:'B로 들고 내려요. 멈추면 몸을 낮춰 가드합니다. 앞에서 오는 투사체를 막지만 운반 중에는 사용할 수 없어요.',price:120,max:1,utility:true},
     {id:'run',name:'뛰기 · 달리기',icon:'»',description:'이동하면서 Shift 또는 달리기 버튼을 누르세요. 강화하면 더 빨라요!',price:100,max:3,utility:true},
     {id:'spin',name:'돌려차기',icon:'↻',description:'앞뒤의 가까운 적을 한 번에 밀어내요.',price:180,max:3,cd:3.6},
     {id:'dash',name:'돌진',icon:'➜',description:'앞으로 빠르게 돌진하며 부딪힌 적을 밀쳐요.',price:210,max:3,cd:3.3},

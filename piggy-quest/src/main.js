@@ -11,7 +11,7 @@
   else P.UI.home();
   if(loaded.warning)P.UI.toast(loaded.warning);
   // Safari gesture/callout suppression supplements touch-action and the fixed viewport.
-  document.addEventListener('pointerdown',()=>P.Audio.unlock(),{passive:true});
+  for(const event of ['pointerdown','touchstart','keydown'])document.addEventListener(event,()=>P.Audio.unlock(),{passive:true});
   for(const event of ['gesturestart','gesturechange','gestureend','dblclick','contextmenu','selectstart'])document.addEventListener(event,e=>{
     if(e.target.tagName!=='TEXTAREA')e.preventDefault();
   },{passive:false});
@@ -20,9 +20,9 @@
     const key=e.key.toLowerCase(),g=P.game;
     if(key==='escape'){e.preventDefault();if(document.getElementById('modal').open)P.UI.close();else if(g.mode==='play')P.UI.pause();else if(g.mode==='pause')P.UI.pause();return;}
     if(g.mode!=='play')return;
-    const valid=['a','d','arrowleft','arrowright','j','k','e','q','m','shift',' ','1','2','3'];if(!valid.includes(key))return;
+    const valid=['a','d','arrowleft','arrowright','j','k','e','q','m','b','shift',' ','1','2','3'];if(!valid.includes(key))return;
     e.preventDefault();P.Audio.unlock();g.keys.add(key);if(e.repeat)return;
-    if(key==='j')g.punch();if(key==='k')g.kick();if(key==='e')g.interact();if(key==='q')g.command();if(key==='m')P.UI.worldMap();if(['1','2','3'].includes(key))g.skill(Number(key)-1);
+    if(key==='j')g.punch();if(key==='k')g.kick();if(key==='e')g.interact();if(key==='q')g.command();if(key==='b')g.toggleShield();if(key==='m')P.UI.worldMap();if(['1','2','3'].includes(key))g.skill(Number(key)-1);
   });
   window.addEventListener('keyup',e=>P.game.keys.delete(e.key.toLowerCase()));
   function suspend(){P.game.clearInput();if(P.game.mode==='play')P.UI.pause();}
@@ -30,7 +30,7 @@
   window.addEventListener('pagehide',()=>{if(P.state.active)P.game.snapshot();});
   document.getElementById('game').addEventListener('pointerdown',e=>{
     P.Audio.unlock();const g=P.game;if(g.mode!=='play')return;const r=g.canvas.getBoundingClientRect(),scale=Math.min(r.width/1280,r.height/720),left=r.left+(r.width-1280*scale)/2,top=r.top+(r.height-720*scale)/2;
-    const x=(e.clientX-left)/scale+g.camera,y=(e.clientY-top)/scale;if(Math.abs(x-g.pig.x)<52&&y>g.pig.y-92&&y<g.pig.y+10)g.command();
+    const x=(e.clientX-left)/scale+g.camera,y=(e.clientY-top)/scale+g.cameraY-P.World.height(g.room,x);if(Math.abs(x-g.pig.x)<52&&y>g.pig.y-92&&y<g.pig.y+10)g.command();
   });
   const originalTick=P.game.tick.bind(P.game);P.game.tick=dt=>{if(P.game.mode==='play'){if(P.game.keys.has('j')&&!P.game.pig.carrying)P.game.punch();if(P.game.keys.has('k'))P.game.kick();}originalTick(dt);};
   if(location.hash==='#source')P.UI.sources();

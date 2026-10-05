@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-require('../src/config.js');require('../src/state.js');require('../src/export.js');
+require('../src/config.js');require('../src/world.js');require('../src/state.js');require('../src/export.js');
 const P=globalThis.PIGGY;
 
 test('new game has 120 safe coins, no risky coins, one companion slot',()=>{const s=P.State.fresh();assert.equal(s.coins,120);assert.equal(s.runCoins,0);assert.equal(s.slots,1);assert.deepEqual(s.party,['sprout']);});

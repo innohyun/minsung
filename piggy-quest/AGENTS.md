@@ -21,7 +21,10 @@ Preserve the Korean UI and pale sage / ivory / pig-pink visual direction.
 
 ## Structure
 
-src/config.js: all balance data and stable IDs.
+src/config.js: base balance data and stable IDs.
+src/world.js: expanded room graph, projected route geometry, biome scenery and map.
+src/combat.js: boss patterns and wooden shield/projectile collision.
+src/controls.js: joystick input and reversible layout editor.
 src/state.js: schema, persistent rules, normalization, purchases and settlement.
 src/art.js: scenery, replaceable SVG assets and stick-figure joint poses.
 src/game.js: fixed-step simulation and world rendering.

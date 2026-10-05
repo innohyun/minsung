@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-require('../src/config.js');require('../src/state.js');require('../src/motion.js');require('../src/art.js');
+require('../src/config.js');require('../src/world.js');require('../src/state.js');require('../src/motion.js');require('../src/art.js');
 const P=globalThis.PIGGY;
 const distance=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
 

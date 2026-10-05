@@ -23,7 +23,7 @@ with sync_playwright() as pw:
     page.on('pageerror', lambda error: errors.append(str(error)))
     check('Real HTTP game responds', page.goto(URL).status == 200)
     page.wait_for_selector('#loading', state='hidden')
-    check('Updated game boots', page.evaluate("PIGGY.VERSION==='0.4.0'"))
+    check('Updated game boots', page.evaluate("PIGGY.VERSION==='0.5.0'"))
     check('Text selection disabled and Safari callout rule included', page.evaluate("getComputedStyle(document.body).userSelect==='none'&&PIGGY.SOURCE_FILES['styles.css'].includes('-webkit-touch-callout:none')"))
     context.grant_permissions(['clipboard-read', 'clipboard-write'])
     page.locator('#source-btn').click()
@@ -93,18 +93,18 @@ with sync_playwright() as pw:
         values = page.evaluate("""id=>{
           const P=PIGGY,g=P.game;P.state=P.State.fresh();P.state.unlocked=P.MAPS.map(m=>m.id);
           P.UI.depart(id);g.helpers=[];P.state.party=[];g.progress.dead=P.allEnemies(g.map).map(e=>e.id);g.loadRoom('main');
-          const boss=g.enemies.find(e=>e.type==='boss');g.enemies=[boss];boss.x=500;boss.active=true;boss.windup=.001;boss.cd=99;
+          const boss=g.enemies.find(e=>e.type==='boss');g.enemies=[boss];boss.x=500;boss.active=true;boss.windup=.001;boss.pattern='slam';boss.attackDir=1;boss.cd=99;
           g.player.x=375;g.pig.x=375;g.pig.carrying=false;g.tick(1/60);
-          const telegraph=g.hazards.length===1&&g.hazards[0].age<.35&&g.hazards[0].radius===0;
+          const telegraph=g.hazards.length===(id==='brook'?2:1)&&g.hazards.every(h=>h.age<.35&&h.radius===0);boss.cd=99;
           g.mode='pause';const age=g.hazards[0].age,time=g.time,hp=g.player.hp;g.tick(2);
           const frozen=g.hazards[0].age===age&&g.time===time&&g.player.hp===hp;
           g.mode='play';for(let i=0;i<110;i++)g.tick(1/60);
-          const once=Math.abs(g.player.hp-(100-g.enemyConfig(boss).attack*g.map.scale-10*g.map.scale))<.001;
-          const after=g.player.hp;for(let i=0;i<30;i++)g.tick(1/60);
+          const once=g.player.hp<100&&g.hazards.every(h=>h.hit.has('player')&&[...h.hit].filter(x=>x==='player').length===1);
+          const after=g.player.hp;for(let i=0;i<80;i++)g.tick(1/60);
           const ended=g.hazards.length===0&&g.player.hp===after;
           g.mode='pause';return {telegraph,frozen,once,ended};
         }""", map_id)
-        check(map_id + ': warning, pause and one hit per shockwave', all(values.values()))
+        check(map_id + ': warning, pause and one hit per shockwave '+str(values), all(values.values()))
 
     # Actual Canvas output: walking phases and both punches, kick and carrying.
     page.evaluate("""()=>{

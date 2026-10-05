@@ -1,7 +1,7 @@
 /** Local Web Audio foley: soil steps, strikes, ceramic clinks and rewards. */
 (function(P){
   'use strict';
-  let context=null,master=null,analyser=null;
+  let context=null,master=null,analyser=null,lastPlayed='',playCount=0;
   function tone(t,f,end,duration,volume=.025,type='sine'){
     const o=context.createOscillator(),g=context.createGain();o.type=type;
     o.frequency.setValueAtTime(f,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,end),t+duration);
@@ -18,21 +18,23 @@
   P.Audio={
     unlock(){
       try{
-        if(!context){context=new (window.AudioContext||window.webkitAudioContext)();master=context.createGain();master.gain.value=.65;
+        if(!context){context=new (window.AudioContext||window.webkitAudioContext)();master=context.createGain();master.gain.value=1;
           analyser=context.createAnalyser();analyser.fftSize=256;master.connect(analyser);analyser.connect(context.destination);}
-        if(context.state==='suspended')context.resume().catch(()=>{});
-      }catch{}
+        return context.resume().then(()=>context.state==='running').catch(()=>false);
+      }catch{return Promise.resolve(false);}
     },
     status(){return context?.state||'locked';},
+    diagnostics(){return {state:context?.state||'locked',lastPlayed,playCount,volume:P.state?.settings.volume};},
     energy(){if(!analyser)return 0;const samples=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(samples);return Math.sqrt(samples.reduce((n,v)=>n+v*v,0)/samples.length);},
     play(name){
       if(!P.state?.settings.sound||!context||context.state!=='running')return;
       try{
-        const t=context.currentTime;
+        const t=context.currentTime;master.gain.value=(P.state.settings.volume??.8)*3.5;lastPlayed=name;playCount++;
         if(name==='step'||name==='run-step'){noise(t,.07,650,.024);tone(t,name==='step'?80:105,38,.07,.012,'triangle');}
         else if(name==='punch'){noise(t,.10,1500,.040);tone(t,130,62,.10,.02,'triangle');}
         else if(name==='kick'){noise(t,.14,2600,.045);tone(t,98,42,.14,.025,'triangle');}
         else if(name==='spin'){noise(t,.22,3400,.045);tone(t,165,58,.18,.023,'triangle');}
+        else if(name==='wood'){noise(t,.075,850,.095);tone(t,165,82,.16,.08,'triangle');tone(t+.018,320,135,.09,.025);}
         else if(name==='hit'){noise(t,.055,700,.08);tone(t,88,32,.13,.045,'triangle');}
         else if(name==='coin'){tone(t,960,1160,.15,.024);tone(t+.065,1450,1630,.15,.019);}
         else if(name==='carry'){tone(t,610,560,.11,.018);tone(t+.025,970,900,.09,.009);}

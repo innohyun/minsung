@@ -3,11 +3,11 @@
 ## Runtime
 
 No framework, CDN or server is required. Namespace `globalThis.PIGGY` connects plain scripts.
-config → motion/state → art/audio → game → export → ui → main.
+config → world/motion/state → art/audio/combat → game/export → ui/controls → main.
 Canvas logical resolution is 1280×720. Device-pixel ratio is capped at 2.
 Game simulation uses 1/60 second steps, capped frame accumulation after inactive periods.
 All damage, attacks, projectiles, knockback, invulnerability and revival use simulation delta.
-The only wall-clock timeouts are notifications and revoking generated download URLs.
+Wall-clock timeouts only serve UI notifications, the gesture sound-test sequence and download cleanup; combat/revival use simulation time.
 
 ## Visuals
 
@@ -18,7 +18,7 @@ shoulders, 90/290ms alternating punches and 45ms snap kicks; separate carry/air/
 Walking uses FK elbows with consistent hinge direction. Carry IK uses outward elbows and fixed
 hand anchors. Running blends stride length without resetting gaitPhase. Roundhouse has its own
 620ms chamber/pivot/extension/re-chamber/plant sequence, with damage at 260ms.
-All ground actors stand at y=600, the midpoint of the visible 550–650 dirt road.
+Logical ground is y=600. world.js projects each world position onto its room route height; cameraY follows the same route. Actor, object, projectile and shadow rendering share this projection. It is side-view 2.5D, not free depth movement or platform physics.
 Monsters/items: original SVG files as Image objects, with transform-based bounce/wing/attack feedback.
 pig.svg embeds original generated PNG bytes with a visible-bounds viewBox; it is an inert
 right-facing ceramic prop and has no idle motion or direction flipping.
@@ -27,7 +27,7 @@ Changing final art does not require changing enemy balance data.
 ## Input and sound
 
 Playing hides camp header/footer and fills the viewport. Action dock renders only learned and
-currently applicable actions; utility/source/save/sound controls live in the pause dialog.
+currently applicable actions. Carrying keeps hand attacks visible but disabled/grey. Source/save/layout/sound test are in pause; sound toggle and purchased shield are usable on the right.
 Touch-action, selection/callout rules and Safari gesture listeners suppress zoom/selection.
 Web Audio starts only after an input gesture; envelopes/noise generate local foley with no downloads.
 
@@ -63,3 +63,21 @@ Add maps/enemies/helpers/skills in src/config.js using new stable IDs.
 Add save schema migrations before changing an existing ID or incompatible state shape.
 Keep obligatory enemies reachable using free movement; optional upper rewards may need learned skills.
 Any backend leaderboard/trading/online account work is new scope, not already supported.
+
+## World, combat and control extensions
+
+world.js extends original stable-ID rooms instead of relocating old enemies. Each map adds three
+regions and bidirectional loop connections, smooth route knots, theme/biome props and SVG mapTrack.
+World.chart derives route connectors and player markers from real portal/spawn and position data.
+Uncleared saves encounter new enemies; previously cleared maps remain cleared until explicit replay.
+
+combat.js owns boss telegraphs, fixed attack direction/landing position, charge/leap motion,
+enemy projectile sweeps and front-facing shield collision. Blocking lowers the body and expands
+lower coverage; it is unavailable while carrying/attacking. Removed shots cannot hit again.
+Boss phases and hazards stop with simulation, and each wave tracks targets in a Set.
+
+controls.js provides a captured pointer joystick with a dead zone and releases keys on cancellation.
+Editing pauses gameplay and captures drag before gameplay handlers. Draft layouts are detached
+from state until Save. Size and viewport-relative positions are validated on import and clamped
+for current dimensions, allowing recovery through Cancel or Reset. Native Safari/device audio
+and long-session balance remain unverified.

@@ -27,9 +27,9 @@
       <div class="health-box"><div><span class="health-symbol">◯</span><label>나의 체력 <small id="player-health-text"></small><progress id="player-health" max="100" value="100"></progress></label></div><div><span class="health-symbol">🐷</span><label>저금통 <small id="pig-health-text"></small><progress id="pig-health" class="pink" max="180" value="180"></progress></label></div></div>
       <div class="quest-pill"><strong id="room-label">바람숲 · 큰길</strong><span id="kill-count">0 / 24 처치</span></div>
       <div class="game-top-right"><div class="run-money"><span>◉</span><label>이번 원정<b id="run-coins">0</b></label></div><button id="pause" class="pause-btn" aria-label="일시정지">☰</button></div>
-      <div class="movement"><button data-hold="a" aria-label="왼쪽 이동">‹</button><button data-hold="d" aria-label="오른쪽 이동">›</button></div>
+      <div class="movement"><div id="joystick" role="group" aria-label="이동 조이스틱"><span id="joystick-knob"></span></div><div id="direction-buttons"><button data-hold="a" aria-label="왼쪽 이동">‹</button><button data-hold="d" aria-label="오른쪽 이동">›</button></div></div>
       <div class="action-dock" id="action-dock">
-        <div class="utility-actions"><button id="world-map" aria-label="탐험 지도"><span>⌘</span><small>지도</small></button><button id="command" aria-label="조수 명령"><kbd>Q</kbd><span>◉</span><small id="command-label">조수</small></button><button id="run-btn" data-hold="shift" hidden aria-label="달리기"><kbd>⇧</kbd><span>»</span><small>달리기</small></button></div>
+        <div class="utility-actions"><button id="sound-play" aria-label="효과음"><span>♪</span><small id="sound-play-label">소리 켜짐</small></button><button id="shield-btn" data-action="toggleShield" hidden aria-label="방패 B"><kbd>B</kbd><span>◈</span><small>방패</small></button><button id="world-map" aria-label="탐험 지도"><span>⌘</span><small>지도</small></button><button id="command" aria-label="조수 명령"><kbd>Q</kbd><span>◉</span><small id="command-label">조수</small></button><button id="run-btn" data-hold="shift" hidden aria-label="달리기"><kbd>⇧</kbd><span>»</span><small>달리기</small></button></div>
         <div class="skills-pad" id="skills-pad"></div>
         <div class="combat"><button id="interact-btn" data-action="interact" aria-label="상호작용 E"><kbd>E</kbd><span>E</span><small>상호작용</small></button><button data-hold="j" id="punch-btn"><kbd>J</kbd><span>✧</span><small>펀치</small></button><button data-hold="k" id="kick-btn"><kbd>K</kbd><span>↗</span><small>발차기</small></button></div>
       </div>
@@ -44,7 +44,7 @@
     <button data-view="bag">가방 · 치료</button>
   </nav>
 </main>
-<footer><div><span class="live-dot"></span> 원정대 기록 <span class="muted">v0.4.0</span><span class="separator">·</span><button id="help">조작법 · 게임 규칙</button><button id="save-tools">저장 관리</button><button id="new-game">처음부터 시작</button></div><div class="footer-controls"><span>이동 A D · 펀치 J · 발차기 K · 상호작용 E</span><button id="sound" aria-label="효과음 끄기">♪</button><button id="fullscreen" aria-label="전체 화면">⛶</button></div></footer>
+<footer><div><span class="live-dot"></span> 원정대 기록 <span class="muted">v0.5.0</span><span class="separator">·</span><button id="help">조작법 · 게임 규칙</button><button id="save-tools">저장 관리</button><button id="new-game">처음부터 시작</button></div><div class="footer-controls"><span>이동 A D · 펀치 J · 발차기 K · 상호작용 E</span><button id="sound" aria-label="효과음 끄기">♪</button><button id="fullscreen" aria-label="전체 화면">⛶</button></div></footer>
 <p class="rotate-hint">휴대전화는 가로로 돌리면 더 넓게 탐험할 수 있어요.</p>
 </div>
 <dialog id="modal" aria-labelledby="modal-title"><div id="modal-body"></div></dialog>
@@ -52,13 +52,16 @@
 <input id="import-save" type="file" accept=".json,application/json" hidden>
 <script src="source-bundle.js"></script>
 <script src="src/config.js"></script>
+<script src="src/world.js"></script>
 <script src="src/motion.js"></script>
 <script src="src/state.js"></script>
 <script src="src/art.js"></script>
 <script src="src/audio.js"></script>
+<script src="src/combat.js"></script>
 <script src="src/game.js"></script>
 <script src="src/export.js"></script>
 <script src="src/ui.js"></script>
+<script src="src/controls.js"></script>
 <script src="src/main.js"></script>
 </body>
 </html>

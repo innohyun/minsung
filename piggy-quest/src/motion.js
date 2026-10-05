@@ -33,8 +33,8 @@
   function pose(o={}){
     const speed=Math.abs(o.speed||0),moving=clamp(o.walkBlend??speed/P.CONFIG.walkSpeed,0,1),running=clamp(o.runBlend??Number(!!o.running),0,1);
     const phase=o.phase??(o.walkDistance??(o.time||0)*speed)/mix(150,190,running),angle=phase*Math.PI*2,wave=Math.cos(angle);
-    const bob=-(Math.sin(angle*2)**2)*mix(2,5,running)*moving,lean=mix(7,13,running)*moving;
-    const hip=[lean*.3,-94+8*moving+bob],shoulder=[lean,-147+8*moving+bob],head=[lean+1,-173+8*moving+bob*.55];
+    const bob=-(Math.sin(angle*2)**2)*mix(.65,2,running)*moving,lean=mix(3,8,running)*moving;
+    const hip=[lean*.3,-94+8*moving+bob],shoulder=[lean,-147+3*moving+bob*.2],head=[lean+1,-173+3*moving+bob*.15];
     const rear=foot(phase+.5,running),front=foot(phase,running);
     let rearFoot=point([-5,0],rear.point,moving),frontFoot=point([5,0],front.point,moving);
     let attackArm=null,kickExtension=0,turn=0,spinArc=0;
@@ -70,7 +70,8 @@
     if(o.pose==='dash'){shoulder[0]+=20;head[0]+=25;}
     if(o.hit){shoulder[0]-=6;head[0]-=9;}
     if(o.carrying){shoulder[0]*=.15;head[0]*=.15;shoulder[1]=-147+bob*.25;head[1]=-173+bob*.25;}
-    const rearShoulder=[shoulder[0]-4-turn*4,shoulder[1]+1],frontShoulder=[shoulder[0]+4+turn*4,shoulder[1]];
+    if(o.blocking){hip[1]+=32;shoulder[1]+=32;head[1]+=32;rearFoot=[-12,0];frontFoot=[12,0];}
+    const rearShoulder=[...shoulder],frontShoulder=[...shoulder];
     const swing=mix(.65,.82,running)*moving,flex=.2+moving*mix(.1,.75,running);
     // Keep these FK elbows. Re-solving them with opposite IK branches caused the broken arms.
     let rearArm=fkArm(rearShoulder,-.09+wave*swing,flex),frontArm=fkArm(frontShoulder,.09-wave*swing,flex);
@@ -87,6 +88,7 @@
       // Separate shoulder/hand lanes and outward elbows support the ceramic base without crossing.
       rearArm=aimArm(rearShoulder,[-31,-196],1);frontArm=aimArm(frontShoulder,[31,-196],-1);
     }
+    else if(o.playerShield){frontArm=aimArm(frontShoulder,[32,o.blocking?-74:-113]);}
     return {hip,shoulder,rearShoulder,frontShoulder,head,rearFoot,frontFoot,
       rearHand:rearArm.hand,frontHand:frontArm.hand,rearElbow:rearArm.elbow,frontElbow:frontArm.elbow,
       rearKnee:joint(hip,rearFoot,47,48),frontKnee:joint(hip,frontFoot,47,48),

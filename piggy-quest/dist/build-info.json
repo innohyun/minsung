@@ -1,8 +1,8 @@
 {
-  "version": "0.4.0",
-  "source_file_count": 41,
-  "html_bytes": 1709475,
-  "sha256": "c71a440dba076610a87ebdc3877e4a157364fee83ed0a94d2acf667aa05a55fa",
+  "version": "0.5.0",
+  "source_file_count": 45,
+  "html_bytes": 1791522,
+  "sha256": "ed2c796600b687e45ec8ec530b64d92e78ab52a3f0ca1530730c5666ea298a98",
   "network_required": false,
   "published": false
 }
