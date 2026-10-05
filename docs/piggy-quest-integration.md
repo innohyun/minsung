@@ -1,5 +1,20 @@
 # 저금통 원정대 · minsung 통합
 
+## v0.4.0 실제 배포 결과 · 2026-10-04
+
+- 구현 커밋: `f52f9e68dabfd2db8f40e6dadfee4ff5e6c6c779`, GitHub main 반영 완료.
+- 배포: `51eee315-329c-4819-84a3-8b02063a88e2`, Production/main/deploy success.
+- 게임: https://minsung.pages.dev/piggy-quest/
+- 배포별 게임: https://51eee315.minsung.pages.dev/piggy-quest/
+- 최종 게임 SHA-256: `c71a440dba076610a87ebdc3877e4a157364fee83ed0a94d2acf667aa05a55fa`.
+- 공개 첫 화면·게임·대시보드·소스 진입·새 저금통 이미지·배포별 게임의 HTTP 200과
+  산출물 바이트 일치를 확인했습니다. 프로젝트 API의 canonical_deployment도 구현 커밋과
+  일치합니다. 첫 화면 해시 `37a05e00…`와 기존 SQLite DB를 유지합니다.
+- 최종 단일 HTML의 실제 로컬 HTTP 저장 복원·ZIP·대시보드 검사 10개 통과.
+  Node 34개, 기존 브라우저 46개, 새 키보드·터치 29개, 맵·초기화 20개도 통과했습니다.
+- 기존 Pages 프로젝트만 갱신했습니다. 공개 HTTPS Chromium/실제 Safari 검증 한계는
+  이전 기록과 같으며 TLS/신뢰 설정이나 계정 권한을 변경하지 않았습니다.
+
 ## v0.4.0 팔 동작·조작 화면·저금통 개선 · 2026-10-04
 
 걷기의 팔꿈치가 뒤로 꺾이는 원인은 FK 관절을 버리고 반대쪽 IK 해로 다시 구하던
