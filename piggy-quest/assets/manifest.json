@@ -66,6 +66,31 @@
       "type": "svg",
       "anchor": "bottom-center",
       "provenance": "Original vector guardian for this map"
+    },
+    "pixel-world": {
+      "file": "assets/pixel-world.svg",
+      "type": "svg-embedded-png-atlas",
+      "metadata": "assets/pixel-world.json",
+      "provenance": "Original image_gen pixel art, 2026-10-05. Unmodified generated PNG embedded once in pixel-world.svg; runtime atlas sampling only.",
+      "anchor": "tile-bottom-center",
+      "tiles": [
+        "forest",
+        "amber",
+        "brook",
+        "cave",
+        "tree",
+        "tent",
+        "cart",
+        "log",
+        "arch",
+        "well",
+        "bridge",
+        "boat",
+        "shield",
+        "crate",
+        "barrel",
+        "sign"
+      ]
     }
   }
 }

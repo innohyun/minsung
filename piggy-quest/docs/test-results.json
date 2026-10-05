@@ -1,17 +1,17 @@
 {
-  "version": "0.5.0",
+  "version": "0.6.0",
   "date": "2026-10-05",
   "unit_tests": {
-    "passed": 45,
+    "passed": 53,
     "failed": 0,
     "command": "npm test"
   },
   "browser": {
-    "version": "0.5.0",
+    "version": "0.6.0",
     "method": "Chromium set_content + in-memory Storage adapter; use the parent HTTP suite for actual origin persistence",
     "results": [
       {
-        "name": "Bundled HTML boots with all 12 SVG assets",
+        "name": "Bundled HTML boots with all 13 SVG and raster-atlas assets",
         "passed": true,
         "detail": ""
       },
@@ -140,7 +140,7 @@
         "detail": ""
       },
       {
-        "name": "All regular monsters gate the boss and clear unlocks next map",
+        "name": "All required nonsecret monsters gate the boss and clear unlocks next map",
         "passed": true,
         "detail": {
           "locked": true,
@@ -310,7 +310,7 @@
       "Right-facing inert pig asset loads",
       "Camp header and footer disappear during play",
       "Gameplay occupies the viewport without scrolling",
-      "No unlearned action or skill placeholder buttons",
+      "Free jump is available without unlearned skill placeholders",
       "Interaction is labeled E",
       "Keyboard walking works with grounded feet",
       "Real touch E carries pig immediately at the hand height",
@@ -337,6 +337,82 @@
       "No browser JavaScript errors"
     ],
     "method": "Real touch/keyboard play; roundhouse shop funding and gate/pose snapshots use explicit test state."
+  },
+  "http_world": {
+    "url": "http://127.0.0.1:4173/piggy-quest/index.html",
+    "passed": 34,
+    "failed": 0,
+    "checks": [
+      "Real HTTP game responds",
+      "Shield shop charges actual starting coins without skill slot",
+      "Default actual joystick visible and directional buttons optional",
+      "Owned shield button is usable",
+      "Real joystick drag moves player and release clears input",
+      "Carrying leaves punch visible, grey and disabled",
+      "Carrying prevents wooden shield use",
+      "Gesture sound test produces audible-level signal",
+      "Control editing freezes simulation without modal blocking drag",
+      "Simulation stays paused during editing",
+      "Dragging and size save actual layout",
+      "Buttons render as circles at configured size",
+      "Saved control layout survives actual origin reload",
+      "Cancel preserves previous control layout",
+      "Reset restores usable default controls",
+      "Front projectile disappears on shield without damage",
+      "Shield triggers wooden impact sound",
+      "B stows shield using real keyboard",
+      "Unblocked projectile damages actual player",
+      "Player world health bar turns red at low health",
+      "wind: larger themed route and real loop branches",
+      "wind: SVG route map displays actual player location",
+      "wind: E enters new branch and connects to another route",
+      "amber: larger themed route and real loop branches",
+      "amber: SVG route map displays actual player location",
+      "amber: E enters new branch and connects to another route",
+      "brook: larger themed route and real loop branches",
+      "brook: SVG route map displays actual player location",
+      "brook: E enters new branch and connects to another route",
+      "wind: boss has multiple attacks, projectiles, movement and pause",
+      "amber: boss has multiple attacks, projectiles, movement and pause",
+      "brook: boss has multiple attacks, projectiles, movement and pause",
+      "Portrait joystick and all learned circle controls stay on screen",
+      "No browser JavaScript errors"
+    ],
+    "boss_patterns": {
+      "wind": {
+        "patterns": [
+          "volley",
+          "charge",
+          "slam"
+        ],
+        "movement": 997.3333333334158,
+        "shots": 3,
+        "frozen": true
+      },
+      "amber": {
+        "patterns": [
+          "leap",
+          "volley",
+          "slam",
+          "charge"
+        ],
+        "movement": 1437.3333333332266,
+        "shots": 3,
+        "frozen": true
+      },
+      "brook": {
+        "patterns": [
+          "volley",
+          "charge",
+          "slam",
+          "leap"
+        ],
+        "movement": 1187.99999999992,
+        "shots": 3,
+        "frozen": true
+      }
+    },
+    "method": "Actual HTTP joystick, shop, keyboard, layout drag/reload and audio signal. Map portal/projectile/boss coverage also uses explicit isolated test state; not a full manual clear or native Safari test."
   },
   "http_revision": {
     "url": "http://127.0.0.1:4173/piggy-quest/index.html",
@@ -365,62 +441,53 @@
       "No browser JavaScript exceptions: []"
     ]
   },
-  "http_storage_source_dashboard": {
-    "passed": 10,
+  "http_exploration": {
+    "version": "0.6.0",
+    "url": "http://127.0.0.1:4173/piggy-quest/index.html",
+    "passed": 24,
     "failed": 0,
-    "command": "PIGGY_DASHBOARD_URL=http://127.0.0.1:4173/ python3 tests/piggy-quest-browser-smoke.py"
+    "checks": [
+      "Actual HTTP responds",
+      "Generated 16-tile atlas loads and default sound has no toggle button",
+      "Camp has actionable shortcuts and honest affordability counts",
+      "Affordable purchases marked and insufficient coins disable purchases",
+      "Moving touch plus E acts on pointer down without stopping",
+      "Releasing E preserves the joystick movement pointer",
+      "Jump works simultaneously with held joystick and carried pig",
+      "Punch begins immediately while movement is held",
+      "Free jump lands on the solid crate with planted feet",
+      "E picks up and stacks a carryable object on another object",
+      "Stack arrangement survives real HTTP storage reload",
+      "Secret room and connector stay off map until entered",
+      "Usable map connections have matching entry and exit markers",
+      "Jumping from stacked objects reaches the concealed ledge",
+      "E starts companion walking transition before changing rooms",
+      "Pause freezes the walking transition clock",
+      "Actual concealed entry discovers room and adds it to map",
+      "Hidden companion immediately joins expedition without a paid slot",
+      "Hidden monsters may remain alive when boss becomes available",
+      "Selected punch size changes while kick and joystick remain independent",
+      "Independent punch and joystick sizes persist in layout",
+      "Cancel discards only draft edits without altering saved individual sizes",
+      "Guest helper and individual layout sizes survive actual reload",
+      "No browser JavaScript exceptions"
+    ],
+    "method": "Actual HTTP Chromium, real CDP multitouch and keyboard, storage reload. Object/secret/boss edge cases use explicit isolated scene setup; not native iPad/Safari or a full manual clear."
   },
-  "repository_baseline": {
-    "passed": 77,
-    "failed": 6,
-    "rerun": false
-  },
-  "local_database": {
-    "existing_sha256_preserved": true
-  },
-  "deployment_record": "../docs/piggy-quest-integration.md in the parent minsung repository",
-  "limits": [
-    "Chromium set_content suite uses a memory Storage adapter; HTTP suites use real origin localStorage.",
-    "Map gate and boss conditions use reproducible state setup, not a full manual playthrough.",
-    "file:// navigation blocked by VM policy.",
-    "Public HTTPS Chromium navigation limited by CA trust; verify public HTTPS bytes separately.",
-    "Actual iPad/Safari and long-term balance not tested.",
-    "HTTP controls include real keyboard/touch play and measured Web Audio output; advanced shop funding and gate/pose snapshots also use explicit test state.",
-    "Rapid touch zoom is verified in Chromium emulation; native iPad/Safari magnification and callouts are not device-tested.",
-    "Side-view 2.5D route projection shares a logical ground for collision; this is not free depth movement or platform physics.",
-    "Boss, projectile and map boundary coverage uses isolated reproducible state setup; full enlarged-map manual clear and difficulty balance are not tested."
-  ],
-  "previous_v030_summary": {
-    "version": "0.3.0",
+  "previous_version": {
+    "version": "0.5.0",
+    "date": "2026-10-05",
     "unit_tests": {
-      "passed": 29,
+      "passed": 45,
       "failed": 0,
       "command": "npm test"
     },
     "browser": {
-      "passed": 46,
-      "failed": 0
-    },
-    "http_revision": {
-      "passed": 20,
-      "failed": 0
-    }
-  },
-  "imported_v020_results": {
-    "version": "0.2.0",
-    "date": "2026-10-04",
-    "published": false,
-    "unit_tests": {
-      "passed": 20,
-      "failed": 0,
-      "command": "node --test tests/rules.test.cjs"
-    },
-    "browser": {
-      "version": "0.2.0",
-      "method": "Chromium set_content + in-memory Storage adapter; actual HTTP navigation blocked by environment policy",
+      "version": "0.5.0",
+      "method": "Chromium set_content + in-memory Storage adapter; use the parent HTTP suite for actual origin persistence",
       "results": [
         {
-          "name": "Bundled HTML boots with all 10 SVG assets",
+          "name": "Bundled HTML boots with all 12 SVG assets",
           "passed": true,
           "detail": ""
         },
@@ -564,12 +631,12 @@
           "detail": ""
         },
         {
-          "name": "Skill shop actually charges coins and learns jump",
+          "name": "Skill shop actually charges coins and learns running",
           "passed": true,
           "detail": ""
         },
         {
-          "name": "Purchased jump moves player off ground",
+          "name": "Purchased running increases speed without jumping",
           "passed": true,
           "detail": ""
         },
@@ -639,40 +706,40 @@
           "name": "Mobile control visible: [data-hold=\"a\"]",
           "passed": true,
           "detail": {
-            "x": 130.78125,
-            "y": 368.296875,
-            "width": 59,
-            "height": 61
+            "x": 12,
+            "y": 412,
+            "width": 56,
+            "height": 56
           }
         },
         {
           "name": "Mobile control visible: [data-hold=\"d\"]",
           "passed": true,
           "detail": {
-            "x": 197.78125,
-            "y": 368.296875,
-            "width": 59,
-            "height": 61
+            "x": 76,
+            "y": 412,
+            "width": 56,
+            "height": 56
           }
         },
         {
           "name": "Mobile control visible: #punch-btn",
           "passed": true,
           "detail": {
-            "x": 641.21875,
-            "y": 363.296875,
-            "width": 65,
-            "height": 66
+            "x": 790,
+            "y": 412,
+            "width": 56,
+            "height": 56
           }
         },
         {
           "name": "Mobile control visible: #kick-btn",
           "passed": true,
           "detail": {
-            "x": 715.21875,
-            "y": 349.296875,
-            "width": 74,
-            "height": 80
+            "x": 852,
+            "y": 412,
+            "width": 56,
+            "height": 56
           }
         },
         {
@@ -710,141 +777,557 @@
       "failed": 0,
       "javascript_errors": []
     },
-    "loopback_http": [
-      {
-        "path": "/",
-        "status": 200,
-        "bytes": 5937,
-        "mime": "text/html; charset=utf-8",
-        "passed": true
-      },
-      {
-        "path": "/src/game.js",
-        "status": 200,
-        "bytes": 22220,
-        "mime": "application/javascript; charset=utf-8",
-        "passed": true
-      },
-      {
-        "path": "/assets/pig.svg",
-        "status": 200,
-        "bytes": 1237,
-        "mime": "image/svg+xml",
-        "passed": true
-      },
-      {
-        "path": "/source.html",
-        "status": 200,
-        "bytes": 326,
-        "mime": "text/html; charset=utf-8",
-        "passed": true
-      },
-      {
-        "path": "/dist/index.html",
-        "status": 200,
-        "bytes": 289718,
-        "mime": "text/html; charset=utf-8",
-        "passed": true
-      }
-    ],
+    "http_controls": {
+      "url": "http://127.0.0.1:4173/piggy-quest/index.html",
+      "passed": 29,
+      "failed": 0,
+      "checks": [
+        "HTTP boots with all embedded art including ceramic pig",
+        "Right-facing inert pig asset loads",
+        "Camp header and footer disappear during play",
+        "Gameplay occupies the viewport without scrolling",
+        "No unlearned action or skill placeholder buttons",
+        "Interaction is labeled E",
+        "Keyboard walking works with grounded feet",
+        "Real touch E carries pig immediately at the hand height",
+        "Unusable hand attack stays visible and grey while carrying",
+        "Paused reload restores carried pig above the head",
+        "Shop purchases running with real starting coins",
+        "Learned run button appears in right action dock",
+        "Two-finger move and run accelerate without jumping",
+        "Releasing touch clears both held controls",
+        "E releases pig and restores punching button",
+        "Gesture-unlocked effects emit an actual audio signal",
+        "Normal input combat defeats an encountered enemy",
+        "Rapid repeated attack taps keep viewport scale unchanged",
+        "Selection and browser gesture fallbacks cancel default actions",
+        "Purchased actions appear on the right without empty slots",
+        "Carrying greys hand skills but retains roundhouse",
+        "Roundhouse starts with a separate knee chamber",
+        "Roundhouse completes and clears its pending strike",
+        "Reachable right control: #world-map",
+        "Reachable right control: #command",
+        "Reachable right control: #run-btn",
+        "Reachable right control: #kick-btn",
+        "Reachable right control: [data-skill=\"0\"]",
+        "No browser JavaScript errors"
+      ],
+      "method": "Real touch/keyboard play; roundhouse shop funding and gate/pose snapshots use explicit test state."
+    },
+    "http_revision": {
+      "url": "http://127.0.0.1:4173/piggy-quest/index.html",
+      "passed": 20,
+      "failed": 0,
+      "checks": [
+        "Real HTTP game responds",
+        "Updated game boots",
+        "Text selection disabled and Safari callout rule included",
+        "Source copy button still copies exact code",
+        "Player stands in the dirt road center",
+        "Walking advances the distance-driven full-body gait",
+        "Restart waits for explicit confirmation and freezes combat",
+        "Cancel preserves progress and resumes expedition",
+        "Restart downloads the complete previous progress",
+        "Confirmed restart resets progression and retains settings",
+        "Fresh game persists through actual origin reload",
+        "wind: connected rooms, reachable boss and settlement",
+        "wind: correct unique boss art",
+        "amber: connected rooms, reachable boss and settlement",
+        "amber: correct unique boss art",
+        "brook: connected rooms, reachable boss and settlement",
+        "brook: correct unique boss art",
+        "amber: warning, pause and one hit per shockwave {'telegraph': True, 'frozen': True, 'once': True, 'ended': True}",
+        "brook: warning, pause and one hit per shockwave {'telegraph': True, 'frozen': True, 'once': True, 'ended': True}",
+        "No browser JavaScript exceptions: []"
+      ]
+    },
+    "http_storage_source_dashboard": {
+      "passed": 10,
+      "failed": 0,
+      "command": "PIGGY_DASHBOARD_URL=http://127.0.0.1:4173/ python3 tests/piggy-quest-browser-smoke.py"
+    },
+    "repository_baseline": {
+      "passed": 77,
+      "failed": 6,
+      "rerun": false
+    },
+    "local_database": {
+      "existing_sha256_preserved": true
+    },
+    "deployment_record": "../docs/piggy-quest-integration.md in the parent minsung repository",
     "limits": [
-      "No public URL created or visited",
-      "set_content rather than browser URL navigation",
-      "Memory Storage adapter, not real origin persistence",
-      "Mobile emulation, not physical-device testing",
-      "Boundary-condition cases may set state directly"
-    ]
-  },
-  "previous_v040_summary": {
-    "version": "0.4.0",
-    "unit_tests": {
+      "Chromium set_content suite uses a memory Storage adapter; HTTP suites use real origin localStorage.",
+      "Map gate and boss conditions use reproducible state setup, not a full manual playthrough.",
+      "file:// navigation blocked by VM policy.",
+      "Public HTTPS Chromium navigation limited by CA trust; verify public HTTPS bytes separately.",
+      "Actual iPad/Safari and long-term balance not tested.",
+      "HTTP controls include real keyboard/touch play and measured Web Audio output; advanced shop funding and gate/pose snapshots also use explicit test state.",
+      "Rapid touch zoom is verified in Chromium emulation; native iPad/Safari magnification and callouts are not device-tested.",
+      "Side-view 2.5D route projection shares a logical ground for collision; this is not free depth movement or platform physics.",
+      "Boss, projectile and map boundary coverage uses isolated reproducible state setup; full enlarged-map manual clear and difficulty balance are not tested."
+    ],
+    "previous_v030_summary": {
+      "version": "0.3.0",
+      "unit_tests": {
+        "passed": 29,
+        "failed": 0,
+        "command": "npm test"
+      },
+      "browser": {
+        "passed": 46,
+        "failed": 0
+      },
+      "http_revision": {
+        "passed": 20,
+        "failed": 0
+      }
+    },
+    "imported_v020_results": {
+      "version": "0.2.0",
+      "date": "2026-10-04",
+      "published": false,
+      "unit_tests": {
+        "passed": 20,
+        "failed": 0,
+        "command": "node --test tests/rules.test.cjs"
+      },
+      "browser": {
+        "version": "0.2.0",
+        "method": "Chromium set_content + in-memory Storage adapter; actual HTTP navigation blocked by environment policy",
+        "results": [
+          {
+            "name": "Bundled HTML boots with all 10 SVG assets",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "No horizontal overflow on desktop",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Keyboard movement changes world position",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Carried pig follows player",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Carry blocks punch but allows kick",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Punch has two damage events",
+            "passed": true,
+            "detail": {
+              "hp": 10,
+              "drops": 3,
+              "coins": 12,
+              "dead": true
+            }
+          },
+          {
+            "name": "Enemy drops ground coins and walking collects them",
+            "passed": true,
+            "detail": {
+              "hp": 10,
+              "drops": 3,
+              "coins": 12,
+              "dead": true
+            }
+          },
+          {
+            "name": "Manual return banks collected coins",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Killed monster stays dead on re-entry",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Player death keeps money without healing",
+            "passed": true,
+            "detail": {
+              "safe": 203,
+              "run": 0,
+              "hp": 0,
+              "active": false
+            }
+          },
+          {
+            "name": "Dead player is directed to treatment rather than starting",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Drag-and-drop consumes one potion and restores 50 HP",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Pig death loses only expedition balance",
+            "passed": true,
+            "detail": {
+              "safe": 120,
+              "run": 0,
+              "hp": 0,
+              "active": false
+            }
+          },
+          {
+            "name": "Click alternative repairs pig without natural recovery",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Source viewer pauses revival and simulation",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Companion revives after 10 simulation seconds at 50% by the pig",
+            "passed": true,
+            "detail": {
+              "before": 0,
+              "after": 40,
+              "distance": 9
+            }
+          },
+          {
+            "name": "Q toggles companion guarding",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Chest grants coins and medicine with a contents dialog",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Opened chest cannot grant its reward twice",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Branch portal moves player, pig and helpers to a saved sub-area",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Hidden helper registers immediately",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "All regular monsters gate the boss and clear unlocks next map",
+            "passed": true,
+            "detail": {
+              "locked": true,
+              "open": true,
+              "cleared": true,
+              "unlocked": true
+            }
+          },
+          {
+            "name": "Explicit replay resets completed map",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Skill shop actually charges coins and learns jump",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Purchased jump moves player off ground",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "All five special actions activate, with hand-use carry restriction",
+            "passed": true,
+            "detail": {
+              "spin": true,
+              "dash": true,
+              "fire": true,
+              "fly": true,
+              "gun": true,
+              "carryBlocked": true
+            }
+          },
+          {
+            "name": "Saved expedition restores health, coins and dead enemy record, paused",
+            "passed": true,
+            "detail": "Memory Storage adapter; not real browser-origin persistence"
+          },
+          {
+            "name": "Source viewer shows the exact executing original module",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Public ZIP passes CRC and includes runnable sources and handoff",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "ZIP excludes individual save data",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Downloaded game source matches original byte-for-byte",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Per-file download matches visible source",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Unsupported save import leaves current state untouched",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Valid save import requests confirmation before replacing data",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Confirmed import backs up old data and restores selected save",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Mobile landscape fits viewport without horizontal scrolling",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Mobile control visible: [data-hold=\"a\"]",
+            "passed": true,
+            "detail": {
+              "x": 130.78125,
+              "y": 368.296875,
+              "width": 59,
+              "height": 61
+            }
+          },
+          {
+            "name": "Mobile control visible: [data-hold=\"d\"]",
+            "passed": true,
+            "detail": {
+              "x": 197.78125,
+              "y": 368.296875,
+              "width": 59,
+              "height": 61
+            }
+          },
+          {
+            "name": "Mobile control visible: #punch-btn",
+            "passed": true,
+            "detail": {
+              "x": 641.21875,
+              "y": 363.296875,
+              "width": 65,
+              "height": 66
+            }
+          },
+          {
+            "name": "Mobile control visible: #kick-btn",
+            "passed": true,
+            "detail": {
+              "x": 715.21875,
+              "y": 349.296875,
+              "width": 74,
+              "height": 80
+            }
+          },
+          {
+            "name": "Real touch press moves player and release clears held input",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Portrait home fits viewport without horizontal overflow",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Portrait home exposes all four navigation destinations",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Portrait navigation opens companion collection",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "Portrait navigation opens skill shop",
+            "passed": true,
+            "detail": ""
+          },
+          {
+            "name": "No browser JavaScript exceptions during suite",
+            "passed": true,
+            "detail": []
+          }
+        ],
+        "passed": 46,
+        "failed": 0,
+        "javascript_errors": []
+      },
+      "loopback_http": [
+        {
+          "path": "/",
+          "status": 200,
+          "bytes": 5937,
+          "mime": "text/html; charset=utf-8",
+          "passed": true
+        },
+        {
+          "path": "/src/game.js",
+          "status": 200,
+          "bytes": 22220,
+          "mime": "application/javascript; charset=utf-8",
+          "passed": true
+        },
+        {
+          "path": "/assets/pig.svg",
+          "status": 200,
+          "bytes": 1237,
+          "mime": "image/svg+xml",
+          "passed": true
+        },
+        {
+          "path": "/source.html",
+          "status": 200,
+          "bytes": 326,
+          "mime": "text/html; charset=utf-8",
+          "passed": true
+        },
+        {
+          "path": "/dist/index.html",
+          "status": 200,
+          "bytes": 289718,
+          "mime": "text/html; charset=utf-8",
+          "passed": true
+        }
+      ],
+      "limits": [
+        "No public URL created or visited",
+        "set_content rather than browser URL navigation",
+        "Memory Storage adapter, not real origin persistence",
+        "Mobile emulation, not physical-device testing",
+        "Boundary-condition cases may set state directly"
+      ]
+    },
+    "previous_v040_summary": {
+      "version": "0.4.0",
+      "unit_tests": {
+        "passed": 34,
+        "failed": 0,
+        "command": "npm test"
+      },
+      "browser": {
+        "passed": 46,
+        "failed": 0
+      },
+      "http_controls": {
+        "passed": 29,
+        "failed": 0
+      }
+    },
+    "http_world_combat_controls": {
+      "url": "http://127.0.0.1:4173/piggy-quest/index.html",
       "passed": 34,
       "failed": 0,
-      "command": "npm test"
-    },
-    "browser": {
-      "passed": 46,
-      "failed": 0
-    },
-    "http_controls": {
-      "passed": 29,
-      "failed": 0
+      "checks": [
+        "Real HTTP game responds",
+        "Shield shop charges actual starting coins without skill slot",
+        "Default actual joystick visible and directional buttons optional",
+        "Owned shield button is usable",
+        "Real joystick drag moves player and release clears input",
+        "Carrying leaves punch visible, grey and disabled",
+        "Carrying prevents wooden shield use",
+        "Gesture sound test produces audible-level signal",
+        "Control editing freezes simulation without modal blocking drag",
+        "Simulation stays paused during editing",
+        "Dragging and size save actual layout",
+        "Buttons render as circles at configured size",
+        "Saved control layout survives actual origin reload",
+        "Cancel preserves previous control layout",
+        "Reset restores usable default controls",
+        "Front projectile disappears on shield without damage",
+        "Shield triggers wooden impact sound",
+        "B stows shield using real keyboard",
+        "Unblocked projectile damages actual player",
+        "Player world health bar turns red at low health",
+        "wind: larger themed route and real loop branches",
+        "wind: SVG route map displays actual player location",
+        "wind: E enters new branch and connects to another route",
+        "amber: larger themed route and real loop branches",
+        "amber: SVG route map displays actual player location",
+        "amber: E enters new branch and connects to another route",
+        "brook: larger themed route and real loop branches",
+        "brook: SVG route map displays actual player location",
+        "brook: E enters new branch and connects to another route",
+        "wind: boss has multiple attacks, projectiles, movement and pause",
+        "amber: boss has multiple attacks, projectiles, movement and pause",
+        "brook: boss has multiple attacks, projectiles, movement and pause",
+        "Portrait joystick and all learned circle controls stay on screen",
+        "No browser JavaScript errors"
+      ],
+      "boss_patterns": {
+        "wind": {
+          "patterns": [
+            "volley",
+            "charge",
+            "slam"
+          ],
+          "movement": 997.3333333334158,
+          "shots": 3,
+          "frozen": true
+        },
+        "amber": {
+          "patterns": [
+            "leap",
+            "volley",
+            "slam",
+            "charge"
+          ],
+          "movement": 1437.3333333332266,
+          "shots": 3,
+          "frozen": true
+        },
+        "brook": {
+          "patterns": [
+            "volley",
+            "charge",
+            "slam",
+            "leap"
+          ],
+          "movement": 1187.99999999992,
+          "shots": 3,
+          "frozen": true
+        }
+      },
+      "method": "Actual HTTP joystick, shop, keyboard, layout drag/reload and audio signal. Map portal/projectile/boss coverage also uses explicit isolated test state; not a full manual clear or native Safari test."
     }
   },
-  "http_world_combat_controls": {
-    "url": "http://127.0.0.1:4173/piggy-quest/index.html",
-    "passed": 34,
-    "failed": 0,
-    "checks": [
-      "Real HTTP game responds",
-      "Shield shop charges actual starting coins without skill slot",
-      "Default actual joystick visible and directional buttons optional",
-      "Owned shield button is usable",
-      "Real joystick drag moves player and release clears input",
-      "Carrying leaves punch visible, grey and disabled",
-      "Carrying prevents wooden shield use",
-      "Gesture sound test produces audible-level signal",
-      "Control editing freezes simulation without modal blocking drag",
-      "Simulation stays paused during editing",
-      "Dragging and size save actual layout",
-      "Buttons render as circles at configured size",
-      "Saved control layout survives actual origin reload",
-      "Cancel preserves previous control layout",
-      "Reset restores usable default controls",
-      "Front projectile disappears on shield without damage",
-      "Shield triggers wooden impact sound",
-      "B stows shield using real keyboard",
-      "Unblocked projectile damages actual player",
-      "Player world health bar turns red at low health",
-      "wind: larger themed route and real loop branches",
-      "wind: SVG route map displays actual player location",
-      "wind: E enters new branch and connects to another route",
-      "amber: larger themed route and real loop branches",
-      "amber: SVG route map displays actual player location",
-      "amber: E enters new branch and connects to another route",
-      "brook: larger themed route and real loop branches",
-      "brook: SVG route map displays actual player location",
-      "brook: E enters new branch and connects to another route",
-      "wind: boss has multiple attacks, projectiles, movement and pause",
-      "amber: boss has multiple attacks, projectiles, movement and pause",
-      "brook: boss has multiple attacks, projectiles, movement and pause",
-      "Portrait joystick and all learned circle controls stay on screen",
-      "No browser JavaScript errors"
-    ],
-    "boss_patterns": {
-      "wind": {
-        "patterns": [
-          "volley",
-          "charge",
-          "slam"
-        ],
-        "movement": 997.3333333334158,
-        "shots": 3,
-        "frozen": true
-      },
-      "amber": {
-        "patterns": [
-          "leap",
-          "volley",
-          "slam",
-          "charge"
-        ],
-        "movement": 1437.3333333332266,
-        "shots": 3,
-        "frozen": true
-      },
-      "brook": {
-        "patterns": [
-          "volley",
-          "charge",
-          "slam",
-          "leap"
-        ],
-        "movement": 1187.99999999992,
-        "shots": 3,
-        "frozen": true
-      }
-    },
-    "method": "Actual HTTP joystick, shop, keyboard, layout drag/reload and audio signal. Map portal/projectile/boss coverage also uses explicit isolated test state; not a full manual clear or native Safari test."
-  }
+  "limitations": [
+    "Native iPad/Safari not tested.",
+    "No full manual map clear.",
+    "File URL blocked by browser policy; no policy bypass."
+  ],
+  "repository_baseline": "77 passed / 6 failed, historical only; full repository suite not rerun."
 }

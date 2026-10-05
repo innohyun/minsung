@@ -29,7 +29,7 @@ with sync_playwright() as pw:
     page.locator('#depart').click()
     check('Camp header and footer disappear during play', page.locator('.site-header').is_hidden() and page.locator('footer').is_hidden() and page.locator('.mobile-nav').is_hidden())
     check('Gameplay occupies the viewport without scrolling', page.evaluate('document.documentElement.scrollWidth<=innerWidth&&document.documentElement.scrollHeight<=innerHeight&&Math.abs(document.getElementById("stage").getBoundingClientRect().height-innerHeight)<2'))
-    check('No unlearned action or skill placeholder buttons', page.locator('[data-skill]').count() == 0 and page.locator('#run-btn').is_hidden() and page.locator('#jump-btn').count() == 0)
+    check('Free jump is available without unlearned skill placeholders', page.locator('[data-skill]').count() == 0 and page.locator('#run-btn').is_hidden() and page.locator('#jump-btn').is_visible())
     check('Interaction is labeled E', page.locator('#interact-btn').inner_text().count('E') > 0 and '상호작용' in page.locator('#interact-btn').inner_text())
 
     cdp = context.new_cdp_session(page)

@@ -1,7 +1,7 @@
 /** Gameplay data. Keep balance values and permanent IDs here, not in rendering. */
 (function (P) {
   'use strict';
-  P.VERSION = '0.5.0';
+  P.VERSION = '0.6.0';
   P.CONFIG = { width:1280, height:720, ground:600, roadTop:550, roadBottom:650, carryHeight:196, fixedStep:1/60,
     walkSpeed:230, runSpeed:380, gravity:1600, guardRadius:240, bossGateOffset:330,
     punchCooldown:.5, kickCooldown:1, reviveSeconds:10, reviveFraction:.5,
@@ -10,6 +10,8 @@
     {id:'sprout',name:'새싹',role:'가벼운 두 주먹',description:'빠른 두 주먹으로 곁을 지키는 첫 동료.',color:'#498c83',hp:80,attack:9,range:88,cooldown:.85,price:0},
     {id:'shield',name:'둥근 방패',role:'가까이서 든든하게',description:'받는 피해를 절반으로 줄이는 방패 조수.',color:'#6a789c',hp:150,attack:12,range:90,cooldown:1.05,price:340},
     {id:'ember',name:'불씨',role:'멀리서 불꽃 한 발',description:'멀리 있는 적을 작은 불꽃으로 공격해요.',color:'#b57450',hp:70,attack:18,range:300,cooldown:1.5,price:560},
+    {id:'dew',name:'물방울',role:'갈대 뒤의 친구',description:'숨은 물레방앗간에서 함께 걷기 시작하는 동료.',color:'#578f9a',hp:110,attack:15,range:125,cooldown:.9,price:null},
+    {id:'glow',name:'반딧',role:'폐허의 작은 빛',description:'숨은 창고에서 만나는 빠른 주먹의 동료.',color:'#a78654',hp:105,attack:15,range:115,cooldown:.8,price:null},
     {id:'scout',name:'잎새',role:'동굴에서 만난 친구',description:'비밀 동굴에서 발견하는 민첩한 조수.',color:'#7a9250',hp:95,attack:13,range:115,cooldown:.75,price:null}
   ];
   P.SKILLS = [

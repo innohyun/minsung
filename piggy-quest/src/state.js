@@ -6,13 +6,13 @@
   const integer=(v,d,a=0,b=1e7)=>Math.floor(number(v,d,a,b));
   const unique=(v,allowed)=>Array.isArray(v)?[...new Set(v.filter(x=>allowed.includes(x)))]:[];
   function freshProgress(map) {
-    return {dead:[],opened:[],drops:[],room:'main',x:180,pigX:225,carrying:false,cleared:false,visited:['main']};
+    return {dead:[],opened:[],drops:[],room:'main',x:180,pigX:225,carrying:false,cleared:false,visited:['main'],objects:{},carriedObject:'',guests:[]};
   }
   function fresh() {
     return {schema:2,version:P.VERSION,coins:120,runCoins:0,active:false,selectedMap:'wind',unlocked:['wind'],
       player:{hp:100,max:100,attackLevel:0},pig:{hp:180,max:180},
       helpers:{sprout:{hp:80,revive:0}},party:['sprout'],slots:1,mode:'follow',
-      inventory:{potion:3,repair:2},skills:{},equipped:[],settings:{sound:true,soundExplicit:false,volume:.8,controls:{mode:"joystick",size:56,stickSize:112,positions:{}},reducedMotion:false},
+      inventory:{potion:3,repair:2},skills:{},equipped:[],settings:{sound:true,soundExplicit:false,volume:.8,controls:{mode:"joystick",size:56,stickSize:112,positions:{},sizes:{}},reducedMotion:false},
       progress:Object.fromEntries(P.MAPS.map(m=>[m.id,freshProgress(m)])),stats:{kills:0,runs:0},updatedAt:''};
   }
   function normalize(raw) {
@@ -33,12 +33,12 @@
     s.inventory.potion=integer(raw.inventory?.potion,3,0,999);s.inventory.repair=integer(raw.inventory?.repair,2,0,999);
     for(const skill of P.SKILLS) {const l=integer(skill.id==='run'?(raw.skills?.run??raw.skills?.jump):raw.skills?.[skill.id],0,0,skill.max);if(l)s.skills[skill.id]=l;}
     s.equipped=unique(raw.equipped,P.SKILLS.filter(x=>!x.utility&&s.skills[x.id]).map(x=>x.id)).slice(0,3);
-    s.settings.soundExplicit=raw.settings?.soundExplicit===true;
-    s.settings.sound=s.settings.soundExplicit?raw.settings.sound===true:['0.4.0','0.5.0'].includes(raw.version)?raw.settings?.sound!==false:true;
+    s.settings.soundExplicit=false;s.settings.sound=true;
     s.settings.volume=number(raw.settings?.volume,.8,.1,1);
     const controls=raw.settings?.controls||{};
-    s.settings.controls={mode:controls.mode==='buttons'?'buttons':'joystick',size:integer(controls.size,56,44,88),stickSize:integer(controls.stickSize,112,88,150),positions:{}};
-    for(const id of ['joystick','move-a','move-d','world-map','command','run-btn','shield-btn','sound-play','interact-btn','punch-btn','kick-btn','skill-0','skill-1','skill-2']){
+    s.settings.controls={mode:controls.mode==='buttons'?'buttons':'joystick',size:integer(controls.size,56,44,88),stickSize:integer(controls.stickSize,112,88,150),positions:{},sizes:{}};
+    for(const id of ['joystick','move-a','move-d','world-map','command','run-btn','shield-btn','jump-btn','interact-btn','punch-btn','kick-btn','skill-0','skill-1','skill-2']){
+      if(controls.sizes?.[id]!==undefined)s.settings.controls.sizes[id]=integer(controls.sizes[id],id==='joystick'?112:56,id==='joystick'?88:44,id==='joystick'?150:96);
       const p=controls.positions?.[id];if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))s.settings.controls.positions[id]={x:clamp(p.x,.02,.98),y:clamp(p.y,.02,.98)};
     }
     s.settings.reducedMotion=raw.settings?.reducedMotion===true;
@@ -48,7 +48,10 @@
       p.opened=unique(r.opened,Object.values(map.rooms).flatMap(room=>room.chests.map(c=>c.id)));
       p.room=map.rooms[r.room]?r.room:'main';p.x=number(r.x,180,60,map.rooms[p.room].width-60);
       p.pigX=number(r.pigX,p.x+40,30,map.rooms[p.room].width-30);p.carrying=r.carrying===true;p.cleared=r.cleared===true;
-      p.visited=unique(r.visited,Object.keys(map.rooms));if(!p.visited.includes('main'))p.visited.unshift('main');
+      p.visited=unique(r.visited,Object.keys(map.rooms));if(!p.visited.includes('main'))p.visited.unshift('main');if(!p.visited.includes(p.room))p.visited.push(p.room);
+      p.guests=unique(r.guests,Object.keys(s.helpers)).filter(id=>!s.party.includes(id));
+      for(const room of Object.values(map.rooms))for(const o of room.objects||[]){const saved=r.objects?.[o.id];if(saved)p.objects[o.id]={x:number(saved.x,o.x,40,room.width-40),y:number(saved.y,600,350,600)};}
+      p.carriedObject=map.rooms[p.room].objects?.some(o=>o.id===r.carriedObject)?r.carriedObject:'';if(p.carrying)p.carriedObject='';
       if(Array.isArray(r.drops))p.drops=r.drops.slice(0,300).filter(d=>map.rooms[d?.room]).map((d,i)=>({id:String(d.id||i).slice(0,100),room:d.room,x:number(d.x,180,0,map.rooms[d.room].width),value:integer(d.value,1,1,1000)}));
     }
     for(let i=0;i<P.MAPS.length-1;i++)if(s.progress[P.MAPS[i].id].cleared&&!s.unlocked.includes(P.MAPS[i+1].id))s.unlocked.push(P.MAPS[i+1].id);
@@ -85,6 +88,17 @@
     object.hp=Math.min(max,object.hp+(item==='repair'?80:50));if('revive' in object)object.revive=0;
     s.inventory[item]--;return '';
   }
+  function offer(s,type,id){
+    let cost=0,available=true;
+    if(type==='item'){cost=id==='potion'?30:45;available=s.inventory[id]<999;}
+    else if(type==='helper'){const h=P.helperById(id);cost=h?.price;available=!!h&&cost!==null&&!s.helpers[id];}
+    else if(type==='skill'){const t=P.skillById(id),level=s.skills[id]||0;cost=t?Math.round(t.price*(1+level*.7)):0;available=!!t&&level<t.max;}
+    else if(type==='slots'){cost=s.slots===1?300:600;available=s.slots<3;}
+    else if(type==='attack'){cost=120+s.player.attackLevel*80;available=s.player.attackLevel<5;}
+    else if(type==='health'){cost=180+(s.player.max-100)*4;available=s.player.max<200;}
+    else available=false;
+    return {cost,available,affordable:available&&s.coins>=cost};
+  }
   function purchase(s,type,id) {
     let cost=0;
     if(type==='item') {if(!['potion','repair'].includes(id))return '알 수 없는 물건이에요.';if(s.inventory[id]>=999)return '가방이 가득해요.';cost=id==='potion'?30:45;}
@@ -105,8 +119,9 @@
     return '';
   }
   function reviveTick(s,dt,onRevive) {
-    for(const id of s.party){const h=s.helpers[id];if(h&&h.hp<=0){h.revive=Math.max(0,(h.revive||10)-dt);
+    const guests=s.active?s.progress[s.selectedMap]?.guests||[]:[];
+    for(const id of new Set([...s.party,...guests])){const h=s.helpers[id];if(h&&h.hp<=0){h.revive=Math.max(0,(h.revive||10)-dt);
       if(h.revive<=0){h.hp=Math.ceil(P.helperById(id).hp*.5);onRevive?.(id);}}}
   }
-  P.State={fresh,freshProgress,normalize,load,save,settle,canDepart,heal,purchase,reviveTick};
+  P.State={fresh,freshProgress,normalize,load,save,settle,canDepart,heal,offer,purchase,reviveTick};
 })(globalThis.PIGGY = globalThis.PIGGY || {});

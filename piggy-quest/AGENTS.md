@@ -10,7 +10,7 @@ Preserve the Korean UI and pale sage / ivory / pig-pink visual direction.
 - Settlement happens once. No replayed death event, resume or rendering callback may duplicate currency.
 - Killed monsters and opened chests remain cleared on return, player death, reload, and re-entry.
 - A completed map resets only on an explicit replay action. Never delete another map or owned helpers.
-- Every regular monster must be defeated before spawning the deepest boss.
+- Every required monster outside hidden rooms must be defeated before spawning the deepest boss. Hidden-room monsters are optional (user request, v0.6).
 - No required enemy may be locked behind an unpurchased movement ability.
 - While carrying the pig overhead, punches, fire punches and guns are blocked; kick stays usable.
 - Companion revival = 10 SIMULATION seconds, at 50% of maximum HP, at the pig.
@@ -22,7 +22,9 @@ Preserve the Korean UI and pale sage / ivory / pig-pink visual direction.
 ## Structure
 
 src/config.js: base balance data and stable IDs.
-src/world.js: expanded room graph, projected route geometry, biome scenery and map.
+src/world.js: expanded room graph, projected route geometry and discovery-aware map.
+src/exploration.js: hidden routes, expedition guests, carryable solid platforms and persistence.
+src/pixel.js: generated raster atlas, background/prop/shield rendering.
 src/combat.js: boss patterns and wooden shield/projectile collision.
 src/controls.js: joystick input and reversible layout editor.
 src/state.js: schema, persistent rules, normalization, purchases and settlement.

@@ -2,7 +2,7 @@
 (function(P){
   'use strict';
   const C=P.CONFIG,clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
-  function shieldActive(g){const p=g.player;return !!P.state.skills.woodshield&&p.shieldRaised&&!g.pig.carrying&&p.pose==='idle';}
+  function shieldActive(g){const p=g.player;return !!P.state.skills.woodshield&&p.shieldRaised&&!g.pig.carrying&&!p.carryingObject&&p.pose==='idle';}
   function blocking(g){return shieldActive(g)&&Math.abs(g.player.vx)<18;}
   function shieldBox(g){const p=g.player;return {x:p.x+p.dir*42,y:p.y-(blocking(g)?83:112),rx:26,ry:68};}
   function intercept(g,before,shot){

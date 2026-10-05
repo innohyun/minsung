@@ -6,7 +6,7 @@
   const ellipse=(c,x,y,rx,ry,color)=>{c.fillStyle=color;c.beginPath();c.ellipse(x,y,Math.max(.01,rx),Math.max(.01,ry),0,0,Math.PI*2);c.fill();};
   const line=(c,points,color,width)=>{c.strokeStyle=color;c.lineWidth=width;c.lineCap='round';c.lineJoin='round';c.beginPath();points.forEach((p,i)=>i?c.lineTo(...p):c.moveTo(...p));c.stroke();};
   function image(c,name,x,y,w,h,alpha=1){const img=images[name];if(!img?.complete||!img.naturalWidth)return;c.save();c.globalAlpha*=alpha;c.drawImage(img,x-w/2,y-h,w,h);c.restore();}
-  async function init(){await Promise.all(['pig','slime','boar','rock','bat','boss','boss-amber','boss-brook','chest','coin','potion','repair'].map(name=>new Promise(resolve=>{const img=new Image();images[name]=img;img.onload=resolve;img.onerror=resolve;const text=P.SOURCE_FILES?.['assets/'+name+'.svg'];img.src=text?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(text):'assets/'+name+'.svg';})));}
+  async function init(){await Promise.all(['pixel-world','pig','slime','boar','rock','bat','boss','boss-amber','boss-brook','chest','coin','potion','repair'].map(name=>new Promise(resolve=>{const img=new Image();images[name]=img;img.onload=resolve;img.onerror=resolve;const text=P.SOURCE_FILES?.['assets/'+name+'.svg'];img.src=text?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(text):'assets/'+name+'.svg';})));}
   function tree(c,x,y,s,variant,alpha=1){
     c.save();c.translate(x,y);c.scale(s,s);c.globalAlpha*=alpha;
     c.fillStyle=variant?'#718769':'#5f7d67';c.beginPath();c.moveTo(-13,0);c.lineTo(-8,-165);c.lineTo(-30,-222);c.lineTo(0,-195);c.lineTo(21,-252);c.lineTo(12,-163);c.lineTo(24,0);c.fill();
@@ -21,6 +21,7 @@
   }
   const seed=id=>{const n=Math.sin(id*127.1+3.1)*43758.5453;return n-Math.floor(n);};
   function scenery(c,camera,time,theme='forest',cave=false){
+    if(P.Pixel){P.Pixel.home(c,camera,theme);return;}
     const amber=theme==='amber',brook=theme==='brook';
     const g=c.createLinearGradient(0,0,0,720);
     g.addColorStop(0,cave?'#a4b5a2':amber?'#eedbbd':brook?'#d6e7df':'#dfe7ce');
@@ -44,6 +45,7 @@
   }
   function landmarks(c,room,camera,theme){
     for(const mark of room.landmarks||[]){
+      if(P.Pixel){P.Pixel.landmark(c,mark,room);continue;}
       if(room.bossX&&Math.abs(mark.x-(room.bossX-C.bossGateOffset))<265)continue;
       if(mark.x<camera-350||mark.x>camera+1630)continue;
       c.save();c.translate(mark.x,P.World?P.World.height(room,mark.x):0);
@@ -99,21 +101,12 @@
     if(o.shield){c.fillStyle='#c8d1be';c.strokeStyle=body;c.lineWidth=3;c.beginPath();c.ellipse(frontHand[0],frontHand[1]-7,16,24,-.15,0,Math.PI*2);c.fill();c.stroke();}
     if(o.playerShield){
       const cy=o.blocking?-83:-112;
-      c.save();c.translate(42,cy);ellipse(c,3,4,27,70,'#405445');
-      const wood=c.createLinearGradient(-24,0,24,0);wood.addColorStop(0,'#8c6949');wood.addColorStop(.5,'#bea170');wood.addColorStop(1,'#8b704c');
-      ellipse(c,0,0,25,68,wood);c.save();c.beginPath();c.ellipse(0,0,23,66,0,0,Math.PI*2);c.clip();
-      for(let i=-18;i<24;i+=9)line(c,[[i,-70],[i+2,70]],'#7d664d',1.5);c.restore();
-      c.strokeStyle='#526551';c.lineWidth=4;c.beginPath();c.ellipse(0,0,25,68,0,0,Math.PI*2);c.stroke();
-      for(const y of [-35,35])line(c,[[-20,y],[20,y]],'#7f8964',6);ellipse(c,0,0,10,10,'#879277');c.restore();
+      P.Pixel.sprite(c,'shield',42,cy+68,64,140);
     }
     c.restore();
   }
   function gate(c,x,locked,remaining,name,theme){
-    const y=C.ground,stone=theme==='amber'?'#a89874':'#829780';
-    ellipse(c,x,y+4,102,10,'rgba(48,74,48,.12)');
-    for(const side of [-1,1]){c.fillStyle=stone;c.beginPath();c.roundRect(x+side*78-15,y-156,30,158,[15,15,5,5]);c.fill();ellipse(c,x+side*78,y-145,24,8,'#a3b18c');}
-    c.strokeStyle=stone;c.lineWidth=22;c.lineCap='round';c.beginPath();c.arc(x,y-138,78,Math.PI,Math.PI*2);c.stroke();
-    for(let i=0;i<5;i++){const a=Math.PI+i*Math.PI/4;ellipse(c,x+Math.cos(a)*80,y-140+Math.sin(a)*78,15,8,'#92aa7d');}
+    const y=C.ground;P.Pixel.sprite(c,'arch',x,y+8,220,255);
     if(locked){
       line(c,[[x-75,y-58],[x,y-47],[x+75,y-58]],'#ad9970',5);
       c.fillStyle='#ddd0a3';c.beginPath();c.roundRect(x-26,y-62,52,30,7);c.fill();label(c,'⌘',x,y-40,16,'#6d7956');
