@@ -1,3 +1,23 @@
+# v0.9.0 직선 탐험·몬스터 애니메이션 · 실제 배포 결과 (2026-10-05)
+
+공개 게임: https://minsung.pages.dev/piggy-quest/
+
+기본 몬스터 세 종의 8프레임 걷기와 날개형의 6프레임 날갯짓을 새로 제작해 적용했습니다. 동굴 세 종도 걷기/화살 장전·발사·화살통에서 재장전, 앞발 들기·달려들기, 팔 올려 내려찍기·회수 동작을 사용합니다. 지상 기술은 발톱 연타/정지 가시/방어 반사/독가루로 구분합니다. 실제 simulation 시간/이동 거리와 타격 시점에 맞춰 프레임을 표시하며 일시정지에서 멈춥니다. 원본 PNG를 변경 없이 SVG에 넣고 alpha 범위/발 기준점으로 샘플링합니다. 이웃 칸의 팔이 끼어드는 문제를 스크린샷에서 발견해 프레임 범위를 수정했고 원본 바이트 SHA-256도 여섯 아틀라스 모두 일치합니다.
+
+모든 구역의 높낮이와 반투명 지면을 없애고 지도 구역도 수평 직선으로 변경했습니다. A 원화 배경은 카메라와 같은 1배 속도로 붙여 이동하며 겹침/페더를 제거했습니다. 표지판·기능 상자·굴착 흙·비밀 발견·처치 체크는 유지합니다. 방패는 풀 없이 좌우 방향/충돌면을 맞췄습니다. 막지 못한 돌진은 공중 밀림→넘어짐→복귀를 만들며 운반 저금통은 바닥에 내려놓습니다. 기존 코인·처치·상자·조수·굴착·저장과 통합 공격/동시 터치/개별 버튼 편집은 유지합니다.
+
+- 게시 코드/GitHub main 커밋: `cfdebe2e73854486b96b33ed68a2da2b812e4aef`. 이 결과 문서는 게임 소스 내보내기 밖의 상위 문서이며 별도 결과 커밋으로 저장합니다.
+- Pages production 배포: `0e9be875-ab7c-4651-b44c-f4c70afdf507`, https://0e9be875.minsung.pages.dev/piggy-quest/ . 계정 API에서 main/deploy success와 게시 코드 커밋 일치를 확인했습니다.
+- 전용 산출물: `/workspace/builds/minsung-pages-piggy-v090-20261005-final`, 공개 allowlist 140파일/소스 부분 45파일. 변경 공개 자산 46개를 프로젝트 upload JWT/지원 프록시 경로로 순차 전송하고 절대 경로 Wrangler 4.147.0으로 기존 minsung 프로젝트를 배포했습니다. 환경 설정·CLI 설치·토큰 범위를 변경하지 않았습니다.
+- Pages 게임 HTML SHA-256 `a922f2f633b55349f9830c188fe92378456862e16c1b757ec17e265067f96908`; 오프라인 단일 HTML SHA-256 `99c681702881e9fd39d4b4818b63aa557cf0a28c561b19d73ffaff2582c798fd`. 공개 소스 ZIP의 CRC와 실제 모듈 원본 일치를 확인했습니다.
+- 정상 TLS/상속 프록시의 실제 HTTPS 51요청: 루트·게임·대시보드·소스 진입·저금통 이미지·45개 소스 부분 파일·배포별 게임 모두 HTTP 200/검증 산출물 바이트 일치, JS Content-Type 확인. 공개 HTTPS 브라우저 CA 제한을 우회하지 않았으며 실제 브라우저 실행은 최종 산출물 로컬 HTTP에서 확인했습니다.
+- 검증: 게임 단위 73, 단일 HTML Chromium 46, 실제 HTTP 통합 공격/지도 체크/긴 터치 회귀 26, 새 스프라이트/공격/지면 27개 통과. 타격 경계 수정 뒤 관련 단위 26개를 재확인했습니다. 최종 분할 배포 산출물에서도 새 동작 27개와 HTTP/실제 저장/소스 ZIP/대시보드 10개 통과. 동일 검사 재실행을 독립 검사 수에 더하지 않습니다. 전투 경계는 실제 Game fixed-step의 격리된 재현 상태를 사용합니다. 전 맵 수동 완주·난이도·네이티브 iPad/Safari는 미검증입니다.
+- 실제 화면/동작 결과: `/workspace/artifacts/piggy-quest-v090/`, 기본 걷기 원화 `surface-walk-sheet.png`, 게임 화면 `surface-walk-0.png`/`surface-attacks.png`/`shield-left.png`/`shield-right.png`/`flat-map.png`, 새 동작 결과 `animation-results.json`. 굴착 위치는 게임 밖 `dig-sites-guide.png`에만 안내합니다.
+- 기존 첫 화면 SHA-256 `37a05e005b7ecb26d1ea3250df67cd8b357713b2d607895898412b9b011b03a1` 및 SQLite SHA-256 `2aafd39bdb7720eace4078fa8b05421e29b45f73df6b13e4b1e077ed87d735f6` 유지, 기존 Node 서버 HTTP 200. server.mjs·루트 package.json/lockfile·설치 스크립트·다른 env/secret 설정 변경 없음. 새 환경 설정 초안 없음. 저장소 전체 baseline 77 통과/6 실패는 기록만 보존하고 전체 테스트를 반복하지 않았습니다.
+- 계정 소유 토큰 verify success=true/status=active 및 절대 경로 Wrangler의 기존 minsung Pages 조회 성공. 대상 계정 `8326f1e0ab93e6bea3b3b6753b9d8fcf`, 사용자 제공 만료일 2027-10-04, Pages Write/Account Settings Read 범위를 유지했습니다. 비밀 값/Authorization 헤더를 출력하지 않았습니다. 전용 정적 산출물만 배포하며 저장소 루트/.local DB/Node 서버/tests/node_modules 경로를 업로드하지 않습니다. Workers/D1/DNS 또는 새 프로젝트 생성 없음.
+
+---
+
 # v0.8.0 표지판·통합 공격·지도 체크 · 실제 배포 결과 (2026-10-05)
 
 공개 게임: https://minsung.pages.dev/piggy-quest/
