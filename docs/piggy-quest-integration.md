@@ -1,3 +1,22 @@
+# v0.10.0 조수 개편·행동 효과음 · 실제 배포 결과 (2026-10-06)
+
+공개 게임: https://minsung.pages.dev/piggy-quest/
+
+새 조수 5종과 방사형/직선/갈래별 기술 트리, 은행 코인 구매·강화 상한, 화면 안의 적을 즉시 인식하는 자동 전투를 적용했습니다. 권투가의 낮은 달리기·펀치·발차기·밀치기·뒤로 회피·대쉬, 궁수의 실제 강화 포물선/재장전, 온기의 살아 있는 아군 치유·유한 방벽, 잿불의 한 손 불기둥/유도 폭발·주기적 불 피해/제한 비행, 대검의 두 번 베기·밀림·추격을 구현했습니다. 조수와 몬스터의 실제 행동 시점에 효과음을 연결하고 같은 소리/발소리/동시 음원의 겹침을 제한했습니다. 첫 입력에서 Web Audio를 활성화합니다.
+
+플레이어의 삭제 기술/장착 칸과 조수 명령 버튼을 제거하고 기본 공격·점프·삽·방패는 유지합니다. 저금통과의 최대 거리 제한은 470→705입니다. 이전 유료 조수/삭제 기술의 비용은 스키마 3으로 한 번만 환급하며 기존 처치·상자·굴착·은행/모험 코인·플레이어/저금통 체력·발견 기록을 보존합니다. 이미 소유하지만 동행하지 않는 조수도 숨은 방에서 합류하며 기존 체력과 강화를 유지합니다. 박쥐/독씨, 검, 화염볼, 폭발/잔류 불과 배경을 원본 PNG 바이트로 적용했습니다. 접합에서 보인 수직 경계는 연결 내용을 한 장에 그린 긴 숲 원화와 같은 가장자리의 교대 반전으로 수정했고 구역별 변형·카메라 1배 이동을 확인했습니다. 배경 원화/반전은 반복되며 모든 구역이 별도 유일 원화인 것은 아닙니다.
+
+- 게시 코드/GitHub 커밋: `8ca4a0057d8e1f81d5e832d725cd141a00c416de`. 이 상위 결과 문서만 별도 커밋으로 기록하므로 게임 소스 ZIP과 검증 산출물은 바뀌지 않습니다.
+- Pages production 배포: `2c42e152-95fe-4f41-9450-edd8b4fcddfe`, https://2c42e152.minsung.pages.dev/piggy-quest/ . 계정 API에서 main/deploy success, 코드 커밋, canonical production 배포 ID 일치를 확인했습니다.
+- 전용 산출물: `/workspace/builds/minsung-pages-piggy-v0100-20261006-release`, 공개 allowlist 180파일/소스 부분 85파일. 변경 자산 86개를 프로젝트 upload JWT로 순차 전송한 뒤 절대 경로 Wrangler 4.147.0으로 기존 minsung 프로젝트에 게시했습니다. 루트·DB·서버·tests·node_modules 경로를 공개 자산으로 올리지 않았습니다. 공개 게임 소스 내보내기에 게임 전용 테스트/기획 문서는 계속 포함됩니다.
+- 게시 게임 HTML SHA-256 `599193d9b179cdda4f51ffdc673d8c4b54a7c0564d015b506ff6e7b12654857e`, 단일 HTML SHA-256 `b877b4a50310c284b5fb519d2de98b685ec3f11c31f373436e96f0dd0afc6e08`. 정상 TLS/상속 프록시의 공개 HTTPS 91요청에서 첫 화면·게임·대시보드·소스 진입·저금통·85개 소스 부분·배포별 게임의 HTTP 200/산출물 바이트 일치와 JS Content-Type을 확인했습니다. 공개 HTTPS Chromium에서도 v0.10.0/이미지 30개 디코딩/탐험 시작/오류 없음이 통과했습니다.
+- 검증: 게임 단위 88개, 단일 HTML Chromium 메모리 Storage 47개, 실제 HTTP 조수/트리/전투/환급/오디오 30개, 실제 멀티터치·통합 공격·지도 체크 26개, 스프라이트/공격/평면 27개, 최종 산출물 HTTP/실제 localStorage/소스 ZIP CRC·원본/대시보드 10개 통과. 관련 재실행을 독립 검사 수에 더하지 않습니다. 새 효과음은 정상 RAF의 실제 조수·몬스터 활 행동과 오디오 엔진 연결을 확인했고 검·화염·치유·돌진/내려찍기/독씨 등 합성 파형을 측정했습니다. 물리 스피커 청취를 주장하지 않습니다. 실제 전투 경계는 fixed-step의 격리 재현 상태를 사용했으며 전 맵 수동 완주/최종 난이도/iPad Safari는 미검증입니다. file://는 VM Chromium의 `ERR_BLOCKED_BY_ADMINISTRATOR` 정책으로 열지 못했고 정책/인증/TLS를 우회하지 않았습니다. 단일 HTML은 set_content로, 실제 원점은 HTTP 및 공개 HTTPS로 구분해 검사했습니다.
+- 결과/화면: `/workspace/artifacts/piggy-quest-v0100/`의 `companions-results.json`, `animation-results.json`, `offline-browser-results.json`, `unit-results.log`, `public-verification.json`, `public-browser.json`, `companion-trees.png`, `portrait-trees.png`, `forest-joined-seam.png`. 새 9개 PNG의 SHA-256과 모든 프레임 범위를 검증했습니다. 대쉬가 접촉 전 판정되던 문제와 당긴 시위/손 위치를 검토해 수정했습니다.
+- 기존 첫 화면 SHA-256 `37a05e005b7ecb26d1ea3250df67cd8b357713b2d607895898412b9b011b03a1`, SQLite SHA-256 `2aafd39bdb7720eace4078fa8b05421e29b45f73df6b13e4b1e077ed87d735f6` 유지. 이번 VM에서 기존 Node 프로세스가 실행 중이지 않아 기존 DB로 다시 시작했고 로컬 HTTP 게임 요청 200을 확인했습니다. server.mjs와 루트 package.json/lockfile 바이트도 기준 커밋과 같습니다. 저장소 전체 baseline 77 통과/6 실패는 기록만 보존하고 전체 루트 테스트는 실행하지 않았습니다.
+- 기존 환경 설정/설치 스크립트/시크릿 바인딩을 변경하지 않았고 새 설정 초안은 필요하지 않아 저장하지 않았습니다. 현재 환경 spec 9/관측 9와 기존 변수·시크릿 ready를 확인했습니다. 계정 토큰 verify는 success=true/status=active, Wrangler Pages 조회에서 기존 minsung 프로젝트가 확인됩니다. 대상 계정은 `8326f1e0ab93e6bea3b3b6753b9d8fcf`, 사용자가 제공한 만료일은 2027-10-04이며 Pages Write/Account Settings Read 범위를 유지합니다. 비밀 값/인증 헤더는 출력하지 않았고 Workers/D1/DNS와 새 프로젝트는 만들지 않았습니다. 이 배포는 전용 정적 게임이며 기존 Node/SQLite HTTP/WebSocket 백엔드를 Pages에 그대로 배포한 것이 아닙니다.
+
+---
+
 # v0.9.0 직선 탐험·몬스터 애니메이션 · 실제 배포 결과 (2026-10-05)
 
 공개 게임: https://minsung.pages.dev/piggy-quest/
