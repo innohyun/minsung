@@ -35,6 +35,7 @@
     const phase=o.phase??(o.walkDistance??(o.time||0)*speed)/mix(150,190,running),angle=phase*Math.PI*2,wave=Math.cos(angle);
     const bob=-(Math.sin(angle*2)**2)*mix(.65,2,running)*moving,lean=mix(3,8,running)*moving;
     const hip=[lean*.3,-94+8*moving+bob],shoulder=[lean,-147+3*moving+bob*.2],head=[lean+1,-173+3*moving+bob*.15];
+    if(o.companionRun){hip[1]+=14*moving;shoulder[1]+=14*moving;head[1]+=14*moving;shoulder[0]+=19*moving;head[0]+=23*moving;}
     const rear=foot(phase+.5,running),front=foot(phase,running);
     let rearFoot=point([-5,0],rear.point,moving),frontFoot=point([5,0],front.point,moving);
     let attackArm=null,kickExtension=0,turn=0,spinArc=0;
@@ -89,6 +90,24 @@
     if(o.carrying){
       // Separate shoulder/hand lanes and outward elbows support the ceramic base without crossing.
       rearArm=aimArm(rearShoulder,[-31,-196],1);frontArm=aimArm(frontShoulder,[31,-196],-1);
+    }
+    else if(o.companionId){
+      if(o.pose==='bow'){
+        const draw=age<.18?0:age<.65?(age-.18)/.47:age<.84?0:0;
+        frontArm=aimArm(frontShoulder,[58,-137],-1);
+        rearArm=aimArm(rearShoulder,age>.84?point([-24,-167],[43,-140],smooth((age-1.02)/.1)):[43-draw*62,-140],1);
+      }
+      if(o.pose==='cast'||o.pose==='heal'||o.pose==='barrier'){
+        frontArm=aimArm(frontShoulder,[59,-132],-1);rearArm=fkArm(rearShoulder,-.35,.65);
+      }
+      if(o.pose==='sword'){
+        const down=age>=.32&&age<.64,side=age>=.8;
+        const target=down?[43,-97]:side?[55,-132]:[12,-192];
+        frontArm=aimArm(frontShoulder,target,-1);
+        const v=o.weaponGrip||[0,-1];rearArm=aimArm(rearShoulder,[frontArm.hand[0]-v[0]*12,frontArm.hand[1]-v[1]*12],1);
+      }
+      if(o.pose==='push'){frontArm=aimArm(frontShoulder,[59,-126],-1);rearArm=aimArm(rearShoulder,[49,-141],-1);}
+      if(o.pose==='dodge'){rearFoot=[-26,-24];frontFoot=[22,-34];rearArm=fkArm(rearShoulder,-.65,1.1);frontArm=fkArm(frontShoulder,.55,1);}
     }
     else if(o.playerShield){frontArm=aimArm(frontShoulder,[32,o.blocking?-74:-113]);}
     return {hip,shoulder,rearShoulder,frontShoulder,head,rearFoot,frontFoot,

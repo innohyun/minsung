@@ -5,6 +5,7 @@
   const cave={'cave-archer':'archer-motion','cave-charger':'charger-motion','cave-guard':'guard-motion'};
   const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
   function frame(e){
+    if(e.type==='bat'&&P.Companions){return {atlas:'bat-projectile',row:e.animAttack?1:0,index:e.animAttack?(e.animAttack.age<.16?0:e.animAttack.age<.32?1:e.animAttack.age<.47?2:e.animAttack.age<.5?3:e.animAttack.age<.78?4:5):Math.floor((e.wingTime||0)*9)%6,unit:P.Companions.meta['bat-projectile'].rows[0].unit};}
     const row=surface.indexOf(e.type),atlas=row>=0?(e.animAttack?'surface-action':'surface-walk'):cave[e.type];
     if(!atlas)return null;
     const index=row>=0?row:(e.animAttack?1:0),frames=meta[atlas].rows[index].frames;
@@ -25,7 +26,7 @@
   function draw(c,e,def){
     const f=frame(e);if(!f)return false;
     c.save();c.translate(e.x,P.CONFIG.ground-(e.type==='bat'?64:0));c.scale(e.dir===-1?1:-1,1);if(e.hit>0)c.globalAlpha=.6;
-    sample(c,f.atlas,f.row,f.index,0,0,def.h/f.unit);c.restore();return true;
+    if(f.atlas==='bat-projectile')P.Companions.sample(c,f.atlas,f.row,f.index,0,-def.h*.5,def.h/f.unit);else sample(c,f.atlas,f.row,f.index,0,0,def.h/f.unit);c.restore();return true;
   }
   function shield(c,x,y,w,h){
     // Right cell is the outward-facing right shield. Art.stick mirrors its whole rig once for left.
@@ -34,7 +35,7 @@
   function advance(e,dt){
     e.walkDistance=(e.walkDistance||0)+Math.abs(e.x-(e.animationX??e.x));e.animationX=e.x;
     if(e.active&&e.stun<=0)e.wingTime=(e.wingTime||0)+dt;
-    if(e.animAttack&&e.stun<=0){e.animAttack.age+=dt;if(e.animAttack.age>=e.animAttack.duration)e.animAttack=null;}
+    if(e.animAttack&&e.stun<=0){const previous=e.animAttack.age;e.animAttack.age+=dt;if(e.type==='cave-archer'&&previous<.9&&e.animAttack.age>=.9)P.Audio?.play('monster-bow-reload');if(e.animAttack.age>=e.animAttack.duration)e.animAttack=null;}
   }
   P.Animation={frame,draw,shield,advance,meta};
 })(globalThis.PIGGY=globalThis.PIGGY||{});

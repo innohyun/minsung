@@ -82,5 +82,5 @@ with sync_playwright() as pw:
  sheet.set_viewport_size({'width':1000,'height':2050});sheet.set_content('<meta charset="utf-8"><style>body{margin:0;padding:16px;background:#eef0e6;color:#304e43;font-family:system-ui}section{margin-bottom:18px}h2{margin:0;font-size:22px}p{margin:8px 0;font-size:15px}img{width:968px;display:block;border-radius:12px}</style>'+''.join(cards));sheet.screenshot(path=str(OUT/'dig-sites-guide.png'),full_page=True)
  check('No browser JavaScript exceptions',not errors)
  b.close()
-result={'version':'0.8.0','url':URL,'passed':len(checks),'failed':0,'checks':checks,'photos':photos,'method':'Actual HTTP Chromium and real CDP touch; isolated scenes/save state for clear checks and location photographs. Native Safari magnifier is not available in this VM.'}
+result={'version':'0.10.0','url':URL,'passed':len(checks),'failed':0,'checks':checks,'photos':photos,'method':'Actual HTTP Chromium and real CDP touch; isolated scenes/save state for clear checks and location photographs. Native Safari magnifier is not available in this VM.'}
 (OUT/'actions-results.json').write_text(json.dumps(result,ensure_ascii=False,indent=2)+'\n');print(json.dumps(result,ensure_ascii=False))

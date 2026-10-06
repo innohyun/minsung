@@ -4,7 +4,7 @@
   const C=P.CONFIG,DIG_STEPS=3;
   for(const [i,map] of P.MAPS.entries()){
     const secret=['cave','vault','mill'][i],room=map.rooms[secret];room.hidden=true;room.biome='cave';
-    room.helper={id:['scout','glow','dew'][i],x:room.width-510};
+    room.helper={id:['archer','sword','support'][i],x:room.width-510};
     // Stable enemy IDs preserve existing kills/coins while changing undiscovered cave encounters.
     room.enemies.forEach((e,n)=>{e.type=['cave-archer','cave-charger','cave-guard'][n%3];});
     for(const [id,r] of Object.entries(map.rooms)){

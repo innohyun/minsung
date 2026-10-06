@@ -9,27 +9,52 @@
     return {dead:[],opened:[],drops:[],room:'main',x:180,pigX:225,carrying:false,cleared:false,visited:['main'],objects:{},carriedObject:'',guests:[],excavations:{}};
   }
   function fresh() {
-    return {schema:2,version:P.VERSION,coins:120,runCoins:0,active:false,selectedMap:'wind',unlocked:['wind'],
+    return {schema:3,version:P.VERSION,coins:120,runCoins:0,active:false,selectedMap:'wind',unlocked:['wind'],
       player:{hp:100,max:100,attackLevel:0},pig:{hp:180,max:180},
-      helpers:{sprout:{hp:80,revive:0}},party:['sprout'],slots:1,mode:'follow',
+      helpers:{brawler:P.newHelper('brawler')},party:['brawler'],slots:1,migration:{companions:true,refund:0},
       inventory:{potion:3,repair:2},skills:{},equipped:[],settings:{sound:true,soundExplicit:false,volume:.8,controls:{mode:"joystick",size:56,stickSize:112,positions:{},sizes:{}},reducedMotion:false},
       progress:Object.fromEntries(P.MAPS.map(m=>[m.id,freshProgress(m)])),stats:{kills:0,runs:0},updatedAt:''};
   }
+  // Only known historical prices are refundable; schema 3 is an idempotent marker.
+  function migrate(raw){
+    if(raw.schema!==2)return raw;
+    const r=JSON.parse(JSON.stringify(raw)),old=r.helpers||{},mapping={sprout:'brawler',shield:'sword',ember:'flame',dew:'support',glow:'sword',scout:'archer'};
+    let refund=0;
+    for(const [id,price] of Object.entries({shield:340,ember:560}))if(Object.hasOwn(old,id))refund+=price;
+    for(const [id,price] of Object.entries({run:100,spin:180,dash:210,fire:290,fly:420,gun:460})){
+      const level=integer(id==='run'?(r.skills?.run??r.skills?.jump):r.skills?.[id],0,0,3);
+      for(let n=0;n<level;n++)refund+=Math.round(price*(1+n*.7));
+    }
+    r.helpers={};
+    for(const [id,h] of Object.entries(old)){const to=mapping[id];if(!to)continue;
+      // Paid legacy companions are refunded; hidden discoveries still unlock their new type.
+      if(id==='shield'||id==='ember')continue;
+      const next=P.newHelper(to);next.hp=Math.min(next.hp,number(h.hp,next.hp));next.revive=number(h.revive,0,0,10);r.helpers[to]=next;
+    }
+    if(!r.helpers.brawler)r.helpers.brawler=P.newHelper('brawler');
+    const translate=ids=>[...new Set((ids||[]).map(id=>mapping[id]).filter(id=>r.helpers[id]))];
+    r.party=translate(r.party);if(!r.party.length&&raw.party?.some(id=>id==='shield'||id==='ember'))r.party=['brawler'];
+    for(const p of Object.values(r.progress||{}))p.guests=translate(p.guests);
+    r.schema=3;r.coins=integer(r.coins,120)+refund;r.migration={companions:true,refund};return r;
+  }
   function normalize(raw) {
-    if (!raw || raw.schema!==2 || typeof raw!=='object') throw new Error('지원하지 않는 저장 파일입니다.');
-    const s=fresh(); s.coins=integer(raw.coins,120);s.runCoins=integer(raw.runCoins,0);s.active=raw.active===true;
+    if (!raw || ![2,3].includes(raw.schema) || typeof raw!=='object') throw new Error('지원하지 않는 저장 파일입니다.');
+    raw=migrate(raw);const s=fresh();s.migration={companions:true,refund:integer(raw.migration?.refund,0)}; s.coins=integer(raw.coins,120);s.runCoins=integer(raw.runCoins,0);s.active=raw.active===true;
     s.selectedMap=P.mapById(raw.selectedMap)?raw.selectedMap:'wind';
     s.unlocked=unique(raw.unlocked,P.MAPS.map(m=>m.id));if(!s.unlocked.includes('wind'))s.unlocked.unshift('wind');
     if(!s.unlocked.includes(s.selectedMap))s.selectedMap='wind';
     s.player.max=integer(raw.player?.max,100,100,200);s.player.hp=number(raw.player?.hp,100,0,s.player.max);
     s.player.attackLevel=integer(raw.player?.attackLevel,0,0,5);
     s.pig.max=integer(raw.pig?.max,180,180,380);s.pig.hp=number(raw.pig?.hp,180,0,s.pig.max);
+    s.helpers={};
     for(const h of P.HELPERS) if(raw.helpers && Object.hasOwn(raw.helpers,h.id)) {
-      s.helpers[h.id]={hp:number(raw.helpers[h.id]?.hp,h.hp,0,h.hp),revive:number(raw.helpers[h.id]?.revive,0,0,10)};
+      const levels={};for(const n of P.HELPER_NODES[h.id])levels[n.id]=integer(raw.helpers[h.id]?.levels?.[n.id],n.base,n.base,n.max);
+      s.helpers[h.id]={levels,hp:0,revive:number(raw.helpers[h.id]?.revive,0,0,10)};
+      s.helpers[h.id].hp=number(raw.helpers[h.id]?.hp,h.hp,0,P.helperStats(s,h.id).max);
       if(s.helpers[h.id].hp===0&&s.helpers[h.id].revive===0)s.helpers[h.id].revive=10;
     }
+    if(!s.helpers.brawler)s.helpers.brawler=P.newHelper('brawler');
     s.slots=integer(raw.slots,1,1,3);s.party=unique(raw.party,Object.keys(s.helpers)).slice(0,s.slots);
-    s.mode=raw.mode==='guard'?'guard':'follow';
     s.inventory.potion=integer(raw.inventory?.potion,3,0,999);s.inventory.repair=integer(raw.inventory?.repair,2,0,999);
     for(const skill of P.SKILLS) {const l=integer(skill.id==='run'?(raw.skills?.run??raw.skills?.jump):raw.skills?.[skill.id],0,0,skill.max);if(l)s.skills[skill.id]=l;}
     s.equipped=unique(raw.equipped,P.SKILLS.filter(x=>!x.utility&&s.skills[x.id]).map(x=>x.id)).slice(0,3);
@@ -37,7 +62,7 @@
     s.settings.volume=number(raw.settings?.volume,.8,.1,1);
     const controls=raw.settings?.controls||{};
     s.settings.controls={mode:controls.mode==='buttons'?'buttons':'joystick',size:integer(controls.size,56,44,88),stickSize:integer(controls.stickSize,112,88,150),positions:{},sizes:{}};
-    for(const id of ['joystick','move-a','move-d','world-map','command','run-btn','shield-btn','jump-btn','interact-btn','attack-btn','skill-0','skill-1','skill-2']){
+    for(const id of ['joystick','move-a','move-d','world-map','shield-btn','jump-btn','interact-btn','attack-btn']){
       const size=controls.sizes?.[id]??(id==='attack-btn'?(controls.sizes?.['kick-btn']??controls.sizes?.['punch-btn']):undefined);
       if(size!==undefined)s.settings.controls.sizes[id]=integer(size,id==='joystick'?112:56,id==='joystick'?88:44,id==='joystick'?150:96);
       const p=controls.positions?.[id]??(id==='attack-btn'?(controls.positions?.['kick-btn']??controls.positions?.['punch-btn']):undefined);if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))s.settings.controls.positions[id]={x:clamp(p.x,.02,.98),y:clamp(p.y,.02,.98)};
@@ -83,7 +108,7 @@
     let object,max;
     if(target==='pig'){if(item!=='repair')return '저금통에는 수리도구를 사용해요.';object=s.pig;max=s.pig.max;}
     else {if(item!=='potion')return '캐릭터에는 치료제를 사용해요.';
-      if(target==='player'){object=s.player;max=s.player.max;}else{object=s.helpers[target];max=P.helperById(target)?.hp;}}
+      if(target==='player'){object=s.player;max=s.player.max;}else{object=s.helpers[target];max=P.helperStats(s,target)?.max;}}
     if(!object||!max)return '치료할 대상을 찾지 못했어요.';
     if(object.hp>=max)return '이미 체력이 가득해요.';
     object.hp=Math.min(max,object.hp+(item==='repair'?80:50));if('revive' in object)object.revive=0;
@@ -94,17 +119,20 @@
     if(type==='item'){cost=id==='potion'?30:45;available=s.inventory[id]<999;}
     else if(type==='helper'){const h=P.helperById(id);cost=h?.price;available=!!h&&cost!==null&&!s.helpers[id];}
     else if(type==='skill'){const t=P.skillById(id),level=s.skills[id]||0;cost=t?Math.round(t.price*(1+level*.7)):0;available=!!t&&level<t.max;}
+    else if(type==='helper-node'){const [helper,node]=String(id).split(':');const n=P.helperNode(helper,node),level=P.helperLevel(s,helper,node);cost=n?Math.round(n.price*(1+.55*Math.max(0,level-n.base))):0;available=!!n&&!!s.helpers[helper]&&level<n.max;}
     else if(type==='slots'){cost=s.slots===1?300:600;available=s.slots<3;}
     else if(type==='attack'){cost=120+s.player.attackLevel*80;available=s.player.attackLevel<5;}
     else if(type==='health'){cost=180+(s.player.max-100)*4;available=s.player.max<200;}
     else available=false;
     return {cost,available,affordable:available&&s.coins>=cost};
   }
+  const offerNode=(s,id)=>offer(s,'helper-node',id);
   function purchase(s,type,id) {
     let cost=0;
     if(type==='item') {if(!['potion','repair'].includes(id))return '알 수 없는 물건이에요.';if(s.inventory[id]>=999)return '가방이 가득해요.';cost=id==='potion'?30:45;}
     else if(type==='helper') {const h=P.helperById(id);if(!h||h.price===null||s.helpers[id])return '구입할 수 없는 조수예요.';cost=h.price;}
     else if(type==='skill') {const t=P.skillById(id),level=s.skills[id]||0;if(!t||level>=t.max)return '최대 단계입니다.';cost=Math.round(t.price*(1+level*.7));}
+    else if(type==='helper-node'){const offer=offerNode(s,id);if(!offer.available)return '보유 조수와 강화 상한을 확인하세요.';cost=offer.cost;}
     else if(type==='slots'){if(s.slots>=3)return '동행 자리가 모두 열렸어요.';cost=s.slots===1?300:600;}
     else if(type==='attack'){if(s.player.attackLevel>=5)return '최대 단계입니다.';cost=120+s.player.attackLevel*80;}
     else if(type==='health'){if(s.player.max>=200)return '최대 단계입니다.';cost=180+(s.player.max-100)*4;}
@@ -112,8 +140,9 @@
     if(s.coins<cost)return '코인이 부족해요.';
     s.coins-=cost;
     if(type==='item')s.inventory[id]++;
-    if(type==='helper')s.helpers[id]={hp:P.helperById(id).hp,revive:0};
+    if(type==='helper')s.helpers[id]=P.newHelper(id);
     if(type==='skill'){s.skills[id]=(s.skills[id]||0)+1;if(!P.skillById(id).utility&&!s.equipped.includes(id)&&s.equipped.length<3)s.equipped.push(id);}
+    if(type==='helper-node'){const [h,n]=id.split(':');s.helpers[h].levels||={};s.helpers[h].levels[n]=P.helperLevel(s,h,n)+1;}
     if(type==='slots')s.slots++;
     if(type==='attack')s.player.attackLevel++;
     if(type==='health')s.player.max+=20; // A larger maximum is not a free heal.
@@ -122,7 +151,7 @@
   function reviveTick(s,dt,onRevive) {
     const guests=s.active?s.progress[s.selectedMap]?.guests||[]:[];
     for(const id of new Set([...s.party,...guests])){const h=s.helpers[id];if(h&&h.hp<=0){h.revive=Math.max(0,(h.revive||10)-dt);
-      if(h.revive<=0){h.hp=Math.ceil(P.helperById(id).hp*.5);onRevive?.(id);}}}
+      if(h.revive<=0){h.hp=Math.ceil(P.helperStats(s,id).max*.5);onRevive?.(id);}}}
   }
-  P.State={fresh,freshProgress,normalize,load,save,settle,canDepart,heal,offer,purchase,reviveTick};
+  P.State={fresh,freshProgress,normalize,migrate,load,save,settle,canDepart,heal,offer,purchase,reviveTick};
 })(globalThis.PIGGY = globalThis.PIGGY || {});

@@ -6,7 +6,7 @@
   const ellipse=(c,x,y,rx,ry,color)=>{c.fillStyle=color;c.beginPath();c.ellipse(x,y,Math.max(.01,rx),Math.max(.01,ry),0,0,Math.PI*2);c.fill();};
   const line=(c,points,color,width)=>{c.strokeStyle=color;c.lineWidth=width;c.lineCap='round';c.lineJoin='round';c.beginPath();points.forEach((p,i)=>i?c.lineTo(...p):c.moveTo(...p));c.stroke();};
   function image(c,name,x,y,w,h,alpha=1){const img=images[name];if(!img?.complete||!img.naturalWidth)return;c.save();c.globalAlpha*=alpha;c.drawImage(img,x-w/2,y-h,w,h);c.restore();}
-  async function init(){await Promise.all(['surface-walk','surface-action','archer-motion','charger-motion','guard-motion','shield-motion','a-scenery','a-props','cave-monsters','pig','slime','boar','rock','bat','boss','boss-amber','boss-brook','chest','coin','potion','repair'].map(name=>new Promise(resolve=>{const img=new Image();images[name]=img;img.onload=resolve;img.onerror=resolve;const text=P.SOURCE_FILES?.['assets/'+name+'.svg'];img.src=text?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(text):'assets/'+name+'.svg';})));}
+  async function init(){await Promise.all(['bat-projectile','sword-sprites','fireball','fireburst-burning','forest-continuation','forest-joined','ruins-continuation','brook-continuation','cave-continuation','surface-walk','surface-action','archer-motion','charger-motion','guard-motion','shield-motion','a-scenery','a-props','cave-monsters','pig','slime','boar','rock','bat','boss','boss-amber','boss-brook','chest','coin','potion','repair'].map(name=>new Promise(resolve=>{const img=new Image();images[name]=img;img.onload=resolve;img.onerror=resolve;const text=P.SOURCE_FILES?.['assets/'+name+'.svg'];img.src=text?'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(text):'assets/'+name+'.svg';})));}
   function tree(c,x,y,s,variant,alpha=1){
     c.save();c.translate(x,y);c.scale(s,s);c.globalAlpha*=alpha;
     c.fillStyle=variant?'#718769':'#5f7d67';c.beginPath();c.moveTo(-13,0);c.lineTo(-8,-165);c.lineTo(-30,-222);c.lineTo(0,-195);c.lineTo(21,-252);c.lineTo(12,-163);c.lineTo(24,0);c.fill();
@@ -105,6 +105,7 @@
       const cy=o.blocking?-83:-112;
       P.Animation.shield(c,42,cy+68,64,140);
     }
+    if(o.companionId)P.Companions?.weapon(c,o,rig);
     c.restore();
   }
   function gate(c,x,locked,remaining,name,theme){

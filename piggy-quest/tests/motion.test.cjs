@@ -63,10 +63,7 @@ test('roundhouse chambers the knee and pivots before its separate strike and rec
   assert.ok(contact.frontFoot[0]>80&&contact.turn>.5&&contact.spinArc>.9);assert.ok(end.frontFoot[1]===0&&end.spinArc===0);
   assert.notDeepEqual(chamber.frontFoot,P.Motion.pose({pose:'kick',age:.13}).frontFoot);
 });
-test('legacy jump purchase migrates to running without losing its level or coins',()=>{
-  const raw=P.State.fresh();raw.version='0.3.0';raw.skills={jump:2,fire:1};raw.coins=333;
-  const s=P.State.normalize(raw);assert.equal(s.skills.run,2);assert.equal(s.skills.jump,undefined);assert.equal(s.coins,333);assert.equal(s.skills.fire,1);
-});
+test('legacy jump and fire purchases are refunded once without retaining player abilities',()=>{const raw=P.State.fresh();raw.schema=2;raw.version='0.3.0';raw.skills={jump:2,fire:1};raw.coins=333;const s=P.State.normalize(raw);assert.equal(s.skills.run,undefined);assert.equal(s.skills.fire,undefined);assert.equal(s.coins,893);assert.equal(P.State.normalize(s).coins,893);});
 test('kick reaches extension in 45ms and retracts with its support foot planted',()=>{
   const peak=P.Motion.pose({pose:'kick',age:.045}),end=P.Motion.pose({pose:'kick',age:.22});
   assert.equal(peak.kickExtension,1);assert.ok(end.kickExtension<.001);assert.equal(peak.rearFoot[1],0);

@@ -33,6 +33,7 @@
       P.Exploration.load(this);
       this.enemies=this.room.enemies.filter(e=>!this.progress.dead.includes(e.id)).map(e=>this.makeEnemy(e));
       this.projectiles=[];this.enemyShots=[];this.shieldHits=0;this.hazards=[];this.fieldEffects=[];this.particles=[];this.coinFlights=[];this.floaters=[];this.flash=0;this.shake=0;
+      P.Companions.initRoom(this);
       this.camera=clamp(this.player.x-410,0,Math.max(0,this.room.width-1280));
       this.cameraY=P.World.height(this.room,this.player.x)*.75;this.spawnBoss();this.roomTitle=3;
     }
@@ -63,25 +64,12 @@
       p.firstPending=false;p.secondPending=false;p.kickHit=.045;p.kickPending=true;
       const enemy=this.nearEnemy(143);p.kickAimY=enemy?clamp(enemy.y-p.y-this.enemyConfig(enemy).h*.5,-95,-28):-74;if(enemy)p.dir=enemy.x>p.x?1:-1;
     }
-    skill(index){
-      if(this.mode!=='play'||this.travel||this.player.dig>0||this.player.knock)return;const s=P.state,id=s.equipped[index],skill=P.skillById(id),p=this.player,level=s.skills[id];
-      if(!skill||!level){this.toast('홈에서 기술을 배우고 이 자리에 장착하세요.');return;}
-      if(p.pose==='spin'&&p.age<.62)return;
-      if((p.skills[id]||0)>0)return;if(skill.hands&&P.Exploration.hasHands(this)){this.toast('이 기술은 저금통을 내려놓아야 사용할 수 있어요.');return;}
-      this.attackPending=null;p.skills[id]=skill.cd/(1+(level-1)*.13);if(id!=='spin')P.Audio.play('skill');
-      if(id==='spin'){p.pose='spin';p.age=0;p.firstPending=false;p.secondPending=false;p.kickPending=false;p.spinPending=true;p.spinHit=.26;p.spinLevel=level;
-        const enemy=this.nearEnemy(185+level*15);p.spinAimY=enemy?clamp(-this.enemyConfig(enemy).h*.7,-94,-40):-76;if(enemy)p.dir=enemy.x>p.x?1:-1;}
-      if(id==='dash'){p.dash=.28;p.pose='dash';p.age=0;p.dashHits=new Set();}
-      if(id==='fly'){p.flight=1.5+level*.5;p.vy=-360;}
-      if(id==='fire'||id==='gun')this.projectiles.push({x:p.x+p.dir*35,y:p.y-118,vx:p.dir*(id==='gun'?900:560),life:1.25,damage:(id==='gun'?28:36)+level*10,type:id});
-    }
     toggleShield(){if(this.mode!=='play'||this.travel||!P.state.skills.woodshield||P.Exploration.hasHands(this))return;this.player.shieldRaised=!this.player.shieldRaised;P.Audio.play('carry');}
-    command(){if(this.mode!=='play'||this.travel)return;P.state.mode=P.state.mode==='follow'?'guard':'follow';this.toast(P.state.mode==='guard'?'조수들이 저금통 주변을 지킵니다.':'조수들이 다시 따라옵니다.');this.snapshot();}
     interactionLabel(){
       const p=this.player;if(!p||!this.room||this.travel)return '';
       const digging=P.Exploration.site(this);if(digging&&!this.pig.carrying)return P.state.skills.shovel?'흙 파기':'흙의 흔적 조사';
       if(this.room.chests.some(c=>!this.progress.opened.includes(c.id)&&Math.abs(c.x-p.x)<100))return '상자 열기';
-      if(this.room.helper&&!P.state.helpers[this.room.helper.id]&&Math.abs(this.room.helper.x-p.x)<95)return '조수와 만나기';
+      if(this.room.helper&&!this.helpers.some(h=>h.id===this.room.helper.id)&&Math.abs(this.room.helper.x-p.x)<95)return '조수와 만나기';
       if(this.room.portals.some(portal=>Math.abs(portal.x-p.x)<90&&P.Exploration.accessible(this,portal))&&(this.pig.carrying||Math.abs(this.pig.x-p.x)<=150))return '샛길 이동';
       if(this.pig.carrying)return '저금통 내려놓기';if(Math.abs(this.pig.x-p.x)<100)return '저금통 들기';return '';
     }
@@ -92,7 +80,7 @@
       const chest=this.room.chests.find(c=>!this.progress.opened.includes(c.id)&&Math.abs(c.x-p.x)<100);
       if(chest){this.progress.opened.push(chest.id);s.runCoins+=chest.coins||0;s.inventory.potion=Math.min(999,s.inventory.potion+(chest.potion||0));s.inventory.repair=Math.min(999,s.inventory.repair+(chest.repair||0));this.pig.bounce=.5;this.snapshot();P.Audio.play('chest');P.UI?.loot(chest);return;}
       const found=this.room.helper;
-      if(found&&!s.helpers[found.id]&&Math.abs(found.x-p.x)<95){const def=P.helperById(found.id);s.helpers[found.id]={hp:def.hp,revive:0};P.Exploration.join(this,def);this.snapshot();P.UI?.foundHelper(def);return;}
+      if(found&&!this.helpers.some(h=>h.id===found.id)&&Math.abs(found.x-p.x)<95){const def=P.helperById(found.id);s.helpers[found.id] ||= P.newHelper(def.id);P.Exploration.join(this,def);this.snapshot();P.UI?.foundHelper(def);return;}
       const portal=this.room.portals.filter(x=>Math.abs(x.x-p.x)<90&&P.Exploration.accessible(this,x)).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0];
       if(portal){if(!this.pig.carrying&&Math.abs(this.pig.x-p.x)>150){this.toast('저금통을 가까이 데려오거나 들고 이동하세요.');return;}
         this.travel={portal:{...portal},age:0,duration:1.15,from:this.room.name,to:this.map.rooms[portal.target].name};this.clearInput();this.snapshot();P.Audio.play('step');return;}
@@ -130,7 +118,7 @@
     }
     kill(e){
       if(e.type==='boss'){this.pendingClear=true;P.state.runCoins+=this.enemyConfig(e).coins;return;}
-      if(this.progress.dead.includes(e.id))return;this.progress.dead.push(e.id);P.state.stats.kills++;
+      if(this.progress.dead.includes(e.id))return;this.progress.dead.push(e.id);P.Audio.play('monster-death');P.state.stats.kills++;
       const total=P.ENEMIES[e.type].coins,count=3;for(let i=0;i<count;i++){
         this.progress.drops.push({id:e.id+'-coin-'+i,room:this.roomId,x:clamp(e.x+(i-1)*19,25,this.room.width-25),value:i===count-1?total-Math.floor(total/count)*2:Math.floor(total/count)});
       }
@@ -152,8 +140,8 @@
       }
       if(target.kind==='pig'){this.pig.hp=Math.max(0,this.pig.hp-damage);this.flash=.22;P.Audio.play('warning');}
       if(target.kind==='helper'){
-        const h=target.actor,stored=P.state.helpers[h.id];if(h.inv>0||stored.hp<=0)return;stored.hp=Math.max(0,stored.hp-damage*(h.id==='shield'?.5:1));h.inv=.3;
-        if(stored.hp<=0){stored.revive=C.reviveSeconds;this.toast(P.helperById(h.id).name+' · 10초 뒤 저금통에서 다시 만나요.');}
+        const h=target.actor,stored=P.state.helpers[h.id];if(h.inv>0||stored.hp<=0)return;stored.hp=Math.max(0,stored.hp-damage);h.inv=.3;
+        P.Audio.play('companion-hurt');if(stored.hp<=0){P.Audio.play('companion-fall');stored.revive=C.reviveSeconds;this.toast(P.helperById(h.id).name+' · 10초 뒤 저금통에서 다시 만나요.');}
       }
       this.floaters.push({x:target.x,y:C.ground-118,text:'−'+Math.ceil(damage),life:.7,color:'#b76f7d'});
     }
@@ -173,37 +161,22 @@
       if(p.firstPending){p.firstHit-=dt;if(p.firstHit<=0){p.firstPending=false;if(!P.Exploration.hasHands(this)){P.Audio.play('punch');const e=this.nearEnemy(118);if(e)this.hitEnemy(e,10+s.player.attackLevel*3,18*p.dir);}}}
       if(p.secondPending){p.secondHit-=dt;if(p.secondHit<=0){p.secondPending=false;if(!P.Exploration.hasHands(this)){P.Audio.play('punch');const e=this.nearEnemy(118);if(e)this.hitEnemy(e,10+s.player.attackLevel*3,18*p.dir);}}}
       if(p.kickPending){p.kickHit-=dt;if(p.kickHit<=0){p.kickPending=false;P.Audio.play('kick');const e=this.nearEnemy(143);if(e)this.hitEnemy(e,17+s.player.attackLevel*4,190*p.dir);}}
-      if(p.spinPending){p.spinHit-=dt;if(p.spinHit<=0){p.spinPending=false;P.Audio.play('spin');for(const e of this.enemies)if(e.hp>0&&e.active&&Math.abs(e.x-p.x)<185+p.spinLevel*15&&Math.abs(e.y-p.y)<150)this.hitEnemy(e,26+p.spinLevel*11,220*(e.x>p.x?1:-1));}}
-      const axis=Number(this.right())-Number(this.left());p.running=!p.knock&&!!axis&&(p.grounded||p.y>=C.ground-1)&&!!s.skills.run&&this.keys.has('shift');
-      const target=(p.pose==='dig'||p.knock?0:axis)*(p.running?C.runSpeed+(s.skills.run-1)*35:C.walkSpeed);if(p.knock){p.knock.age+=dt;p.vx*=Math.max(0,1-dt*(p.knock.stage==='air'?.7:12));}else p.vx+=(target-p.vx)*Math.min(1,dt*17);
+      const axis=Number(this.right())-Number(this.left());p.running=false;
+      const target=(p.pose==='dig'||p.knock?0:axis)*C.walkSpeed;if(p.knock){p.knock.age+=dt;p.vx*=Math.max(0,1-dt*(p.knock.stage==='air'?.7:12));}else p.vx+=(target-p.vx)*Math.min(1,dt*17);
       if(axis&&!p.knock)p.dir=axis;
-      if(p.dash>0){p.dash=Math.max(0,p.dash-dt);p.vx=p.dir*690;for(const e of this.enemies)if(e.hp>0&&e.active&&Math.abs(e.x-p.x)<115&&!p.dashHits.has(e.id)){p.dashHits.add(e.id);this.hitEnemy(e,30+(s.skills.dash||1)*9,p.dir*250);}}
       const previousX=p.x,previousY=p.y;p.x+=p.vx*dt;p.x=clamp(p.x,40,this.room.width-60);
       if(this.room.bossX&&this.remaining()>0)p.x=Math.min(p.x,this.room.bossX-C.bossGateOffset-105);
-      if(!this.pig.carrying)p.x=clamp(p.x,Math.max(40,this.pig.x-470),Math.min(this.room.width-60,this.pig.x+470));
+      if(!this.pig.carrying)p.x=clamp(p.x,Math.max(40,this.pig.x-C.tetherRadius),Math.min(this.room.width-60,this.pig.x+C.tetherRadius));
       const travelled=Math.abs(p.x-previousX);p.walkDistance+=travelled;p.stepDistance+=travelled;p.walkBlend+=((p.knock?0:clamp(travelled/dt/C.walkSpeed,0,1))-p.walkBlend)*Math.min(1,dt*12);
       p.runBlend+=(Number(p.running)-p.runBlend)*Math.min(1,dt*10);p.gaitPhase+=(p.knock?0:travelled)/(150+p.runBlend*40);
       if(!p.knock&&p.stepDistance>(p.running?82:75)&&p.y>=C.ground-1){p.stepDistance=0;P.Audio.play(p.running?'run-step':'step');}
-      if(p.flight>0){p.flight=Math.max(0,p.flight-dt);p.vy+=(p.y>C.ground-175?-220:60)*dt;p.vy=clamp(p.vy,-150,100);}else p.vy+=C.gravity*dt;
+      p.vy+=C.gravity*dt;
       p.y+=p.vy*dt;P.Exploration.physics(this,dt,previousX,previousY);if(p.knock){if(p.knock.stage==='air'&&p.grounded){p.knock.stage='down';p.knock.age=0;}else if(p.knock.stage==='down'&&p.knock.age>=.28){p.knock.stage='getup';p.knock.age=0;}else if(p.knock.stage==='getup'&&p.knock.age>=.32)p.knock=null;}if(p.y<C.ground-400){p.y=C.ground-400;p.vy=0;}
       this.pig.bounce=Math.max(0,this.pig.bounce-dt);if(this.pig.carrying){this.pig.x=p.x;this.pig.y=p.y-C.carryHeight;}else this.pig.y=C.ground;
       this.camera+=(clamp(p.x-410,0,Math.max(0,this.room.width-1280))-this.camera)*Math.min(1,dt*8);
       this.cameraY=0;
       P.State.reviveTick(s,dt,id=>{const h=this.helpers.find(h=>h.id===id);if(h){h.x=this.pig.x;h.y=C.ground;h.inv=1;}this.toast(P.helperById(id).name+' 부활 · 체력 50%');});
-      for(const h of this.helpers){
-        h.age+=dt;h.cd=Math.max(0,h.cd-dt);h.inv=Math.max(0,h.inv-dt);if(h.age>.45)h.pose='idle';if(s.helpers[h.id].hp<=0)continue;
-        const oldX=h.x,def=P.helperById(h.id),anchor=s.mode==='guard'?this.pig.x:p.x-65;
-        const candidates=this.enemies.filter(e=>e.hp>0&&e.active&&Math.abs(e.x-anchor)<(s.mode==='guard'?C.guardRadius:365));
-        const enemy=candidates.sort((a,b)=>Math.abs(a.x-h.x)-Math.abs(b.x-h.x))[0];
-        const followTarget=anchor-(this.helpers.indexOf(h)*42);let tx=enemy?enemy.x:followTarget;
-        let dist=tx-h.x,range=enemy?def.range-12:20;
-        if(Math.abs(dist)>range){h.vx=Math.sign(dist)*180;h.x+=h.vx*dt;h.dir=Math.sign(dist);}else h.vx=0;
-        if(s.mode==='guard')h.x=clamp(h.x,this.pig.x-C.guardRadius,this.pig.x+C.guardRadius);
-        h.x=clamp(h.x,30,this.room.width-30);
-        h.walkDistance+=Math.abs(h.x-oldX);h.walkBlend+=(clamp(Math.abs(h.x-oldX)/dt/C.walkSpeed,0,1)-h.walkBlend)*Math.min(1,dt*12);
-        if(enemy&&Math.abs(enemy.x-h.x)<def.range&&h.cd<=0){h.dir=enemy.x>h.x?1:-1;h.cd=def.cooldown;h.pose='punch';h.age=0;this.hitEnemy(enemy,def.attack,h.dir*20);
-          if(h.id==='ember')this.particles.push({type:'beam',x:h.x,y:C.ground-118,tx:enemy.x,ty:C.ground-40,life:.15,max:.15});}
-      }
+      P.Companions.tick(this,dt);
       for(const e of this.enemies){
         if(e.hp<=0)continue;const def=this.enemyConfig(e);
         if(e.x+def.w>this.camera&&e.x-def.w<this.camera+1280)e.active=true;
@@ -211,7 +184,7 @@
         e.x=clamp(e.x,25,this.room.width-25);if(!e.active)continue;if(e.type==='boss'){P.Combat.bossTick(this,e,dt);continue;}if(e.stun>0)continue;if(e.type.startsWith('cave-')){P.Combat.caveTick(this,e,dt);continue;}
         P.Combat.surfaceTick(this,e,dt);
       }
-      for(const e of this.enemies)if(e.hp>0&&e.active)P.Animation.advance(e,dt);
+      for(const e of this.enemies)if(e.hp>0&&e.active){const before=e.walkDistance||0;P.Animation.advance(e,dt);e.stepDistance=(e.stepDistance||0)+e.walkDistance-before;if(e.stepDistance>65&&P.Companions.visible(this,e)&&e.type!=='bat'){e.stepDistance=0;P.Audio.play('monster-step');}}
       P.Combat.fieldsTick(this,dt);
       P.Combat.shotsTick(this,dt);
       for(const hazard of this.hazards){
@@ -267,9 +240,8 @@
       A.landmarks(c,this.room,this.camera,this.map.theme);P.Exploration.draw(c,this);
       for(const portal of this.room.portals.filter(p=>!p.secret||this.progress.visited.includes(p.target)))P.World.sign(c,portal,this.room,this.player.x);
       for(const chest of this.room.chests)at(chest.x,()=>{const open=this.progress.opened.includes(chest.id);c.save();c.globalAlpha=open?.35:1;P.Pixel.sprite(c,'chest',chest.x,C.ground+2,69,56);c.restore();if(!open&&Math.abs(chest.x-this.player.x)<120)A.label(c,'E · 상자 열기',chest.x,C.ground-67,13);});
-      const found=this.room.helper;if(found&&!P.state.helpers[found.id])at(found.x,()=>{A.stick(c,found.x,C.ground,{color:P.helperById(found.id).color,time:t,scale:.8});A.label(c,'E · '+P.helperById(found.id).name+'와 만나기',found.x,C.ground-159,13);});
+      const found=this.room.helper;if(found&&!this.helpers.some(h=>h.id===found.id))at(found.x,()=>{A.stick(c,found.x,C.ground,{color:P.helperById(found.id).color,time:t,scale:.8});A.label(c,'E · '+P.helperById(found.id).name+'와 만나기',found.x,C.ground-159,13);});
       if(this.room.bossX)at(this.room.bossX-C.bossGateOffset,()=>A.gate(c,this.room.bossX-C.bossGateOffset,this.remaining()>0,this.remaining(),this.map.bossName,this.map.theme));
-      if(P.state.mode==='guard'){c.save();c.setLineDash([5,8]);c.strokeStyle='rgba(77,118,92,.3)';c.lineWidth=1.4;c.beginPath();c.ellipse(this.pig.x,C.ground+3+H(this.pig.x),C.guardRadius,32,0,0,Math.PI*2);c.stroke();c.restore();}
       for(const d of this.progress.drops)if(d.room===this.roomId&&d.x>this.camera-30&&d.x<this.camera+1310)A.image(c,'coin',d.x,C.ground-5+H(d.x)+Math.sin(t*3+d.x)*3,19,23);
       for(const e of this.enemies){if(e.hp<=0||e.x<this.camera-200||e.x>this.camera+1480)continue;at(e.x,()=>{const def=this.enemyConfig(e);
         A.ellipse(c,e.x,C.ground+4,def.w*.4,6,'rgba(54,75,50,.13)');if(!P.Animation.draw(c,e,def)){c.save();c.translate(e.x,C.ground+(e.bossLift||0));c.scale(-e.dir,1);if(e.hit>0)c.globalAlpha=.6;A.image(c,def.asset,0,0,def.w,def.h);c.restore();}
@@ -279,8 +251,7 @@
         if(e.type==='boss'&&e.pattern==='leap'&&e.windup>0)A.ellipse(c,e.aimX,C.ground+H(e.aimX)-H(e.x),60,12,'#c3846c55');
         });
       }
-      for(const h of this.helpers){const def=P.helperById(h.id),stored=P.state.helpers[h.id];if(stored.hp<=0)continue;at(h.x,()=>{
-        A.ellipse(c,h.x,C.ground+3,22,5,'rgba(45,80,60,.12)');A.stick(c,h.x,h.y,{time:this.time,speed:h.vx,walkDistance:h.walkDistance,walkBlend:h.walkBlend,dir:h.dir,pose:h.pose,age:h.age,color:def.color,band:'#d4ddbc',scale:.86,shield:h.id==='shield',hit:h.inv>.1});A.bar(c,h.x,h.y-169,stored.hp,def.hp,55,'#7ca598');});}
+      for(const h of this.helpers)P.Companions.drawActor(c,this,h);
       const bounce=reduced?0:Math.sin(this.pig.bounce*32)*this.pig.bounce*13;
       at(this.pig.x,()=>{A.ellipse(c,this.pig.x,C.ground+4,36,6,'rgba(45,80,60,.13)');A.image(c,'pig',this.pig.x,this.pig.y-bounce,94,63);A.bar(c,this.pig.x,this.pig.y-78-bounce,this.pig.hp,P.state.pig.max,84,'#cc91a0');
       const threat=this.enemies.some(e=>e.hp>0&&e.active&&Math.abs(e.x-this.pig.x)<C.guardRadius);
@@ -300,8 +271,10 @@
       for(const b of this.projectiles)at(b.x,()=>{A.ellipse(c,b.x,b.y,b.type==='fire'?12:8,b.type==='fire'?8:3,b.type==='fire'?'#e6a36b':'#e9d7a0');A.line(c,[[b.x-Math.sign(b.vx)*23,b.y],[b.x,b.y]],'#f8dfac',3);});
       for(const b of this.enemyShots)at(b.x,()=>{
         if(b.type==='arrow'){c.save();c.translate(b.x,b.y);c.rotate(Math.atan2(b.vy,b.vx));A.line(c,[[-18,0],[13,0]],'#725d42',2.4);A.line(c,[[8,-4],[16,0],[8,4]],'#b7c3b5',2.5);A.line(c,[[-14,-4],[-9,0],[-14,4]],'#e4dbc3',2);c.restore();}
+        else if(b.type==='venom'){c.save();c.translate(b.x,b.y);c.scale(b.vx<0?1:-1,1);P.Companions.sample(c,'bat-projectile',2,Math.floor((b.age||0)*12)%4,0,0,.13);c.restore();}
         else{A.ellipse(c,b.x,b.y,b.r,b.r,b.theme==='amber'?'#c68357':b.theme==='brook'?'#81b8b2':'#879c60');A.line(c,[[b.x-Math.sign(b.vx)*18,b.y],[b.x,b.y]],'#dfdaba',3);}
       });
+      P.Companions.draw(c,this);
       for(const f of this.coinFlights){let q=f.t,x=f.x+(this.pig.x-f.x)*q,y=f.y+(this.pig.y-35-f.y)*q-Math.sin(q*Math.PI)*90;A.image(c,'coin',x,y+H(x),17,20);}
       for(const f of this.particles){c.save();c.translate(0,H(f.x));c.globalAlpha=Math.max(0,f.life/f.max);
         if(f.type==='ring'){c.strokeStyle='#ebd5a1';c.lineWidth=4;c.beginPath();c.ellipse(f.x,f.y,f.r,f.r*.4,0,0,Math.PI*2);c.stroke();}

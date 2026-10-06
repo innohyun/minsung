@@ -12,7 +12,7 @@ Preserve the Korean UI and pale sage / ivory / pig-pink visual direction.
 - A completed map resets only on an explicit replay action. Never delete another map or owned helpers.
 - Every required monster outside hidden rooms must be defeated before spawning the deepest boss. Hidden-room monsters are optional (user request, v0.6).
 - No required enemy may be locked behind an unpurchased movement ability.
-- While carrying the pig overhead, punches, fire punches and guns are blocked; kick stays usable.
+- While carrying the pig overhead, punches are blocked; kick stays usable.
 - Companion revival = 10 SIMULATION seconds, at 50% of maximum HP, at the pig.
 - Pause, source viewer, inventory dialogs, map dialogs and hidden tabs must freeze combat and revival.
 - Home does not automatically heal. Player AND pig need >=1 HP to start.
@@ -25,7 +25,8 @@ src/config.js: base balance data and stable IDs.
 src/world.js: expanded room graph, projected route geometry and discovery-aware map.
 src/exploration.js: shovel excavations, optional underground routes, expedition guests and discovery persistence.
 src/pixel.js: user-selected A raster atlases, native-resolution scroll and background/prop/shield rendering.
-src/combat.js: boss/cave attack patterns, ballistic arrows and wooden shield/projectile collision.
+src/combat.js: monster attacks and hostile projectile/shield collision.
+src/companions.js: automatic companion actions, friendly projectiles, healing/barriers, weapon anchors and raster effects.
 src/controls.js: joystick input and reversible layout editor.
 src/state.js: schema, persistent rules, normalization, purchases and settlement.
 src/art.js: scenery, replaceable SVG assets and stick-figure joint poses.

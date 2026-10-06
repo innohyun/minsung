@@ -11,16 +11,20 @@
     const canvas=document.createElement('canvas');canvas.width=r[2];canvas.height=r[3];const c=canvas.getContext('2d');c.drawImage(img,...r,0,0,r[2],r[3]);
     layers.set(name,canvas);return canvas;
   }
-  function backgroundPlan(camera,theme,biome){
-    const offset=camera,spacing=1440,name=scene(theme,biome),first=Math.floor((offset-1440)/spacing);
-    return Array.from({length:4},(_,n)=>{const id=first+n;return {id,name,x:id*spacing-offset,width:1440,flip:Math.abs(id)%2===1};});
+  function backgroundPlan(camera,theme,biome,roomId='main'){
+    const name=scene(theme,biome),branch=roomId!=='main'&&roomId!==undefined;
+    // The old-to-new forest transition is painted in one continuous panorama.
+    // Alternate reflection of the same per-room panorama makes boundary pixels identical.
+    const spacing=name==='forest'&&!branch?2160:1440,first=Math.floor((camera-spacing)/spacing);
+    const asset=name==='forest'?(branch?'forest-continuation':'forest-joined'):name==='cave'?'cave-continuation':branch?(name==='amber'?'ruins-continuation':'brook-continuation'):'';
+    return Array.from({length:4},(_,n)=>{const id=first+n;return {id,name,asset,x:id*spacing-camera,width:spacing,flip:Math.abs(id)%2===1};});
   }
-  function background(c,camera,cy,theme,biome){
+  function background(c,camera,cy,theme,biome,roomId='main'){
     c.fillStyle=biome==='cave'?'#829785':theme==='amber'?'#e8d3ac':'#e5e8ce';c.fillRect(0,0,1280,720);
-    const plan=backgroundPlan(camera,theme,biome),image=panorama(plan[0].name);
-    if(image)for(const a of plan){c.save();c.translate(a.x,0);if(a.flip){c.translate(a.width,0);c.scale(-1,1);}c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(image,0,0,a.width,720);c.restore();}
+    for(const a of backgroundPlan(camera,theme,biome,roomId)){const image=a.asset?P.Art.images[a.asset]:panorama(a.name);if(!image?.width)continue;
+      c.save();c.translate(a.x,0);if(a.flip){c.translate(a.width,0);c.scale(-1,1);}c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(image,0,0,a.width,720);c.restore();}
   }
-  function backdrop(c,g){background(c,g.camera,0,g.map.theme,g.room.biome);}
+  function backdrop(c,g){background(c,g.camera,0,g.map.theme,g.room.biome,g.roomId);}
   function home(c,camera,theme){backdrop(c,{camera,cameraY:0,map:{theme},room:{width:16000,route:[{x:0,y:0},{x:16000,y:0}],portals:[],biome:'camp'}});}
   function landmark(){} // Decorative landmarks are intentionally removed.
   function sign(c,p,room,x){if(p.secret)return;P.World.at(c,room,p.x,()=>{sprite(c,'sign',p.x,C.ground-51,95,150);P.Art.label(c,p.label,p.x,C.ground-215,12);if(Math.abs(p.x-x)<90)P.Art.label(c,'E · 함께 이동',p.x,C.ground-235,13);});}

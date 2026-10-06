@@ -54,9 +54,9 @@ test('every map connection has one matching entry and exit with its actual edge 
  assert.ok(edges.size>=6);for(const [edge,ends] of edges){assert.ok(edge.includes(':'));assert.deepEqual(ends,['A','B']);}
 });
 test('found companion joins current expedition without buying a slot or replacing party',()=>{
- const g=game(),def=P.helperById('scout');P.state.helpers.scout={hp:def.hp,revive:0};P.Exploration.join(g,def);P.Exploration.join(g,def);
- assert.deepEqual(P.state.party,['sprout']);assert.equal(P.state.slots,1);assert.equal(g.helpers.filter(h=>h.id==='scout').length,1);assert.deepEqual(g.progress.guests,['scout']);
- P.state.active=true;P.state.helpers.scout={hp:0,revive:1};P.State.reviveTick(P.state,1);assert.equal(P.state.helpers.scout.hp,48);
+ const g=game(),def=P.helperById('archer');P.state.helpers.archer={hp:def.hp,revive:0};P.Exploration.join(g,def);P.Exploration.join(g,def);
+ assert.deepEqual(P.state.party,['brawler']);assert.equal(P.state.slots,1);assert.equal(g.helpers.filter(h=>h.id==='archer').length,1);assert.deepEqual(g.progress.guests,['archer']);
+ P.state.active=true;P.state.helpers.archer={hp:0,revive:1};P.State.reviveTick(P.state,1);assert.equal(P.state.helpers.archer.hp,38);
 });
 test('individual control sizes clamp independently and legacy global defaults remain intact',()=>{
  const raw=P.State.fresh();raw.settings.controls.sizes={'punch-btn':76,'jump-btn':999,joystick:1,unknown:99};const s=P.State.normalize(raw);
@@ -64,7 +64,7 @@ test('individual control sizes clamp independently and legacy global defaults re
 });
 test('shop offers agree with real purchase charges and affordability',()=>{
  const s=P.State.fresh();for(const t of P.SKILLS){const o=P.State.offer(s,'skill',t.id);assert.equal(o.cost,t.price);assert.equal(o.affordable,t.price<=120);}
- const o=P.State.offer(s,'skill','run');assert.equal(P.State.purchase(s,'skill','run'),'');assert.equal(s.coins,120-o.cost);assert.equal(P.State.offer(s,'skill','woodshield').affordable,false);
+ const o=P.State.offer(s,'skill','shovel');assert.equal(P.State.purchase(s,'skill','shovel'),'');assert.equal(s.coins,120-o.cost);assert.equal(P.State.offer(s,'skill','woodshield').affordable,false);
 });
 test('room checks require every local enemy and never expose an undiscovered cave',()=>{
  const g=game();g.player.x=1000;
