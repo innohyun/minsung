@@ -115,7 +115,7 @@
         frontArm=aimArm(frontShoulder,point([25,-118],[54,-145],lift),-1);
         // Retrieve over the far shoulder, nock, draw to the cheek, then release.
         const retrieval=point([-19,-145],[-27,-167],smooth(age/.16));
-        const nock=[frontArm.hand[0]-7,frontArm.hand[1]];
+        const nock=[frontArm.hand[0]-22,frontArm.hand[1]];
         const back=age<.28?retrieval:age<.43?point(retrieval,nock,smooth((age-.28)/.15)):point(point(nock,[-10,-153],draw),[-4,-146],release);
         rearArm=aimArm(rearShoulder,back,1);
       }

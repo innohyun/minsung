@@ -150,6 +150,7 @@
       for(const h of this.helpers)if(P.state.helpers[h.id].hp>0)targets.push({kind:'helper',x:h.x,y:h.y,actor:h});
       return targets.filter(t=>Math.abs(t.y+(t.kind==='pig'&&this.pig.carrying?C.carryHeight-140:0)-C.ground)<155).sort((a,b)=>Math.abs(a.x-e.x)-Math.abs(b.x-e.x))[0];
     }
+    knockTick(){const p=this.player;if(p.knock){if(p.knock.stage==='air'&&p.grounded){p.knock.stage='down';p.knock.age=0;}else if(p.knock.stage==='down'&&p.knock.age>=.28){p.knock.stage='getup';p.knock.age=0;}else if(p.knock.stage==='getup'&&p.knock.age>=.32)p.knock=null;}}
     training(){return !P.state.tutorial?.complete&&P.state.tutorial?.step<5&&this.map?.id==='wind';}
     tickAttacks(dt){const p=this.player,s=P.state;
       p.dig=Math.max(0,p.dig-dt);p.punch=Math.max(0,p.punch-dt);p.kick=Math.max(0,p.kick-dt);p.inv=Math.max(0,p.inv-dt);p.age+=dt;
@@ -178,7 +179,7 @@
       p.runBlend+=(Number(p.running)-p.runBlend)*Math.min(1,dt*10);p.gaitPhase+=(p.knock?0:travelled)/(150+p.runBlend*40);
       if(!p.knock&&p.stepDistance>(p.running?82:75)&&p.y>=C.ground-1){p.stepDistance=0;P.Audio.play(p.running?'run-step':'step');}
       p.vy+=C.gravity*dt;
-      p.y+=p.vy*dt;P.Exploration.physics(this,dt,previousX,previousY);if(p.knock){if(p.knock.stage==='air'&&p.grounded){p.knock.stage='down';p.knock.age=0;}else if(p.knock.stage==='down'&&p.knock.age>=.28){p.knock.stage='getup';p.knock.age=0;}else if(p.knock.stage==='getup'&&p.knock.age>=.32)p.knock=null;}if(p.y<C.ground-400){p.y=C.ground-400;p.vy=0;}
+      p.y+=p.vy*dt;P.Exploration.physics(this,dt,previousX,previousY);this.knockTick();if(p.y<C.ground-400){p.y=C.ground-400;p.vy=0;}
       this.pig.bounce=Math.max(0,this.pig.bounce-dt);if(this.pig.carrying){this.pig.x=p.x;this.pig.y=p.y-C.carryHeight;}else this.pig.y=C.ground;
       this.camera+=(clamp(p.x-410,0,Math.max(0,this.room.width-1280))-this.camera)*Math.min(1,dt*8);
       this.cameraY=0;

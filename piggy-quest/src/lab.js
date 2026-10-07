@@ -26,7 +26,7 @@
    status('배치 완료 · 화면/캐릭터를 드래그해 옮길 수 있어요.');
   }
   tick(dt){this.time+=dt;const p=this.player;
-   if(p.hp>0){p.inv=Math.max(0,p.inv-dt);this.tickAttacks(dt);const foe=this.nearEnemy(1200,p.x);p.vx=0;if(foe){p.dir=foe.x>p.x?1:-1;if(Math.abs(foe.x-p.x)>90){p.vx=p.dir*180;p.x+=p.vx*dt;p.walkDistance+=Math.abs(p.vx*dt);}else this.punch();}}
+   if(p.hp>0){this.tickAttacks(dt);if(p.knock){p.knock.age+=dt;p.vx*=Math.max(0,1-dt*(p.knock.stage==='air'?.7:12));p.x=clamp(p.x+p.vx*dt,40,this.room.width-40);p.vy+=C.gravity*dt;p.y+=p.vy*dt;P.Exploration.physics(this);this.knockTick();}else{const foe=this.nearEnemy(1200,p.x);p.vx=0;if(foe){p.dir=foe.x>p.x?1:-1;if(Math.abs(foe.x-p.x)>90){p.vx=p.dir*180;p.x+=p.vx*dt;p.walkDistance+=Math.abs(p.vx*dt);}else this.punch();}}}
    P.State.reviveTick(labState,dt,id=>{const h=this.helpers.find(h=>h.id===id);h.x=h.homeX;h.y=C.ground;h.inv=1;});
    P.Companions.tick(this,dt);
    for(const e of this.enemies){if(e.hp<=0)continue;e.active=true;e.hit=Math.max(0,e.hit-dt);e.stun=Math.max(0,e.stun-dt);e.cd=Math.max(0,e.cd-dt);e.x=clamp(e.x+(e.kb||0)*dt,25,this.room.width-25);e.kb*=Math.max(0,1-dt*8);if(!e.stun){if(e.type.startsWith('cave-'))P.Combat.caveTick(this,e,dt);else P.Combat.surfaceTick(this,e,dt);}const before=e.walkDistance||0;P.Animation.advance(e,dt);e.stepDistance=(e.stepDistance||0)+e.walkDistance-before;if(e.stepDistance>65&&e.type!=='bat'){e.stepDistance=0;P.Audio.play('monster-step');}}
@@ -34,7 +34,7 @@
   }
   draw(){const c=this.ctx;c.save();c.translate(0,-this.viewTop);P.Pixel.background(c,this.camera,0,this.map.theme,this.room.biome);c.save();c.translate(-this.camera,0);
    for(const e of this.enemies){if(e.hp<=0)continue;const def=this.enemyConfig(e);P.Animation.draw(c,e,def);A.bar(c,e.x,C.ground-def.h-15,e.hp,e.max,60,'#b88078');if(e.windup>0)A.label(c,e.warning||'!',e.x,C.ground-def.h-34,12);}
-   for(const h of this.helpers)P.Companions.drawActor(c,this,h);if(this.player.hp>0){A.stick(c,this.player.x,C.ground,{pose:this.player.pose,age:this.player.age,aimY:this.player.aimY,dir:this.player.dir,speed:this.player.vx,walkDistance:this.player.walkDistance});A.bar(c,this.player.x,C.ground-205,this.player.hp,100,66);}
+   for(const h of this.helpers)P.Companions.drawActor(c,this,h);if(this.player.hp>0){A.stick(c,this.player.x,this.player.y,{knock:this.player.knock,air:!this.player.grounded,pose:this.player.pose,age:this.player.age,aimY:this.player.aimY,dir:this.player.dir,speed:this.player.vx,walkDistance:this.player.walkDistance});A.bar(c,this.player.x,C.ground-205,this.player.hp,100,66);}
    for(const s of this.enemyShots){c.save();c.translate(s.x,s.y);c.rotate(Math.atan2(s.vy,s.vx));if(s.type==='arrow'){const im=A.images.arrow;if(im?.naturalWidth)c.drawImage(im,-25,-8,50,17);}else if(s.type==='venom')P.Companions.sample(c,'bat-projectile',2,Math.floor((s.age||0)*12)%4,0,0,.13);else A.ellipse(c,0,0,6,6,'#90a85d');c.restore();}
    for(const f of this.fieldEffects)A.ellipse(c,f.x,C.ground-6,f.r,10,'#b9a77670');P.Companions.draw(c,this);
    for(const f of this.floaters)A.label(c,f.text,f.x,f.y,14,f.color);c.restore();if(paused){c.fillStyle='#20322b55';c.fillRect(0,0,1280,720);A.label(c,'일시정지 · 배치하고 재생하세요',640,this.viewTop+this.viewHeight*.35,25,'#fff9df');}c.restore();}

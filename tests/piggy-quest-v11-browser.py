@@ -50,6 +50,10 @@ with sync_playwright() as p:
     check('Sword has distinct backward windup before side slash',page.evaluate('PIGGY.Lab.battle.helpers[0].pose==="sword"&&PIGGY.Companions.swordFrame(PIGGY.Lab.battle.helpers[0].age).gripDir[0]<0'))
     page.select_option('#lab-map','wind:cave');page.evaluate('PIGGY.Lab.scoped(()=>{const b=PIGGY.Lab.battle;b.spawn("dummy:player",450);b.spawn("enemy:cave-archer",730);for(let n=0;n<130;n++)b.tick(1/60)})')
     check('Ordinary stick fighter can receive actual monster attacks',page.evaluate('PIGGY.Lab.battle.player.hp<100'))
+    page.evaluate('PIGGY.Lab.scoped(()=>{const b=PIGGY.Lab.battle;b.player.hp=100;b.player.x=450;b.player.inv=0;b.enemies=[];b.hurt({kind:"player",x:450,y:600,actor:b.player},10,400,true);for(let n=0;n<10;n++)b.tick(1/60)})')
+    thrown=page.evaluate('PIGGY.Lab.battle.player.x>450&&PIGGY.Lab.battle.player.y<600')
+    page.evaluate('PIGGY.Lab.scoped(()=>{for(let n=0;n<100;n++)PIGGY.Lab.battle.tick(1/60)})')
+    check('Lab stick fighter flies back and naturally gets up after a charge',thrown and page.evaluate('!PIGGY.Lab.battle.player.knock&&PIGGY.Lab.battle.player.y===600'))
     check('Lab cannot alter device save bytes',page.evaluate('localStorage.getItem(PIGGY.Accounts.key())')==storage)
     page.click('#lab-close');check('Leaving lab restores unchanged bank/progress/state',page.evaluate('JSON.stringify({...PIGGY.state,updatedAt:""})')==saved)
     if os.environ.get('PIGGY_SKIP_ONLINE')!='1':
