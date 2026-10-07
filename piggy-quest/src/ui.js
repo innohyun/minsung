@@ -25,7 +25,7 @@
     home(){resumeAfter=false;$('modal').close();kind='';P.game.mode='home';P.game.clearInput();$('hero').hidden=false;$('game-ui').hidden=true;document.body.classList.remove('playing');UI.refreshHome();},
     restoreActive(){
       if(!P.state.active)return;
-      const s=P.state,reason=s.pig.hp<1?'pig-death':s.player.hp<1?'player-death':s.progress[s.selectedMap].cleared?'clear':'';
+      const s=P.state,reason=s.pig.hp<1?'pig-death':s.progress[s.selectedMap].cleared?'clear':'';
       if(reason){P.State.settle(s,reason);P.State.save(s);UI.home();UI.toast('마지막 원정의 종료 상태를 정산했어요.');return;}
       UI.depart(s.selectedMap);UI.pause();
     },
@@ -39,12 +39,12 @@
       }
     },
     depart(mapId=P.state.selectedMap,replay=false){
-      const error=P.game.start(mapId,replay);if(error){UI.toast(error);if(P.State.canDepart(P.state))UI.bag();return;}
+      if(!P.Accounts.current){P.Accounts.show();return;}const error=P.game.start(mapId,replay);if(error){UI.toast(error);if(P.State.canDepart(P.state))UI.bag();return;}
       resumeAfter=false;$('modal').close();kind='';$('hero').hidden=true;$('game-ui').hidden=false;document.body.classList.add('playing');UI.renderSkillPad();P.Controls.apply();lastHud=-1;UI.updateHUD();
     },
     pause(){
       if(!P.state.active)return;P.game.snapshot();P.game.mode='pause';P.game.clearInput();resumeAfter=false;
-      UI.open('잠깐, 숨 고르기','시간이 멈췄어요. 조수의 부활 시간도 함께 멈춥니다.',`<div class="dialog-content"><div class="result-hero"><span class="symbol">☷</span><div class="result-coins"><small>현재 저금통 안의 코인</small>${fmt(P.state.runCoins)}<span style="font-size:20px"> ◉</span></div><p class="smallnote">홈에 보관한 ${fmt(P.state.coins)}코인은 이번 원정과 별개예요.</p></div><div class="button-row"><button class="primary" id="continue">계속하기</button><button class="secondary" id="return-home">홈으로 돌아가기</button></div><p class="smallnote" style="text-align:center">지금 귀환하면 ${fmt(P.state.runCoins)}코인을 모두 가져갑니다. 처치 기록은 유지돼요.</p></div>`,{kind:'pause',eyebrow:'TAKE A LITTLE BREAK'});
+      UI.open('잠깐, 숨 고르기','시간이 멈췄어요. 조수의 부활 시간도 함께 멈춥니다.',`<div class="dialog-content"><div class="result-hero"><span class="symbol">☷</span><div class="result-coins"><small>현재 저금통 안의 코인</small>${fmt(P.state.runCoins)}<span style="font-size:20px"> ◉</span></div><p class="smallnote">홈에 보관한 ${fmt(P.state.coins)}코인은 이번 원정과 별개예요.</p></div><div class="button-row"><button class="primary" id="continue">계속하기</button><button class="secondary" id="return-home">홈으로 돌아가기</button></div><p class="smallnote" style="text-align:center">지금 귀환하면 ${fmt(Math.floor(P.state.runCoins/2))}코인(절반)을 가져갑니다. 처치 기록은 유지돼요.</p></div>`,{kind:'pause',eyebrow:'TAKE A LITTLE BREAK'});
       const reset=document.createElement('button');reset.className='secondary';reset.textContent='처음부터 시작';reset.id='restart-pause';reset.onclick=()=>UI.newGame();$('continue').parentElement.append(reset);
       const menu=document.createElement('div');menu.className='button-row pause-tools';
       for(const [id,text,fn] of [['pause-controls','조이스틱 편집',()=>P.Controls.edit()],['pause-test-sound','소리 테스트',()=>UI.testSound()],['pause-source','소스코드',()=>UI.sources()],['pause-save','저장 관리',()=>UI.saveTools()],['pause-help','조작법',()=>UI.help()]]){const b=document.createElement('button');b.id=id;b.className='secondary';b.textContent=text;b.onclick=fn;menu.append(b);}
@@ -54,7 +54,7 @@
     result(r){
       resumeAfter=false;const clear=r.reason==='clear',pig=r.reason==='pig-death',dead=r.reason==='player-death';
       const title=clear?'원정 성공!':pig?'저금통이 부서졌어요':dead?'다음 모험을 준비해요':'안전하게 돌아왔어요';
-      const subtitle=clear?'보스를 쓰러뜨리고 이 맵을 모두 탐험했어요.':pig?'이번 원정에서 모은 코인만 잃었어요. 홈의 코인은 안전합니다.':dead?'플레이어가 쓰러졌지만 저금통의 코인은 안전하게 가져왔어요.':'획득한 코인을 보관하고 탐험 진행을 저장했어요.';
+      const subtitle=clear?'일반 구역의 몬스터를 모두 처치했어요. 숨은 구역은 선택입니다.':pig?'이번 원정에서 모은 코인만 잃었어요. 홈의 코인은 안전합니다.':dead?'플레이어가 쓰러졌지만 저금통의 코인은 안전하게 가져왔어요.':'원정 코인의 절반을 보관했어요. 처치와 탐험 기록은 유지됩니다.';
       UI.open(title,subtitle,`<div class="dialog-content"><div class="result-hero"><span class="symbol">${clear?'✦':pig?'🐷':'⌂'}</span><h3>${clear?P.game.map.name+' 클리어':'모험은 계속됩니다.'}</h3><div class="result-coins"><small>${pig?'잃은 원정 코인':'안전하게 가져온 코인'}</small>${pig?'−':'+'}${fmt(pig?r.lost:r.kept)} ◉</div><p class="smallnote">보유 코인 ${fmt(P.state.coins)} · 처치 ${P.game.progress.dead.length} / ${P.allEnemies(P.game.map).length}</p>${dead||pig?'<p class="warn">체력은 자동으로 회복되지 않아요. 홈에서 치료하거나 수리한 뒤 출발하세요.</p>':''}${clear?'<p class="smallnote">클리어한 맵은 새 판으로 다시 플레이할 수 있어요.</p>':''}</div><div class="button-row"><button class="primary" id="result-home">홈으로</button><button class="secondary" id="result-retry">${clear?'다시 플레이':'다시 탐험'}</button></div></div>`,{kind:'result',eyebrow:clear?'ADVENTURE COMPLETE':'EXPEDITION REPORT'});
       $('result-home').onclick=()=>UI.home();$('result-retry').onclick=()=>{const id=P.game.map.id;UI.home();UI.depart(id,clear);};UI.refreshHome();
     },
@@ -108,11 +108,11 @@
       UI.open('다음 원정은 어디로?','맵마다 진행을 따로 기억해요. 클리어한 맵은 처음부터 다시 도전할 수 있어요.',`<div class="dialog-content"><div class="cards two">${P.MAPS.map(m=>{const p=s.progress[m.id],unlocked=s.unlocked.includes(m.id);return `<article class="card"><span class="skill-icon">${m.tag}</span><h3>${m.name}</h3><span class="badge">${!unlocked?'잠김':p.cleared?'클리어':'진행 중'}</span><p>${m.subtitle}</p><div class="statline">일반 몬스터 ${p.dead.length} / ${P.allEnemies(m).length} · 보스 1마리</div><button class="primary" data-map="${m.id}" ${unlocked?'':'disabled'}>${!unlocked?'앞선 맵을 클리어하세요':p.cleared?'처음부터 다시 플레이':'이 맵 탐험하기'}</button></article>`;}).join('')}</div></div>`,{eyebrow:'CHOOSE YOUR NEXT CHAPTER'});
       document.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>{P.state.selectedMap=b.dataset.map;P.State.save(P.state);UI.refreshHome();UI.depart(b.dataset.map,s.progress[b.dataset.map].cleared);});
     },
-    worldMap(){
+    worldMap(){P.Tutorial?.event('map');
       if(!P.state.active){UI.maps();return;}const g=P.game;
       UI.open(g.map.name+' · 탐험 지도','선은 실제 이동 경로, 점선은 표지판에서 이동하는 샛길입니다. ● 현위치 · ■ 상자 · ◈ 보스 · ✓ 구역 몬스터 모두 처치 · 같은 번호의 A/B는 이동 입구/도착점',`<div class="dialog-content">${P.World.chart(g)}<p class="smallnote">현재: ${esc(g.room.name)} · ${Math.round(g.player.x/g.room.width*100)}% · 남은 몬스터 ${g.remaining()}마리. 표지판 앞에서 E로 이동하세요.</p><details><summary>구역별 탐험 기록</summary>${Object.entries(g.map.rooms).filter(([id,r])=>!r.hidden||g.progress.visited.includes(id)).map(([id,r])=>`<p>${esc(r.name)} · ${r.enemies.filter(e=>g.progress.dead.includes(e.id)).length}/${r.enemies.length} 처치 ${P.World.roomCleared(g,id)?'· ✓ 모두 처치':''} ${id===g.roomId?'· 현위치':''}</p>`).join('')}</details></div>`,{eyebrow:'EXPEDITION MAP'});
     },
-    help(){UI.open('작은 원정 안내서','저금통을 데리고 넓은 길을 탐험하는 횡스크롤 모험입니다.',`<div class="dialog-content rules"><section><h3>함께 익힐 조작</h3><table><tr><td>A D / ← →</td><td>좌우 이동 · 휴대전화는 화면 버튼</td></tr><tr><td>공격 버튼</td><td>한 번 누르면 발차기 · 0.24초 안에 두 번 누르면 좌우 펀치<br>두 번 입력을 기다린 뒤 한 번 입력의 발차기가 나갑니다.</td></tr><tr><td>J / K</td><td>키보드: 펀치 / 발차기 · 길게 누르면 반복<br>재사용 0.5초 / 1초</td></tr><tr><td>E</td><td>저금통 들기·내려놓기 / 상자·샛길·조수와 상호작용</td></tr><tr><td>B</td><td>구입한 나무 방패 들기·내리기 · 정지하면 낮은 가드</td></tr><tr><td>스페이스 / W / ↑</td><td>무료 점프 · 구입 없이 장애물과 투사체를 뛰어넘을 수 있어요</td></tr><tr><td>ESC / M</td><td>일시정지 / 탐험 기록 보기</td></tr></table></section><section><h3>저금통이 가장 중요해요</h3><p>몬스터가 화면 안에 보이면 다가옵니다. 저금통을 들고 있을 때는 펀치을 사용할 수 없어요. 발차기로 길을 열어보세요.</p><p>몬스터가 떨어뜨린 코인 위를 걸으면 코인이 저금통에 들어가고 통통 뛰어요. 홈으로 돌아가거나 플레이어만 쓰러지면 코인을 가져가요. 저금통이 깨지면 이번 원정 코인만 잃어요.</p><p>귀환해도 처치한 몬스터는 다시 나오지 않아요. 일반 길을 정리한 뒤 보스를 잡으면 다음 맵이 열립니다.</p><p>홈에서는 체력이 회복되지 않아요. 치료제와 수리도구를 구입해 끌어다 놓으세요. 조수는 전투 중 10초 뒤 체력 50%로 부활해요.</p><p class="smallnote">배경·방패는 A 이미지, 졸라맨은 관절 애니메이션을 사용합니다. 탐험 삽을 구입해 덮인 흙을 세 번 파면 숨은 지하 입구가 열려요. 비밀 구역의 적은 보스 조건에 포함되지 않습니다. 고급 완성형 애니메이션과 최종 일러스트로 교체할 수 있게 파일을 나눠두었습니다.</p></section></div>`,{eyebrow:'HOW TO ADVENTURE'});},
+    help(){UI.open('작은 원정 안내서','저금통을 데리고 넓은 길을 탐험하는 횡스크롤 모험입니다.',`<div class="dialog-content rules"><section><h3>함께 익힐 조작</h3><table><tr><td>A D / ← →</td><td>좌우 이동 · 휴대전화는 화면 버튼</td></tr><tr><td>공격 버튼</td><td>한 번 누르면 발차기 · 0.24초 안에 두 번 누르면 좌우 펀치<br>두 번 입력을 기다린 뒤 한 번 입력의 발차기가 나갑니다.</td></tr><tr><td>J / K</td><td>키보드: 펀치 / 발차기 · 길게 누르면 반복<br>재사용 0.5초 / 1초</td></tr><tr><td>E</td><td>저금통 들기·내려놓기 / 상자·샛길·조수와 상호작용</td></tr><tr><td>B</td><td>구입한 나무 방패 들기·내리기 · 정지하면 낮은 가드</td></tr><tr><td>스페이스 / W / ↑</td><td>무료 점프 · 구입 없이 장애물과 투사체를 뛰어넘을 수 있어요</td></tr><tr><td>ESC / M</td><td>일시정지 / 탐험 기록 보기</td></tr></table></section><section><h3>저금통이 가장 중요해요</h3><p>몬스터가 화면 안에 보이면 다가옵니다. 저금통을 들고 있을 때는 펀치을 사용할 수 없어요. 발차기로 길을 열어보세요.</p><p>몬스터가 떨어뜨린 코인 위를 걸으면 코인이 저금통에 들어가고 통통 뛰어요. 중도 귀환하면 원정 코인의 절반을 가져가요. 플레이어는 10초 뒤 저금통에서 체력 50%로 부활해요. 저금통이 깨지면 이번 원정 코인만 잃어요.</p><p>귀환해도 처치한 몬스터는 다시 나오지 않아요. 일반 구역의 몬스터를 모두 처치하면 다음 맵이 열립니다.</p><p>홈에서는 체력이 회복되지 않아요. 치료제와 수리도구를 구입해 끌어다 놓으세요. 조수는 전투 중 10초 뒤 체력 50%로 부활해요.</p><p class="smallnote">배경·방패는 A 이미지, 졸라맨은 관절 애니메이션을 사용합니다. 탐험 삽을 구입해 덮인 흙을 세 번 파면 숨은 지하 입구가 열려요. 비밀 구역의 적은 맵 완료 조건에 포함되지 않습니다. 고급 완성형 애니메이션과 최종 일러스트로 교체할 수 있게 파일을 나눠두었습니다.</p></section></div>`,{eyebrow:'HOW TO ADVENTURE'});},
     sources(){
       const files=P.SOURCE_FILES||{},names=Object.keys(files).sort((a,b)=>{const pr=['HANDOFF.md','AGENTS.md','README.md','docs/GAME_DESIGN.md'];return (pr.includes(a)?pr.indexOf(a):-1)<0?((pr.includes(b)?-1:0)<0?1:a.localeCompare(b)):(pr.includes(b)?pr.indexOf(a)-pr.indexOf(b):-1);});
       if(!files[currentSource])currentSource=names[0];
@@ -135,6 +135,7 @@
     },
     saveTools(){
       UI.open('저장 관리','진행 기록은 이 브라우저에만 저장돼요. 다른 기기로 옮기거나 안전하게 보관하려면 파일로 내보내세요.',`<div class="dialog-content"><div class="button-row"><button class="primary" id="export-save">내 저장 파일 내려받기</button><button class="secondary" id="select-import">저장 파일 불러오기</button></div><p class="warn">저장 파일은 소스코드와 별개입니다. 공개 사이트나 공개 저장소에 올리지 마세요. 불러오기는 현재 진행을 교체합니다.</p><label class="checkline"><input id="reduce-motion" type="checkbox" ${P.state.settings.reducedMotion?'checked':''}> 화면 흔들림과 붉은 깜빡임 줄이기</label><p class="smallnote">브라우저 데이터를 지우면 자동 저장도 사라집니다. 다른 탭에서 동시에 플레이하면 마지막 저장이 우선하므로 한 탭에서 사용하세요.</p></div>`,{eyebrow:'KEEP YOUR ADVENTURE SAFE'});
+      if(P.Accounts?.recovery()){const b=document.createElement('button');b.className='secondary';b.textContent='온라인 연동 전 기기 백업 내려받기';b.onclick=()=>P.Export.download(new Blob([P.Accounts.recovery()],{type:'application/json'}),'Piggy_Quest_Account_Recovery.json');$('export-save').parentElement.after(b);}
       $('export-save').onclick=()=>{if(P.state.active)P.game.snapshot();P.Export.download(new Blob([JSON.stringify(P.state,null,2)],{type:'application/json'}),'Piggy_Quest_Save.json');};
       $('select-import').onclick=()=>{if(P.state.active){UI.toast('먼저 현재 원정을 귀환한 뒤 저장 파일을 불러오세요.');return;}$('import-save').click();};
       $('reduce-motion').onchange=e=>{P.state.settings.reducedMotion=e.target.checked;P.State.save(P.state);};
@@ -154,10 +155,10 @@
       $('pig-health-text').textContent=Math.ceil(pig.hp)+' / '+P.state.pig.max;$('pig-health').max=P.state.pig.max;$('pig-health').value=pig.hp;
       $('room-label').textContent=g.map.name+' · '+g.room.name;$('kill-count').textContent=(P.requiredEnemies(g.map).length-g.remaining())+' / '+P.requiredEnemies(g.map).length+' 처치　⌘';
       $('run-coins').textContent=fmt(P.state.runCoins);
-      const interaction=g.interactionLabel();$('interact-btn').hidden=!interaction;$('interact-btn').querySelector('small').textContent=interaction.includes('흙')?'파기':'상호작용';$('interact-btn').title=interaction+' · E';$('interact-btn').setAttribute('aria-label',interaction+' · E');
+      for(const b of document.querySelectorAll('[data-action]'))b.disabled=p.hp<=0;const interaction=p.hp>0?g.interactionLabel():'';$('interact-btn').hidden=!interaction;$('interact-btn').querySelector('small').textContent=interaction.includes('흙')?'파기':'상호작용';$('interact-btn').title=interaction+' · E';$('interact-btn').setAttribute('aria-label',interaction+' · E');
       const attack=$('attack-btn'),busy=P.Exploration.hasHands(g);attack.classList.toggle('hands-busy',busy);
       attack.title=busy?'한 번: 발차기 · 두 번: 펀치 불가 (저금통 운반 중)':'한 번: 발차기 · 빠르게 두 번: 펀치';attack.setAttribute('aria-label',attack.title);
-      $('shield-btn').hidden=!P.state.skills.woodshield;$('shield-btn').disabled=busy;$('shield-btn').classList.toggle('active',P.Combat.shieldActive(g));
+      $('shield-btn').hidden=!P.state.skills.woodshield;$('shield-btn').disabled=busy||p.hp<=0;$('shield-btn').classList.toggle('active',P.Combat.shieldActive(g));
       $('distance-progress').style.width=(p.x/g.room.width*100)+'%';
       attack.classList.toggle('cooling',p.kick>0&&p.punch>0);attack.style.setProperty('--cd',Math.max(0,Math.min(p.kick,p.punch/.5)));
       document.querySelectorAll('[data-skill]').forEach(b=>{let id=P.state.equipped[Number(b.dataset.skill)],t=P.skillById(id),r=p.skills[id]||0;b.hidden=false;b.disabled=!!t?.hands&&P.Exploration.hasHands(g);b.classList.toggle("unavailable",b.disabled);b.classList.toggle('cooling',r>0);b.style.setProperty('--cd',t?r/t.cd:0);});
@@ -169,6 +170,7 @@
       b.onclick=e=>{if(!e||e.detail===0){if(!b.disabled&&!P.Controls?.editing){P.Audio.unlock();fn();}}};
     },
     init(){
+      $('account-btn').onclick=()=>P.Accounts.show();$('developer-btn').onclick=()=>P.Lab.open();
       $('brand').onclick=()=>P.state.active?UI.pause():UI.home();$('source-btn').onclick=()=>UI.sources();$('help').onclick=()=>UI.help();$('save-tools').onclick=()=>UI.saveTools();$('new-game').onclick=()=>UI.newGame();
       $('depart').onclick=()=>UI.depart(P.state.selectedMap,P.state.progress[P.state.selectedMap].cleared);
       $('map-select').onclick=()=>UI.maps();UI.bindAction($('world-map'),()=>UI.worldMap());$('pause').onclick=()=>UI.pause();

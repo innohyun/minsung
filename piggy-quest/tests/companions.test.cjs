@@ -29,7 +29,7 @@ test('basic companion punches hit on two separate animation phases, never on eve
  const g=game('brawler',220);steps(g,1);assert.equal(g.hits.length,0);steps(g,6);assert.equal(g.hits.length,1);steps(g,12);assert.equal(g.hits.length,2);steps(g,12);assert.equal(g.hits.length,2);
 });
 test('bow release has real ballistic flight, a reload phase and one impact',()=>{
- const g=game('archer',345);steps(g,40);assert.equal(g.allyShots.length,1);const s={...g.allyShots[0]};steps(g,6);assert.ok(g.allyShots[0].vy>s.vy);steps(g,80);assert.equal(g.hits.length,1);
+ const g=game('archer',345);steps(g,59);assert.equal(g.allyShots.length,1);const s={...g.allyShots[0]};steps(g,6);assert.ok(g.allyShots[0].vy>s.vy);steps(g,80);assert.equal(g.hits.length,1);
 });
 test('upgraded sword knocks back, chases within a cap and makes exactly two strikes',()=>{
  const g=game('sword',265);P.state.helpers.sword.levels.sword=2;steps(g,25);assert.equal(g.hits.length,1);assert.ok(g.hits[0].k>200);g.enemies[0].x+=130;const x=g.helpers[0].x;steps(g,60);assert.equal(g.hits.length,2);assert.ok(g.helpers[0].x>x);assert.ok(g.helpers[0].x-x<=160);
@@ -54,5 +54,5 @@ test('dash is a short committed move and not a continuous run or repeated damage
 });
 test('new weapon poses keep both arm chains attached to their actual shoulders',()=>{
  const distance=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
- for(const id of ['archer','sword','flame'])for(let n=0;n<80;n++){const age=n/60,f=P.Companions.swordFrame(age),r=P.Motion.pose({companionId:id,pose:id==='archer'?'bow':id==='sword'?'sword':'cast',age,weaponGrip:f.gripDir});for(const side of ['front','rear']){assert.deepEqual(r[side+'Shoulder'],r.shoulder);assert.ok(Math.abs(distance(r.shoulder,r[side+'Elbow'])-32)<1e-6);assert.ok(Math.abs(distance(r[side+'Elbow'],r[side+'Hand'])-31)<1e-6);}}
+ for(const id of ['archer','sword','flame'])for(let n=0;n<80;n++){const age=n/60,f=P.Companions.swordFrame(age),r=P.Motion.pose({companionId:id,pose:id==='archer'?'bow':id==='sword'?'sword':'cast',age,weaponGrip:f.gripDir});for(const side of ['front','rear']){assert.ok(distance(r[side+'Shoulder'],r.shoulder)<=5);assert.ok(Math.abs(distance(r[side+'Shoulder'],r[side+'Elbow'])-32)<1e-6);assert.ok(Math.abs(distance(r[side+'Elbow'],r[side+'Hand'])-31)<1e-6);}}
 });

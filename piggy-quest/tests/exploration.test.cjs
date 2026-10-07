@@ -4,7 +4,7 @@ require('../src/config.js');require('../src/world.js');require('../src/explorati
 const P=globalThis.PIGGY;P.Audio={play(){}};
 function game(){P.state=P.State.fresh();const map=P.MAPS[0],progress=P.state.progress.wind;
  const g={map,room:map.rooms.main,roomId:'main',progress,player:{x:1000,y:600,vy:0,dir:1,grounded:true,dig:0},pig:{carrying:false},helpers:[],particles:[],toast(){},snapshot(){P.Exploration.snapshot(this);}};P.Exploration.load(g);return g;}
-test('hidden cave enemies and companions remain optional for every boss',()=>{
+test('hidden cave enemies and companions remain optional for map completion',()=>{
  for(const map of P.MAPS){const hidden=Object.values(map.rooms).filter(r=>r.hidden);assert.equal(hidden.length,1);assert.ok(hidden[0].helper);
   const required=new Set(P.requiredEnemies(map).map(e=>e.id));assert.ok(hidden[0].enemies.every(e=>!required.has(e.id)));
   assert.deepEqual(new Set(hidden[0].enemies.map(e=>e.type)),new Set(['cave-archer','cave-charger','cave-guard']));
@@ -73,7 +73,7 @@ test('room checks require every local enemy and never expose an undiscovered cav
   g.progress.dead=map.rooms.main.enemies.slice(0,-1).map(e=>e.id);
   assert.ok(!P.World.chart(g).includes('data-cleared-room="main"'));
   g.progress.dead.push(map.rooms.main.enemies.at(-1).id);
-  assert.ok(!P.World.chart(g).includes('data-cleared-room="main"'),'boss still alive');
+  assert.ok(P.World.chart(g).includes('data-cleared-room="main"'),'no boss blocks a cleared room');
   g.progress.cleared=true;assert.ok(P.World.chart(g).includes('data-cleared-room="main"'));
   const [id,hidden]=Object.entries(map.rooms).find(([,r])=>r.hidden);g.progress.dead.push(...hidden.enemies.map(e=>e.id));
   assert.ok(!P.World.chart(g).includes('data-cleared-room="'+id+'"'));

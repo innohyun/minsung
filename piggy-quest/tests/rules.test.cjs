@@ -5,7 +5,7 @@ require('../src/config.js');require('../src/world.js');require('../src/state.js'
 const P=globalThis.PIGGY;
 
 test('new game has 120 safe coins, no risky coins, one companion slot',()=>{const s=P.State.fresh();assert.equal(s.coins,120);assert.equal(s.runCoins,0);assert.equal(s.slots,1);assert.deepEqual(s.party,['brawler']);});
-test('manual return banks run coins exactly once',()=>{const s=P.State.fresh();s.runCoins=75;s.active=true;const r=P.State.settle(s,'return');assert.equal(s.coins,195);assert.equal(r.kept,75);P.State.settle(s,'return');assert.equal(s.coins,195);});
+test('manual return banks run coins exactly once',()=>{const s=P.State.fresh();s.runCoins=75;s.active=true;const r=P.State.settle(s,'return');assert.equal(s.coins,157);assert.equal(r.kept,37);P.State.settle(s,'return');assert.equal(s.coins,157);});
 test('player death preserves coins and does not heal',()=>{const s=P.State.fresh();s.player.hp=0;s.runCoins=80;P.State.settle(s,'player-death');assert.equal(s.coins,200);assert.equal(s.player.hp,0);assert.ok(P.State.canDepart(s));});
 test('pig death loses only risky coins',()=>{const s=P.State.fresh();s.pig.hp=0;s.runCoins=90;const r=P.State.settle(s,'pig-death');assert.equal(s.coins,120);assert.equal(r.lost,90);assert.equal(s.runCoins,0);});
 test('no departure without at least 1 player HP and 1 pig HP',()=>{const s=P.State.fresh();s.player.hp=.5;assert.ok(P.State.canDepart(s));s.player.hp=1;s.pig.hp=0;assert.ok(P.State.canDepart(s));s.pig.hp=1;assert.equal(P.State.canDepart(s),'');});

@@ -13,7 +13,7 @@
       player:{hp:100,max:100,attackLevel:0},pig:{hp:180,max:180},
       helpers:{brawler:P.newHelper('brawler')},party:['brawler'],slots:1,migration:{companions:true,refund:0},
       inventory:{potion:3,repair:2},skills:{},equipped:[],settings:{sound:true,soundExplicit:false,volume:.8,controls:{mode:"joystick",size:56,stickSize:112,positions:{},sizes:{}},reducedMotion:false},
-      progress:Object.fromEntries(P.MAPS.map(m=>[m.id,freshProgress(m)])),stats:{kills:0,runs:0},updatedAt:''};
+      progress:Object.fromEntries(P.MAPS.map(m=>[m.id,freshProgress(m)])),tutorial:{complete:false,step:0},stats:{kills:0,runs:0},updatedAt:''};
   }
   // Only known historical prices are refundable; schema 3 is an idempotent marker.
   function migrate(raw){
@@ -44,6 +44,8 @@
     s.unlocked=unique(raw.unlocked,P.MAPS.map(m=>m.id));if(!s.unlocked.includes('wind'))s.unlocked.unshift('wind');
     if(!s.unlocked.includes(s.selectedMap))s.selectedMap='wind';
     s.player.max=integer(raw.player?.max,100,100,200);s.player.hp=number(raw.player?.hp,100,0,s.player.max);
+    s.player.revive=number(raw.player?.revive,0,0,10);
+    s.tutorial={complete:raw.tutorial?.complete===true||(!raw.tutorial&&(integer(raw.stats?.runs,0)>0||integer(raw.stats?.kills,0)>0||Object.values(raw.progress||{}).some(p=>p?.cleared||p?.dead?.length||p?.opened?.length||p?.visited?.length>1))),step:integer(raw.tutorial?.step,0,0,6)};
     s.player.attackLevel=integer(raw.player?.attackLevel,0,0,5);
     s.pig.max=integer(raw.pig?.max,180,180,380);s.pig.hp=number(raw.pig?.hp,180,0,s.pig.max);
     s.helpers={};
@@ -85,20 +87,20 @@
     return s;
   }
   function load() {
-    try {const data=localStorage.getItem(P.CONFIG.saveKey);return data?{state:normalize(JSON.parse(data)),warning:''}:{state:fresh(),warning:''};}
+    try {const data=localStorage.getItem(P.Accounts?.key()||P.CONFIG.saveKey);return data?{state:normalize(JSON.parse(data)),warning:''}:{state:fresh(),warning:''};}
     catch(error) {return {state:fresh(),warning:'저장을 읽지 못해 임시 새 원정을 열었어요. 기존 저장은 백업 후 확인하세요.'};}
   }
   function save(s) {
     s.updatedAt=new Date().toISOString();
-    try {localStorage.setItem(P.CONFIG.saveKey,JSON.stringify(s));return true;}catch{return false;}
+    try {localStorage.setItem(P.Accounts?.key()||P.CONFIG.saveKey,JSON.stringify(s));P.Accounts?.queue(s);return true;}catch{return false;}
   }
   function settle(s,reason) {
-    const earned=s.runCoins,kept=reason==='pig-death'?0:earned;
+    const earned=s.runCoins,kept=reason==='pig-death'?0:reason==='return'?Math.floor(earned/2):earned;
     s.coins+=kept;s.runCoins=0;s.active=false;
     return {reason,earned,kept,lost:earned-kept};
   }
   function canDepart(s) {
-    if(s.player.hp<1)return '플레이어를 치료해 체력을 1 이상 채워주세요.';
+    if(s.player.hp<1&&!s.active&&!s.player.revive)return '플레이어를 치료해 체력을 1 이상 채워주세요.';
     if(s.pig.hp<1)return '수리도구로 저금통을 고쳐주세요.';
     return '';
   }

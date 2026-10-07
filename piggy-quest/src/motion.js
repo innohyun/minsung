@@ -73,7 +73,25 @@
     if(o.hit){shoulder[0]-=6;head[0]-=9;}
     if(o.carrying){shoulder[0]*=.15;head[0]*=.15;shoulder[1]=-147+bob*.25;head[1]=-173+bob*.25;}
     if(o.blocking){hip[1]+=32;shoulder[1]+=32;head[1]+=32;rearFoot=[-12,0];frontFoot=[12,0];}
+    // Side-view projection: the far shoulder lies behind the near shoulder.
+    // Plant the feet and rotate/shift the torso before solving either arm.
+    if(o.companionId==='archer'&&o.pose==='bow'){
+      const pull=smooth((age-.43)/.43),recoil=strike(age-.94,.025,.02,.18);
+      rearFoot=[-25,0];frontFoot=[29,0];hip[0]=-5-pull*3;hip[1]=-91;
+      shoulder[0]=-3-pull*4-recoil*3;shoulder[1]=-143;head[0]=shoulder[0]-1;head[1]=-169;
+    }
+    if(o.companionId==='flame'&&o.pose==='cast'){
+      const brace=smooth(age/.22),pulse=Math.sin(age*17)*.5;
+      rearFoot=[-27,0];frontFoot=[23,0];hip[0]=-8*brace;hip[1]=-85;
+      shoulder[0]=-10*brace+pulse;shoulder[1]=-138;head[0]=shoulder[0]+1;head[1]=-165;
+    }
+    if(o.companionId==='sword'&&o.pose==='sword'){
+      const down=strike(age-.24,.12,.1,.18),sweep=strike(age-.83,.12,.11,.21);
+      rearFoot=[-27,0];frontFoot=[26+sweep*12,0];hip[0]=-6+down*13+sweep*15;hip[1]=-86-down*6;
+      shoulder[0]=-9+down*20+sweep*26;shoulder[1]=-137-down*5;head[0]=shoulder[0]+1;head[1]=shoulder[1]-26;
+    }
     const rearShoulder=[...shoulder],frontShoulder=[...shoulder];
+    if(['bow','cast','sword'].includes(o.pose)&&o.companionId){rearShoulder[0]-=4;rearShoulder[1]-=1;frontShoulder[0]+=3;}
     const swing=mix(.65,.82,running)*moving,flex=.2+moving*mix(.1,.75,running);
     // Keep these FK elbows. Re-solving them with opposite IK branches caused the broken arms.
     let rearArm=fkArm(rearShoulder,-.09+wave*swing,flex),frontArm=fkArm(frontShoulder,.09-wave*swing,flex);
@@ -93,18 +111,22 @@
     }
     else if(o.companionId){
       if(o.pose==='bow'){
-        const draw=age<.18?0:age<.65?(age-.18)/.47:age<.84?0:0;
-        frontArm=aimArm(frontShoulder,[58,-137],-1);
-        rearArm=aimArm(rearShoulder,age>.84?point([-24,-167],[43,-140],smooth((age-1.02)/.1)):[43-draw*62,-140],1);
+        const lift=smooth(age/.28),draw=smooth((age-.43)/.43),release=smooth((age-.94)/.12);
+        frontArm=aimArm(frontShoulder,point([25,-118],[54,-145],lift),-1);
+        // Retrieve over the far shoulder, nock, draw to the cheek, then release.
+        const retrieval=point([-19,-145],[-27,-167],smooth(age/.16));
+        const nock=[frontArm.hand[0]-7,frontArm.hand[1]];
+        const back=age<.28?retrieval:age<.43?point(retrieval,nock,smooth((age-.28)/.15)):point(point(nock,[-10,-153],draw),[-4,-146],release);
+        rearArm=aimArm(rearShoulder,back,1);
       }
       if(o.pose==='cast'||o.pose==='heal'||o.pose==='barrier'){
-        frontArm=aimArm(frontShoulder,[59,-132],-1);rearArm=fkArm(rearShoulder,-.35,.65);
+        frontArm=aimArm(frontShoulder,point([24,-119],[50,-140],smooth(age/.23)),-1);rearArm=fkArm(rearShoulder,-.6,1.8);
       }
       if(o.pose==='sword'){
         const down=age>=.32&&age<.64,side=age>=.8;
-        const target=down?[43,-97]:side?[55,-132]:[12,-192];
+        const target=age<.24?point([10,-157],[0,-189],smooth(age/.24)):age<.51?point([0,-189],[44,-108],smooth((age-.24)/.13)):age<.84?point([44,-108],[-25,-143],smooth((age-.51)/.25)):point([-25,-143],[52,-127],smooth((age-.84)/.15));
         frontArm=aimArm(frontShoulder,target,-1);
-        const v=o.weaponGrip||[0,-1];rearArm=aimArm(rearShoulder,[frontArm.hand[0]-v[0]*12,frontArm.hand[1]-v[1]*12],1);
+        const v=o.weaponGrip||[0,-1];rearArm=aimArm(rearShoulder,[frontArm.hand[0]-v[0]*10,frontArm.hand[1]-v[1]*10],1);
       }
       if(o.pose==='push'){frontArm=aimArm(frontShoulder,[59,-126],-1);rearArm=aimArm(rearShoulder,[49,-141],-1);}
       if(o.pose==='dodge'){rearFoot=[-26,-24];frontFoot=[22,-34];rearArm=fkArm(rearShoulder,-.65,1.1);frontArm=fkArm(frontShoulder,.55,1);}

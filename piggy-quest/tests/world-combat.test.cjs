@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 require('../src/config.js');require('../src/world.js');require('../src/state.js');require('../src/motion.js');require('../src/combat.js');
 const P=globalThis.PIGGY;
-const game=()=>{P.state=P.State.fresh();P.state.skills.woodshield=1;return {player:{x:1000,y:600,vx:0,dir:1,pose:'idle',shieldRaised:true},pig:{x:800,y:600,carrying:false},particles:[],enemyShots:[],hurtCalls:[],hurt(t,d){this.hurtCalls.push([t.kind,d]);}};};
+const game=()=>{P.state=P.State.fresh();P.state.skills.woodshield=1;return {player:{hp:100,x:1000,y:600,vx:0,dir:1,pose:'idle',shieldRaised:true},pig:{x:800,y:600,carrying:false},particles:[],enemyShots:[],hurtCalls:[],hurt(t,d){this.hurtCalls.push([t.kind,d]);}};};
 test('shoulders share the exact trunk joint in every walking phase',()=>{
   for(let i=0;i<32;i++){const p=P.Motion.pose({phase:i/32,walkBlend:1});assert.deepEqual(p.frontShoulder,p.shoulder);assert.deepEqual(p.rearShoulder,p.shoulder);}
 });
@@ -52,10 +52,4 @@ test('control import clamps size/position and starts sound enabled',()=>{
   const raw=P.State.fresh();raw.settings={sound:false,soundExplicit:true,volume:99,controls:{mode:'bad',size:999,stickSize:1,positions:{'punch-btn':{x:-9,y:4},bad:{x:.5,y:.5}}}};
   const s=P.State.normalize(raw);assert.equal(s.settings.sound,true);assert.equal(s.settings.controls.size,88);assert.equal(s.settings.controls.stickSize,88);assert.deepEqual(s.settings.controls.positions,{'attack-btn':{x:.02,y:.98}});assert.equal(s.settings.volume,1);
 });
-test('every boss cycles multiple telegraphs, projectiles and movement',()=>{
-  for(const map of P.MAPS){const g=game();g.map=map;g.room=map.rooms.main;g.hazards=[];g.enemyConfig=()=>({...P.ENEMIES.boss,...map.boss});g.player.x=2000;g.pig.x=1900;
-    const e={x:1750,hp:1000,max:1000,dir:1,windup:0,cd:0};const seen=new Set();let moved=0;
-    for(let i=0;i<2400;i++){e.cd=Math.max(0,e.cd-1/60);const x=e.x;P.Combat.bossTick(g,e,1/60);moved+=Math.abs(e.x-x);if(e.pattern)seen.add(e.pattern);}
-    assert.ok(seen.size>=3);assert.ok(g.enemyShots.length>=3);assert.ok(g.hazards.length>0);assert.ok(moved>150);
-  }
-});
+test('boss definitions and their attack loop are removed',()=>{assert.equal(P.ENEMIES.boss,undefined);assert.equal(P.Combat.bossTick,undefined);for(const map of P.MAPS){assert.equal(map.boss,undefined);assert.equal(map.rooms.main.bossX,undefined);}});

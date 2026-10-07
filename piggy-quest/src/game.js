@@ -7,7 +7,7 @@
       this.canvas=canvas;this.ctx=canvas.getContext('2d',{alpha:false});
       this.mode='home';this.keys=new Set();this.time=0;this.decorTime=0;this.camera=0;this.accumulator=0;this.last=0;
       this.particles=[];this.floaters=[];this.projectiles=[];this.coinFlights=[];this.flash=0;this.shake=0;this.savedAt=0;
-      this.resize();window.addEventListener('resize',()=>this.resize());
+      this.resize();this.onResize=()=>this.resize();window.addEventListener('resize',this.onResize);
     }
     resize(){const d=Math.min(window.devicePixelRatio||1,2);this.canvas.width=1280*d;this.canvas.height=720*d;this.ctx.setTransform(d,0,0,d,0,0);}
     clearInput(){this.keys.clear();this.attackPending=null;P.Controls?.releaseAll();}
@@ -21,7 +21,7 @@
       if(!s.active){s.runCoins=0;s.stats.runs++;}s.selectedMap=mapId;s.active=true;
       this.map=map;this.progress=s.progress[mapId];this.time=0;this.savedAt=0;this.pendingClear=false;this.travel=null;
       this.player={x:this.progress.x,y:C.ground,vx:0,vy:0,grounded:true,dir:1,hp:s.player.hp,inv:0,pose:'idle',age:0,
-        shieldRaised:!!s.skills.woodshield,dig:0,punch:0,kick:0,firstHit:0,firstPending:false,secondHit:0,secondPending:false,kickPending:false,spinPending:false,
+        revive:s.player.revive||0,shieldRaised:!!s.skills.woodshield,dig:0,punch:0,kick:0,firstHit:0,firstPending:false,secondHit:0,secondPending:false,kickPending:false,spinPending:false,
         walkDistance:0,walkBlend:0,gaitPhase:0,runBlend:0,stepDistance:0,running:false,skills:{},flight:0,dash:0,dashHits:new Set()};
       this.pig={x:this.progress.carrying?this.player.x:this.progress.pigX,y:this.progress.carrying?C.ground-C.carryHeight:C.ground,hp:s.pig.hp,bounce:0,carrying:this.progress.carrying};
       this.helpers=[...new Set([...s.party,...(this.progress.guests||[])])].map((id,i)=>({id,x:this.player.x-65-i*55,y:C.ground,vx:0,dir:1,pose:'idle',age:0,cd:0,inv:0,walkDistance:0,walkBlend:0}));
@@ -37,34 +37,34 @@
       this.camera=clamp(this.player.x-410,0,Math.max(0,this.room.width-1280));
       this.cameraY=P.World.height(this.room,this.player.x)*.75;this.spawnBoss();this.roomTitle=3;
     }
-    enemyConfig(e){return e.type==='boss'?{...P.ENEMIES.boss,...this.map.boss}:P.ENEMIES[e.type];}
+    enemyConfig(e){return P.ENEMIES[e.type];}
     makeEnemy(e){const conf=this.enemyConfig(e),scale=this.map.scale;return {...e,y:C.ground,hp:Math.ceil(conf.hp*scale),max:Math.ceil(conf.hp*scale),active:false,cd:.8,windup:0,stun:0,kb:0,hit:0,dir:-1,phase:e.x*.01,animationX:e.x,walkDistance:0,wingTime:0};}
     remaining(){return P.requiredEnemies(this.map).filter(e=>!this.progress.dead.includes(e.id)).length;}
-    spawnBoss(){if(this.room.bossX&&this.remaining()===0&&!this.progress.cleared&&!this.enemies.some(e=>e.type==='boss')){this.enemies.push(this.makeEnemy({id:this.map.id+'-boss',x:this.room.bossX,type:'boss'}));this.toast('all-cleared');}}
-    toast(text){if(text==='all-cleared')text='일반 길의 몬스터를 모두 처치했어요. 비밀 구역은 선택이에요. 가장 깊은 곳의 보스를 찾아가세요!';P.UI?.toast(text);}
+    spawnBoss(){} // Kept as a compatibility hook; bosses are no longer spawned.
+    toast(text){if(text==='all-cleared')text='일반 길의 몬스터를 모두 처치했어요. 비밀 구역은 선택이에요.';P.UI?.toast(text);}
     nearEnemy(range,center=this.player.x,vertical=140){return this.enemies.filter(e=>e.hp>0&&e.active&&Math.abs(e.x-center)<range&&Math.abs(e.y-this.player.y)<vertical).sort((a,b)=>Math.abs(a.x-center)-Math.abs(b.x-center))[0];}
     attackTap(){
-      if(this.mode!=='play'||this.travel||this.player.dig>0||this.player.knock)return;
+      if(this.mode!=='play'||this.player.hp<=0||this.travel||this.player.dig>0||this.player.knock)return;
       if(this.attackPending!==null&&this.attackPending!==undefined){
         this.attackPending=null;this.punch();
       }else this.attackPending=C.attackTapWindow;
     }
     punch(){
-      if(this.mode!=='play'||this.travel||this.player.dig>0||this.player.knock)return;
+      if(this.mode!=='play'||this.player.hp<=0||this.travel||this.player.dig>0||this.player.knock)return;
       this.attackPending=null;
-      const p=this.player;if(P.Exploration.hasHands(this)){this.toast('저금통을 들고 있을 때는 발차기를 사용해요.');return;}if(p.punch>0)return;
+      const p=this.player;P.Tutorial?.event('attack');if(P.Exploration.hasHands(this)){this.toast('저금통을 들고 있을 때는 발차기를 사용해요.');return;}if(p.punch>0)return;
       if((p.pose==='kick'&&p.age<.22)||(p.pose==='spin'&&p.age<.62))return;
       p.punch=C.punchCooldown;p.pose='punch';p.age=0;p.firstHit=.09;p.firstPending=true;p.secondHit=.29;p.secondPending=true;
       const enemy=this.nearEnemy(118);p.aimY=enemy?clamp(enemy.y-p.y-this.enemyConfig(enemy).h*.55,-132,-34):-125;
       if(enemy)p.dir=enemy.x>p.x?1:-1;
     }
     kick(){
-      if(this.mode!=='play'||this.travel||this.player.dig>0||this.player.knock||this.player.kick>0)return;const p=this.player;if(p.pose==='spin'&&p.age<.62)return;p.kick=C.kickCooldown;p.pose='kick';p.age=0;
-      this.attackPending=null;
+      if(this.mode!=='play'||this.player.hp<=0||this.travel||this.player.dig>0||this.player.knock||this.player.kick>0)return;const p=this.player;if(p.pose==='spin'&&p.age<.62)return;p.kick=C.kickCooldown;p.pose='kick';p.age=0;
+      P.Tutorial?.event('attack');this.attackPending=null;
       p.firstPending=false;p.secondPending=false;p.kickHit=.045;p.kickPending=true;
       const enemy=this.nearEnemy(143);p.kickAimY=enemy?clamp(enemy.y-p.y-this.enemyConfig(enemy).h*.5,-95,-28):-74;if(enemy)p.dir=enemy.x>p.x?1:-1;
     }
-    toggleShield(){if(this.mode!=='play'||this.travel||!P.state.skills.woodshield||P.Exploration.hasHands(this))return;this.player.shieldRaised=!this.player.shieldRaised;P.Audio.play('carry');}
+    toggleShield(){if(this.mode!=='play'||this.player.hp<=0||this.travel||!P.state.skills.woodshield||P.Exploration.hasHands(this))return;this.player.shieldRaised=!this.player.shieldRaised;P.Audio.play('carry');}
     interactionLabel(){
       const p=this.player;if(!p||!this.room||this.travel)return '';
       const digging=P.Exploration.site(this);if(digging&&!this.pig.carrying)return P.state.skills.shovel?'흙 파기':'흙의 흔적 조사';
@@ -74,7 +74,7 @@
       if(this.pig.carrying)return '저금통 내려놓기';if(Math.abs(this.pig.x-p.x)<100)return '저금통 들기';return '';
     }
     interact(){
-      if(this.mode!=='play'||this.travel||this.player.dig>0||this.player.knock)return;const p=this.player,s=P.state;
+      if(this.mode!=='play'||this.player.hp<=0||this.travel||this.player.dig>0||this.player.knock)return;const p=this.player,s=P.state;
       this.attackPending=null;
       const digging=P.Exploration.site(this);if(digging&&!this.pig.carrying){P.Exploration.dig(this,digging);return;}
       const chest=this.room.chests.find(c=>!this.progress.opened.includes(c.id)&&Math.abs(c.x-p.x)<100);
@@ -85,13 +85,13 @@
       if(portal){if(!this.pig.carrying&&Math.abs(this.pig.x-p.x)>150){this.toast('저금통을 가까이 데려오거나 들고 이동하세요.');return;}
         this.travel={portal:{...portal},age:0,duration:1.15,from:this.room.name,to:this.map.rooms[portal.target].name};this.clearInput();this.snapshot();P.Audio.play('step');return;}
       if(this.pig.carrying){this.pig.carrying=false;this.pig.x=clamp(p.x+p.dir*38,35,this.room.width-35);this.pig.y=C.ground;}
-      else if(Math.abs(this.pig.x-p.x)<100){this.pig.carrying=true;this.pig.x=p.x;this.pig.y=p.y-C.carryHeight;}
+      else if(Math.abs(this.pig.x-p.x)<100){P.Tutorial?.event('interact');this.pig.carrying=true;this.pig.x=p.x;this.pig.y=p.y-C.carryHeight;}
       else{this.toast('저금통·상자·샛길 가까이에서 E를 눌러주세요.');return;}
       P.Audio.play('carry');this.snapshot();
     }
     jump(){
-      if(this.mode!=='play'||this.travel||this.player.dig>0||this.player.knock)return;const p=this.player;if(p.vy!==0||(!p.grounded&&p.y<C.ground-1))return;
-      p.vy=-610;p.grounded=false;p.firstPending=false;p.secondPending=false;p.pose='idle';P.Audio.play('skill');
+      if(this.mode!=='play'||this.player.hp<=0||this.travel||this.player.dig>0||this.player.knock)return;const p=this.player;if(p.vy!==0||(!p.grounded&&p.y<C.ground-1))return;
+      P.Tutorial?.event('jump');p.vy=-610;p.grounded=false;p.firstPending=false;p.secondPending=false;p.pose='idle';P.Audio.play('skill');
     }
     travelTick(dt){
       this.travel.age+=dt;if(this.travel.age<this.travel.duration)return;
@@ -117,8 +117,7 @@
       if(enemy.hp===0)this.kill(enemy);
     }
     kill(e){
-      if(e.type==='boss'){this.pendingClear=true;P.state.runCoins+=this.enemyConfig(e).coins;return;}
-      if(this.progress.dead.includes(e.id))return;this.progress.dead.push(e.id);P.Audio.play('monster-death');P.state.stats.kills++;
+      if(this.progress.dead.includes(e.id))return;P.Tutorial?.event('kill');this.progress.dead.push(e.id);P.Audio.play('monster-death');P.state.stats.kills++;
       const total=P.ENEMIES[e.type].coins,count=3;for(let i=0;i<count;i++){
         this.progress.drops.push({id:e.id+'-coin-'+i,room:this.roomId,x:clamp(e.x+(i-1)*19,25,this.room.width-25),value:i===count-1?total-Math.floor(total/count)*2:Math.floor(total/count)});
       }
@@ -127,7 +126,7 @@
     }
     hurt(target,damage,sourceX,charge=false){
       if(target.kind==='player'){
-        const p=this.player;if(p.inv>0||p.dash>0)return;
+        const p=this.player;if(p.hp<=0||p.inv>0||p.dash>0)return;
         const guarded=P.Combat.shieldActive(this)&&Number.isFinite(sourceX)&&(sourceX-p.x)*p.dir>0;
         if(guarded){damage*=P.Combat.blocking(this)?.2:.5;P.Combat.woodHit(this);}
         p.hp=Math.max(0,p.hp-damage);p.inv=.55;
@@ -145,27 +144,34 @@
       }
       this.floaters.push({x:target.x,y:C.ground-118,text:'−'+Math.ceil(damage),life:.7,color:'#b76f7d'});
     }
+    targets(){return [...(this.player.hp>0?[{kind:'player',x:this.player.x,y:this.player.y,actor:this.player}]:[]),{kind:'pig',x:this.pig.x,y:this.pig.y,actor:this.pig},...this.helpers.filter(h=>P.state.helpers[h.id]?.hp>0).map(h=>({kind:'helper',x:h.x,y:h.y,actor:h}))];}
     targetFor(e){
-      const targets=[{kind:'player',x:this.player.x,y:this.player.y,actor:this.player},{kind:'pig',x:this.pig.x,y:this.pig.y,actor:this.pig}];
+      const targets=[...(this.player.hp>0?[{kind:'player',x:this.player.x,y:this.player.y,actor:this.player}]:[]),{kind:'pig',x:this.pig.x,y:this.pig.y,actor:this.pig}];
       for(const h of this.helpers)if(P.state.helpers[h.id].hp>0)targets.push({kind:'helper',x:h.x,y:h.y,actor:h});
       return targets.filter(t=>Math.abs(t.y+(t.kind==='pig'&&this.pig.carrying?C.carryHeight-140:0)-C.ground)<155).sort((a,b)=>Math.abs(a.x-e.x)-Math.abs(b.x-e.x))[0];
     }
-    tick(dt){
-      if(this.mode!=='play')return;if(this.travel){this.travelTick(dt);return;}
-      if(this.mode!=='play'||this.travel)return;
-      const p=this.player,s=P.state;this.time+=dt;this.savedAt+=dt;this.roomTitle=Math.max(0,this.roomTitle-dt);
-      if(this.attackPending!==null&&this.attackPending!==undefined){this.attackPending-=dt;if(this.attackPending<=0){this.attackPending=null;this.kick();}}
+    tickAttacks(dt){const p=this.player,s=P.state;
       p.dig=Math.max(0,p.dig-dt);p.punch=Math.max(0,p.punch-dt);p.kick=Math.max(0,p.kick-dt);p.inv=Math.max(0,p.inv-dt);p.age+=dt;
       for(const id of Object.keys(p.skills))p.skills[id]=Math.max(0,p.skills[id]-dt);
       if(p.age>({dig:.48,punch:.46,kick:.22,spin:.62,dash:.32}[p.pose]||.48))p.pose='idle';
       if(p.firstPending){p.firstHit-=dt;if(p.firstHit<=0){p.firstPending=false;if(!P.Exploration.hasHands(this)){P.Audio.play('punch');const e=this.nearEnemy(118);if(e)this.hitEnemy(e,10+s.player.attackLevel*3,18*p.dir);}}}
       if(p.secondPending){p.secondHit-=dt;if(p.secondHit<=0){p.secondPending=false;if(!P.Exploration.hasHands(this)){P.Audio.play('punch');const e=this.nearEnemy(118);if(e)this.hitEnemy(e,10+s.player.attackLevel*3,18*p.dir);}}}
       if(p.kickPending){p.kickHit-=dt;if(p.kickHit<=0){p.kickPending=false;P.Audio.play('kick');const e=this.nearEnemy(143);if(e)this.hitEnemy(e,17+s.player.attackLevel*4,190*p.dir);}}
-      const axis=Number(this.right())-Number(this.left());p.running=false;
+    }
+    tick(dt){
+      if(this.mode!=='play')return;if(this.travel){this.travelTick(dt);return;}
+      if(this.mode!=='play'||this.travel)return;
+      const p=this.player,s=P.state;this.time+=dt;
+      if(p.hp<=0){if(!p.revive)this.beginRevive();p.revive=Math.max(0,p.revive-dt);if(p.revive===0){p.hp=Math.ceil(s.player.max*C.reviveFraction);p.x=this.pig.x;p.y=C.ground;p.vy=0;p.knock=null;p.inv=2;s.player.hp=p.hp;this.toast('저금통에서 부활 · 체력 50%');P.Audio.play('heal');this.snapshot();}}
+      P.Tutorial?.tick(this);this.savedAt+=dt;this.roomTitle=Math.max(0,this.roomTitle-dt);
+      if(this.attackPending!==null&&this.attackPending!==undefined){this.attackPending-=dt;if(this.attackPending<=0){this.attackPending=null;this.kick();}}
+      this.tickAttacks(dt);
+      const axis=p.hp>0?Number(this.right())-Number(this.left()):0;p.running=false;
       const target=(p.pose==='dig'||p.knock?0:axis)*C.walkSpeed;if(p.knock){p.knock.age+=dt;p.vx*=Math.max(0,1-dt*(p.knock.stage==='air'?.7:12));}else p.vx+=(target-p.vx)*Math.min(1,dt*17);
       if(axis&&!p.knock)p.dir=axis;
+      if(p.hp<=0){p.vx=0;p.vy=0;p.firstPending=p.secondPending=p.kickPending=false;}
       const previousX=p.x,previousY=p.y;p.x+=p.vx*dt;p.x=clamp(p.x,40,this.room.width-60);
-      if(this.room.bossX&&this.remaining()>0)p.x=Math.min(p.x,this.room.bossX-C.bossGateOffset-105);
+
       if(!this.pig.carrying)p.x=clamp(p.x,Math.max(40,this.pig.x-C.tetherRadius),Math.min(this.room.width-60,this.pig.x+C.tetherRadius));
       const travelled=Math.abs(p.x-previousX);p.walkDistance+=travelled;p.stepDistance+=travelled;p.walkBlend+=((p.knock?0:clamp(travelled/dt/C.walkSpeed,0,1))-p.walkBlend)*Math.min(1,dt*12);
       p.runBlend+=(Number(p.running)-p.runBlend)*Math.min(1,dt*10);p.gaitPhase+=(p.knock?0:travelled)/(150+p.runBlend*40);
@@ -181,7 +187,7 @@
         if(e.hp<=0)continue;const def=this.enemyConfig(e);
         if(e.x+def.w>this.camera&&e.x-def.w<this.camera+1280)e.active=true;
         e.hit=Math.max(0,e.hit-dt);e.stun=Math.max(0,e.stun-dt);e.cd=Math.max(0,e.cd-dt);e.x+=e.kb*dt;e.kb*=Math.max(0,1-dt*8);
-        e.x=clamp(e.x,25,this.room.width-25);if(!e.active)continue;if(e.type==='boss'){P.Combat.bossTick(this,e,dt);continue;}if(e.stun>0)continue;if(e.type.startsWith('cave-')){P.Combat.caveTick(this,e,dt);continue;}
+        e.x=clamp(e.x,25,this.room.width-25);if(!e.active)continue;if(e.stun>0)continue;if(e.type.startsWith('cave-')){P.Combat.caveTick(this,e,dt);continue;}
         P.Combat.surfaceTick(this,e,dt);
       }
       for(const e of this.enemies)if(e.hp>0&&e.active){const before=e.walkDistance||0;P.Animation.advance(e,dt);e.stepDistance=(e.stepDistance||0)+e.walkDistance-before;if(e.stepDistance>65&&P.Companions.visible(this,e)&&e.type!=='bat'){e.stepDistance=0;P.Audio.play('monster-step');}}
@@ -195,27 +201,29 @@
       this.hazards=this.hazards.filter(h=>h.life>0);
       for(const bullet of this.projectiles){bullet.life-=dt;bullet.x+=bullet.vx*dt;const hit=this.enemies.find(e=>e.hp>0&&e.active&&Math.abs(e.x-bullet.x)<this.enemyConfig(e).w*.6&&bullet.y>e.y-this.enemyConfig(e).h-35&&bullet.y<e.y+20);if(hit){if(hit.type==='rock'&&hit.guardTime>0){this.enemyShots.push({type:'reflected',x:hit.x-Math.sign(bullet.vx)*48,y:bullet.y,vx:-bullet.vx,vy:0,r:5,life:1.4,damage:bullet.damage*.5,theme:'forest'});P.Audio.play('wood');}else this.hitEnemy(hit,bullet.damage,Math.sign(bullet.vx)*70);bullet.life=0;}}
       this.projectiles=this.projectiles.filter(b=>b.life>0);
-      this.progress.drops=this.progress.drops.filter(d=>{if(d.room===this.roomId&&Math.abs(p.x-d.x)<36&&p.y>C.ground-85){s.runCoins+=d.value;this.coinFlights.push({x:d.x,y:C.ground-16,t:0});this.pig.bounce=.35;P.Audio.play('coin');return false;}return true;});
+      this.progress.drops=this.progress.drops.filter(d=>{if(p.hp>0&&d.room===this.roomId&&Math.abs(p.x-d.x)<36&&p.y>C.ground-85){s.runCoins+=d.value;this.coinFlights.push({x:d.x,y:C.ground-16,t:0});this.pig.bounce=.35;P.Audio.play('coin');return false;}return true;});
       for(const f of this.coinFlights)f.t+=dt*2.9;this.coinFlights=this.coinFlights.filter(f=>f.t<1);
       for(const f of this.floaters){f.life-=dt;f.y-=25*dt;}this.floaters=this.floaters.filter(f=>f.life>0);
       for(const f of this.particles){f.life-=dt;if(f.type==='ring')f.r+=300*dt;else if(!f.type){f.x+=f.vx*dt;f.y+=f.vy*dt;}}
       this.particles=this.particles.filter(f=>f.life>0);this.flash=Math.max(0,this.flash-dt);this.shake*=Math.max(0,1-dt*14);
       if(this.pig.hp<=0){this.finish('pig-death');return;}
-      if(p.hp<=0){this.finish('player-death');return;}
-      if(this.pendingClear){this.clearMap();return;}
+      if(p.hp<=0&&!p.revive)this.beginRevive();
+      if(this.remaining()===0&&p.hp>0){this.clearMap();return;}
       this.spawnBoss();if(this.savedAt>.8){this.savedAt=0;this.snapshot();}
     }
+    beginRevive(){const p=this.player;p.revive=C.reviveSeconds;this.clearInput();p.pose='idle';p.firstPending=p.secondPending=p.kickPending=false;if(this.pig.carrying){this.pig.carrying=false;this.pig.x=p.x;this.pig.y=C.ground;}this.snapshot();}
     snapshot(){
       if(!this.player||!this.map)return;
-      const s=P.state;s.player.hp=this.player.hp;s.pig.hp=this.pig.hp;
+      const s=P.state;s.player.hp=this.player.hp;s.player.revive=this.player.revive||0;s.pig.hp=this.pig.hp;
       P.Exploration.snapshot(this);
       Object.assign(this.progress,{room:this.roomId,x:this.player.x,pigX:this.pig.x,carrying:this.pig.carrying});
       if(!P.State.save(s))P.UI?.storageWarning();
     }
     finish(reason){
       if(this.mode!=='play'&&this.mode!=='pause')return;
+      if(reason==='player-death'){this.beginRevive();return;}
       this.snapshot();const result=P.State.settle(P.state,reason);
-      if(reason==='player-death'||reason==='pig-death'){this.progress.x=180;this.progress.pigX=225;this.progress.carrying=false;this.progress.carriedObject='';}
+      if(reason==='pig-death'){this.progress.carrying=false;this.progress.carriedObject='';}
       P.State.save(P.state);this.clearInput();this.mode='result';P.UI?.result(result);return result;
     }
     clearMap(){
@@ -241,12 +249,11 @@
       for(const portal of this.room.portals.filter(p=>!p.secret||this.progress.visited.includes(p.target)))P.World.sign(c,portal,this.room,this.player.x);
       for(const chest of this.room.chests)at(chest.x,()=>{const open=this.progress.opened.includes(chest.id);c.save();c.globalAlpha=open?.35:1;P.Pixel.sprite(c,'chest',chest.x,C.ground+2,69,56);c.restore();if(!open&&Math.abs(chest.x-this.player.x)<120)A.label(c,'E · 상자 열기',chest.x,C.ground-67,13);});
       const found=this.room.helper;if(found&&!this.helpers.some(h=>h.id===found.id))at(found.x,()=>{A.stick(c,found.x,C.ground,{color:P.helperById(found.id).color,time:t,scale:.8});A.label(c,'E · '+P.helperById(found.id).name+'와 만나기',found.x,C.ground-159,13);});
-      if(this.room.bossX)at(this.room.bossX-C.bossGateOffset,()=>A.gate(c,this.room.bossX-C.bossGateOffset,this.remaining()>0,this.remaining(),this.map.bossName,this.map.theme));
+
       for(const d of this.progress.drops)if(d.room===this.roomId&&d.x>this.camera-30&&d.x<this.camera+1310)A.image(c,'coin',d.x,C.ground-5+H(d.x)+Math.sin(t*3+d.x)*3,19,23);
       for(const e of this.enemies){if(e.hp<=0||e.x<this.camera-200||e.x>this.camera+1480)continue;at(e.x,()=>{const def=this.enemyConfig(e);
         A.ellipse(c,e.x,C.ground+4,def.w*.4,6,'rgba(54,75,50,.13)');if(!P.Animation.draw(c,e,def)){c.save();c.translate(e.x,C.ground+(e.bossLift||0));c.scale(-e.dir,1);if(e.hit>0)c.globalAlpha=.6;A.image(c,def.asset,0,0,def.w,def.h);c.restore();}
-        if(e.hp<e.max||e.type==='boss')A.bar(c,e.x,C.ground+(e.bossLift||0)-def.h-(e.type==='bat'?35:12),e.hp,e.max,e.type==='boss'?160:55,'#b88078');
-        if(e.type==='boss')A.label(c,this.map.bossName,e.x,C.ground+(e.bossLift||0)-def.h-33,14);
+        if(e.hp<e.max)A.bar(c,e.x,C.ground+(e.bossLift||0)-def.h-(e.type==='bat'?35:12),e.hp,e.max,55,'#b88078');
         if(e.windup>0)A.label(c,e.warning||'!',e.x,C.ground-def.h-(e.type==='boss'?57:24),e.warning?12:24,'#b97955');
         if(e.type==='boss'&&e.pattern==='leap'&&e.windup>0)A.ellipse(c,e.aimX,C.ground+H(e.aimX)-H(e.x),60,12,'#c3846c55');
         });
@@ -257,7 +264,7 @@
       const threat=this.enemies.some(e=>e.hp>0&&e.active&&Math.abs(e.x-this.pig.x)<C.guardRadius);
       if(threat)A.label(c,'! 저금통 주의',this.pig.x,this.pig.y-94,13,'#a86a62');
       for(const id of this.helpers.map(h=>h.id)){const stored=P.state.helpers[id];if(stored.hp<=0)A.label(c,P.helperById(id).name+' 부활 '+Math.ceil(stored.revive)+'초',this.pig.x,this.pig.y-111-P.state.party.indexOf(id)*17,12);}});
-      at(this.player.x,()=>{A.ellipse(c,this.player.x,(this.player.grounded?this.player.y:C.ground)+4,23,5,'rgba(39,69,51,.15)');
+      if(this.player.hp>0)at(this.player.x,()=>{A.ellipse(c,this.player.x,(this.player.grounded?this.player.y:C.ground)+4,23,5,'rgba(39,69,51,.15)');
       A.stick(c,this.player.x,this.player.y,{time:this.time,speed:this.player.vx,phase:this.player.gaitPhase,walkBlend:this.player.walkBlend,runBlend:this.player.runBlend,dir:this.player.dir,pose:this.player.pose,age:this.player.age,aimY:this.player.aimY,kickAimY:this.player.kickAimY,spinAimY:this.player.spinAimY,carrying:P.Exploration.hasHands(this),air:!this.player.grounded&&this.player.y<C.ground-4,hit:this.player.inv>.35,playerShield:P.Combat.shieldActive(this),blocking:P.Combat.blocking(this),slope:0,knock:this.player.knock});
       A.bar(c,this.player.x,this.player.y-(P.Combat.blocking(this)?174:210),this.player.hp,P.state.player.max,66,this.player.hp/P.state.player.max<.3?'#c85555':'#6d9878');});
       for(const f of this.fieldEffects){
@@ -283,6 +290,8 @@
       for(const f of this.floaters){c.globalAlpha=Math.min(1,f.life*3);A.label(c,f.text,f.x,f.y+H(f.x),15,f.color);}c.globalAlpha=1;c.restore();
       P.World.foreground(c,this);
       if(this.travel)this.drawTravel(c);
+      if(this.player.hp<=0){c.fillStyle='#101b22aa';c.fillRect(0,0,1280,720);A.label(c,'저금통에서 다시 일어나요',640,310,26,'#fff2d8');A.label(c,Math.ceil(this.player.revive)+'초',640,365,38,'#fff2d8');}
+      P.Tutorial?.draw(c,this);
       if(this.roomTitle>0&&!this.travel){c.globalAlpha=Math.min(1,this.roomTitle);A.label(c,this.map.name+' · '+this.room.name,640,208,23);c.globalAlpha=1;}
       if(this.flash>0&&!reduced){c.fillStyle='rgba(215,77,93,'+(this.flash*.3)+')';c.fillRect(0,0,1280,720);}
     }

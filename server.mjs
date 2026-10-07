@@ -5,6 +5,7 @@ import { createServer as createHttpsServer } from 'node:https';
 import { DatabaseSync } from 'node:sqlite';
 import { dirname, extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createPiggyAccounts } from './piggy-accounts.mjs';
 import { GUANGBOO_SCHEMA_SQL, createGuangbooRealtime, createGuangbooStore } from './guangboo-runtime.mjs';
 
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -325,15 +326,20 @@ export function createMinsungServer(options = {}) {
     const rootDir = options.rootDir || ROOT_DIR;
     const dbPath = options.dbPath || process.env.MINSUNG_DB_PATH || join(rootDir, '.local', 'minsung.sqlite');
     const sessionTtlMs = options.sessionTtlMs || SESSION_TTL_MS;
+    const configuredPiggyDb=options.piggyDbPath||process.env.PIGGY_ACCOUNTS_DB;
+    if(configuredPiggyDb&&resolve(configuredPiggyDb)===resolve(dbPath))throw new Error('Player accounts require a separate database path.');
     const db = createDatabase(dbPath);
     const store = createAuthStore(db, sessionTtlMs);
     const guangbooStore = createGuangbooStore(db);
+    const piggyDbPath=options.piggyDbPath||process.env.PIGGY_ACCOUNTS_DB;
+    const piggyAccounts=piggyDbPath?createPiggyAccounts({dbPath:piggyDbPath,trustProxy:options.trustProxy===true,origins:options.piggyOrigins||['https://minsung.pages.dev']}):null;
 
     const server = createTransportServer(async (req, res) => {
         const url = new URL(req.url || '/', `http://${req.headers.host || '127.0.0.1'}`);
         applyCorsHeaders(req, res);
 
         try {
+            if (piggyAccounts && await piggyAccounts.handle(req,res,url)) return;
             if (req.method === 'OPTIONS' && url.pathname.startsWith('/api/')) {
                 if (!isAllowedBridgeOrigin(req.headers.origin)) {
                     return sendJson(res, 403, { ok: false, error: 'untrusted_origin' });
@@ -454,6 +460,7 @@ export function createMinsungServer(options = {}) {
         server,
         close() {
             guangbooRealtime.close();
+            piggyAccounts?.close();
             db.close();
         }
     };

@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 require('../src/config.js');require('../src/world.js');require('../src/exploration.js');require('../src/state.js');require('../src/combat.js');
 const P=globalThis.PIGGY;P.Audio={play(){}};
-function game(){P.state=P.State.fresh();return {map:P.MAPS[0],room:{width:5000},player:{x:1000,y:600,dir:1,vx:0,pose:'idle'},pig:{x:700,y:600,carrying:false},helpers:[],enemyShots:[],particles:[],hurtCalls:[],
+function game(){P.state=P.State.fresh();return {map:P.MAPS[0],room:{width:5000},player:{hp:100,x:1000,y:600,dir:1,vx:0,pose:'idle'},pig:{x:700,y:600,carrying:false},helpers:[],enemyShots:[],particles:[],hurtCalls:[],
  enemyConfig:e=>P.ENEMIES[e.type],targetFor(){return {kind:'player',x:this.player.x,y:this.player.y,actor:this.player};},hurt(t,d){this.hurtCalls.push([t.kind,d]);}};}
 function enemy(type,x=1300){return {type,x,hp:200,max:200,dir:-1,windup:0,cd:0};}
 test('archer warns first, locks the aim and releases an arrow after the warning',()=>{

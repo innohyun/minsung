@@ -12,18 +12,18 @@
 <header class="site-header">
   <button class="brand" id="brand" aria-label="저금통 원정대 홈"><span class="brand-mark">🐷</span><span><strong>저금통 원정대</strong><small>P I G G Y &nbsp; Q U E S T</small></span></button>
   <nav aria-label="홈 메뉴"><button data-view="camp" class="active">캠프</button><button data-view="helpers">조수 모음집</button><button data-view="skills">기술 배우기</button><button data-view="bag">가방 · 치료</button></nav>
-  <div class="header-tools"><span class="bank" title="홈에 안전하게 보관한 코인"><span>◉</span> <b id="bank-value">120</b></span><button class="source-link" id="source-btn"><span>&lt;/&gt;</span> 소스코드</button></div>
+  <div class="header-tools"><button id="account-btn" class="source-link">로그인 · 계정</button><button id="developer-btn" class="source-link">전투 실험실</button><span class="bank" title="홈에 안전하게 보관한 코인"><span>◉</span> <b id="bank-value">120</b></span><button class="source-link" id="source-btn"><span>&lt;/&gt;</span> 소스코드</button></div>
 </header>
 <main>
   <section class="stage" id="stage" aria-label="저금통 원정대 게임 화면">
-    <canvas id="game" width="1280" height="720" tabindex="0" aria-label="A D 이동, J 펀치, K 발차기, E 상호작용, Q 조수 명령, ESC 일시정지"></canvas>
+    <canvas id="game" width="1280" height="720" tabindex="0" aria-label="A D 이동, J 펀치, K 발차기, E 상호작용, ESC 일시정지"></canvas>
     <div class="hero" id="hero">
       <div class="hero-copy"><p class="eyebrow"><span></span> A LITTLE PIG. A BIG ADVENTURE.</p><h1>작은 저금통과<br><em>커다란 모험.</em></h1><p class="lead">길을 찾고. 동료를 만나고. 저금통을 지켜주세요.<br>당신의 첫 번째 원정이 시작됩니다.</p><p class="home-vitals" id="home-vitals"></p><div class="camp-shortcuts"><button data-view="skills"><span>◈</span><b>장비 · 기술</b><small id="camp-skills-offer"></small></button><button data-view="bag"><span>✚</span><b>치료 · 보급</b><small id="camp-bag-offer"></small></button><button data-view="helpers"><span>◯</span><b>동료</b><small id="camp-helpers-offer"></small></button></div><button id="depart" class="primary hero-action">탐험 떠나기 <span>↗</span></button><button class="text-link" data-view="bag">출발 전, 체력을 확인하세요 <span>→</span></button></div>
       <button id="map-select" class="next-map"><b id="map-number">01</b><span><small>NEXT ADVENTURE</small><strong id="map-label">바람숲</strong></span><i>→</i></button>
       <p class="camp-caption">◦ &nbsp; 바람이 머무는 캠프<small>우리의 모험은 여기서부터.</small></p>
-      <div class="hero-foot">● 브라우저에 자동 저장 <span>/</span> 로그인 없는 오프라인 모험</div>
+      <div class="hero-foot">● 브라우저에 자동 저장 <span>/</span> 기기별 계정 · 자동 저장</div>
     </div>
-    <div class="game-ui" id="game-ui" hidden>
+    <div class="game-ui" id="game-ui" hidden><div id="tutorial-card" role="status" hidden></div>
       <div class="health-box"><div><span class="health-symbol">◯</span><label>나의 체력 <small id="player-health-text"></small><progress id="player-health" max="100" value="100"></progress></label></div><div><span class="health-symbol">🐷</span><label>저금통 <small id="pig-health-text"></small><progress id="pig-health" class="pink" max="180" value="180"></progress></label></div></div>
       <div class="quest-pill"><strong id="room-label">바람숲 · 큰길</strong><span id="kill-count">0 / 24 처치</span></div>
       <div class="game-top-right"><div class="run-money"><span>◉</span><label>이번 원정<b id="run-coins">0</b></label></div><button id="pause" class="pause-btn" aria-label="일시정지">☰</button></div>
@@ -44,7 +44,7 @@
     <button data-view="bag">가방 · 치료</button>
   </nav>
 </main>
-<footer><div><span class="live-dot"></span> 원정대 기록 <span class="muted">v0.10.0</span><span class="separator">·</span><button id="help">조작법 · 게임 규칙</button><button id="save-tools">저장 관리</button><button id="new-game">처음부터 시작</button></div><div class="footer-controls"><span>공격 1회 발차기 · 2회 펀치 · 상호작용 E</span><button id="fullscreen" aria-label="전체 화면">⛶</button></div></footer>
+<footer><div><span class="live-dot"></span> 원정대 기록 <span class="muted">v0.11.0</span><span class="separator">·</span><button id="help">조작법 · 게임 규칙</button><button id="save-tools">저장 관리</button><button id="new-game">처음부터 시작</button></div><div class="footer-controls"><span>공격 1회 발차기 · 2회 펀치 · 상호작용 E</span><button id="fullscreen" aria-label="전체 화면">⛶</button></div></footer>
 <p class="rotate-hint">휴대전화는 가로로 돌리면 더 넓게 탐험할 수 있어요.</p>
 </div>
 <dialog id="modal" aria-labelledby="modal-title"><div id="modal-body"></div></dialog>
@@ -56,6 +56,8 @@
 <script src="src/exploration.js"></script>
 <script src="src/motion.js"></script>
 <script src="src/state.js"></script>
+<script src="src/accounts.js"></script>
+<script src="src/tutorial.js"></script>
 <script src="src/art.js"></script>
 <script src="src/pixel.js"></script>
 <script src="src/animation.js"></script>
@@ -66,6 +68,7 @@
 <script src="src/export.js"></script>
 <script src="src/ui.js"></script>
 <script src="src/controls.js"></script>
+<script src="src/lab.js"></script>
 <script src="src/main.js"></script>
 </body>
 </html>

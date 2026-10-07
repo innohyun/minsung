@@ -1,0 +1,22 @@
+{
+  "bow": {
+    "width": 1024,
+    "height": 1536,
+    "sha256": "0f170710258bd3d4206bae904bf4fb1ee375c3d0abb1dd37d7dbf84aefb9af73"
+  },
+  "arrow": {
+    "width": 2172,
+    "height": 724,
+    "sha256": "4531d5445bb22d485a536292b43c27d6c809469a31d34ed2efcdaede1d584e8b"
+  },
+  "quiver": {
+    "width": 1312,
+    "height": 1199,
+    "sha256": "2716e1928e52eed480c67ad94e479796cad123de11dad17308f1ce02b9e1e3f1"
+  },
+  "fire-jet": {
+    "width": 1247,
+    "height": 1261,
+    "sha256": "710d3256f35c917bb69307435fef6b5ee01082446b53d8aa89dc08151ec99398"
+  }
+}

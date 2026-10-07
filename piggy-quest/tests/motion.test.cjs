@@ -82,9 +82,9 @@ test('old completed saves retain progress and unlock the added third map',()=>{
   const raw=P.State.fresh();delete raw.progress.brook;raw.progress.wind.cleared=true;raw.progress.amber.cleared=true;raw.unlocked=['wind','amber'];raw.coins=333;
   const s=P.State.normalize(raw);assert.equal(s.coins,333);assert.ok(s.unlocked.includes('brook'));assert.equal(s.progress.brook.cleared,false);
 });
-test('every map has complete reachable areas and a deepest boss approach',()=>{
+test('every map has complete reachable areas without bosses',()=>{
   assert.equal(P.MAPS.length,3);
-  for(const map of P.MAPS){assert.ok(map.rooms.main.bossX<map.rooms.main.width);const seen=new Set(['main']);
+  for(const map of P.MAPS){assert.equal(map.rooms.main.bossX,undefined);const seen=new Set(['main']);
     for(let pass=0;pass<10;pass++)for(const id of [...seen])for(const p of map.rooms[id].portals){assert.ok(map.rooms[p.target]);assert.ok(p.x>=0&&p.x<map.rooms[id].width);seen.add(p.target);}
     assert.equal(seen.size,Object.keys(map.rooms).length);
     for(const room of Object.values(map.rooms)){assert.ok(room.landmarks.length>=3);for(const enemy of room.enemies)assert.ok(enemy.x>0&&enemy.x<room.width);}
