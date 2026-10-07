@@ -6,7 +6,7 @@
  if(P.Animation)Object.assign(P.Animation.meta,meta);
  const lv=(h,n)=>P.helperLevel(P.state,h.id,n);
  function visible(g,e){const d=g.enemyConfig(e);return e.hp>0&&e.x+d.w/2>=g.camera&&e.x-d.w/2<=g.camera+C.width;}
- function target(g,h){const current=g.enemies.find(e=>e.id===h.targetId&&visible(g,e));
+ function target(g,h){if(g.training?.()){h.targetId='';return undefined;}const current=g.enemies.find(e=>e.id===h.targetId&&visible(g,e));
    const e=current||g.enemies.filter(e=>visible(g,e)).sort((a,b)=>Math.abs(a.x-h.x)-Math.abs(b.x-h.x))[0];h.targetId=e?.id||'';return e;}
  function initRoom(g){g.allyShots=[];g.burns=[];g.allyEffects=[];g.barriers=[];
    for(const h of g.helpers){h.action=null;h.pose='idle';h.flight=0;h.flightCd=0;h.y=C.ground;h.vy=0;h.targetId='';h.timers={};}}

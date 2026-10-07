@@ -150,6 +150,7 @@
       for(const h of this.helpers)if(P.state.helpers[h.id].hp>0)targets.push({kind:'helper',x:h.x,y:h.y,actor:h});
       return targets.filter(t=>Math.abs(t.y+(t.kind==='pig'&&this.pig.carrying?C.carryHeight-140:0)-C.ground)<155).sort((a,b)=>Math.abs(a.x-e.x)-Math.abs(b.x-e.x))[0];
     }
+    training(){return !P.state.tutorial?.complete&&P.state.tutorial?.step<5&&this.map?.id==='wind';}
     tickAttacks(dt){const p=this.player,s=P.state;
       p.dig=Math.max(0,p.dig-dt);p.punch=Math.max(0,p.punch-dt);p.kick=Math.max(0,p.kick-dt);p.inv=Math.max(0,p.inv-dt);p.age+=dt;
       for(const id of Object.keys(p.skills))p.skills[id]=Math.max(0,p.skills[id]-dt);
@@ -184,7 +185,7 @@
       P.State.reviveTick(s,dt,id=>{const h=this.helpers.find(h=>h.id===id);if(h){h.x=this.pig.x;h.y=C.ground;h.inv=1;}this.toast(P.helperById(id).name+' 부활 · 체력 50%');});
       P.Companions.tick(this,dt);
       for(const e of this.enemies){
-        if(e.hp<=0)continue;const def=this.enemyConfig(e);
+        if(e.hp<=0||this.training())continue;const def=this.enemyConfig(e);
         if(e.x+def.w>this.camera&&e.x-def.w<this.camera+1280)e.active=true;
         e.hit=Math.max(0,e.hit-dt);e.stun=Math.max(0,e.stun-dt);e.cd=Math.max(0,e.cd-dt);e.x+=e.kb*dt;e.kb*=Math.max(0,1-dt*8);
         e.x=clamp(e.x,25,this.room.width-25);if(!e.active)continue;if(e.stun>0)continue;if(e.type.startsWith('cave-')){P.Combat.caveTick(this,e,dt);continue;}

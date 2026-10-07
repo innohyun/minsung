@@ -28,3 +28,5 @@ test('tutorial and pending player revival persist without resetting previous exp
 test('map current position is explicitly red and cleared rooms need no boss',()=>{
  const map=P.MAPS[0],progress=P.State.freshProgress(map);progress.dead=map.rooms.main.enemies.map(e=>e.id);const g={map,room:map.rooms.main,player:{x:200},progress};assert.ok(P.World.roomCleared(g,'main'));const chart=P.World.chart(g);assert.match(chart,/data-current-position="true" fill="#d74646"/);assert.ok(!chart.includes('이끼 거인'));
 });
+
+test('tutorial explanations hold companion targeting until the first combat step',()=>{const g=battle('brawler',420);g.training=()=>P.state.tutorial.step<5;P.state.tutorial={complete:false,step:0};const x=g.helpers[0].x;P.Companions.tick(g,1/60);assert.equal(g.helpers[0].targetId,'');P.state.tutorial.step=5;P.Companions.tick(g,1/60);assert.equal(g.helpers[0].targetId,'foe');});
