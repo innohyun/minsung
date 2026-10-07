@@ -30,3 +30,5 @@ test('map current position is explicitly red and cleared rooms need no boss',()=
 });
 
 test('tutorial explanations hold companion targeting until the first combat step',()=>{const g=battle('brawler',420);g.training=()=>P.state.tutorial.step<5;P.state.tutorial={complete:false,step:0};const x=g.helpers[0].x;P.Companions.tick(g,1/60);assert.equal(g.helpers[0].targetId,'');P.state.tutorial.step=5;P.Companions.tick(g,1/60);assert.equal(g.helpers[0].targetId,'foe');});
+
+test('a straight fire jet aims at low monsters both on the ground and during flight',()=>{for(const flight of [0,1]){const g=battle('flame',660);g.enemies[0].type='cave-charger';if(flight)P.state.helpers.flame.levels.flight=1;for(let n=0;n<100;n++)P.Companions.tick(g,1/60);assert.ok(g.hits.length>0,'jet missed low monster; flight='+flight);assert.ok(g.helpers[0].castAngle>0);}});

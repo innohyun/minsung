@@ -10,8 +10,8 @@
    const e=current||g.enemies.filter(e=>visible(g,e)).sort((a,b)=>Math.abs(a.x-h.x)-Math.abs(b.x-h.x))[0];h.targetId=e?.id||'';return e;}
  function initRoom(g){g.allyShots=[];g.burns=[];g.allyEffects=[];g.barriers=[];
    for(const h of g.helpers){h.action=null;h.pose='idle';h.flight=0;h.flightCd=0;h.y=C.ground;h.vy=0;h.targetId='';h.timers={};}}
- function start(h,type,duration,e){h.action={type,age:0,duration,targetId:e?.id};h.pose=type==='pillar'||type==='fireball'?'cast':type;h.age=0;h.vx=0;}
- function hand(h){const options={companionId:h.id,pose:h.pose,age:h.age,speed:h.vx,companionRun:h.running,walkDistance:h.walkDistance,running:h.running,weaponGrip:swordFrame(h.age).gripDir};
+ function start(h,type,duration,e){h.castAngle=0;h.action={type,age:0,duration,targetId:e?.id};h.pose=type==='pillar'||type==='fireball'?'cast':type;h.age=0;h.vx=0;}
+ function hand(h){const options={companionId:h.id,pose:h.pose,age:h.age,speed:h.vx,companionRun:h.running,walkDistance:h.walkDistance,running:h.running,weaponGrip:swordFrame(h.age).gripDir,castAngle:h.castAngle||0};
    const p=P.Motion.pose(options).frontHand;return {x:h.x+p[0]*.86*h.dir,y:h.y+p[1]*.86};}
  function swordFrame(age){const row=age<.64?0:1,index=row===0?(age<.12?0:age<.24?1:age<.32?2:age<.5?3:age<.6?4:5):(age<.76?0:age<.87?1:age<.98?2:age<1.1?3:age<1.24?4:5);
    const f=meta['sword-sprites'].rows[row].frames[index],v=f.gripDir,t=clamp((age-.84)/.18,0,1),rotation=row===1?-Math.PI*(1-t*t*(3-2*t)):0;return {...f,pivot:[f.pivot[0]+v[0]*34,f.pivot[1]+v[1]*34],gripDir:[v[0]*Math.cos(rotation)-v[1]*Math.sin(rotation),v[0]*Math.sin(rotation)+v[1]*Math.cos(rotation)],rotation,row,index};}
@@ -48,10 +48,10 @@
        if(a.age>=.94)strike(g,h,a,stats.attack+2,155,60,true,'side');
      }
      if(a.type==='pillar'&&a.age>=.22&&a.age<1.35){
-       const p=hand(h),length=Math.min(stats.range,(a.age-.22)*1200),pulse=Math.floor((a.age-.22)/.25);
-       if(!a.jet){a.jet={type:'pillar',x:p.x,y:p.y,dir:h.dir,r:length,age:0,life:.12};g.allyEffects.push(a.jet);sound('pillar');}
-       Object.assign(a.jet,{x:p.x,y:p.y,dir:h.dir,r:length,life:.12});
-       if(a.pulse!==pulse){a.pulse=pulse;for(const foe of g.enemies){const d=g.enemyConfig(foe),dx=(foe.x-p.x)*h.dir;if(foe.hp>0&&dx>=-d.w*.3&&dx<=length+d.w*.3&&p.y>=foe.y-d.h-25&&p.y<=foe.y+20)g.hitEnemy(foe,stats.attack*.28,h.dir*9);}if(pulse%2===0)sound('pillar');}
+       const before=hand(h),aim=victim?clamp(Math.atan2(victim.y-g.enemyConfig(victim).h*.55-before.y,Math.abs(victim.x-before.x)),-.4,.8):0;h.castAngle+=(aim-h.castAngle)*Math.min(1,dt*12);const p=hand(h),length=Math.min(stats.range,(a.age-.22)*1200),pulse=Math.floor((a.age-.22)/.25);
+       if(!a.jet){a.jet={type:'pillar',x:p.x,y:p.y,dir:h.dir,r:length,angle:h.castAngle,age:0,life:.12};g.allyEffects.push(a.jet);sound('pillar');}
+       Object.assign(a.jet,{x:p.x,y:p.y,dir:h.dir,r:length,angle:h.castAngle,life:.12});
+       if(a.pulse!==pulse){a.pulse=pulse;for(const foe of g.enemies){const d=g.enemyConfig(foe),tip={x:p.x+Math.cos(h.castAngle)*h.dir*length,y:p.y+Math.sin(h.castAngle)*length,r:22};if(foe.hp>0&&segmentHit(p,tip,foe,d))g.hitEnemy(foe,stats.attack*.28,h.dir*9);}if(pulse%2===0)sound('pillar');}
      }
      if(a.type==='fireball'&&a.age>=.22&&!a.fired){a.fired=true;const p=hand(h);g.allyShots.push({type:'fireball',owner:h.id,targetId:a.targetId,x:p.x,y:p.y,vx:h.dir*330,vy:0,speed:330,life:2.3,age:0,level:lv(h,'fireball'),r:15});sound('fireball');}
      if(a.type==='heal'&&a.age>=.3&&!a.done){a.done=true;const t=healTarget(g,h);if(t){const amount=8+lv(h,'heal')*5;t.actor.hp=Math.min(t.max,t.actor.hp+amount);g.allyEffects.push({type:'heal',x:t.x??t.actor.x,y:t.y??t.actor.y,age:0,life:.6});sound('heal');}}
@@ -70,7 +70,7 @@
        else if(healTarget(g,h)&&h.cd<=0){start(h,'heal',.65);h.cd=3.5-Math.min(1.3,lv(h,'heal')*.2);}
      }else if(e){const distance=Math.abs(e.x-h.x);
        if(h.id==='brawler'&&lv(h,'dash')&&distance>125&&distance<280&&!h.timers.dash){start(h,'dash',.32,e);h.timers.dash=4.5;sound('dash');}
-       else if(distance<=stats.range+6&&h.cd<=0){
+       else if((h.id==='flame'?Math.hypot(distance,e.y-g.enemyConfig(e).h*.55-(h.y-120)):distance)<=stats.range+6&&h.cd<=0){
          if(h.id==='brawler'){
            h.turn=(h.turn||0)+1;const ability=lv(h,'push')&&h.turn%3===0?'push':lv(h,'kick')&&h.turn%2===0?'kick':'punch';start(h,ability,ability==='punch'?.46:ability==='kick'?.25:.36,e);h.cd=stats.cooldown;
          }else if(h.id==='archer'){start(h,'bow',1.4,e);h.action.speed=Math.max(1,1.4/(stats.cooldown*.85));h.cd=stats.cooldown;}
@@ -124,7 +124,7 @@
  function backWeapon(c,o,rig){const im=P.Art.images.quiver;if(!im?.naturalWidth)return;const sc=.045;c.drawImage(im,rig.rearShoulder[0]-28,rig.rearShoulder[1]-25,im.naturalWidth*sc,im.naturalHeight*sc);}
  function drawActor(c,g,h){const d=P.helperStats(P.state,h.id),stored=P.state.helpers[h.id];if(stored.hp<=0)return;
    P.Art.ellipse(c,h.x,C.ground+3,22,5,'rgba(45,80,60,.12)');const f=swordFrame(h.age);
-   P.Art.stick(c,h.x,h.y,{time:g.time,speed:h.vx,walkDistance:h.walkDistance,walkBlend:h.walkBlend,dir:h.dir,pose:h.pose,age:h.age,color:d.color,band:'#d4ddbc',scale:.86,companionId:h.id,companionRun:h.running,running:h.running,weaponGrip:f.gripDir,flight:h.flight,hit:h.inv>.1,air:h.pose==='dodge'});
+   P.Art.stick(c,h.x,h.y,{time:g.time,speed:h.vx,walkDistance:h.walkDistance,walkBlend:h.walkBlend,dir:h.dir,pose:h.pose,age:h.age,color:d.color,band:'#d4ddbc',scale:.86,companionId:h.id,companionRun:h.running,running:h.running,weaponGrip:f.gripDir,castAngle:h.castAngle||0,flight:h.flight,hit:h.inv>.1,air:h.pose==='dodge'});
    P.Art.bar(c,h.x,h.y-169,stored.hp,d.max,55,stored.hp/d.max<.3?'#c85555':'#7ca598');
  }
  function draw(c,g){const A=P.Art;
@@ -132,7 +132,7 @@
    for(const s of g.allyShots){if(s.type==='fireball'){c.save();c.translate(s.x,s.y);c.rotate(Math.atan2(s.vy,s.vx));sample(c,'fireball',0,Math.floor(s.age*12)%6,0,0,.16);c.restore();}else{c.save();c.translate(s.x,s.y);c.rotate(Math.atan2(s.vy,s.vx));const im=A.images.arrow;if(im?.naturalWidth)c.drawImage(im,-35,-12,72,24);c.restore();}}
    for(const f of g.burns)sample(c,'fireburst-burning',1,Math.floor(f.age*10)%6,f.x,C.ground+3,.42);
    for(const f of g.allyEffects){if(f.type==='burst')sample(c,'fireburst-burning',0,Math.min(5,Math.floor(f.age/.6*6)),f.x,f.y+3,.48);
-     else if(f.type==='pillar'){const im=A.images['fire-jet'];if(im?.naturalWidth&&f.r>0){const cell=im.naturalHeight/4,index=Math.floor(f.age*16)%4;c.save();c.translate(f.x,f.y);c.scale(f.dir,1);c.drawImage(im,0,index*cell,im.naturalWidth,cell,0,-24,f.r,48);c.restore();}}
+     else if(f.type==='pillar'){const im=A.images['fire-jet'];if(im?.naturalWidth&&f.r>0){const cell=im.naturalHeight/4,index=Math.floor(f.age*16)%4;c.save();c.translate(f.x,f.y);c.scale(f.dir,1);c.rotate(f.angle||0);c.drawImage(im,0,index*cell,im.naturalWidth,cell,0,-24,f.r,48);c.restore();}}
      else {c.save();c.globalAlpha=f.life;A.ellipse(c,f.x,f.y-82,30+f.age*45,45,'#95c1a3');c.restore();}}
  }
  P.Companions={meta,visible,target,initRoom,tick,tickActor,intercept,sample,weapon,backWeapon,drawActor,draw,swordFrame,segmentHit};

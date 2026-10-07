@@ -120,7 +120,7 @@
         rearArm=aimArm(rearShoulder,back,1);
       }
       if(o.pose==='cast'||o.pose==='heal'||o.pose==='barrier'){
-        frontArm=aimArm(frontShoulder,point([24,-119],[50,-140],smooth(age/.23)),-1);rearArm=fkArm(rearShoulder,-.6,1.8);
+        const aim=o.companionId==='flame'?[frontShoulder[0]+Math.cos(o.castAngle||0)*59,frontShoulder[1]+Math.sin(o.castAngle||0)*59]:[50,-140];frontArm=aimArm(frontShoulder,point([24,-119],aim,smooth(age/.23)),-1);rearArm=fkArm(rearShoulder,-.6,1.8);
       }
       if(o.pose==='sword'){
         const down=age>=.32&&age<.64,side=age>=.8;
