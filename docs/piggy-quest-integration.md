@@ -1,3 +1,26 @@
+# v0.11.0 조수 동작·부활·전투 실험실·계정 · 실제 배포 결과 (2026-10-07)
+
+공개 게임: https://minsung.pages.dev/piggy-quest/
+
+활·화살·화살통과 연속 불 분사 원화를 따로 제작했습니다. 원본 PNG 바이트를 보존하며 뒤쪽 팔/화살통, 고정 길이의 위팔·아래팔, 어깨·몸통·다리 자세를 함께 계산합니다. 궁수는 화살 꺼내기→장전→시위 당기기→발사 동작을 사용하고 기본 사거리는 520으로 늘렸습니다. 원거리 조수는 사거리에 맞춰 접근·후퇴합니다. 잿불은 버티는 자세에서 시간에 따라 길어지는 직선 불줄기를 연속 분사하며 낮은 적과 비행 중 지상 적도 조준합니다. 대검은 손잡이를 쥐고 몸의 무게를 옮기며 뒤로 준비한 뒤 내려베기/옆베기를 구분합니다. 기존 조수·몬스터 행동 효과음을 유지합니다.
+
+플레이어가 죽으면 어두운 화면에 10초 부활 시간을 표시하고 같은 원정의 저금통에서 부활합니다. 지도·처치·코인·방 진행을 초기화하지 않으며 자발적인 홈 귀환은 원정 코인의 절반을 정산합니다. 지도 현재 위치는 빨간색, 처치 완료 구역은 체크 표시입니다. 보스를 제거하고 필수 구역의 일반 적 처치로 다음 맵을 엽니다. 첫 맵은 새 계정이 실제 이동·점프·공격·저금통 상호작용·지도·전투를 수행하는 튜토리얼입니다. 설명 단계의 전투는 멈추고 마지막 전투 단계에서 시작합니다.
+
+홈의 **전투 실험실**은 플레이어 없이 시작합니다. 아래 목록에서 조수 5종·몬스터 7종·일반 졸라맨을 드래그해 배치하고 화면을 드래그해 카메라를 이동합니다. 실제 게임 AI·공격·피격·효과음을 사용하며 맵/강화 수준 선택, 일시정지·부활·초기화를 제공합니다. 일반 졸라맨의 돌진 피격→공중 밀림→넘어짐→복귀도 확인했습니다. 실험은 실제 계정 진행에 저장하지 않습니다.
+
+**계정 기능의 공개 범위:** 공개 Pages에서는 기기별 계정 추가·선택·이어서 하기를 사용할 수 있습니다. 기존 진행은 `기존 원정`으로 보존합니다. 비밀번호 로그인·서버 저장용 API와 HTTPS 서버 연결 UI도 구현했으며 별도 임시 SQLite를 사용하는 VM 서버에서 다른 브라우저 로그인/이어 하기까지 검증했습니다. 그러나 운영 계정 서버는 배포하지 않았으므로 현재 공개 사이트의 기기 계정을 온라인 인증이나 기기 간 동기화로 안내하지 않습니다. 온라인 사용에는 운영 HTTPS 백엔드 연결이 필요합니다. 기존 Node/SQLite 서버를 Pages에 그대로 올리지 않았고 Workers/D1/DNS 리소스도 만들지 않았습니다. 선택적 계정 API는 `PIGGY_ACCOUNTS_DB`의 별도 DB를 요구하며 기존 대시보드 DB와 같은 경로를 거부합니다. 비밀번호는 scrypt, 세션은 HttpOnly 쿠키, 저장은 계정별 분리와 revision 충돌 검사를 사용합니다.
+
+- 게시 코드/GitHub 커밋: `1880e2f914eec35f0f091fef5f7ae285fe3d9635`. 이 상위 결과 문서만 별도 커밋으로 기록하므로 게시된 게임 소스와 산출물은 바뀌지 않습니다.
+- Pages production 배포: `6f436281-b9b1-4395-a0bb-db8f90a2d5aa`, https://6f436281.minsung.pages.dev/piggy-quest/ . 계정 API에서 main/production/deploy success, 게시 코드 커밋, canonical production 배포 ID 일치를 확인했습니다.
+- 전용 산출물: `/workspace/builds/minsung-pages-piggy-v0110-20261007-complete`, 공개 allowlist 191파일/소스 부분 96파일. 절대 경로 Wrangler 4.147.0으로 기존 minsung 프로젝트에 배포했습니다. 저장소 루트·로컬 DB·Node 서버·루트 tests·node_modules는 공개 자산에 포함하지 않습니다. 게임 전용 소스 내보내기에는 게임의 테스트/기획 문서가 포함됩니다.
+- 게시 게임 HTML SHA-256 `8fc341c59ebeda346d8495dfd71ea7581e436f10ed5d83ff512895e68850035d`, 단일 HTML SHA-256 `959bc1bc6566446b61f91636790032f241dea793a26a384bd8f0b040b91d5c3a`. 정상 TLS/상속 프록시의 공개 HTTPS 102요청에서 첫 화면·게임·대시보드·소스 진입·저금통·96개 소스 부분·배포별 게임의 HTTP 200과 산출물 바이트 일치를 확인했습니다. 공개 HTTPS Chromium에서도 v0.11.0, 이미지 31개 디코딩, 새 기기 계정의 튜토리얼 시작, 실제 드래그 배치와 궁수 피해, 브라우저 오류 없음이 통과했습니다.
+- 관련 검증: 게임 단위 97개, 계정 API 테스트 1개(등록·로그인·계정별 저장·충돌·로그아웃 등 여러 검증), 기존 서버 선택 테스트 6개 통과. 격리 계정 서버의 실제 HTTP 브라우저 검증 31개는 마지막 불줄기 조준 수정 전 통과했으며, 최종 산출물에서는 정적 HTTP 브라우저 28개와 단일 HTML 48개가 통과했습니다. 정적 산출물 검사에서 온라인 서버가 필요한 3개 항목은 제외했습니다. 최종 조준의 지상/비행·낮은 적 판정은 단위 검사에 포함합니다. 반복 검사를 독립 검사 수에 더하지 않습니다. 저장소 전체 baseline 77 통과/6 실패는 기록만 보존하고 전체 루트 테스트는 반복하지 않았습니다.
+- 결과/화면: `/workspace/artifacts/piggy-quest-v0110/`의 `validation-summary.json`, `public-verification.json`, `public-browser.json`, `public-accounts.png`, `public-archer-lab.png`, `full-browser-final/results.json`, `complete-browser/results.json`, `complete-offline/browser-results.json`, `unit-results.log`, `accounts-results.log`. 멀티터치·실제 Web Audio 연결/신호도 검증했습니다. 물리 스피커 청취, 네이티브 iPad/Safari, 전 맵 수동 완주/최종 난이도는 미검증입니다. file://는 VM Chromium의 `ERR_BLOCKED_BY_ADMINISTRATOR` 정책으로 열리지 않아 단일 HTML은 set_content/메모리 Storage, 실제 원점·저장은 HTTP/HTTPS로 구분해 검사했습니다. 정책·TLS·인증을 우회하지 않았습니다.
+- 기존 첫 화면 SHA-256 `37a05e005b7ecb26d1ea3250df67cd8b357713b2d607895898412b9b011b03a1`, 기존 `.local/minsung.sqlite` SHA-256 `2aafd39bdb7720eace4078fa8b05421e29b45f73df6b13e4b1e077ed87d735f6` 유지. 루트 package.json/lockfile도 변경하지 않았습니다. server.mjs에는 선택적 별도 계정 API 연결만 추가했습니다. 기존 Node 서버의 `/`와 `/piggy-quest/index.html` HTTP 200을 확인했습니다.
+- 환경 spec 9/관측 9, 기존 변수·시크릿 ready, 계정 토큰 verify success=true/status=active, Wrangler의 기존 minsung Pages 조회를 확인했습니다. 기존 설치 스크립트·start_skill·다른 env/secret 설정을 변경하지 않았고 새 설정 초안도 만들지 않았습니다. `WRANGLER_SEND_METRICS=false`, 기존 XDG_CONFIG_HOME과 대상 계정 `8326f1e0ab93e6bea3b3b6753b9d8fcf`를 사용합니다. 사용자 제공 만료일은 2027-10-04, 권한은 Pages Write/Account Settings Read이며 비밀 값/Authorization 헤더를 출력하거나 권한을 추가하지 않았습니다. 환경 저장·게시 버튼은 실행하지 않았습니다.
+
+---
+
 # v0.10.0 조수 개편·행동 효과음 · 실제 배포 결과 (2026-10-06)
 
 공개 게임: https://minsung.pages.dev/piggy-quest/
