@@ -1,0 +1,6 @@
+import {createServer} from 'node:http';import {readFileSync} from 'node:fs';import {api} from '../src/server/api.js';import {database} from './db-local.mjs';
+const env={DB:database('.local/rooms.sqlite')};
+const files={'/':['src/client/index.html','text/html; charset=utf-8'],'/index.html':['src/client/index.html','text/html; charset=utf-8'],'/style.css':['src/client/style.css','text/css; charset=utf-8'],'/game.js':['.local/game.js','text/javascript; charset=utf-8']};
+const server=createServer(async(req,res)=>{try{const url=new URL(req.url,'http://127.0.0.1:4180');if(url.pathname.startsWith('/api/')){const chunks=[];for await(const c of req)chunks.push(c);const r=await api(new Request(url,{method:req.method,headers:req.headers,...(req.method!=='GET'?{body:Buffer.concat(chunks)}:{})}),env);res.writeHead(r.status,Object.fromEntries(r.headers));res.end(Buffer.from(await r.arrayBuffer()));return;}const f=files[url.pathname];if(!f){res.writeHead(404);res.end('Not found');return;}res.writeHead(200,{'content-type':f[1],'cache-control':'no-store'});res.end(readFileSync(f[0]));}catch(e){res.writeHead(500);res.end('Server error');console.error(e);}});
+server.listen(4180,'127.0.0.1',()=>console.log('Local: http://127.0.0.1:4180'));
+process.on('SIGTERM',()=>server.close(()=>process.exit()));

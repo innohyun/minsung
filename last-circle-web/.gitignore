@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.local/
+.outputs/
+.sites-runtime/
+*.log
+
+worker/index.js
