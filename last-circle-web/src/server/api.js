@@ -1,4 +1,4 @@
-import {makeRoom,player,start,returnLobby,advance,applyInput,snapshot,SLOTS} from '../sim.js';
+import {makeRoom,player,start,returnLobby,advance,applyInput,snapshot,SLOTS,RULES_VERSION} from '../sim.js';
 export function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});}
 const safe=(x,n)=>typeof x==='string'?x.trim().slice(0,n):'';
 const hash=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))).map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -27,6 +27,7 @@ export async function api(req,env){
    const s=JSON.parse(row.state);
    const host=s.players.find(p=>p.id===s.host);
    if(s.closed||!host||now-host.lastSeen>60000)return json({error:'방장이 나갔거나 연결이 종료됐어요.'},410);
+   if(s.rulesVersion!==RULES_VERSION&&s.phase!=='lobby'&&operation!=='leave')return json({error:'게임이 업데이트됐어요. 새로고침한 뒤 새 방을 만들어 주세요.',upgrade:true},409);
    advance(s,now);
    let p=s.players.find(x=>x.tokenHash===tokenHash);
    if(operation==='join'){

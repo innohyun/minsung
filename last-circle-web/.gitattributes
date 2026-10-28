@@ -1,0 +1,2 @@
+# Generated Three.js shader strings preserve upstream whitespace.
+worker/index.js -diff -whitespace
