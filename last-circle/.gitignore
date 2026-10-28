@@ -1,0 +1,12 @@
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Builds/
+.vs/
+*.sln
+Config/EOS.local.ini
+Content/
+!Content/.gitkeep
+Config/DefaultEngine.ini
+__pycache__/
