@@ -1,44 +1,22 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {makeRoom,player,start,step,fire,act,applyInput,RELOAD_SECONDS} from '../src/sim.js';
-import {terrainHeight,BOXES,BUILDINGS,integrateMovement,move,rayTerrain,supportHeight} from '../src/world.js';
-import {Motion} from '../src/client/motion.js';
-const still={mx:0,mz:0,yaw:0,pitch:0,fire:false,sprint:false,aim:false,crouch:false};
-function match(){const s=makeRoom('ABCDEF','test',player('host','Tester'));start(s,'host');for(const p of s.players){p.onPlane=false;p.x=-105;p.z=-30;p.y=terrainHeight(p.x,p.z);p.bot=false;p.input={...still};}return s;}
-test('rifle fires a full 30-round magazine before automatic reload; reserve and ammo conserved',()=>{
- const s=match(),p=s.players[0];p.guns=[true,false];p.ammo=[30,0];p.reserve=[60,0];
- for(let i=0;i<30;i++){s.time=i*.131;assert.equal(fire(s,p),true);if(i<29)assert.equal(p.reload,0);}
- assert.equal(p.ammo[0],0);assert.equal(p.reload,RELOAD_SECONDS[0]);assert.equal(p.reserve[0],60);assert.equal(fire(s,p),false);
- const t=s.time;for(let i=0;i<105;i++)step(s,.02);assert.ok(s.time>t+2);assert.equal(p.ammo[0],30);assert.equal(p.reserve[0],30);assert.equal(p.reload,0);
-});
-test('pistol has 12 rounds, and the final partial reserve reloads without pressing R',()=>{
- const s=match(),p=s.players[0];p.weapon=1;p.guns=[false,true];p.ammo=[0,12];p.reserve=[0,4];
- for(let i=0;i<12;i++){s.time=i*.321;assert.equal(fire(s,p),true);if(i<11)assert.equal(p.reload,0);}
- assert.equal(p.ammo[1],0);assert.ok(p.reload>0);for(let i=0;i<80;i++)step(s,.02);assert.equal(p.ammo[1],4);assert.equal(p.reserve[1],0);
- p.ammo[1]=0;for(let i=0;i<10;i++)step(s,.02);assert.equal(p.reload,0);
-});
-test('hills and cliff elevation affect movement and bullets; buildings have distinct footprints',()=>{
- assert.ok(terrainHeight(-36,37)>terrainHeight(-8,37)+4);
- const x=83,z=-17,p={x,z,y:terrainHeight(x,z),vy:0};const old=p.x;move(p,2,0);assert.equal(p.x,old,'cliff face cannot be walked through');
- const tiny={x:83,z:-17,y:terrainHeight(83,-17),vy:0};for(let i=0;i<60;i++)integrateMovement(tiny,{...still,mx:-1},1/60);assert.ok(tiny.x<83.4,'small real movement steps cannot climb the cliff either');
- const from=[-8,terrainHeight(-8,37)+1.4,37],to=[-62,terrainHeight(-62,37)+1.4,37],len=Math.hypot(...to.map((v,i)=>v-from[i])),dir=to.map((v,i)=>(v-from[i])/len);
- assert.ok(rayTerrain(from,dir,len)<len,'hill occludes the shot');assert.ok(new Set(BUILDINGS.map(b=>b.w+'x'+b.d)).size>=7);
-});
-test('parachute descent lands ON cover instead of becoming embedded inside a crate',()=>{
- const b=BOXES.find(b=>b.kind==='crate'),p={...player('x','x'),x:b.x,z:b.z,y:b.y+b.h+4,vy:-4.8};
- for(let i=0;i<300;i++)integrateMovement(p,still,.016);
- assert.ok(Math.abs(p.y-(b.y+b.h))<.03);assert.equal(p.vy,0);assert.equal(p.chute,false);
-});
-test('jump works from elevated ground, not only world y=0',()=>{
- const s=match(),p=s.players[0];p.x=-36;p.z=37;p.y=terrainHeight(p.x,p.z);assert.ok(p.y>5);act(s,p,'jump');assert.equal(p.vy,5.2);
-});
-test('snapshot reconciliation is continuous horizontally and during parachute descent',()=>{
- const m=new Motion(),p={...player('you','you'),x:-105,z:-30,y:terrainHeight(-105,-30)+12,vy:-4.8,chute:true};let clock=0;m.receive(p,0,clock,still,0);let last=m.display.y,largest=0;
- for(let i=0;i<90;i++){
-  integrateMovement(p,still,1/60);clock+=1000/60;
-  if(i%12===0)m.receive(p,clock/1000,clock,still,0);
-  const visual=m.frame(1/60,still,clock);largest=Math.max(largest,Math.abs(visual.y-last));assert.ok(visual.y<=last+.015);last=visual.y;
- }
- assert.ok(largest<.15,`largest visual jump: ${largest}`);
- const before={...m.display};m.receive({...p,x:p.x+.6},2,clock,still,0);assert.equal(m.display.x,before.x,'receipt does not teleport visual position');const after=m.frame(1/60,still,clock+16.67);assert.ok(Math.abs(after.x-before.x)<.14);
-});
+import test from 'node:test';import assert from 'node:assert/strict';
+import {player,makeRoom,start,step,fire,act,startReload,WEAPONS,damage,throwGrenade} from '../src/sim.js';
+import {BUILDINGS,BOXES,LOOT_SPOTS,terrainHeight,integrateMovement,supportHeight,rayBox,rayTerrain,FLIGHT_HEIGHT,beginJump,contains,blocked} from '../src/world.js';
+import {bodyParts,hitBody,bodyDamage,STANCES} from '../src/weapons.js';import {Motion} from '../src/client/motion.js';
+const still={mx:0,mz:0,yaw:0,pitch:0,fire:false,sprint:false,aim:true,stance:'stand',view:'first'};
+function match(){const s=makeRoom('ABCDEF','test',player('host','Tester'));start(s,'host');for(const [index,p]of s.players.entries()){p.bot=false;p.onPlane=p.gliding=p.chute=false;p.x=index?100+index:-108;p.z=index?100:-30;p.y=terrainHeight(p.x,p.z);p.input={...still};p.view='first';}return s;}
+test('five named weapons use their full magazine and automatically reload from the correct bag',()=>{for(const[i,w]of WEAPONS.entries()){const s=match(),p=s.players[0];p.weapon=i;p.guns[i]=true;p.ammo[i]=w.magazine;p.bag[w.caliber]=w.magazine+3;for(let n=0;n<w.magazine;n++){s.time=n*(w.interval+.001);assert.equal(fire(s,p),true);if(n<w.magazine-1)assert.equal(p.reload,0);}assert.equal(p.ammo[i],0);assert.ok(p.reload>0);for(let n=0;n<Math.ceil(w.reload/.02)+2;n++)step(s,.02);assert.equal(p.ammo[i],w.magazine);assert.equal(p.bag[w.caliber],3);}});
+test('low reserve produces a partial magazine and empty bag never creates ammo',()=>{const s=match(),p=s.players[0];p.guns[3]=true;p.weapon=3;p.ammo[3]=0;p.bag['762']=2;assert.equal(startReload(p),true);for(let n=0;n<165;n++)step(s,.02);assert.equal(p.ammo[3],2);assert.equal(p.bag['762'],0);p.ammo[3]=0;step(s,.02);assert.equal(p.reload,0);});
+test('head, torso and legs have independent accurate intersections in all three postures',()=>{for(const stance of ['stand','crouch','prone']){const p={...player('q','q'),stance};const head=bodyParts(p).find(p=>p.zone==='head'),o=[head.a[0],head.a[1],head.a[2]+10];const hit=hitBody(o,[0,0,-1],p,20);assert.equal(hit?.zone,'head',stance);assert.ok(hit.distance<10);assert.equal(hitBody([head.a[0]+.23,head.a[1]+.1,head.a[2]+10],[0,0,-1],p,20)?.zone==='head',false);}
+ const p=player('q','q'),leg=hitBody([.15,.25,10],[0,0,-1],p,20);assert.equal(leg.zone,'leg');assert.ok(bodyDamage(WEAPONS[0],'head')>=100);assert.ok(bodyDamage(WEAPONS[0],'leg')<bodyDamage(WEAPONS[0],'torso'));});
+test('round rocks and trunks do not use a rectangular corner collision',()=>{for(const shape of ['ellipsoid','cylinder']){const b=BOXES.find(b=>b.shape===shape),x=b.x+b.w*.48,z=b.z+b.d*.48;assert.equal(contains(b,x,z),false);assert.equal(rayBox([x,b.y+b.h/2,z],[0,1,0],b,10),Infinity);assert.ok(rayBox([b.x,b.y+b.h/2,b.z-10],[0,0,1],b,30)<30);}});
+test('all buildings have reachable solid roofs and real multi-storey stairs',()=>{assert.ok(BUILDINGS.filter(b=>b.floors===2).length>=4);for(const b of BUILDINGS){const route=b.routes.flat(),p=player('t','t');Object.assign(p,route[0]);let index=0;for(let n=0;n<4000&&index<route.length;n++){const g=route[index],dx=g.x-p.x,dz=g.z-p.z;if(Math.hypot(dx,dz)<.45&&p.y>=g.y-.25){index++;continue;}p.yaw=Math.atan2(dx,dz);integrateMovement(p,{...still,mz:1,yaw:p.yaw},.02);}assert.equal(index,route.length,b.style);assert.ok(Math.abs(p.y-b.y-b.h)<.1);const x=b.x+(b.rot?0:-b.w*.3),z=b.z+(b.rot?-b.w*.3:0);assert.ok(rayBox([x,b.y+b.h+8,z],[0,-1,0],BOXES.find(v=>v.building===b.index&&v.kind==='roof'),30)<Infinity);}});
+test('vault clears reachable low cover; jump and sprint are restricted to standing',()=>{const cover=BOXES.find(b=>b.kind==='cover'),p=player('p','p');Object.assign(p,{x:cover.x,z:cover.z-cover.d/2-.7,y:terrainHeight(cover.x,cover.z-cover.d/2-.7),yaw:0});assert.equal(beginJump(p),true);assert.ok(p.vault||p.vy===8.4);for(const stance of ['crouch','prone']){p.vault=null;p.stance=stance;p.vy=0;assert.equal(beginJump(p),false);}const distances=[];for(const stance of ['stand','crouch','prone']){const q={...player('p','p'),x:-108,z:-30,y:terrainHeight(-108,-30),stance};for(let i=0;i<50;i++)integrateMovement(q,{...still,mz:1,sprint:true,stance},.02);distances.push(q.z+30);}assert.ok(distances[0]>distances[1]&&distances[1]>distances[2]);assert.ok(STANCES.prone.recoil<STANCES.crouch.recoil&&STANCES.crouch.recoil<STANCES.stand.recoil);});
+test('supplies are on building benches, not random roadway drops',()=>{const s=match();assert.equal(s.loot.length,LOOT_SPOTS.length);assert.ok(s.loot.every(l=>Number.isInteger(l.building)&&BOXES.some(b=>b.kind==='table'&&contains(b,l.x,l.z)&&Math.abs(l.y-b.y-b.h)<.2)));assert.equal(s.loot.filter(l=>l.kind==='weapon').map(l=>l.weapon).filter((v,i,a)=>a.indexOf(v)===i).length,5);assert.ok(s.loot.some(l=>l.kind==='pain')&&s.loot.some(l=>l.kind==='grenade'));});
+test('painkillers take eight stationary seconds, cancel/reset on movement and consume on completion only',()=>{const s=match(),p=s.players[0];p.hp=50;p.painkillers=1;act(s,p,'pain');for(let i=0;i<100;i++)step(s,.02);assert.ok(p.usingPain>5);p.input.mx=1;step(s,.02);assert.equal(p.usingPain,0);assert.equal(p.painkillers,1);p.input.mx=0;act(s,p,'pain');for(let i=0;i<405;i++)step(s,.02);assert.equal(p.painkillers,0);assert.ok(p.boost>59);assert.ok(p.hp>=50);});
+test('grenade is a finite inventory item, explodes after fuse and produces damage',()=>{const s=match(),p=s.players[0];p.grenades=1;p.pitch=-.2;assert.equal(throwGrenade(s,p),true);assert.equal(p.grenades,0);assert.equal(throwGrenade(s,p),false);assert.equal(s.grenades.length,1);for(let n=0;n<145;n++)step(s,.02);const g=s.grenades[0],victim=s.players[1];victim.x=g.x+1;victim.z=g.z;victim.y=terrainHeight(victim.x,victim.z);for(let n=0;n<15;n++)step(s,.02);assert.equal(s.grenades.length,0);assert.equal(s.explosions.length,1);assert.ok(victim.hp<100);});
+test('flight is substantially higher, glider turns on a curve with banking, snapshots stay continuous',()=>{assert.ok(FLIGHT_HEIGHT>=150);const p={...player('p','p'),onPlane:true,y:FLIGHT_HEIGHT};beginJump(p);integrateMovement(p,{...still,yaw:Math.PI/2},.02);assert.ok(p.glideYaw>0&&p.glideYaw<.1);assert.ok(p.bank<0);const m=new Motion();m.receive(p,0,0,still,0);let previous=m.display.y,largest=0;for(let n=0;n<120;n++){integrateMovement(p,still,1/60);const now=(n+1)*1000/60;if(n%12===0)m.receive(p,now/1000,now,still,0);const d=m.frame(1/60,still,now);largest=Math.max(largest,Math.abs(d.y-previous));assert.ok(d.y<=previous+.001);previous=d.y;}assert.ok(largest<.2);});
+test('terrain actually occludes a shot across a ridge',()=>{const from=[-8,terrainHeight(-8,37)+1.4,37],to=[-62,terrainHeight(-62,37)+1.4,37],len=Math.hypot(...to.map((v,i)=>v-from[i])),d=to.map((v,i)=>(v-from[i])/len);assert.ok(rayTerrain(from,d,len)<len);});
+
+test('roof catwalk joins the two-storey buildings and vault cannot pass through a window lintel',()=>{const a=BUILDINGS[0],b=BUILDINGS[1],p={...player('p','p'),x:a.x+(a.rot?a.d:a.w)/2-.5,z:a.z,y:a.y+a.h};for(let i=0;i<120;i++)integrateMovement(p,{...still,mx:-1,yaw:0},.02);assert.ok(p.x>b.x-b.w/2+.3);assert.ok(p.y>b.y+b.h-.2);const q={...player('q','q'),x:b.x-b.w/2-.8,z:b.z+4,y:terrainHeight(b.x-b.w/2-.8,b.z+4),yaw:Math.PI/2};beginJump(q);assert.equal(q.vault,undefined);});
+
+test('AI can leave roof landings, find weapons and finish a full round',()=>{const s=makeRoom('ABCDEF','AI',player('h','h'));start(s,'h');s.players.forEach((p,i)=>{p.bot=true;p.ai.drop=3+i*1.5;});for(let n=0;n<3000;n++)step(s,.04);assert.ok(s.players.filter(p=>p.guns.some(Boolean)).length>=5);for(let n=3000;n<20000&&s.phase!=='finished';n++)step(s,.04);assert.equal(s.phase,'finished');assert.equal(s.players.filter(p=>!p.dead).length,1);assert.ok(s.players.some(p=>p.kills>0));});
