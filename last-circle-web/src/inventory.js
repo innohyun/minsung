@@ -15,7 +15,7 @@ export function giveWeapon(p,weapon,ammo=WEAPONS[weapon].magazine,slot){
 }
 export function startSwitch(p,toSlot){
  if(!Number.isInteger(toSlot)||toSlot<0||toSlot>1||toSlot===p.activeSlot||!p.loadout[toSlot]||p.reload||p.switchLeft||p.vehicleId||p.usingPain)return false;
- p.switchFromSlot=p.activeSlot;p.switchToSlot=toSlot;p.switchFrom=p.weapon;p.switchTo=p.loadout[toSlot].weapon;p.switchOld={...activeGun(p)};p.switchLeft=p.switchTotal=1.45;p.input.fire=false;syncLoadout(p,true);return true;
+ p.held='gun';p.grenadeAim=false;p.switchFromSlot=p.activeSlot;p.switchToSlot=toSlot;p.switchFrom=p.weapon;p.switchTo=p.loadout[toSlot].weapon;p.switchOld={...activeGun(p)};p.switchLeft=p.switchTotal=1.45;p.input.fire=false;syncLoadout(p,true);return true;
 }
 export function advanceSwitch(p,dt){if(!p.switchLeft)return;p.switchLeft=Math.max(0,p.switchLeft-dt);if(p.switchLeft<=p.switchTotal/2){p.activeSlot=p.switchToSlot;syncLoadout(p);}if(!p.switchLeft)p.switchOld=null;}
 function dropPosition(p,s){
@@ -38,8 +38,8 @@ export function dropEquipment(s,p){
  if(p.dropped)return;p.dropped=true;const items=[];
  for(const gun of p.loadout||[])if(gun)items.push({id:gun.uid,kind:'weapon',weapon:gun.weapon,magAmmo:gun.ammo,gunUID:gun.uid});
  for(const[caliber,amount]of Object.entries(p.bag))if(amount>0)items.push({id:'ammo-'+caliber,kind:'ammo',caliber,amount});
- for(const[field,kind]of[['meds','med'],['painkillers','pain'],['grenades','grenade']])if(p[field]>0)items.push({id:kind,kind,amount:p[field]});
+ for(const[field,kind]of[['meds','med'],['painkillers','pain'],['grenades','grenade'],['smokes','smoke'],['flashes','flash'],['molotovs','molotov']])if(p[field]>0)items.push({id:kind,kind,amount:p[field]});
  if(p.armor>0)items.push({id:'vest',kind:'armor',armor:'vest',amount:p.armor});if(p.helmet>0)items.push({id:'helmet',kind:'armor',armor:'helmet',amount:p.helmet});
  if(items.length)s.containers.push({id:'fallen-'+s.round+'-'+p.id,name:p.name,...dropPosition(p,s),items});
- p.loadout=[null,null];p.bag={556:0,762:0,45:0,'12g':0};p.meds=p.painkillers=p.grenades=p.armor=p.helmet=0;p.switchLeft=0;syncLoadout(p);
+ p.loadout=[null,null];p.bag={556:0,762:0,45:0,'12g':0};p.meds=p.painkillers=p.grenades=p.smokes=p.flashes=p.molotovs=p.armor=p.helmet=0;p.switchLeft=0;syncLoadout(p);
 }

@@ -6,7 +6,7 @@ let validSpots;
 export function createLoot(seed,round){
  validSpots??=LOOT_SPOTS.filter(usableLootSpot);
  const random=rng(seed+round*173),types=shuffle([...Array(36).fill(0),...Array(30).fill(1),...Array(30).fill(2),...Array(12).fill(3),...Array(12).fill(4)],random),items=[];let sequence=0;
- const globalSupplies=shuffle([...Array(30).fill('vest'),...Array(30).fill('helmet'),...Array(40).fill('med'),...Array(30).fill('pain'),...Array(30).fill('grenade')],random);
+ const globalSupplies=shuffle([...Array(30).fill('vest'),...Array(30).fill('helmet'),...Array(40).fill('med'),...Array(30).fill('pain'),...Array(30).fill('grenade'),...Array(24).fill('smoke'),...Array(20).fill('flash'),...Array(20).fill('molotov')],random);
  const used=new Set(),byZone=new Map();
  for(const p of POIS)byZone.set(p.id,{inside:shuffle(validSpots.filter(l=>l.zone===p.id&&!l.outdoor),random),outside:shuffle(validSpots.filter(l=>l.zone===p.id&&l.outdoor),random)});
  function place(item,spot){used.add(spot.id);items.push({...spot,...item,id:'loot-'+round+'-'+(++sequence)});}
@@ -24,6 +24,6 @@ export function createLoot(seed,round){
   }
  }
  const remaining=shuffle(validSpots.filter(l=>!used.has(l.id)),random);
- for(const kind of globalSupplies){const spot=takeSpot(remaining);place(kind==='vest'||kind==='helmet'?{kind:'armor',armor:kind,amount:100}:{kind,amount:kind==='grenade'?2:1},spot);}
+ for(const kind of globalSupplies){const spot=takeSpot(remaining);place(kind==='vest'||kind==='helmet'?{kind:'armor',armor:kind,amount:100}:{kind,amount:['grenade','smoke','flash','molotov'].includes(kind)?2:1},spot);}
  return items;
 }

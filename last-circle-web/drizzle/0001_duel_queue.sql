@@ -1,0 +1,1 @@
+CREATE TABLE duel_queue (id INTEGER PRIMARY KEY CHECK(id=1), room_code TEXT, revision INTEGER NOT NULL DEFAULT 0);
