@@ -1,0 +1,7 @@
+import {rayWorld,terrainHeight} from './world.js';
+import {eyePosition} from './weapons.js';
+import {rayVehicle} from './vehicles.js';
+function trace(o,d,max,doors,vehicles){const hit=rayWorld(o,d,max,doors);for(const v of vehicles||[]){const t=rayVehicle(o,d,v,max);if(t<hit.distance){hit.distance=t;hit.object=v;}}return hit;}
+export function grenadeLaunch(p,doors,vehicles){const eye=eyePosition(p),dx=Math.sin(p.yaw),dz=Math.cos(p.yaw),safe=trace(eye,[dx,0,dz],.65,doors,vehicles).distance,offset=Math.min(.6,Math.max(.05,safe-.08));return{x:eye[0]+dx*offset,y:eye[1],z:eye[2]+dz*offset,vx:dx*16,vy:6+Math.sin(p.pitch)*7,vz:dz*16,fuse:3.1,delay:.28};}
+export function moveGrenade(g,dt,doors,vehicles){g.fuse-=dt;if(g.delay>0){g.delay-=dt;return;}g.vy-=12*dt;const speed=Math.hypot(g.vx,g.vy,g.vz),d=[g.vx/speed,g.vy/speed,g.vz/speed],hit=trace([g.x,g.y,g.z],d,speed*dt+.08,doors,vehicles);if(hit.distance<speed*dt+.08){g.x+=d[0]*Math.max(0,hit.distance-.1);g.y+=d[1]*Math.max(0,hit.distance-.1);g.z+=d[2]*Math.max(0,hit.distance-.1);if(!hit.object||d[1]<-.65){g.vy=Math.abs(g.vy)*.35;g.vx*=.6;g.vz*=.6;}else{g.vx*=-.35;g.vz*=-.35;g.vy*=.65;}}else{g.x+=g.vx*dt;g.y+=g.vy*dt;g.z+=g.vz*dt;}if(g.y<terrainHeight(g.x,g.z)+.12){g.y=terrainHeight(g.x,g.z)+.12;g.vy=Math.abs(g.vy)*.3;}}
+export function predictGrenade(p,doors,vehicles){const g=grenadeLaunch(p,doors,vehicles),points=[[g.x,g.y,g.z]];for(let i=0;i<78;i++){moveGrenade(g,.04,doors,vehicles);if(i%2===0)points.push([g.x,g.y,g.z]);}return{points,landing:[g.x,g.y,g.z]};}

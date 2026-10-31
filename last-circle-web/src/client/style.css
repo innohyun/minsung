@@ -28,3 +28,9 @@ body:not(.touch-device) #touch-controls{display:none!important}.touch-device.pla
 @media(pointer:coarse) and (orientation:landscape){#touch-stance{bottom:calc(39px + env(safe-area-inset-bottom))}#touch-view{top:calc(158px + env(safe-area-inset-top));right:calc(15px + env(safe-area-inset-right));height:34px;width:40px}.touch-device #zone-direction{top:76px;left:12px}.touch-device #safe-warning{top:73px;max-width:46%}.touch-device #center-note{font-size:10px;top:60%}.touch-device .bottom-left{width:190px}.touch-device .scope.scope .scope-lens{height:72vh;width:72vh}}
 #touch-view{right:calc(128px + env(safe-area-inset-right));top:calc(94px + env(safe-area-inset-top))}.touch-device #safe-warning{left:12px;right:auto;transform:none;max-width:54%;top:calc(116px + env(safe-area-inset-top));text-align:left}
 @media(pointer:coarse) and (orientation:landscape){#touch-view{right:calc(115px + env(safe-area-inset-right));top:calc(76px + env(safe-area-inset-top))}.touch-device #safe-warning{left:190px;top:76px;max-width:42%;font-size:9px}}
+
+/* Physical sights align with the camera; the surrounding image narrows with ADS. */
+#scope.dot,#scope.holo,#scope.iron,#scope.shotgun{background:radial-gradient(ellipse at center,transparent 35%,#10150d40 100%)}
+#scope.dot .scope-lens,#scope.holo .scope-lens,#scope.iron .scope-lens,#scope.shotgun .scope-lens{display:none}
+#touch-loot{font-size:10px;padding:6px;min-width:72px;height:44px;border-radius:8px;max-width:124px}
+#protection{color:#d6c59f;font-size:9px}.touch-device .weapon-slots{max-width:240px}

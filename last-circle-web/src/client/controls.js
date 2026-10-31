@@ -12,7 +12,7 @@ export class TouchControls{
   for(const event of ['pointerup','pointercancel','lostpointercapture'])fire.addEventListener(event,e=>{if(e.pointerId===fireId){fireId=null;this.fire=false;fire.classList.remove('held');}});
   $('touch-aim').addEventListener('pointerdown',e=>{e.preventDefault();this.aim=!this.aim;onAction('combat');$('touch-aim').classList.toggle('held',this.aim);});
   $('touch-stance').addEventListener('pointerdown',e=>{e.preventDefault();this.stance={stand:'crouch',crouch:'prone',prone:'stand'}[this.stance];onAction('stance:'+this.stance);});
-  for(const[id,action]of[['touch-jump','jump'],['touch-loot','loot'],['touch-switch','switch'],['touch-view','view']])$(id).addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();onAction(action);});
+  for(const[id,action]of[['touch-jump','jump'],['touch-loot','context'],['touch-switch','switch'],['touch-view','view']])$(id).addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();onAction(action);});
   $('touch-kit').onclick=()=>{this.fire=false;$('touch-fire').classList.remove('held');$('kit-tray').hidden=!$('kit-tray').hidden;};
   for(const b of document.querySelectorAll('[data-kit]'))b.onclick=()=>{onAction(b.dataset.kit);$('kit-tray').hidden=true;};
   $('minimap').addEventListener('pointerdown',e=>{e.preventDefault();e.currentTarget.classList.toggle('expanded');});
