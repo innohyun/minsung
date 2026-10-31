@@ -34,3 +34,19 @@ body:not(.touch-device) #touch-controls{display:none!important}.touch-device.pla
 #scope.dot .scope-lens,#scope.holo .scope-lens,#scope.iron .scope-lens,#scope.shotgun .scope-lens{display:none}
 #touch-loot{font-size:10px;padding:6px;min-width:72px;height:44px;border-radius:8px;max-width:124px}
 #protection{color:#d6c59f;font-size:9px}.touch-device .weapon-slots{max-width:240px}
+/* The scope masks only the world. HUD, menus and controls remain above it. */
+#scope{position:fixed;z-index:3}#hud,.touch-device #hud{z-index:14}#touch-controls{z-index:12}#inventory,.inventory,.modal,dialog{z-index:30}
+#vehicle-controls{position:fixed;inset:0;z-index:12;pointer-events:none}
+#drive-look{position:absolute;inset:70px 190px 120px 160px;pointer-events:auto;touch-action:none;cursor:grab}
+.vehicle-steering,.vehicle-pedals{position:absolute;display:flex;gap:15px;bottom:calc(24px + env(safe-area-inset-bottom));pointer-events:auto}
+.vehicle-steering{left:calc(24px + env(safe-area-inset-left))}.vehicle-pedals{right:calc(24px + env(safe-area-inset-right))}
+#vehicle-controls button{width:76px;height:70px;border:1px solid #e2edc29a;border-radius:15px;background:#263e32d9;color:#f3f5d7;touch-action:none;font-size:25px;user-select:none}
+#vehicle-controls .vehicle-pedals button{font-size:14px;width:100px}#vehicle-controls small{display:block;font-size:9px;opacity:.7;margin-top:7px}
+#vehicle-controls button.held{background:#9ebc71;color:#102017;transform:translateY(2px)}.drive-help{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);font-size:10px;color:#eef5d6;white-space:nowrap;text-shadow:0 1px 3px #000}
+#container-content{border-bottom:1px solid #dbe8b640;padding-bottom:12px;margin-bottom:12px}#container-content button{display:block;width:100%;text-align:left;margin:5px 0;padding:10px;background:#394c31;border:1px solid #b8cc9950;border-radius:5px;color:#f3f4dd}
+@media(pointer:coarse){.drive-help{display:none}.vehicle-steering,.vehicle-pedals{gap:10px}#vehicle-controls button{width:66px;height:64px}.vehicle-pedals button{width:88px!important}#drive-look{inset:65px 160px 100px 145px}}
+@media(pointer:coarse) and (orientation:portrait){.vehicle-steering{left:15px;bottom:85px}.vehicle-pedals{right:15px;bottom:15px}#drive-look{inset:190px 0 200px 0}#vehicle-controls button{width:66px;height:65px}.vehicle-pedals button{width:94px!important}}
+
+#vehicle-controls #drive-exit{position:absolute;right:130px;top:75px;width:80px;height:36px;font-size:12px;pointer-events:auto;border-radius:7px}
+
+body.driving #weapon-label,body.driving .ammo,body.driving .weapon-slots,body.driving #match-keys{display:none}body.driving .bottom-left{bottom:125px}body.touch-device.driving .bottom-left{bottom:160px}

@@ -11,7 +11,7 @@ export class Motion{
  }
  action(action,now){if(!this.physics)return;if(action==='jump'){const was=this.physics.onPlane;beginJump(this.physics,this.doors,this.vehicles);if(was)this.dropUntil=now+1600;}}
  frame(dt,input,now){if(!this.physics)return null;let left=dt;while(left>.00001){const d=Math.min(.016,left);integrateMovement(this.physics,input,d,this.serverTime+(now-this.received)/1000,this.doors,this.vehicles);left-=d;}
-  const p=this.physics,last=this.display;const result={...p,yaw:input.yaw,pitch:input.pitch,view:input.view,aim:input.aim,grenadeAim:input.grenadeAim};
+  const p=this.physics,last=this.display;const result={...p,yaw:input.yaw,pitch:input.pitch,view:input.view,aim:input.aim,grenadeAim:input.grenadeAim,reload:Math.max(0,(p.reload||0)-(now-this.received)/1000),switchLeft:Math.max(0,(p.switchLeft||0)-(now-this.received)/1000)};
   for(const axis of ['x','y','z']){const filtered=damp(last[axis],p[axis],this.velocity[axis],dt,p.gliding?.11:.085);result[axis]=filtered.value;this.velocity[axis]=filtered.velocity;}
   // Never let a delayed airborne snapshot make the camera bounce upward during descent.
   if(p.gliding&&p.vy<0&&result.y>last.y){result.y=last.y;this.velocity.y=Math.min(0,this.velocity.y);}

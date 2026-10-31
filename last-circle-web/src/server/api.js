@@ -1,4 +1,4 @@
-import {makeRoom,player,start,returnLobby,advance,applyInput,snapshot,SLOTS,RULES_VERSION} from '../sim.js';
+import {makeRoom,player,start,returnLobby,advance,applyInput,snapshot,SLOTS,RULES_VERSION,eliminate} from '../sim.js';
 export function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});}
 const safe=(x,n)=>typeof x==='string'?x.trim().slice(0,n):'';
 const hash=async value=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))).map(x=>x.toString(16).padStart(2,'0')).join('');
@@ -6,10 +6,11 @@ const key=(n=24)=>Array.from(crypto.getRandomValues(new Uint8Array(n)),x=>x.toSt
 async function body(req){if(Number(req.headers.get('content-length'))>4096)throw Error('요청이 너무 커요.');const text=await req.text();if(text.length>4096)throw Error('요청이 너무 커요.');try{return JSON.parse(text);}catch{throw Error('잘못된 요청이에요.');}}
 export async function api(req,env){
  const u=new URL(req.url),path=u.pathname;
+ if(req.method==='POST'&&!path.endsWith('/leave')&&req.headers.get('x-game-rules')!==String(RULES_VERSION))return json({error:'게임이 업데이트됐어요. 새로고침한 뒤 새 방을 만들어 주세요.',upgrade:true},409);
  if(!env.DB)return json({error:'온라인 서버 데이터베이스가 연결되지 않았어요.'},503);
  try{
   if(req.method==='GET'&&path==='/api/rooms'){
-   const {results}=await env.DB.prepare("SELECT code,json_extract(state,'$.name') AS name,json_array_length(json_extract(state,'$.players')) AS count,json_extract(state,'$.locked') AS locked FROM rooms WHERE updated_at>? AND json_extract(state,'$.phase')='lobby' AND json_extract(state,'$.closed')=0 ORDER BY updated_at DESC LIMIT 20").bind(Date.now()-60000).all();return json({rooms:results});
+   const {results}=await env.DB.prepare("SELECT code,json_extract(state,'$.name') AS name,json_array_length(json_extract(state,'$.players')) AS count,json_extract(state,'$.locked') AS locked FROM rooms WHERE updated_at>? AND json_extract(state,'$.phase')='lobby' AND json_extract(state,'$.closed')=0 AND json_extract(state,'$.rulesVersion')=5 ORDER BY updated_at DESC LIMIT 20").bind(Date.now()-60000).all();return json({rooms:results});
   }
   if(req.method==='POST'&&path==='/api/rooms'){
    const b=await body(req),name=safe(b.name,32)||'친구들과 한 판',nick=safe(b.nick,16)||'플레이어',password=safe(b.password,24),token=key();
@@ -27,8 +28,8 @@ export async function api(req,env){
    const s=JSON.parse(row.state);
    const host=s.players.find(p=>p.id===s.host);
    if(s.closed||!host||now-host.lastSeen>60000)return json({error:'방장이 나갔거나 연결이 종료됐어요.'},410);
-   if(s.rulesVersion!==RULES_VERSION&&s.phase!=='lobby'&&operation!=='leave')return json({error:'게임이 업데이트됐어요. 새로고침한 뒤 새 방을 만들어 주세요.',upgrade:true},409);
-   advance(s,now);
+   if(s.rulesVersion!==RULES_VERSION&&operation!=='leave')return json({error:'게임이 업데이트됐어요. 새로고침한 뒤 새 방을 만들어 주세요.',upgrade:true},409);
+   if(s.rulesVersion===RULES_VERSION)advance(s,now);
    let p=s.players.find(x=>x.tokenHash===tokenHash);
    if(operation==='join'){
     if(s.phase!=='lobby')return json({error:'이미 진행 중인 경기예요.'},409);
@@ -44,11 +45,11 @@ export async function api(req,env){
     if(operation==='leave'){
      if(p.id===s.host)s.closed=true;
      else if(s.phase==='lobby')s.players=s.players.filter(q=>q.id!==p.id);
-     else{p.hp=0;p.dead=true;p.connected=false;const alive=s.players.filter(q=>!q.dead);if(alive.length<=1){s.phase='finished';s.winner=alive[0]?.id??null;}}
+     else{if(s.rulesVersion===RULES_VERSION)eliminate(s,p);else{p.hp=0;p.dead=true;}p.connected=false;const alive=s.players.filter(q=>!q.dead);if(alive.length<=1){s.phase='finished';s.winner=alive[0]?.id??null;}}
     }
    }
    // Remove absent lobby guests and eliminate absent match guests. The host gets its own grace period above.
-   for(const q of s.players)if(!q.bot&&q.id!==s.host&&now-q.lastSeen>60000){q.dead=true;q.connected=false;}
+   for(const q of s.players)if(!q.bot&&q.id!==s.host&&now-q.lastSeen>60000){if(s.phase==='lobby'||s.rulesVersion!==RULES_VERSION){q.dead=true;}else eliminate(s,q);q.connected=false;}
    if(s.phase==='lobby')s.players=s.players.filter(q=>q.connected!==false);
    if(['flight','battle'].includes(s.phase)){const alive=s.players.filter(q=>!q.dead);if(alive.length<=1){s.phase='finished';s.winner=alive[0]?.id??null;}}
    s.revision=row.version+1;

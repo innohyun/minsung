@@ -1,40 +1,16 @@
 import {STANCES,stanceOf} from './weapons.js';
-export const HALF=205,FLIGHT_HEIGHT=185,FLIGHT_SECONDS=24,FLIGHT_START=-195,FLIGHT_SPAN=390;
-export const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-export const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
-export const angleDiff=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
-export function rng(seed=1){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
-const hill=(x,z,cx,cz,s,h)=>h*Math.exp(-((x-cx)**2+(z-cz)**2)/(s*s));
-export const riverX=z=>47+17*Math.sin(z*.013)+6*Math.sin(z*.035);
-export const WATER_Y=-1.1;
-export function landscapeHeight(x,z){return hill(x,z,-138,32,39,36)+hill(x,z,131,-114,48,29)+hill(x,z,-13,154,37,16)+hill(x,z,-79,-155,38,19)+hill(x,z,151,121,45,25)+hill(x,z,-39,34,32,11)+hill(x,z,31,-30,27,12)+smooth(153,168,x)*10+Math.sin(x*.037)*Math.cos(z*.029)*2.1+Math.sin(x*.091+z*.047)*.42;}
-export function naturalHeight(x,z){const d=Math.abs(x-riverX(z)),h=landscapeHeight(x,z);return h*smooth(7,25,d)-3.5*(1-smooth(4,12,d));}
-export const BRIDGES=[-44,97].map((z,i)=>({id:'river-'+i,x:riverX(z),z,y:2.1,w:48,d:8.4}));
-function spline(points){const out=[];for(let j=0;j<points.length-1;j++)for(let k=0;k<14;k++){const t=k/14,a=points[Math.max(0,j-1)],b=points[j],c=points[j+1],d=points[Math.min(points.length-1,j+2)],v=i=>.5*(2*b[i]+(-a[i]+c[i])*t+(2*a[i]-5*b[i]+4*c[i]-d[i])*t*t+(-a[i]+3*b[i]-3*c[i]+d[i])*t*t*t);out.push({x:v(0),z:v(1)});}out.push({x:points.at(-1)[0],z:points.at(-1)[1]});return out;}
-const north=BRIDGES[0],south=BRIDGES[1];
-export const ROADS=[
- {id:'valley-road',width:7.4,points:[[-220,-92],[-166,-95],[-116,-101],[-65,-95],[-9,-54],[north.x-28,-44],[north.x+28,-44],[102,-31],[151,-65],[220,-88]]},
- {id:'farm-road',width:6.2,points:[[-210,142],[-146,129],[-96,130],[-45,109],[south.x-28,97],[south.x+28,97],[139,96],[214,138]]},
- {id:'ridge-bypass',width:4.6,points:[[-166,-95],[-186,-62],[-193,-12],[-186,41],[-159,90],[-112,118],[-96,130]]},
- {id:'east-link',width:5.6,points:[[102,-31],[143,-3],[166,38],[162,71],[139,96]]}
-].map(r=>({...r,points:spline(r.points)}));
-for(const r of ROADS)for(const p of r.points){p.y=naturalHeight(p.x,p.z);for(const b of BRIDGES){const q=Math.max(Math.abs(p.x-b.x)/44,Math.abs(p.z-b.z)/16);p.y+=(b.y-p.y)*(1-smooth(.58,1,q));}}
-const roadGrid=new Map();for(const r of ROADS)for(let i=1;i<r.points.length;i++){const a=r.points[i-1],b=r.points[i],seg={a,b,width:r.width};for(let x=Math.floor((Math.min(a.x,b.x)-14)/20);x<=Math.floor((Math.max(a.x,b.x)+14)/20);x++)for(let z=Math.floor((Math.min(a.z,b.z)-14)/20);z<=Math.floor((Math.max(a.z,b.z)+14)/20);z++){const k=x+','+z;if(!roadGrid.has(k))roadGrid.set(k,[]);roadGrid.get(k).push(seg);}}
-export function roadAt(x,z){let best={distance:Infinity,y:0,width:0};for(const s of roadGrid.get(Math.floor(x/20)+','+Math.floor(z/20))||[]){const dx=s.b.x-s.a.x,dz=s.b.z-s.a.z,t=clamp(((x-s.a.x)*dx+(z-s.a.z)*dz)/(dx*dx+dz*dz),0,1),d=Math.hypot(x-s.a.x-dx*t,z-s.a.z-dz*t);if(d<best.distance)best={distance:d,y:s.a.y+(s.b.y-s.a.y)*t,width:s.width};}return best;}
-const defs=[[-100,-65,18,16,1,'cottage',2,0x815a3b],[-73,-65,26,20,0,'warehouse',2,0x80644c],[-24,-128,20,18,1,'workshop',1,0x97734e],[-144,35,15,17,0,'tower',2,0x73583d],[-24,4,22,18,1,'barn',1,0x8b5434],[110,-56,24,21,0,'courtyard',2,0x956c44],[-90,113,19,22,1,'farmhouse',2,0x7c5339],[12,137,26,16,1,'garage',1,0x8e7352],[142,92,18,23,0,'chapel',1,0x947653],[153,-141,17,14,1,'cabin',1,0x75523c],[-159,-139,21,18,0,'lodge',2,0x8e6342],[-8,85,18,15,1,'mill',2,0x80684b],[0,-62,14,13,0,'hut',1,0x976c41]];
-export const BUILDINGS=defs.map(([x,z,w,d,rot,style,floors,color],index)=>({x,z,w,d,rot,style,floors,color,index,y:naturalHeight(x,z)+.4,level:3.4,h:floors*3.4}));
+import {clamp,smooth,angleDiff,rng} from './math.js';
+import {HALF,MAP_SIZE,MAP_ID,FLIGHT_HEIGHT,FLIGHT_SECONDS,FLIGHT_START,FLIGHT_SPAN,WATER_Y,POIS,BRIDGES,FORDS,ROADS,BUILDINGS,buildingsNear,riverX,branchZ,riverDistance,roadAt,landscapeHeight,naturalHeight,terrainHeight,heightFormula,heightCacheSize,flightPosition,LANDING_POINTS} from './map.js';
+export {clamp,smooth,angleDiff,rng,HALF,MAP_SIZE,MAP_ID,FLIGHT_HEIGHT,FLIGHT_SECONDS,FLIGHT_START,FLIGHT_SPAN,WATER_Y,POIS,BRIDGES,FORDS,ROADS,BUILDINGS,buildingsNear,riverX,branchZ,riverDistance,roadAt,landscapeHeight,naturalHeight,terrainHeight,heightFormula,heightCacheSize,flightPosition,LANDING_POINTS};
+export const TERRAIN_SIZE=1536,TERRAIN_SEGMENTS=768;
 export function localPoint(b,x,z,y=0){return{x:b.x+(b.rot?-z:x),z:b.z+(b.rot?x:z),y:b.y+y};}
 export function toLocal(b,x,z){return{x:b.rot?z-b.z:x-b.x,z:b.rot?b.x-x:z-b.z};}
-function heightFormula(x,z){let h=naturalHeight(x,z);const road=roadAt(x,z);if(Math.abs(x-riverX(z))>13&&road.distance<road.width/2+6)h+=(road.y-h)*(1-smooth(road.width/2,road.width/2+6,road.distance));for(const b of BUILDINGS){const w=b.rot?b.d:b.w,d=b.rot?b.w:b.d,edge=Math.max(Math.abs(x-b.x)-w/2,Math.abs(z-b.z)-d/2);h+=(b.y-.4-h)*(1-smooth(2,9,edge));}return h;}
-export const TERRAIN_SIZE=512,TERRAIN_SEGMENTS=256;
-const RES=2,COUNT=257,MIN=-256,heights=new Float32Array(COUNT*COUNT);for(let z=0;z<COUNT;z++)for(let x=0;x<COUNT;x++)heights[z*COUNT+x]=heightFormula(MIN+x*RES,MIN+z*RES);
-export function terrainHeight(x,z){const gx=clamp((x-MIN)/RES,0,COUNT-1.001),gz=clamp((z-MIN)/RES,0,COUNT-1.001),ix=Math.floor(gx),iz=Math.floor(gz),a=gx-ix,b=gz-iz;return(heights[iz*COUNT+ix]*(1-a)+heights[iz*COUNT+ix+1]*a)*(1-b)+(heights[(iz+1)*COUNT+ix]*(1-a)+heights[(iz+1)*COUNT+ix+1]*a)*b;}
-export const TREES=(()=>{const r=rng(771),out=[];for(let i=0;i<950;i++){const x=(r()-.5)*490,z=(r()-.5)*490,density=.44+.25*Math.sin(x*.031+z*.018)+.2*Math.cos(z*.046);if(r()>density||Math.abs(x-riverX(z))<16||roadAt(x,z).distance<7||BUILDINGS.some(b=>Math.abs(x-b.x)<(b.rot?b.d:b.w)/2+4&&Math.abs(z-b.z)<(b.rot?b.w:b.d)/2+4))continue;out.push({x,z,y:terrainHeight(x,z),h:6+r()*6,type:Math.floor(r()*3),seed:i});}return out;})();
-export const GRASS_PATCHES=[[-35,39,10],[5,-30,10],[-170,4,8],[28,166,12],[-38,-104,7],[104,-11,9],[-117,-137,9],[178,127,10],[-60,98,8],[21,35,9],[-125,86,11],[114,139,8]].map(([x,z,r])=>({x,z,r}));
+export const TREES=(()=>{const random=rng(771),out=[],cells=new Map();for(let i=0;i<23000;i++){const x=(random()-.5)*1530,z=(random()-.5)*1530,density=.49+.21*Math.sin(x*.009+z*.007)+.17*Math.cos(z*.017);if(random()>density||riverDistance(x,z)<20||roadAt(x,z).distance<6||buildingsNear(x,z).some(b=>Math.abs(x-b.x)<(b.rot?b.d:b.w)/2+5&&Math.abs(z-b.z)<(b.rot?b.w:b.d)/2+5)||POIS.some(p=>p.kind==='camp'&&Math.hypot(x-p.x,z-p.z)<12))continue;const cx=Math.floor(x/5),cz=Math.floor(z/5);let near=false;for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++)for(const q of cells.get((cx+dx)+','+(cz+dz))||[])if(Math.hypot(q.x-x,q.z-z)<4)near=true;if(near)continue;const t={x,z,y:terrainHeight(x,z),h:8+random()*9,type:Math.floor(random()*4),seed:i};out.push(t);const key=cx+','+cz;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(t);}return out;})();
+export const GRASS_PATCHES=POIS.flatMap((p,i)=>[[-70,25],[65,-40]].map(([x,z])=>({x:p.x+x,z:p.z+z,r:11+i%4}))).filter(p=>riverDistance(p.x,p.z)>22);
 export const inGrass=(x,z)=>GRASS_PATCHES.some(p=>(x-p.x)**2+(z-p.z)**2<p.r*p.r);
 export const DOORS=BUILDINGS.map(b=>({...localPoint(b,0,-b.d/2,0),id:'door-'+b.index,building:b.index,rot:b.rot,w:3.14,h:2.68}));
 export function doorBox(d,open){const b=BUILDINGS[d.building],p=localPoint(b,open?-d.w/2:0,-b.d/2+(open?d.w/2:0));return{...p,w:open?(b.rot?d.w:.16):(b.rot?.16:d.w),d:open?(b.rot?.16:d.w):(b.rot?d.w:.16),h:d.h,shape:'box',kind:'door',id:d.id};}
-export function dynamicBoxes(doors){return doors?DOORS.map(d=>doorBox(d,!!doors[d.id])):[];}
+export function dynamicBoxes(doors,x,z){return doors?DOORS.filter(d=>x===undefined||Math.abs(d.x-x)<22&&Math.abs(d.z-z)<22).map(d=>doorBox(d,!!doors[d.id])):[];}
 export const WINDOWS=BUILDINGS.flatMap(b=>{const out=[];for(let f=0;f<b.floors;f++){for(const side of [-1,1])for(const z of [-b.d*.2,b.d*.2]){const p=localPoint(b,side*b.w/2,z,f*b.level);out.push({...p,nx:b.rot?0:side,nz:b.rot?side:0,width:b.d*.4-2.2,building:b.index,floor:f});}for(const side of [-1,1]){if(side<0&&f===0)continue;for(const x of [-b.w*.19,b.w*.19]){const p=localPoint(b,x,side*b.d/2,f*b.level);out.push({...p,nx:b.rot?-side:0,nz:b.rot?0:side,width:b.w*.38-2.3,building:b.index,floor:f});}}}return out;});
 export const LOOT_SPOTS=[];
 export function mapGeometry(){
@@ -83,20 +59,22 @@ export function mapGeometry(){
   if(porch){const pw=b.w*.74;add(0,-b.d/2-1.5,pw,3,.2,-.4,'porch',0x8e6e48);const roofY=balcony?b.level-.08:2.8;add(0,-b.d/2-1.4,pw+.3,2.9,.18,roofY-.18,balcony?'balcony':'awning',0x806241);for(const side of[-1,1])add(side*(pw/2-.2),-b.d/2-2.6,.18,.18,roofY,0,'post',0x725235);if(balcony){add(0,-b.d/2-2.8,pw,.15,.75,roofY,'balcony-rail',0x685039);for(const side of[-1,1])add(side*pw/2,-b.d/2-1.5,.15,2.8,.75,roofY,'balcony-rail',0x685039);}}
   // Supplies live on tables/shelves, both ground and upper floor, never scattered along roads.
   const spots=[[-b.w*.22,-b.d*.24,0],[-b.w*.22,b.d*.24,0],[-b.w*.08,0,b.floors>1?b.level:0]];
-  spots.forEach(([x,z,y],i)=>{add(x,z,2.8,1.15,.84,y,'table',0x906b45);for(let k=0;k<3;k++){const p=localPoint(b,x+(k-1)*.8,z,y+.96);LOOT_SPOTS.push({...p,id:`b${b.index}t${i}i${k}`,building:b.index,floor:y?1:0,type:i*3+k});}});
+  spots.forEach(([x,z,y],i)=>{add(x,z,2.8,1.15,.84,y,'table',0x906b45);for(let k=0;k<3;k++){const p=localPoint(b,x+(k-1)*.8,z,y+.96);LOOT_SPOTS.push({...p,id:`b${b.index}t${i}i${k}`,building:b.index,floor:y?1:0,zone:b.zone,outdoor:false,category:'table'});}});
   add(-b.w*.25,b.d*.43,3,.6,1.6,0,'shelf',0x76573b);
+  for(let f=0;f<b.floors;f++)for(const [x,z]of[[-b.w*.3,-b.d*.12],[-b.w*.4,b.d*.1],[b.w*.06,-b.d*.27],[b.w*.08,b.d*.27]]){const p=localPoint(b,x,z,f*b.level+.09);LOOT_SPOTS.push({...p,id:`b${b.index}f${f}-${x}-${z}`,building:b.index,floor:f,zone:b.zone,outdoor:false,category:'floor'});}
   // Room partitions leave a full doorway and keep the stair lane clear.
   for(let f=0;f<b.floors;f++){const y=f*b.level;add(-b.w*.27,1.4,b.w*.42,.22,2.9,y,'partition',0x8b6948);add(-b.w*.27,b.d*.32,3.3,1.5,.5,y,'bed',0x665846);add(-b.w*.31,b.d*.32,3.1,1.3,.16,y+.5,'mattress',0x818372);add(-b.w*.35,-b.d*.35,.8,1.2,1.7,y,'cabinet',0x67482e);}
 
  }
- // A stepped maintenance catwalk connects the two-storey cottage and warehouse roofs.
- const a=BUILDINGS[0],b=BUILDINGS[1],x0=a.x+(a.rot?a.d:a.w)/2,x1=b.x-b.w/2;
- for(let i=0;i<10;i++){const t=(i+.5)/10,x=x0+(x1-x0)*t,y=a.y+a.h+(b.y+b.h-a.y-a.h)*t;list.push({x,z:a.z,w:(x1-x0)/10+.025,d:2.4,h:.2,y:y-.2,shape:'box',kind:'bridge',color:0x98784f});for(const side of [-1,1])list.push({x,z:a.z+side*1.15,w:(x1-x0)/10+.025,d:.12,h:.6,y:y,shape:'box',kind:'rail',color:0x6f8a87});}
- for(const bridge of BRIDGES){list.push({...bridge,h:.45,y:bridge.y-.45,shape:'box',kind:'roadbridge',color:0x796a50});for(const side of [-1,1])list.push({x:bridge.x,z:bridge.z+side*(bridge.d/2-.15),y:bridge.y,w:bridge.w,d:.26,h:.9,shape:'box',kind:'bridge-rail',color:0x655c4d});}
- const r=rng(1277);for(let i=0;i<165;i++){const x=(r()-.5)*403,z=(r()-.5)*403;if(roadAt(x,z).distance<6||Math.abs(x-riverX(z))<14||BUILDINGS.some(b=>Math.abs(x-b.x)<20&&Math.abs(z-b.z)<20))continue;list.push({x,z,w:2+r()*3.6,d:2+r()*3.6,h:1.3+r()*3.5,y:terrainHeight(x,z)-.1,shape:'ellipsoid',kind:'rock',color:i%3?0x8c9b85:0x687e75});}
- for(let i=0;i<11;i++){const x=-167+r()*12,z=-35+i*8+r()*5;list.push({x,z,w:3.5,d:5,h:2.1,y:terrainHeight(x,z)-.1,shape:'ellipsoid',kind:'rock',color:0x73857b});}
- // Real low cover links hills, entrances, and climbable routes.
- for(const [x,z,w,d]of [[-42,17,11,1.1],[112,-40,10,1.2],[-122,-48,1,12],[-3,-85,9,1.1],[-93,99,9,1],[137,115,13,1.2],[-179,38,1.1,14],[-149,100,12,1],[76,107,1,10],[-16,61,12,1]])list.push({x,z,w,d,h:1.3,y:terrainHeight(x,z),shape:'box',kind:'cover',color:0x9b987e});
+ for(const bridge of BRIDGES){list.push({...bridge,h:.45,y:bridge.y-.45,shape:'box',kind:'roadbridge',color:0x8a8068});for(const side of [-1,1])list.push({x:bridge.x+(bridge.rot?side*(bridge.w/2-.15):0),z:bridge.z+(bridge.rot?0:side*(bridge.d/2-.15)),y:bridge.y,w:bridge.rot?.26:bridge.w,d:bridge.rot?bridge.d:.26,h:.85,shape:'box',kind:'bridge-rail',color:0x6c705e});}
+ // Contextual outdoor supplies sit on pallets and work benches beside cover.
+ for(const poi of POIS){const count=Math.max(poi.outdoor?Math.ceil(poi.outdoor/2):0,poi.kind==='camp'?1:0);for(let i=0;i<count;i++){let x=poi.x+(poi.kind==='camp'?(i-1)*7:(i%3-1)*9),z=poi.z+(poi.kind==='camp'?0:poi.kind==='port'?66:poi.kind==='ruins'?-58:poi.kind==='quarry'?52:70+Math.floor(i/3)*8);const base=Math.max(terrainHeight(x-1.5,z-.6),terrainHeight(x+1.5,z+.6),terrainHeight(x,z))+.04,h=poi.kind==='ruins'?.45:.72;list.push({x,z,y:base,w:3.2,d:1.4,h,kind:poi.kind==='ruins'?'stone-supply':'supply-pallet',color:poi.kind==='ruins'?0x7a8065:0x92734a,shape:'box'});for(let slot=0;slot<6;slot++){LOOT_SPOTS.push({id:`${poi.id}-yard-${i}-${slot}`,x:x+(slot%3-1)*.9,z:z+(slot<3?-.28:.28),y:base+h+.1,zone:poi.id,outdoor:true,category:'pallet'});}if(i%2===0)list.push({x:x-4,z:z+2,y:terrainHeight(x-4,z+2),w:2,d:1.3,h:1.2,kind:'crate',color:0x81633e,shape:'box'});}
+  if(poi.kind==='camp'){for(const side of[-1,1])list.push({x:poi.x+side*3,z:poi.z-2,y:terrainHeight(poi.x+side*3,poi.z-2),w:.15,d:.15,h:2.6,kind:'camp-post',color:0x796443,shape:'box'});list.push({x:poi.x,z:poi.z-2,y:Math.max(terrainHeight(poi.x-3,poi.z-2),terrainHeight(poi.x+3,poi.z-2))+2.6,w:7,d:5,h:.12,kind:'tarp',color:0x777e50,shape:'box'});}
+  if(poi.kind==='port')for(let i=0;i<12;i++){const x=poi.x-65+(i%4)*14,z=poi.z-70+Math.floor(i/4)*9;list.push({x,z,y:terrainHeight(x,z),w:11.5,d:5,h:2.5+(i%4===0?2.5:0),kind:'container',color:[0x697b71,0x8b7454,0x626b78][i%3],shape:'box'});}
+  if(poi.kind==='ruins')for(let i=0;i<12;i++){const x=poi.x-60+(i%4)*18,z=poi.z+30+Math.floor(i/4)*13;list.push({x,z,y:terrainHeight(x,z),w:i%2?1.7:9,d:1.4,h:i%3?1.2:3,kind:'ruin-wall',color:0x747f63,shape:'box'});}
+ }
+ const r=rng(1277);for(let i=0;i<1350;i++){const x=(r()-.5)*1470,z=(r()-.5)*1470;if(roadAt(x,z).distance<6||riverDistance(x,z)<20||buildingsNear(x,z).some(b=>Math.abs(x-b.x)<20&&Math.abs(z-b.z)<20))continue;list.push({x,z,w:2+r()*3.6,d:2+r()*3.6,h:1.3+r()*3.5,y:terrainHeight(x,z)-.1,shape:'ellipsoid',kind:'rock',color:i%3?0x8c9b85:0x687e75});}
+ for(const poi of POIS.filter(p=>p.kind!=='camp'))for(let i=0;i<6;i++){const x=poi.x+(i-2.5)*13,z=poi.z+87+(i%2)*6;list.push({x,z,y:terrainHeight(x,z),w:i%2?1.1:9,d:i%2?8:1.1,h:1.15,shape:'box',kind:'cover',color:0x85866b});}
  for(const t of TREES)list.push({x:t.x,z:t.z,w:.55,d:.55,h:t.h*.65,y:t.y,shape:'cylinder',kind:'trunk',color:0x6a593f});
  return list;
 }
@@ -125,8 +103,8 @@ export function rayBox(o,d,b,max=1e4){
 }
 export function rayTerrain(o,d,max){let last=0;for(let t=.35;t<max;t+=1.2){if(o[1]+d[1]*t<=terrainHeight(o[0]+d[0]*t,o[2]+d[2]*t)){let lo=last,hi=t;for(let i=0;i<8;i++){const m=(lo+hi)/2;if(o[1]+d[1]*m<=terrainHeight(o[0]+d[0]*m,o[2]+d[2]*m))hi=m;else lo=m;}return hi;}last=t;}return Infinity;}
 export function rayWorld(o,d,max,doors){let distance=rayTerrain(o,d,max),object=null;for(const b of rayCandidates(o,d,Math.min(max,distance))){const t=rayBox(o,d,b,Math.min(max,distance));if(t<distance){distance=t;object=b;}}for(const b of dynamicBoxes(doors)){const t=rayBox(o,d,b,Math.min(max,distance));if(t<distance){distance=t;object=b;}}return{distance,object};}
-export function blocked(x,z,y=terrainHeight(x,z),r=.32,height=1.78,step=.0,doors,vehicles){return [...nearby(x,z),...dynamicBoxes(doors),...vehicleBoxes(vehicles)].some(b=>b.y<y+height-.04&&b.y+b.h>y+.045&&!(b.y+b.h<=y+step&&b.y<=y+.1)&&contains(b,x,z,r));}
-export function supportHeight(x,z,ceiling=Infinity,vehicles){let h=terrainHeight(x,z);if(Math.abs(x-riverX(z))<9&&h<WATER_Y-.85&&WATER_Y-.85<=ceiling+.06)h=WATER_Y-.85;for(const b of [...nearby(x,z),...vehicleBoxes(vehicles)]){const top=topAt(b,x,z);if(top<=ceiling+.06&&top>h)h=top;}return h;}
+export function blocked(x,z,y=terrainHeight(x,z),r=.32,height=1.78,step=.0,doors,vehicles){return [...nearby(x,z),...dynamicBoxes(doors,x,z),...vehicleBoxes(vehicles)].some(b=>b.y<y+height-.04&&b.y+b.h>y+.045&&!(b.y+b.h<=y+step&&b.y<=y+.1)&&contains(b,x,z,r));}
+export function supportHeight(x,z,ceiling=Infinity,vehicles){let h=terrainHeight(x,z);if(riverDistance(x,z)<9&&h<WATER_Y-.85&&WATER_Y-.85<=ceiling+.06)h=WATER_Y-.85;for(const b of [...nearby(x,z),...vehicleBoxes(vehicles)]){const top=topAt(b,x,z);if(top<=ceiling+.06&&top>h)h=top;}return h;}
 function actorBlocked(p,x,z,step=0,stance=p.stance||'stand',doors,vehicles){const s=STANCES[stance]||STANCES.stand;const positions=stance==='prone'?[-.88,-.3,.3,.65]:[0];return positions.some(t=>blocked(x+Math.sin(p.yaw)*t,z+Math.cos(p.yaw)*t,p.y,s.radius,s.height,step,doors,vehicles));}
 export function move(p,dx,dz,doors,vehicles){const accept=(x,z)=>{const g=terrainHeight(x,z),og=terrainHeight(p.x,p.z),distance=Math.hypot(x-p.x,z-p.z),step=p.stance==='prone'?.12:.27;return !(p.y<og+.3&&g-og>distance*1.12+.03)&&g<=p.y+step&&!actorBlocked(p,x,z,step,p.stance,doors,vehicles);};const x=clamp(p.x+dx,-HALF,HALF),z=clamp(p.z+dz,-HALF,HALF);if(accept(x,p.z))p.x=x;if(accept(p.x,z))p.z=z;}
 export function beginJump(p,doors,vehicles){
@@ -140,7 +118,7 @@ export function beginJump(p,doors,vehicles){
 }
 export function integrateMovement(p,i,dt,time=0,doors,vehicles){
  if(p.dead){p.vx=p.vz=0;return;}if(p.vehicleId)return;const oldX=p.x,oldZ=p.z;
- if(p.onPlane){p.x=FLIGHT_START+clamp(time/FLIGHT_SECONDS,0,1)*FLIGHT_SPAN;p.z=((p.seat||0)%5-2)*1.25;p.y=FLIGHT_HEIGHT;p.vx=FLIGHT_SPAN/FLIGHT_SECONDS;p.vy=p.vz=0;return;}
+ if(p.onPlane){const f=flightPosition(time,p.flightRoute||0);p.x=f.x;p.z=f.z;p.y=f.y;p.vx=Math.sin(f.yaw)*FLIGHT_SPAN/FLIGHT_SECONDS;p.vz=Math.cos(f.yaw)*FLIGHT_SPAN/FLIGHT_SECONDS;p.vy=0;return;}
  if(p.vault){const v=p.vault;v.t+=dt;const a=clamp(v.t/(v.duration||.52),0,1),t=v.window?smooth(.22,.78,a):a*a*(3-2*a);p.x=v.x0+(v.x-v.x0)*t;p.z=v.z0+(v.z-v.z0)*t;p.y=v.window?(a<.22?v.y0+(v.h-v.y0)*smooth(0,.22,a):v.h+(v.y-v.h)*smooth(.78,1,a)):v.y0+(v.y-v.y0)*t+Math.sin(t*Math.PI)*(v.h-Math.max(v.y0,v.y));p.vx=(p.x-oldX)/dt;p.vz=(p.z-oldZ)/dt;p.vy=0;if(a>=1)p.vault=null;return;}
  if(p.gliding){
   const heading=p.glideYaw??p.yaw,lookDelta=angleDiff(i.yaw,p.glideLookYaw??i.yaw);p.glideLookYaw=i.yaw;
@@ -151,8 +129,8 @@ export function integrateMovement(p,i,dt,time=0,doors,vehicles){
  }
  const wanted=['stand','crouch','prone'].includes(i.stance)?i.stance:'stand';if(wanted===p.stance||!actorBlocked(p,p.x,p.z,0,wanted,doors,vehicles))p.stance=wanted;
  const s=stanceOf(p),groundBefore=supportHeight(p.x,p.z,p.y+.12,vehicles),grounded=p.y<=groundBefore+.14&&p.vy<=0,boost=p.boost>0?1.035:1;
- p.wading=Math.abs(p.x-riverX(p.z))<9&&p.y<WATER_Y-.4;const speed=p.usingPain?0:p.wading?1.7:p.heal?1.1:(p.stance==='stand'&&i.sprint&&!i.aim?7.5:s.speed)*(i.aim?.75:1)*boost;
- const n=Math.max(1,Math.hypot(i.mx||0,i.mz||0)),dx=(i.mx||0)/n,dz=(i.mz||0)/n;
+ p.wading=riverDistance(p.x,p.z)<9&&p.y<WATER_Y-.4;const speed=p.usingPain?0:p.wading?1.7:p.heal?1.1:(p.stance==='stand'&&i.sprint&&!i.aim&&(i.mz||0)>.5&&Math.abs(i.mx||0)<.65?6.8:s.speed)*(i.aim?.75:1)*boost;
+ const n=Math.max(1,Math.hypot(i.mx||0,i.mz||0)),dx=(i.mx||0)/n*.68,dz=(i.mz||0)/n*((i.mz||0)<0?.8:1);
  move(p,(-Math.cos(i.yaw)*dx+Math.sin(i.yaw)*dz)*speed*dt,(Math.sin(i.yaw)*dx+Math.cos(i.yaw)*dz)*speed*dt,doors,vehicles);
  const step=p.stance==='prone'?.12:.28,ground=supportHeight(p.x,p.z,p.y+step,vehicles);
  if(grounded&&ground>=p.y-.32&&ground<=p.y+step){p.y=ground;p.vy=0;}else{const oldY=p.y;p.vy=Math.max(-32,(p.vy||0)-18*dt);const next=p.y+p.vy*dt;

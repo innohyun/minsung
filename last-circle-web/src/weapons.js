@@ -5,7 +5,7 @@ export const WEAPONS=[
  {id:'kar98k',name:'Kar98k',caliber:'762',magazine:5,reload:3.15,interval:1.25,damage:85,head:2.5,range:260,spread:.001,recoil:.075,sight:'scope',zoom:4,color:0x91683d,length:1.38},
  {id:'s12k',name:'S12K',caliber:'12g',magazine:5,reload:2.65,interval:.37,damage:17,head:2,pellets:7,range:65,spread:.064,recoil:.06,sight:'shotgun',zoom:1.15,color:0x526052,length:1.03}
 ];
-export const STANCES={stand:{height:1.78,eye:1.53,speed:4.7,radius:.32,recoil:1},crouch:{height:1.22,eye:1.05,speed:2.3,radius:.34,recoil:.55},prone:{height:.55,eye:.36,speed:.95,radius:.29,recoil:.23}};
+export const STANCES={stand:{height:1.78,eye:1.53,speed:3.2,radius:.32,recoil:1},crouch:{height:1.22,eye:1.05,speed:1.8,radius:.34,recoil:.55},prone:{height:.55,eye:.36,speed:.8,radius:.29,recoil:.23}};
 export const CALIBERS={556:'5.56mm',762:'7.62mm',45:'.45 ACP','12g':'12게이지'};
 export const getWeapon=p=>WEAPONS[p.weapon]||WEAPONS[0];
 const VAULT_STANCE={...STANCES.crouch,height:1.12,eye:.87};
