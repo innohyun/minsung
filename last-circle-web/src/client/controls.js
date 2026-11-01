@@ -15,5 +15,6 @@ export class TouchControls{
  }
  reset(){this.mx=this.mz=0;this.fire=false;this.pointer=this.lookPointer=null;for(const k of Object.keys(this.drive))this.drive[k]=0;document.querySelectorAll('#vehicle-controls .held').forEach(b=>b.classList.remove('held'));const k=document.getElementById('stick-knob');if(k)k.style.transform='';document.getElementById('touch-fire')?.classList.remove('held');}
  setVisible(value){document.getElementById('touch-controls').hidden=!value||!this.enabled||this.vehicleMode;if(!value)document.getElementById('kit-tray').hidden=true;}
+ setSpectatorMode(mode,visible=true){this.spectator=mode;document.body.classList.toggle('spectating',!!mode);const stick=document.getElementById('joystick');stick.hidden=!!mode&&mode!=='free';stick.querySelector('span').textContent=mode==='free'?'바라보는 방향으로 비행':'끝까지 밀면 달리기';if(mode&&this.enabled){document.getElementById('touch-controls').hidden=!visible;document.getElementById('kit-tray').hidden=true;}}
  setVehicleMode(value,visible=true){if(this.vehicleMode!==value){this.reset();this.vehicleMode=value;}document.getElementById('vehicle-controls').hidden=!value||!visible;if(value){document.getElementById('touch-controls').hidden=true;document.getElementById('kit-tray').hidden=true;}}
 }

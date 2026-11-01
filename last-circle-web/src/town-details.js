@@ -1,0 +1,21 @@
+import{POIS,BUILDINGS,terrainHeight,roadAt,riverDistance}from'./map.js';
+import{localPoint}from'./building-utils.js';
+export function townDetails(){const out=[];
+ const free=(x,z,r=1)=>riverDistance(x,z)>15&&!BUILDINGS.some(b=>x>b.bounds.minX-r&&x<b.bounds.maxX+r&&z>b.bounds.minZ-r&&z<b.bounds.maxZ+r);
+ const add=(x,z,w,d,h,kind,color,y=terrainHeight(x,z),shape='box',extra={})=>out.push({x,z,w,d,h,y,kind,color,shape,...extra});
+ for(const b of BUILDINGS){const front=-b.d/2-4.3,gate=b.doorX||0,width=b.w+3.5,wall=b.style==='brick-home'||b.style==='plaster-villa',color=wall?0x9c947c:0x887251;
+  if(b.index%3!==2){for(const[a,c]of[[-width/2,gate-2.2],[gate+2.2,width/2]])if(c-a>.5){const p=localPoint(b,(a+c)/2,front);if(free(p.x,p.z,.3))add(p.x,p.z,b.rot?.22:c-a,b.rot?c-a:.22,wall?1.05:.9,wall?'garden-wall':'picket-fence',color);}for(const side of[-1,1]){const p=localPoint(b,side*width/2,-b.d*.1);if(free(p.x,p.z,.25))add(p.x,p.z,b.rot?b.d*.65:.22,b.rot?.22:b.d*.65,.9,wall?'garden-wall':'picket-fence',color);}}
+  if(b.index%4===0){const p=localPoint(b,b.w*.33,-b.d/2-2.2);if(free(p.x,p.z))add(p.x,p.z,.75,.75,1.1,'rain-barrel',0x6b7e74,undefined,'cylinder');}
+  if(b.index%5===1){const p=localPoint(b,-b.w/2-3,b.d*.25);if(free(p.x,p.z,1.5)){add(p.x,p.z,2.8,1.7,1.2,'wood-pile',0x8e7451);for(let k=0;k<3;k++)add(p.x-.85+k*.8,p.z,1,.12,.15,'wood-stack-band',0x706342,terrainHeight(p.x,p.z)+1.2,'box',{solid:false});}}
+  // Threshold path is colored into the terrain by the main street; small separate gate posts give cover.
+  for(const sign of[-1,1]){const p=localPoint(b,gate+sign*2.2,front);if(free(p.x,p.z,.5))add(p.x,p.z,.38,.38,1.18,'gate-post',color);}
+ }
+ for(const poi of POIS.filter(p=>p.kind==='village')){const vertical=['north','south'].includes(poi.id),p=(a,b)=>({x:poi.x+(vertical?b:a),z:poi.z+(vertical?a:b)});
+  for(let a=-170;a<=170;a+=34)for(const side of[-1,1]){const q=p(a,side*7.2);if(free(q.x,q.z,.5)){add(q.x,q.z,.22,.22,6.2,'street-pole',0x6d6250,undefined,'cylinder');add(q.x,q.z,vertical?1.5:.25,vertical?.25:1.5,.18,'lamp-arm',0x6d6250,terrainHeight(q.x,q.z)+5.9);const lamp=p(a,side*6.7);add(lamp.x,lamp.z,.5,.5,.2,'street-lamp',0xc6be8e,terrainHeight(q.x,q.z)+5.72,'box',{solid:false});}}
+  for(let a=-176;a<176;a+=8)for(const side of[-1,1]){const q=p(a,side*5.05);if(!free(q.x,q.z,.8)||Math.abs(a)<5)continue;add(q.x,q.z,vertical?1.15:7.85,vertical?7.85:1.15,.1,'curb',0xa49b82,terrainHeight(q.x,q.z)+.025);}
+  for(let i=0;i<3;i++){const q=p(-32+i*30,80+(i%2)*8);if(!free(q.x,q.z,4)||roadAt(q.x,q.z).distance<7)continue;for(const s of[-1,1])add(q.x+s*1.7,q.z,.12,.12,2.65,'market-post',0x846a48);add(q.x,q.z,4.2,3.2,.16,'market-canopy',[0x8b7754,0x7b8e72,0xb49a6a][i],terrainHeight(q.x,q.z)+2.65);add(q.x,q.z,3.4,1.2,.82,'market-table',0x92734f);for(let k=0;k<3;k++)add(q.x-.9+k*.9,q.z, .65,.8,.22,'produce-crate',0x8b7650,terrainHeight(q.x,q.z)+.82);}
+  const well=p(18,74);if(free(well.x,well.z,2))add(well.x,well.z,2.4,2.4,.95,'village-well',0x999880,undefined,'cylinder');
+  for(let i=0;i<8;i++){const q=p(-145+i*41,(i%2?1:-1)*(77+i%3*6));if(!free(q.x,q.z,3)||roadAt(q.x,q.z).distance<8)continue;add(q.x,q.z,2.2,2.2,1.25,'hay-bale',0xaaa06a,undefined,'cylinder');if(i%2)for(let j=0;j<3;j++)add(q.x+j*.8,q.z+2.4, .65,.65,.9,'farm-crate',0x8c7958);}
+  const bus=p(60,-9);if(free(bus.x,bus.z,2)){for(const side of[-1,1])add(bus.x+(vertical?0:side*2),bus.z+(vertical?side*2:0),.12,.12,2.6,'bus-post',0x6d756b);add(bus.x,bus.z,vertical?2:4.8,vertical?4.8:2,.15,'bus-shelter',0x748276,terrainHeight(bus.x,bus.z)+2.6);add(bus.x,bus.z,vertical?.65:3.5,vertical?3.5:.65,.5,'bench',0x8a7354);}
+ }
+ return out;}

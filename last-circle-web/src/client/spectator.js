@@ -1,0 +1,2 @@
+import{terrainHeight,clamp}from'../world.js';
+export function freeFlight(p,input,dt){const speed=input.fast?20:12,n=Math.max(1,Math.hypot(input.mx||0,input.mz||0)),right=(input.mx||0)/n,forward=(input.mz||0)/n,yaw=input.yaw||0,pitch=input.pitch||0,x=p.x+(-Math.cos(yaw)*right+Math.sin(yaw)*Math.cos(pitch)*forward)*speed*dt,z=p.z+(Math.sin(yaw)*right+Math.cos(yaw)*Math.cos(pitch)*forward)*speed*dt,y=p.y+Math.sin(pitch)*forward*speed*dt;return{x:clamp(x,-1000,1000),z:clamp(z,-1000,1000),y:clamp(y,terrainHeight(x,z)+.7,500)};}

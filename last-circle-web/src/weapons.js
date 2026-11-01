@@ -1,20 +1,28 @@
 export const WEAPONS=[
- {id:'m416',name:'M416',caliber:'556',magazine:30,reload:2.2,interval:.11,damage:32,head:3.3,range:185,spread:.009,recoil:.026,sight:'dot',zoom:1.35,color:0x576b65,length:1.02},
- {id:'akm',name:'AKM',caliber:'762',magazine:30,reload:2.45,interval:.13,damage:40,head:2.75,range:185,spread:.014,recoil:.039,sight:'iron',zoom:1.25,color:0x967044,length:1.12},
- {id:'ump45',name:'UMP45',caliber:'45',magazine:25,reload:1.95,interval:.085,damage:27,head:3.5,range:115,spread:.012,recoil:.019,sight:'holo',zoom:1.4,color:0x414e55,length:.76},
- {id:'kar98k',name:'Kar98k',caliber:'762',magazine:5,reload:3.15,interval:1.25,damage:85,head:2.5,range:260,spread:.001,recoil:.075,sight:'scope',zoom:4,color:0x91683d,length:1.38},
- {id:'s12k',name:'S12K',caliber:'12g',magazine:5,reload:2.65,interval:.37,damage:17,head:2,pellets:7,range:65,spread:.064,recoil:.06,sight:'shotgun',zoom:1.15,color:0x526052,length:1.03}
+ {id:'m416',name:'M416',caliber:'556',magazine:30,reload:2.1,interval:.09,damage:40,head:2.65,range:240,spread:.009,recoil:.026,sight:'dot',zoom:1.35,color:0x576b65,length:1.02,family:'ar'},
+ {id:'akm',name:'AKM',caliber:'762',magazine:30,reload:2.5,interval:.10,damage:48,head:2.3,range:240,spread:.014,recoil:.039,sight:'iron',zoom:1.25,color:0x967044,length:1.12,family:'ar'},
+ {id:'ump45',name:'UMP45',caliber:'45',magazine:25,reload:2,interval:.09,damage:36,head:3,range:140,spread:.012,recoil:.019,sight:'holo',zoom:1.4,color:0x414e55,length:.76,family:'smg'},
+ {id:'kar98k',name:'Kar98k',caliber:'762',magazine:5,reload:4,interval:1.8,damage:85,head:2.5,range:360,spread:.001,recoil:.075,sight:'scope',zoom:4,color:0x91683d,length:1.38,family:'bolt'},
+ {id:'s12k',name:'S12K',caliber:'12g',magazine:5,reload:3,interval:.25,damage:15,head:1,pellets:6,maxDamage:90,range:65,spread:.052,recoil:.06,sight:'shotgun',zoom:1.15,color:0x526052,length:1.03,family:'shotgun'},
+ {id:'aug',name:'AUG',caliber:'556',magazine:30,reload:2.2,interval:.085,damage:42,head:2.6,range:250,spread:.0075,recoil:.024,sight:'dot',zoom:1.6,color:0x819079,length:.92,family:'bullpup'},
+ {id:'vector',name:'Vector',caliber:'45',magazine:19,reload:2.1,interval:.055,damage:31,head:3.3,range:125,spread:.012,recoil:.017,sight:'holo',zoom:1.4,color:0x6e745f,length:.68,family:'smg'},
+ {id:'awm',name:'AWM',caliber:'300',magazine:5,reload:4.5,interval:1.9,damage:110,head:2.5,range:480,spread:.0007,recoil:.09,sight:'scope',zoom:6,color:0x7a8665,length:1.48,family:'bolt'},
+ {id:'mini14',name:'Mini14',caliber:'556',magazine:20,reload:2.4,interval:.14,damage:45,head:2.4,range:330,spread:.003,recoil:.037,sight:'scope',zoom:2,color:0x727c73,length:1.22,family:'dmr'},
+ {id:'m249',name:'M249',caliber:'556',magazine:75,reload:5,interval:.075,damage:42,head:2.5,range:270,spread:.014,recoil:.038,sight:'iron',zoom:1.25,color:0x66745d,length:1.32,family:'lmg'},
+ {id:'p10',name:'P10 권총',caliber:'9mm',magazine:10,reload:1.5,interval:.22,damage:24,head:2.3,range:90,spread:.015,recoil:.024,sight:'iron',zoom:1.2,color:0x4e5c60,length:.35,family:'pistol'}
 ];
+export const PISTOL=10,PRIMARY_WEAPONS=WEAPONS.slice(0,10);
 export const STANCES={stand:{height:1.78,eye:1.53,speed:3.2,radius:.32,recoil:1},crouch:{height:1.22,eye:1.05,speed:1.8,radius:.34,recoil:.55},prone:{height:.55,eye:.36,speed:.8,radius:.29,recoil:.23}};
-export const CALIBERS={556:'5.56mm',762:'7.62mm',45:'.45 ACP','12g':'12게이지'};
+export const CALIBERS={556:'5.56mm',762:'7.62mm',45:'.45 ACP','12g':'12게이지',300:'.300 Magnum','9mm':'9mm'};
 export const getWeapon=p=>WEAPONS[p.weapon]||WEAPONS[0];
+const INJURED_STANCE={height:1.24,eye:1.04,speed:1,radius:.34,recoil:1.4};
 const VAULT_STANCE={...STANCES.crouch,height:1.12,eye:.87};
-export const stanceOf=p=>p.vault?.window?VAULT_STANCE:STANCES[p.stance]||STANCES.stand;
+export const stanceOf=p=>p.downed?INJURED_STANCE:p.vault?.window?VAULT_STANCE:STANCES[p.stance]||STANCES.stand;
 export const magazineSize=p=>getWeapon(p).magazine;
 export const reserveAmmo=p=>p.bag?.[getWeapon(p).caliber]||0;
 export function eyePosition(p){const e=stanceOf(p).eye,forward=p.stance==='prone'?.63:0;return[p.x+Math.sin(p.yaw)*forward,p.y+e,p.z+Math.cos(p.yaw)*forward];}
 export function bodyParts(p){
- const compact=!!p.vault?.window,stance=compact?'crouch':p.stance||'stand',out=[],sin=Math.sin(p.yaw||0),cos=Math.cos(p.yaw||0);
+ const compact=!!p.vault?.window,stance=compact||p.downed?'crouch':p.stance||'stand',out=[],sin=Math.sin(p.yaw||0),cos=Math.cos(p.yaw||0);
  const point=(x,y,z)=>{if(p.gliding){const r=p.bank||0,nx=x*Math.cos(r)-y*Math.sin(r);y=x*Math.sin(r)+y*Math.cos(r);x=nx;}return[p.x+x*cos+z*sin,p.y+y,p.z-x*sin+z*cos];};
  const sphere=(zone,x,y,z,r)=>out.push({zone,a:point(x,y,z),b:point(x,y,z),r});
  const limb=(zone,a,b,r)=>out.push({zone,a:point(...a),b:point(...b),r});

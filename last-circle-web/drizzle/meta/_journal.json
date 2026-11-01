@@ -15,6 +15,20 @@
       "when": 1793460000000,
       "tag": "0001_duel_queue",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793498400000,
+      "tag": "0002_room_live",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793498500000,
+      "tag": "0003_input_mailboxes",
+      "breakpoints": true
     }
   ]
 }
