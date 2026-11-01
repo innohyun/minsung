@@ -1,6 +1,6 @@
 {
   "name": "last-circle-web",
-  "version": "0.8.0",
+  "version": "0.9.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,8 @@
     "three": "0.180.0"
   },
   "devDependencies": {
-    "esbuild": "0.25.10"
+    "esbuild": "0.25.10",
+    "miniflare": "^4.20260730.0",
+    "ws": "^8.22.1"
   }
 }

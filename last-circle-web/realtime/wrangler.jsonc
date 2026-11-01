@@ -1,0 +1,8 @@
+{
+  "name": "last-circle-realtime-6ae206ec",
+  "main": "../.local/realtime-worker.mjs",
+  "compatibility_date": "2026-08-01",
+  "durable_objects": {"bindings": [{"name": "ROOMS", "class_name": "MatchRoom"}]},
+  "migrations": [{"tag": "v1", "new_sqlite_classes": ["MatchRoom"]}],
+  "vars": {"SITE_ORIGIN": "https://last-circle-arena.innohyun13.chatgpt.site"}
+}

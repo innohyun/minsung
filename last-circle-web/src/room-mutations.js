@@ -1,0 +1,3 @@
+import {eliminate} from './sim.js';
+import {forfeitDuel} from './duel.js';
+export function reconcileMutation(previous,next){const m=next.controlMutation;if(!previous||m?.operation!=='leave'||m.key===previous.controlMutation?.key||previous.round!==next.round||previous.mode!==next.mode||previous.duel?.round!==next.duel?.round||!['flight','battle'].includes(previous.phase))return next;previous.controlMutation={...m};const p=previous.players.find(p=>p.id===m.player);if(!p)return next;if(previous.mode==='duel')forfeitDuel(previous,p);else if(p.id===previous.host)previous.closed=true;else{eliminate(previous,p);p.connected=false;}return previous;}

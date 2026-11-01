@@ -1,5 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {api} from '../src/server/api.js';import {database} from '../scripts/db-local.mjs';
-const req=(path,b={},token)=>new Request('http://local'+path,{method:'POST',headers:{'content-type':'application/json','x-game-rules':'8',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(b)});
+const req=(path,b={},token)=>new Request('http://local'+path,{method:'POST',headers:{'content-type':'application/json','x-game-rules':'10',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(b)});
 test('real SQLite: create, open join, capacity, host authority, twenty-slot start, late join and guest leave',async()=>{
  const env={DB:database()};let r=await api(req('/api/rooms',{nick:'방장',name:'테스트',password:'1234'}),env);assert.equal(r.status,201);const h=await r.json();const c=h.state.code;
 
