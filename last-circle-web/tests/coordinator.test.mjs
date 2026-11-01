@@ -1,6 +1,6 @@
 import test from'node:test';import assert from'node:assert/strict';
 import{api}from'../src/server/api.js';import{pumpRoom}from'../src/server/controls.js';import{database}from'../scripts/db-local.mjs';import{encodeFrame}from'../src/net-input.js';import{ARENA}from'../src/world.js';
-const request=(path,body={},token)=>new Request('http://local'+path,{method:'POST',headers:{'content-type':'application/json','x-game-rules':'10',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
+const request=(path,body={},token)=>new Request('http://local'+path,{method:'POST',headers:{'content-type':'application/json','x-game-rules':'11',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
 const read=(env,c)=>JSON.parse(env.DB.sqlite.prepare('SELECT state FROM rooms WHERE code=?').get(c).state);
 test('twenty concurrent input mailboxes produce one authoritative world write; retries never move or shoot twice',async()=>{
  const env={DB:database()},seats=[await(await api(request('/api/rooms',{}),env)).json()],code=seats[0].state.code;for(let n=1;n<20;n++)seats.push(await(await api(request(`/api/rooms/${code}/join`,{nick:'p'+n}),env)).json());await api(request(`/api/rooms/${code}/start`,{},seats[0].token),env);

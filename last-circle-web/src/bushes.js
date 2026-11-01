@@ -1,0 +1,6 @@
+import{rng}from'./math.js';
+import{terrainHeight,riverDistance,roadAt,buildingsNear,POIS}from'./map.js';
+// The same seeded fields drive foliage, observer concealment and AI sight.
+export const BUSH_PATCHES=(()=>{const r=rng(58019),out=[];for(let i=0;i<1000&&out.length<130;i++){const anchor=POIS[i%POIS.length],x=i<160?anchor.x+(r()-.5)*210:(r()-.5)*1440,z=i<160?anchor.z+(r()-.5)*210:(r()-.5)*1440,radius=4.5+r()*4;if(riverDistance(x,z)<25||roadAt(x,z).distance<radius+5||buildingsNear(x,z).some(b=>Math.hypot(b.x-x,b.z-z)<Math.hypot(b.w,b.d)/2+radius+3)||out.some(b=>Math.hypot(b.x-x,b.z-z)<b.r+radius+8))continue;out.push({id:'bush-'+out.length,x,z,y:terrainHeight(x,z),r:radius,h:2.05+r()*.35,seed:i*71+907});}return out;})();
+export function bushAt(p){if(!p||p.onPlane||p.gliding||p.falling||p.vehicleId||p.dead)return null;return BUSH_PATCHES.find(b=>(p.x-b.x)**2+(p.z-b.z)**2<(b.r-1)**2&&p.y<terrainHeight(p.x,p.z)+.7)||null;}
+export function concealedFrom(observer,target){const patch=bushAt(target);return!!patch&&!!observer&&Math.hypot(observer.x-target.x,observer.z-target.z)>3.5&&((observer.x-patch.x)**2+(observer.z-patch.z)**2>patch.r**2||Math.hypot(observer.x-target.x,observer.z-target.z)>6);}

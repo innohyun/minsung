@@ -18,7 +18,7 @@ export function createLoot(seed,round){
  for(const poi of POIS){const g=groups.get(poi.id);for(let n=g.outDone||0;n<poi.outdoor;n++)gun(g.outside);for(let n=g.done;n<poi.guns-poi.outdoor;n++)gun(g.inside);}
  // Each building also gets a treatment item, giving the injury timer a useful local escape route.
  for(const b of BUILDINGS){const list=groups.get(b.zone).inside,spot=list.find(s=>s.building===b.index&&!used.has(s.id));if(spot)place({kind:b.index%3?'med':'pain',amount:1},spot);}
- const supplies=shuffle([...Array(45).fill('vest'),...Array(45).fill('helmet'),...Array(40).fill('med'),...Array(35).fill('pain'),...Array(32).fill('grenade'),...Array(28).fill('smoke'),...Array(24).fill('flash'),...Array(24).fill('molotov'),...Array(15).fill('fuel'),...Array(20).fill('pistolAmmo')],r),remaining=shuffle(validSpots.filter(s=>!used.has(s.id)),r);
- for(const kind of supplies){const spot=remaining.pop();if(!spot)break;place(kind==='vest'||kind==='helmet'?{kind:'armor',armor:kind,amount:100}:kind==='pistolAmmo'?{kind:'ammo',caliber:'9mm',amount:20}:{kind,amount:['grenade','smoke','flash','molotov'].includes(kind)?2:1},spot);}
+ const supplies=shuffle([...Array(45).fill('vest'),...Array(45).fill('helmet'),...Array(40).fill('med'),...Array(35).fill('pain'),...Array(32).fill('grenade'),...Array(28).fill('smoke'),...Array(24).fill('flash'),...Array(24).fill('molotov'),...Array(15).fill('fuel'),...Array(20).fill('pistolAmmo'),...Array(96).fill('coin')],r),remaining=shuffle(validSpots.filter(s=>!used.has(s.id)),r);
+ for(const kind of supplies){const spot=remaining.pop();if(!spot)break;if(kind==='coin'){place({kind:'coin',amount:20+Math.floor(r()*36)},spot);continue;}place(kind==='vest'||kind==='helmet'?{kind:'armor',armor:kind,amount:100}:kind==='pistolAmmo'?{kind:'ammo',caliber:'9mm',amount:20}:{kind,amount:['grenade','smoke','flash','molotov'].includes(kind)?2:1},spot);}
  return items;
 }

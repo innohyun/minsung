@@ -9,7 +9,9 @@ export const WEAPONS=[
  {id:'awm',name:'AWM',caliber:'300',magazine:5,reload:4.5,interval:1.9,damage:110,head:2.5,range:480,spread:.0007,recoil:.09,sight:'scope',zoom:6,color:0x7a8665,length:1.48,family:'bolt'},
  {id:'mini14',name:'Mini14',caliber:'556',magazine:20,reload:2.4,interval:.14,damage:45,head:2.4,range:330,spread:.003,recoil:.037,sight:'scope',zoom:2,color:0x727c73,length:1.22,family:'dmr'},
  {id:'m249',name:'M249',caliber:'556',magazine:75,reload:5,interval:.075,damage:42,head:2.5,range:270,spread:.014,recoil:.038,sight:'iron',zoom:1.25,color:0x66745d,length:1.32,family:'lmg'},
- {id:'p10',name:'P10 권총',caliber:'9mm',magazine:10,reload:1.5,interval:.22,damage:24,head:2.3,range:90,spread:.015,recoil:.024,sight:'iron',zoom:1.2,color:0x4e5c60,length:.35,family:'pistol'}
+ {id:'p10',name:'P10 권총',caliber:'9mm',magazine:10,reload:1.5,interval:.22,damage:24,head:2.3,range:90,spread:.015,recoil:.024,sight:'iron',zoom:1.2,color:0x4e5c60,length:.35,family:'pistol'},
+ {id:'groza',name:'GROZA',exclusive:true,caliber:'762',magazine:30,reload:2.6,interval:.08,damage:49,head:2.4,range:250,spread:.008,recoil:.031,sight:'dot',zoom:1.6,color:0x4e6a58,length:.91,family:'bullpup'},
+ {id:'mk14',name:'Mk14',exclusive:true,caliber:'762',magazine:20,reload:3.2,interval:.12,damage:61,head:2.5,range:400,spread:.002,recoil:.05,sight:'scope',zoom:4,color:0x6f7768,length:1.25,family:'dmr'}
 ];
 export const PISTOL=10,PRIMARY_WEAPONS=WEAPONS.slice(0,10);
 export const STANCES={stand:{height:1.78,eye:1.53,speed:3.2,radius:.32,recoil:1},crouch:{height:1.22,eye:1.05,speed:1.8,radius:.34,recoil:.55},prone:{height:.55,eye:.36,speed:.8,radius:.29,recoil:.23}};
@@ -19,7 +21,7 @@ const INJURED_STANCE={height:1.24,eye:1.04,speed:1,radius:.34,recoil:1.4};
 const VAULT_STANCE={...STANCES.crouch,height:1.12,eye:.87};
 export const stanceOf=p=>p.downed?INJURED_STANCE:p.vault?.window?VAULT_STANCE:STANCES[p.stance]||STANCES.stand;
 export const magazineSize=p=>getWeapon(p).magazine;
-export const reserveAmmo=p=>p.bag?.[getWeapon(p).caliber]||0;
+export const reserveAmmo=p=>(p.bag?.[getWeapon(p).caliber]||0)+(p.universalAmmo||0);
 export function eyePosition(p){const e=stanceOf(p).eye,forward=p.stance==='prone'?.63:0;return[p.x+Math.sin(p.yaw)*forward,p.y+e,p.z+Math.cos(p.yaw)*forward];}
 export function bodyParts(p){
  const compact=!!p.vault?.window,stance=compact||p.downed?'crouch':p.stance||'stand',out=[],sin=Math.sin(p.yaw||0),cos=Math.cos(p.yaw||0);
