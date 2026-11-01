@@ -6,7 +6,7 @@ export {clamp,smooth,angleDiff,rng,ARENA,HALF,MAP_SIZE,MAP_ID,FLIGHT_HEIGHT,FLIG
 export const TERRAIN_SIZE=1536,TERRAIN_SEGMENTS=768;
 export function localPoint(b,x,z,y=0){return{x:b.x+(b.rot?-z:x),z:b.z+(b.rot?x:z),y:b.y+y};}
 export function toLocal(b,x,z){return{x:b.rot?z-b.z:x-b.x,z:b.rot?b.x-x:z-b.z};}
-export const TREES=(()=>{const random=rng(771),out=[],cells=new Map();for(let i=0;i<23000;i++){const x=(random()-.5)*1530,z=(random()-.5)*1530,density=.49+.21*Math.sin(x*.009+z*.007)+.17*Math.cos(z*.017);if(random()>density||riverDistance(x,z)<20||roadAt(x,z).distance<6||buildingsNear(x,z).some(b=>Math.abs(x-b.x)<(b.rot?b.d:b.w)/2+5&&Math.abs(z-b.z)<(b.rot?b.w:b.d)/2+5)||POIS.some(p=>p.kind==='camp'&&Math.hypot(x-p.x,z-p.z)<12))continue;const cx=Math.floor(x/5),cz=Math.floor(z/5);let near=false;for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++)for(const q of cells.get((cx+dx)+','+(cz+dz))||[])if(Math.hypot(q.x-x,q.z-z)<4)near=true;if(near)continue;const t={x,z,y:terrainHeight(x,z),h:8+random()*9,type:Math.floor(random()*4),seed:i};out.push(t);const key=cx+','+cz;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(t);}return out;})();
+export const TREES=(()=>{const random=rng(771),out=[],cells=new Map();for(let i=0;i<23000;i++){const x=(random()-.5)*1530,z=(random()-.5)*1530,density=.49+.21*Math.sin(x*.009+z*.007)+.17*Math.cos(z*.017);if(random()>density||riverDistance(x,z)<20||roadAt(x,z).distance<6||buildingsNear(x,z).some(b=>Math.abs(x-b.x)<(b.rot?b.d:b.w)/2+5&&Math.abs(z-b.z)<(b.rot?b.w:b.d)/2+5)||POIS.some(p=>p.kind==='camp'&&Math.hypot(x-p.x,z-p.z)<12))continue;const cx=Math.floor(x/5),cz=Math.floor(z/5);let near=false;for(let dx=-1;dx<=1;dx++)for(let dz=-1;dz<=1;dz++)for(const q of cells.get((cx+dx)+','+(cz+dz))||[])if(Math.hypot(q.x-x,q.z-z)<4)near=true;if(near)continue;const t={x,z,y:terrainHeight(x,z),h:8+random()*9,type:Math.floor(random()*5),seed:i};out.push(t);const key=cx+','+cz;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(t);}return out;})();
 export const GRASS_PATCHES=Array.from({length:150},(_,i)=>{const r=rng(431+i*113);return{x:(r()-.5)*1450,z:(r()-.5)*1450,r:12+r()*18};}).concat(POIS.flatMap((p,i)=>[[-70,25],[65,-40]].map(([x,z])=>({x:p.x+x,z:p.z+z,r:11+i%4})))).filter(p=>riverDistance(p.x,p.z)>19);
 export const inGrass=(x,z)=>GRASS_PATCHES.some(p=>(x-p.x)**2+(z-p.z)**2<p.r*p.r);
 export const DOORS=BUILDINGS.map(b=>({...localPoint(b,0,-b.d/2,0),id:'door-'+b.index,building:b.index,rot:b.rot,w:3.14,h:2.68}));
@@ -57,13 +57,15 @@ export function mapGeometry(){
   add(left,doorZ,.35,doorway,.4,roof+2.15,'stairwall',0x846443);
   for(const z of [-b.d/2,b.d/2]){if(b.index===0&&z<0){const lo=-b.w/2,hi=b.w/2-strip;add((lo-1.6)/2,z,-1.6-lo,.25,.65,roof,'parapet',0x6a5942);if(hi>1.6)add((hi+1.6)/2,z,hi-1.6,.25,.65,roof,'parapet',0x6a5942);}else add(-strip/2,z,main,.25,.65,roof,'parapet',0x6a5942);}
   if(b.index===1){for(const side of [-1,1])add(-b.w/2,side*(b.d/4+.8),.25,b.d/2-1.6,.65,roof,'parapet',0x6a5942);}else add(-b.w/2,0,.25,b.d,.65,roof,'parapet',0x6a5942);
-  const porch=['cottage','farmhouse','lodge','cabin','courtyard'].includes(b.style),balcony=b.floors===2&&['farmhouse','lodge','courtyard'].includes(b.style);
+  const porch=['cottage','farmhouse','lodge','cabin','courtyard','hunter','lumberjack'].includes(b.style),balcony=b.floors===2&&['farmhouse','lodge','courtyard'].includes(b.style);
   if(porch){const pw=b.w*.74;add(0,-b.d/2-1.5,pw,3,.2,-.4,'porch',0x8e6e48);const roofY=balcony?b.level-.08:2.8;add(0,-b.d/2-1.4,pw+.3,2.9,.18,roofY-.18,balcony?'balcony':'awning',0x806241);for(const side of[-1,1])add(side*(pw/2-.2),-b.d/2-2.6,.18,.18,roofY,0,'post',0x725235);if(balcony){add(0,-b.d/2-2.8,pw,.15,.75,roofY,'balcony-rail',0x685039);for(const side of[-1,1])add(side*pw/2,-b.d/2-1.5,.15,2.8,.75,roofY,'balcony-rail',0x685039);}}
   // Supplies live on tables/shelves, both ground and upper floor, never scattered along roads.
   const spots=[[-b.w*.22,-b.d*.24,0],[-b.w*.22,b.d*.24,0],[-b.w*.08,0,b.floors>1?b.level:0]];
   spots.forEach(([x,z,y],i)=>{add(x,z,2.8,1.15,.84,y,'table',0x906b45);for(let k=0;k<3;k++){const p=localPoint(b,x+(k-1)*.8,z,y+.96);LOOT_SPOTS.push({...p,id:`b${b.index}t${i}i${k}`,building:b.index,floor:y?1:0,zone:b.zone,outdoor:false,category:'table'});}});
   add(-b.w*.25,b.d*.43,3,.6,1.6,0,'shelf',0x76573b);
   for(let f=0;f<b.floors;f++)for(const [x,z]of[[-b.w*.3,-b.d*.12],[-b.w*.4,b.d*.1],[b.w*.06,-b.d*.27],[b.w*.08,b.d*.27]]){const p=localPoint(b,x,z,f*b.level+.09);LOOT_SPOTS.push({...p,id:`b${b.index}f${f}-${x}-${z}`,building:b.index,floor:f,zone:b.zone,outdoor:false,category:'floor'});}
+  if(b.style==='lumberjack'){add(-b.w*.37,-.4,1.25,2.2,.84,0,'workbench',0x987142);add(-b.w*.35,-.4,.8,.9,.15,.84,'wood-offcut',0xb68c54);for(let i=0;i<4;i++)add(-b.w*.43,b.d*.41-i*.55,.65,.45,.3,0,'split-wood',0x9b733f);add(-b.w*.43,-b.d*.16,.06,.12,1.1,.3,'axe-handle',0x967547);add(-b.w*.43,-b.d*.16,.16,.38,.3,1.2,'axe-head',0x65726c);}
+  if(b.style==='hunter'){add(b.w*.04,b.d*.41,1.1,.9,1,0,'stove',0x454e48);add(b.w*.04,b.d*.41,.19,.19,1.6,1,'chimney',0x62675a);for(const side of[-1,1]){add(-b.w*.38+side*.3,b.d*.46,.12,.16,.7,1.7,'antler',0xc0b28c);add(-b.w*.38+side*.45,b.d*.46,.4,.13,.13,2.15,'antler',0xc0b28c);}add(-b.w*.36,-.4,1.1,1.8,.18,0,'bedroll',0x5e7153);add(-b.w*.42,-.4,.16,1.9,1.4,.25,'tool-rack',0x8c6940);}
   // Room partitions leave a full doorway and keep the stair lane clear.
   for(let f=0;f<b.floors;f++){const y=f*b.level;add(-b.w*.27,1.4,b.w*.42,.22,2.9,y,'partition',0x8b6948);add(-b.w*.27,b.d*.32,3.3,1.5,.5,y,'bed',0x665846);add(-b.w*.31,b.d*.32,3.1,1.3,.16,y+.5,'mattress',0x818372);add(-b.w*.35,-b.d*.35,.8,1.2,1.7,y,'cabinet',0x67482e);}
 
@@ -77,6 +79,8 @@ export function mapGeometry(){
  }
  const r=rng(1277);for(let i=0;i<460;i++){const x=(r()-.5)*1450,z=(r()-.5)*1450,sx=terrainHeight(x+2,z)-terrainHeight(x-2,z),sz=terrainHeight(x,z+2)-terrainHeight(x,z-2),slope=Math.hypot(sx,sz)/4;if(slope<.12||slope>.9||roadAt(x,z).distance<12||riverDistance(x,z)<25||buildingsNear(x,z).some(b=>Math.abs(x-b.x)<30&&Math.abs(z-b.z)<30))continue;const yaw=Math.atan2(sz,-sx);for(let k=0;k<2+i%3;k++){const a=yaw+(r()-.5)*.3,xx=x+Math.cos(a)*(k-1)*5,zz=z-Math.sin(a)*(k-1)*5;list.push({x:xx,z:zz,w:5+r()*8,d:3+r()*5,h:1.6+r()*3.2,y:terrainHeight(xx,zz)-.9,shape:'bedrock',yaw:a,kind:'outcrop',color:i%3?0x858d77:0x747c6b});}}
  for(let i=0;i<TREES.length;i+=53){const t=TREES[i],yaw=(t.seed%100)*.06283,length=4.5+(i%4),x=t.x+Math.sin(yaw)*3,z=t.z+Math.cos(yaw)*3;if(roadAt(x,z).distance<9||riverDistance(x,z)<22||buildingsNear(x,z).some(b=>Math.abs(x-b.x)<24&&Math.abs(z-b.z)<24))continue;list.push({x,z,y:terrainHeight(x,z)-.12,w:.72,d:length,h:.72,shape:'log',yaw,kind:'fallen-log',color:0x736044});list.push({x:t.x+.9,z:t.z+.8,y:t.y,w:1.05,d:1.05,h:.72,shape:'cylinder',kind:'stump',color:0x8a704b});}
+ // Root plates and eroded banks belong to fallen timber, creating low natural cover.
+ for(let i=0;i<TREES.length;i+=83){const t=TREES[i],x=t.x+1.8,z=t.z+1.3;if(roadAt(x,z).distance<10||riverDistance(x,z)<23||buildingsNear(x,z).some(b=>Math.hypot(b.x-x,b.z-z)<29))continue;list.push({x,z,y:terrainHeight(x,z)-.35,w:2.6,d:1.6,h:1.45,shape:'bedrock',yaw:t.seed*.19,kind:'root-plate',color:0x655c3d});}
  for(const poi of POIS.filter(p=>p.kind==='village'))for(const side of[-1,1])for(let i=0;i<4;i++){const x=poi.x+side*(54+i*2),z=poi.z+25+i*9;list.push({x,z,y:terrainHeight(x,z),w:.16,d:6.5,h:1.1,shape:'box',kind:'farm-fence',color:0x807450});}
  // A separate enclosed arena, outside the survival map's movement bounds.
  const a=ARENA,addArena=(x,z,w,d,h,y=0,kind='arena-cover',color=0x828374,shape='box')=>list.push({x:a.x+x,z:a.z+z,w,d,h,y:a.y+y,kind,color,shape});
@@ -118,7 +122,7 @@ export function supportHeight(x,z,ceiling=Infinity,vehicles){let h=terrainHeight
 function actorBlocked(p,x,z,step=0,stance=p.stance||'stand',doors,vehicles){const s=STANCES[stance]||STANCES.stand;const positions=stance==='prone'?[-.88,-.3,.3,.65]:[0];return positions.some(t=>blocked(x+Math.sin(p.yaw)*t,z+Math.cos(p.yaw)*t,p.y,s.radius,s.height,step,doors,vehicles));}
 export function move(p,dx,dz,doors,vehicles){const accept=(x,z)=>{const g=terrainHeight(x,z),og=terrainHeight(p.x,p.z),distance=Math.hypot(x-p.x,z-p.z),step=p.stance==='prone'?.12:.27;return !(p.y<og+.3&&g-og>distance*1.12+.03)&&g<=p.y+step&&!actorBlocked(p,x,z,step,p.stance,doors,vehicles);};const x=clamp(p.x+dx,p.bounds?.minX??-HALF,p.bounds?.maxX??HALF),z=clamp(p.z+dz,p.bounds?.minZ??-HALF,p.bounds?.maxZ??HALF);if(accept(x,p.z))p.x=x;if(accept(p.x,z))p.z=z;}
 export function beginJump(p,doors,vehicles){
- if(p.onPlane){p.onPlane=false;p.falling=true;p.gliding=p.chute=false;p.glideYaw=p.yaw;p.glideLookYaw=p.yaw;p.vy=-5;p.vx=Math.sin(p.yaw)*10;p.vz=Math.cos(p.yaw)*10;return true;}
+ if(p.knockdown)return false;if(p.onPlane){p.onPlane=false;p.falling=true;p.gliding=p.chute=false;p.glideYaw=p.yaw;p.glideLookYaw=p.yaw;p.vy=-5;p.vx=Math.sin(p.yaw)*10;p.vz=Math.cos(p.yaw)*10;return true;}
  if(p.falling){p.falling=false;p.gliding=p.chute=true;p.chuteOpen=0;p.glideYaw=p.yaw;p.glideLookYaw=p.yaw;return true;}
  if(p.vault||p.gliding||p.stance!=='stand'||p.y>supportHeight(p.x,p.z,p.y+.1,vehicles)+.16)return false;
  // Windows use a tucked body: lift, pass through the opening, then lower.
@@ -129,7 +133,7 @@ export function beginJump(p,doors,vehicles){
 }
 export function integrateMovement(p,i,dt,time=0,doors,vehicles){
  if(p.dead){p.vx=p.vz=0;return;}if(p.vehicleId)return;const oldX=p.x,oldZ=p.z;
- if(p.onPlane){const f=flightPosition(time,p.flightRoute||0);p.x=f.x;p.z=f.z;p.y=f.y;p.vx=Math.sin(f.yaw)*FLIGHT_SPAN/FLIGHT_SECONDS;p.vz=Math.cos(f.yaw)*FLIGHT_SPAN/FLIGHT_SECONDS;p.vy=0;return;}
+ if(p.knockdown>0){p.knockdown=Math.max(0,p.knockdown-dt);p.stance='prone';move(p,(p.vx||0)*dt,(p.vz||0)*dt,doors,vehicles);p.vx*=Math.exp(-dt*2.6);p.vz*=Math.exp(-dt*2.6);p.vy=(p.vy||0)-18*dt;const floor=supportHeight(p.x,p.z,p.y+.2,vehicles);p.y=Math.max(floor,p.y+p.vy*dt);if(p.y<=floor+.02)p.vy=0;if(!p.knockdown&&!actorBlocked(p,p.x,p.z,0,'stand',doors,vehicles))p.stance='stand';return;}if(p.onPlane){const f=flightPosition(time,p.flightRoute||0);p.x=f.x;p.z=f.z;p.y=f.y;p.vx=Math.sin(f.yaw)*FLIGHT_SPAN/FLIGHT_SECONDS;p.vz=Math.cos(f.yaw)*FLIGHT_SPAN/FLIGHT_SECONDS;p.vy=0;return;}
  if(p.vault){const v=p.vault;v.t+=dt;const a=clamp(v.t/(v.duration||.52),0,1),t=v.window?smooth(.22,.78,a):a*a*(3-2*a);p.x=v.x0+(v.x-v.x0)*t;p.z=v.z0+(v.z-v.z0)*t;p.y=v.window?(a<.22?v.y0+(v.h-v.y0)*smooth(0,.22,a):v.h+(v.y-v.h)*smooth(.78,1,a)):v.y0+(v.y-v.y0)*t+Math.sin(t*Math.PI)*(v.h-Math.max(v.y0,v.y));p.vx=(p.x-oldX)/dt;p.vz=(p.z-oldZ)/dt;p.vy=0;if(a>=1)p.vault=null;return;}
  if(p.falling){const n=Math.max(1,Math.hypot(i.mx||0,i.mz||0)),speed=9+Math.max(0,i.mz||0)*5,a=1-Math.exp(-dt*3);p.vx+=(Math.sin(i.yaw)*speed-Math.cos(i.yaw)*(i.mx||0)*6/n-p.vx)*a;p.vz+=(Math.cos(i.yaw)*speed+Math.sin(i.yaw)*(i.mx||0)*6/n-p.vz)*a;p.vy=Math.max(-55,p.vy-28*dt);move(p,p.vx*dt,p.vz*dt,doors,vehicles);const oldY=p.y;p.y+=p.vy*dt;const ground=supportHeight(p.x,p.z,oldY,vehicles);if(p.y<=ground){p.landImpact=-p.vy;p.y=ground;p.vy=0;p.falling=false;p.landPose=.24;}return;}
  if(p.gliding){p.chuteOpen=Math.min(1,(p.chuteOpen||0)+dt/ .65);
@@ -142,7 +146,7 @@ export function integrateMovement(p,i,dt,time=0,doors,vehicles){
  const wanted=['stand','crouch','prone'].includes(i.stance)?i.stance:'stand';if(wanted===p.stance||!actorBlocked(p,p.x,p.z,0,wanted,doors,vehicles))p.stance=wanted;
  const s=stanceOf(p),groundBefore=supportHeight(p.x,p.z,p.y+.12,vehicles),grounded=p.y<=groundBefore+.14&&p.vy<=0,boost=p.boost>0?1.035:1;
  p.wading=riverDistance(p.x,p.z)<9&&p.y<WATER_Y-.4;const speed=p.usingPain?0:p.wading?1.7:p.heal?1.1:(p.stance==='stand'&&i.sprint&&!i.aim&&(i.mz||0)>.5&&Math.abs(i.mx||0)<.65?6.8:s.speed)*(i.aim?.75:1)*boost;
- const n=Math.max(1,Math.hypot(i.mx||0,i.mz||0)),dx=(i.mx||0)/n,dz=(i.mz||0)/n*((i.mz||0)<0?.8:1);
+ const n=Math.max(1,Math.hypot(i.mx||0,i.mz||0)),dx=(i.mx||0)/n*1.08,dz=(i.mz||0)/n*((i.mz||0)<0?.9:1);
  move(p,(-Math.cos(i.yaw)*dx+Math.sin(i.yaw)*dz)*speed*dt,(Math.sin(i.yaw)*dx+Math.cos(i.yaw)*dz)*speed*dt,doors,vehicles);
  const step=p.stance==='prone'?.12:.28,ground=supportHeight(p.x,p.z,p.y+step,vehicles);
  if(grounded&&ground>=p.y-.32&&ground<=p.y+step){p.y=ground;p.vy=0;}else{const oldY=p.y;p.vy=Math.max(-32,(p.vy||0)-18*dt);const next=p.y+p.vy*dt;
@@ -150,5 +154,5 @@ export function integrateMovement(p,i,dt,time=0,doors,vehicles){
   else{p.y=next;const landing=supportHeight(p.x,p.z,oldY+.02,vehicles);if(p.y<=landing){if(p.vy<-1.5)p.landPose=.24;p.y=landing;p.vy=0;}}
  }
  p.landPose=Math.max(0,(p.landPose||0)-dt);if(!grounded)p.jumpTime=(p.jumpTime||0)+dt;else p.jumpTime=0;
- p.vx=(p.x-oldX)/Math.max(.001,dt);p.vz=(p.z-oldZ)/Math.max(.001,dt);
+ p.vx=(p.x-oldX)/Math.max(.001,dt);p.vz=(p.z-oldZ)/Math.max(.001,dt);if(grounded)p.gaitPhase=(p.gaitPhase||0)+Math.hypot(p.x-oldX,p.z-oldZ)*(p.stance==='prone'?2.5:1.95);
 }

@@ -3,15 +3,16 @@ export const HALF=750,MAP_SIZE=1500,MAP_ID='emerald-isles',FLIGHT_HEIGHT=300,FLI
 export const ARENA={x:940,z:940,w:74,d:66,y:8,bounds:{minX:905,maxX:975,minZ:909,maxZ:971}};
 const rollingHills=Array.from({length:28},(_,i)=>{const r=rng(1853+i*311);return{x:(r()-.5)*1400,z:(r()-.5)*1400,r:35+r()*60,h:5+r()*16};});
 export const POIS=[
- {id:'training',name:'중앙 훈련장',x:-40,z:-20,kind:'training',buildings:8,guns:20,outdoor:8},
- {id:'resort',name:'정글 휴양지',x:430,z:-460,kind:'resort',buildings:8,guns:16,outdoor:0},
- {id:'port',name:'동남 부두',x:470,z:500,kind:'port',buildings:6,guns:16,outdoor:10},
- {id:'northwest',name:'반얀 마을',x:-500,z:-480,kind:'village',buildings:8,guns:10,outdoor:1},
- {id:'north',name:'강바람 마을',x:-60,z:-520,kind:'village',buildings:8,guns:10,outdoor:1},
- {id:'southwest',name:'대나무 마을',x:-480,z:460,kind:'village',buildings:8,guns:10,outdoor:1},
- {id:'south',name:'남쪽 논밭 마을',x:-20,z:480,kind:'village',buildings:8,guns:10,outdoor:1},
- {id:'ruins',name:'이끼 유적',x:-500,z:10,kind:'ruins',buildings:3,guns:8,outdoor:8},
- {id:'quarry',name:'붉은 채석장',x:520,z:80,kind:'quarry',buildings:3,guns:8,outdoor:6},
+ {id:'training',name:'중앙 훈련장',x:-40,z:-20,kind:'training',buildings:8,guns:18,outdoor:10},
+ {id:'resort',name:'정글 휴양지',x:430,z:-460,kind:'resort',buildings:8,guns:14,outdoor:0},
+ {id:'port',name:'동남 부두',x:470,z:500,kind:'port',buildings:6,guns:14,outdoor:8},
+ {id:'northwest',name:'반얀 마을',x:-500,z:-480,kind:'village',buildings:8,guns:10,outdoor:2},
+ {id:'north',name:'강바람 마을',x:-60,z:-520,kind:'village',buildings:8,guns:10,outdoor:2},
+ {id:'southwest',name:'대나무 마을',x:-480,z:460,kind:'village',buildings:8,guns:10,outdoor:2},
+ {id:'south',name:'남쪽 논밭 마을',x:-20,z:480,kind:'village',buildings:8,guns:10,outdoor:2},
+ {id:'ruins',name:'이끼 유적',x:-500,z:10,kind:'ruins',buildings:3,guns:8,outdoor:5},
+ {id:'quarry',name:'붉은 채석장',x:520,z:80,kind:'quarry',buildings:3,guns:8,outdoor:5},
+ ...[[-660,-110],[-310,-670],[270,-650],[680,270],[-660,640],[260,650]].map(([x,z],i)=>({id:'homestead-'+i,name:i%2?'사냥꾼의 오두막':'나무꾼의 집',x,z,kind:'homestead',style:i%2?'hunter':'lumberjack',buildings:1,guns:1,outdoor:0})),
  ...[[-280,-500],[185,-490],[-270,-5],[240,50],[-250,470],[225,490]].map(([x,z],i)=>({id:'camp-'+i,name:`숲 보급 야영지 ${i+1}`,x,z,kind:'camp',buildings:0,guns:2,outdoor:2}))
 ];
 export const riverX=z=>112+37*Math.sin(z*.0055)+14*Math.sin(z*.014);
@@ -40,7 +41,7 @@ const roadGrid=new Map();for(const r of ROADS)for(let i=1;i<r.points.length;i++)
 export function roadAt(x,z){let best={distance:Infinity,y:0,width:0};for(const s of roadGrid.get(Math.floor(x/32)+','+Math.floor(z/32))||[]){const dx=s.b.x-s.a.x,dz=s.b.z-s.a.z,t=clamp(((x-s.a.x)*dx+(z-s.a.z)*dz)/(dx*dx+dz*dz),0,1),d=Math.hypot(x-s.a.x-dx*t,z-s.a.z-dz*t);if(d<best.distance)best={distance:d,y:s.a.y+(s.b.y-s.a.y)*t,width:s.width};}return best;}
 const ring=[[-31,-31],[0,-31],[31,-31],[-31,0],[31,0],[-31,31],[0,31],[31,31]],resort=[[-38,-38],[0,-38],[38,-38],[-38,0],[38,0],[-38,38],[38,38],[-73,-38]];
 export const BUILDINGS=[];
-for(const poi of POIS){for(let i=0;i<poi.buildings;i++){const q=poi.kind==='training'?[[-45,-30],[-15,-30],[15,-30],[45,-30],[-45,30],[-15,30],[15,30],[45,30]][i]:poi.kind==='resort'?resort[i]:poi.kind==='port'?[[-40,-25],[0,-25],[40,-25],[-40,25],[0,25],[40,25]][i]:ring[i],wood=poi.kind==='village',w=wood?15+(i%3)*1.5:poi.kind==='port'?25:poi.kind==='training'?18:poi.kind==='resort'?21:16,d=wood?14+(i%2)*2:poi.kind==='port'?20:17,rot=i%2,floors=poi.kind==='port'||poi.kind==='quarry'||poi.kind==='ruins'?1:(i%3===0?1:2),style=wood?['cottage','farmhouse','cabin','lodge'][i%4]:poi.kind,colors=wood?[0x8d6440,0x795333,0x9c7144]:poi.kind==='training'?[0x858771,0x6e795f]:poi.kind==='resort'?[0xa38c66,0x8b7758]:poi.kind==='port'?[0x70847d,0x8b7557]:[0x7b8069,0x82755a],x=poi.x+q[0],z=poi.z+q[1];BUILDINGS.push({index:BUILDINGS.length,x,z,w,d,rot,style,floors,color:colors[i%colors.length],zone:poi.id,y:naturalHeight(x,z)+.4,level:3.4,h:floors*3.4});}}
+for(const poi of POIS){for(let i=0;i<poi.buildings;i++){const q=poi.kind==='homestead'?[0,0]:poi.kind==='training'?[[-45,-30],[-15,-30],[15,-30],[45,-30],[-45,30],[-15,30],[15,30],[45,30]][i]:poi.kind==='resort'?resort[i]:poi.kind==='port'?[[-40,-25],[0,-25],[40,-25],[-40,25],[0,25],[40,25]][i]:ring[i],wood=poi.kind==='village'||poi.kind==='homestead',w=poi.kind==='homestead'?14:wood?15+(i%3)*1.5:poi.kind==='port'?25:poi.kind==='training'?18:poi.kind==='resort'?21:16,d=poi.kind==='homestead'?13:wood?14+(i%2)*2:poi.kind==='port'?20:17,rot=i%2,floors=poi.kind==='homestead'?1:poi.kind==='port'||poi.kind==='quarry'||poi.kind==='ruins'?1:(i%3===0?1:2),style=poi.kind==='homestead'?poi.style:wood?['cottage','farmhouse','cabin','lodge'][i%4]:poi.kind,colors=wood?[0x8d6440,0x795333,0x9c7144]:poi.kind==='training'?[0x858771,0x6e795f]:poi.kind==='resort'?[0xa38c66,0x8b7758]:poi.kind==='port'?[0x70847d,0x8b7557]:[0x7b8069,0x82755a],x=poi.x+q[0],z=poi.z+q[1];BUILDINGS.push({index:BUILDINGS.length,x,z,w,d,rot,style,floors,color:colors[i%colors.length],zone:poi.id,y:naturalHeight(x,z)+.4,level:3.4,h:floors*3.4});}}
 const buildingGrid=new Map();for(const b of BUILDINGS)for(let x=Math.floor((b.x-28)/64);x<=Math.floor((b.x+28)/64);x++)for(let z=Math.floor((b.z-28)/64);z<=Math.floor((b.z+28)/64);z++){const key=x+','+z;if(!buildingGrid.has(key))buildingGrid.set(key,[]);buildingGrid.get(key).push(b);}
 export function buildingsNear(x,z){return buildingGrid.get(Math.floor(x/64)+','+Math.floor(z/64))||[];}
 export function heightFormula(x,z){let h=naturalHeight(x,z);const ae=Math.max(Math.abs(x-ARENA.x)-ARENA.w/2,Math.abs(z-ARENA.z)-ARENA.d/2);if(ae<12)h+=(ARENA.y-h)*(1-smooth(1,12,ae));const r=roadAt(x,z);if(riverDistance(x,z)>18&&r.distance<r.width/2+7)h+=(r.y-h)*(1-smooth(r.width/2,r.width/2+7,r.distance));for(const bridge of BRIDGES){const along=Math.abs(bridge.rot?z-bridge.z:x-bridge.x),across=Math.abs(bridge.rot?x-bridge.x:z-bridge.z);if(along<33&&across<6)h=Math.min(h,bridge.y-.22);}

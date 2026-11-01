@@ -18,6 +18,7 @@ export function bodyParts(p){
  const point=(x,y,z)=>{if(p.gliding){const r=p.bank||0,nx=x*Math.cos(r)-y*Math.sin(r);y=x*Math.sin(r)+y*Math.cos(r);x=nx;}return[p.x+x*cos+z*sin,p.y+y,p.z-x*sin+z*cos];};
  const sphere=(zone,x,y,z,r)=>out.push({zone,a:point(x,y,z),b:point(x,y,z),r});
  const limb=(zone,a,b,r)=>out.push({zone,a:point(...a),b:point(...b),r});
+ if(p.vehicleId){sphere('head',0,.9,.075,.205);limb('torso',[0,.15,0],[0,.7,.04],.265);for(const side of[-1,1]){limb('leg',[side*.15,.15,0],[side*.15,-.38,.55],.13);limb('arm',[side*.29,.7,.04],[side*.26,.72,.72],.11);}return out;}
  if(stance==='prone'){
   sphere('head',0,.35,.69,.195);limb('torso',[0,.31,-.35],[0,.32,.39],.25);
   for(const side of [-1,1]){limb('arm',[side*.29,.27,.22],[side*.24,.22,.88],.11);limb('leg',[side*.15,.21,-.33],[side*.2,.13,-1.02],.13);}

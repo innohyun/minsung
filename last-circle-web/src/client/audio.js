@@ -8,6 +8,8 @@ export class GameAudio {
   if(!this.ctx||!this.enabled||kind==='nearMiss'&&distance>=7||kind==='impact'&&distance>=22)return;this.counts[kind]=(this.counts[kind]||0)+1;
   const v=1/(1+distance*.12);
   if(kind==='shot'){this.noiseBurst((weapon===3?.42:.30)*v,weapon===4?.2:.12,[5100,4200,6500,3300,2900][weapon]||4200,pan);this.tone(.22*v,[95,75,150,56,68][weapon]||95,35,.16,pan);this.noiseBurst(.06*v,.25,1800,pan,'bandpass');}
+  if(kind==='splash'){this.noiseBurst(.23*v,.5,1700,pan,'bandpass');this.tone(.08*v,240,65,.2,pan);}
+  if(kind==='waterStep'){this.noiseBurst(.1*v,.24,1900,pan,'bandpass');this.tone(.035*v,180,60,.12,pan);}
   if(kind==='step'){this.noiseBurst((prone?.035:run?.12:.075)*v,.09,600,pan,'bandpass');this.tone(.055*v,90,42,.07,pan);}
   if(kind==='reload'){this.noiseBurst(.09*v,.065,2600,pan,'highpass');this.tone(.035*v,540,230,.07,pan);}
   if(kind==='hit'){this.noiseBurst(.10,.11,900,0);this.tone(.08,100,42,.14);}

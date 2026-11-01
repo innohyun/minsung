@@ -1,4 +1,4 @@
-<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#121b18"><meta name="description" content="설치 없이 친구와 AI를 합쳐 20명이 겨루는 3인칭 배틀로얄. 방을 만들고 마지막 한 명이 되어보세요."><title>LAST CIRCLE — 마지막 한 명</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231a2820'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23c6eb85' stroke-width='5'/%3E%3Cpath d='M32 19v26M19 32h26' stroke='%23c6eb85' stroke-width='3'/%3E%3C/svg%3E"><link rel="stylesheet" href="/style.css?v=0.6.0"></head><body>
+<!doctype html><html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#121b18"><meta name="description" content="설치 없이 친구와 AI를 합쳐 20명이 겨루는 3인칭 배틀로얄. 방을 만들고 마지막 한 명이 되어보세요."><title>LAST CIRCLE — 마지막 한 명</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%231a2820'/%3E%3Ccircle cx='32' cy='32' r='19' fill='none' stroke='%23c6eb85' stroke-width='5'/%3E%3Cpath d='M32 19v26M19 32h26' stroke='%23c6eb85' stroke-width='3'/%3E%3C/svg%3E"><link rel="stylesheet" href="/style.css?v=0.7.0"></head><body>
 <canvas id="scene" aria-label="3D 배틀로얄 게임 화면"></canvas>
 <div id="shade"></div>
 <header><a href="/" class="brand"><span class="brand-icon">◎</span> LAST CIRCLE<span class="edition">BROWSER EDITION</span></a><div class="top-right"><span class="connection"><i></i><span id="connection">플레이 준비 완료</span></span><button id="sound" class="icon-button" title="소리 켜기/끄기" aria-label="소리 켜기/끄기">♫</button><button id="help" class="icon-button" title="조작법">?</button></div></header>
@@ -26,6 +26,7 @@
 <div id="duel-countdown" hidden></div>
 <div id="flash-overlay" aria-hidden="true"></div><div id="smoke-overlay" aria-hidden="true"></div>
 <div id="scope" hidden><div class="scope-lens"><i class="scope-h"></i><i class="scope-v"></i><i class="scope-dot"></i><span>4×</span></div></div>
+<div id="burn-overlay" hidden aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
 <div id="damage-overlay" aria-hidden="true"></div>
 <div id="touch-controls" hidden>
  <div id="touch-look" aria-label="드래그해서 시점 이동"></div>
@@ -40,4 +41,4 @@
 </div>
 <div id="vehicle-controls" hidden><div id="drive-look" aria-label="드래그해서 차량 시점 회전"></div><div class="vehicle-steering"><button id="drive-left" aria-label="왼쪽 조향">◀</button><button id="drive-right" aria-label="오른쪽 조향">▶</button></div><div class="vehicle-pedals"><button id="drive-brake">브레이크<small>정지 시 후진</small></button><button id="drive-accelerate">가속<small>누르고 유지</small></button></div><button id="drive-exit">내리기 · E</button><span class="drive-help">← → 조향 · ↑ 가속 · ↓ 브레이크/후진 · E 내리기</span></div>
 <div id="toast" role="status" hidden></div><div id="loading"><div class="loader-logo">◎</div><b>LAST CIRCLE</b><span id="load-message">들판을 준비하고 있어요…</span></div><div id="webgl-error" class="modal" hidden><h2>3D 화면을 열 수 없어요</h2><p>PC의 Chrome 또는 Edge에서 하드웨어 가속을 켜고 다시 접속해 주세요.</p></div>
-<footer id="footer"><span>© LAST CIRCLE</span><span>첫 번째 원이 곧 시작됩니다.</span><a href="#" id="footer-help">조작법 ↗</a></footer><script type="module" src="/game.js?v=0.6.0"></script></body></html>
+<footer id="footer"><span>© LAST CIRCLE</span><span>첫 번째 원이 곧 시작됩니다.</span><a href="#" id="footer-help">조작법 ↗</a></footer><script type="module" src="/game.js?v=0.7.0"></script></body></html>
