@@ -28,7 +28,7 @@ export function createArchitecture(buildings){
   };
   // Outer bounds contain the wall thickness; side walls stop at the inner front/back planes.
   slab(0,0,b.w-2*t,b.d-2*t,0);add(0,0,b.w,b.d,.40,-.60,'foundation',0x726d5a);
-  const doorX=((b.variant%5)-2)*.25,doorWidth=b.style==='garage'?3.6:3.2;
+  const doorX=((b.variant%5)-2)*.25,doorWidth=b.style==='warehouse'?5.8:b.style==='garage'?3.6:3.2;
   b.doorX=doorX;
   doors.push({...localPoint(b,doorX,-b.d/2+t/2),id:'door-'+b.index,building:b.index,rot:b.rot,flip:b.flip,w:doorWidth-.06,h:2.68,yaw:buildingYaw(b)});
   for(let floor=0;floor<b.floors;floor++){
@@ -70,6 +70,7 @@ export function createArchitecture(buildings){
   // Rooms and furnishings stay on the wide side, with a 1.4m hall beside the stairs.
   const roomMin=center-main/2+t,roomMax=center+main/2-t,roomCenter=(roomMin+roomMax)/2;
   for(let f=0;f<b.floors;f++){
+   if(b.style==='warehouse'){for(const side of[-1,1])for(let row=0;row<4;row++){const x=side*b.w*.28,z=-b.d*.23+row*b.d*.17,height=.75+(row%3)*.65;add(x,z,3.8,2.6,height,0,'cargo-crate',0x8d7755);for(let k=0;k<3;k++)loot(x+(k-1)*.7,z,height+.10,'cargo-'+side+'-'+row+'-'+k,'table',f);loot(side*2,z,.10,'aisle-'+side+'-'+row,'floor',f);}b.rooms.push({floor:f,plan:'cargo',center:0,splitZ:0,doorAt:0});continue;}
    const y=f*b.level,plan=(b.variant+f)%4,splitZ=(plan<2?1:-1)*b.d*(.08+(b.variant%7)*.009),partitionStart=roomMin+(side<0?1.4:.05),partitionEnd=roomMax-(side>0?1.4:.05);
    if(partitionEnd-partitionStart>2.4){const gapAt=roomCenter+(plan%2?.65:-.4),left=gapAt-1.2,right=gapAt+1.2;for(const[a,c]of[[partitionStart,left],[right,partitionEnd]])if(c-a>.1)add((a+c)/2,splitZ,c-a,.22,2.85,y,'partition',0xb2a68a);}
    if(plan>1&&main>10){const x=roomMin+main*.31,z=splitZ+(splitZ>0?-1:1)*b.d*.19;add(x,z,.22,b.d*.24,2.7,y,'partition',0xb2a68a);}

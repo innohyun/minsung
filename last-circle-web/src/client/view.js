@@ -1,3 +1,4 @@
+import{createWeaponModel}from'./weapon-model.js';
 import{FlightClock}from'./flight-clock.js';
 import{buildBushes}from'./foliage.js';
 import{concealedFrom}from'../bushes.js';
@@ -37,23 +38,7 @@ export function createView(canvas){
 
  const containerMeshes=new Map();
  const human={jacket:mat('#385f73'),npc:mat('#71876a'),pants:mat('#3e5054'),skin:mat('#c69d7b'),helmet:mat('#627c73'),boots:mat('#2b3840'),vest:mat('#596d61')};
- function gunModel(parent,index){const w=WEAPONS[index],group=new T.Group();parent.add(group);group.name='weapon-'+w.id;const pistol=w.family==='pistol',bull=w.family==='bullpup',bolt=w.family==='bolt',lmg=w.family==='lmg',compact=w.family==='smg',metal=mat(w.color,{metalness:.5,roughness:.43}),black=M.dark,wood=mat(index===1||index===3?'#a87a4b':'#526762');
-  const body=box(group,0,0,bull?-.08:0,pistol?.10:lmg?.19:.14,pistol?.115:lmg?.23:.17,pistol?.19:compact?.30:bull?.53:.5,metal,true);
-  box(group,0,.03,w.length*.34,pistol?.035:.05,pistol?.035:.055,w.length*.54,black);
-  box(group,0,pistol?-.10:-.13,pistol?-.045:-.08,pistol?.075:.085,pistol?.18:.23,pistol?.10:.12,black,true);
-  if(!pistol)box(group,0,-.01,-w.length*.32,bolt?.13:.16,.20,w.length*.26,wood,true);
-  if(index===6){box(group,0,-.07,.1,.15,.29,.18,metal,true);box(group,0,-.17,.18,.07,.16,.09,black);}
-  if(bull)box(group,0,-.08,.15,.07,.14,.09,black,true);
-  const magazine=box(group,0,pistol?-.18:-.19,bull?-.22:pistol?-.045:.1,lmg?.28:index===4?.14:pistol?.055:.075,lmg?.25:pistol?.06:bolt?.09:.26,lmg?.28:index===4?.22:.14,lmg?mat('#8c8c5e'):black,true);
-  if(lmg){box(group,0,.14,.05,.14,.09,.5,black);for(const side of[-1,1]){const leg=box(group,side*.09,-.13,.58,.035,.36,.035,black);leg.rotation.z=side*.32;}}
-  const opticalHeight=w.sight==='dot'||w.sight==='holo'?.245:w.sight==='scope'?.18:pistol?.088:.13;
-  if(w.sight==='scope'){const scope=new T.Mesh(geo.cylinder,black);scope.rotation.x=Math.PI/2;scope.position.set(0,opticalHeight,.03);scope.scale.set(w.family==='dmr'?.11:.145,w.family==='dmr'?.32:.48,w.family==='dmr'?.11:.145);group.add(scope);box(group,0,.11,0,.09,.1,.2,black);}
-  else if(w.sight==='dot'){box(group,0,.12,0,.075,.09,.09,black);const rim=new T.Mesh(new T.TorusGeometry(.068,.011,6,24),black);rim.position.set(0,opticalHeight,-.025);group.add(rim);const glass=new T.Mesh(new T.CircleGeometry(.057,24),new T.MeshBasicMaterial({color:'#85c3ba',transparent:true,opacity:.07,side:T.DoubleSide,depthWrite:false}));glass.position.copy(rim.position);group.add(glass);}
-  else if(w.sight==='holo'){box(group,0,.12,0,.11,.08,.09,black);for(const side of[-1,1]){box(group,side*.087,opticalHeight,-.025,.018,.16,.07,black,true);box(group,0,opticalHeight+side*.075,-.025,.185,.018,.07,black,true);}}
-  else{for(const side of[-1,1])box(group,side*(pistol?.028:.05),pistol?.071:.12,-.08,.012,pistol?.038:.06,.025,black);box(group,0,pistol?.056:.085,w.length*.43,.018,pistol?.042:.075,.032,black);}
-  if(w.sight==='dot'||w.sight==='holo'){const dot=new T.Mesh(new T.SphereGeometry(.0038,8,6),new T.MeshBasicMaterial({color:w.sight==='holo'?'#a5ff97':'#ff5144',toneMapped:false}));dot.position.set(0,opticalHeight,.022);group.add(dot);}
-  const flash=new T.Mesh(new T.ConeGeometry(pistol?.07:.13,pistol?.19:.36,5),new T.MeshBasicMaterial({color:'#ffe495'}));flash.rotation.x=Math.PI/2;flash.position.set(0,.03,w.length*.66);flash.visible=false;group.add(flash);return{group,magazine,flash,opticalHeight};
- }
+ const gunModel=(parent,index)=>createWeaponModel(parent,index,{geo,mat,box,M});
  function label(name,bot){const c=document.createElement('canvas');c.width=512;c.height=96;const ctx=c.getContext('2d');ctx.font='700 36px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineJoin='round';ctx.lineWidth=7;ctx.strokeStyle='#172d2be6';ctx.strokeText(name,256,50,470);ctx.fillStyle=bot?'#cfdfc2':'#f3ffe6';ctx.fillText(name,256,50,470);const texture=new T.CanvasTexture(c);texture.colorSpace=T.SRGBColorSpace;const sprite=new T.Sprite(new T.SpriteMaterial({map:texture,depthWrite:false}));sprite.scale.set(1.7,.31,1);return sprite;}
  const vectorA=v3(),vectorB=v3(),vectorD=v3();
  function segment(mesh,a,b,r){vectorA.set(...a);vectorB.set(...b);mesh.position.copy(vectorA).add(vectorB).multiplyScalar(.5);vectorD.subVectors(vectorB,vectorA);mesh.quaternion.setFromUnitVectors(UP,vectorD.clone().normalize());mesh.scale.set(r*2,vectorD.length(),r*2);}

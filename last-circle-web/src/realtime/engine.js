@@ -26,8 +26,8 @@ export class GameRoom {
   let s=this.s;if(s.closed)return{status:410,error:'방장이 방을 닫았어요.'};
   let p,newToken;if(operation==='join'){
    if(s.mode==='duel'||s.phase!=='lobby')return{status:409,error:'이미 진행 중인 경기예요.'};
-   if(s.players.length>=SLOTS)return{status:409,error:'20명이 모두 찼어요.'};
-   newToken=randomToken();p=player(randomToken(8),(typeof body.nick==='string'?body.nick.trim().slice(0,16):'')||'플레이어');p.tokenHash=await digest(newToken);if(this.s!==s||s.phase!=='lobby')return{status:409,error:'이미 시작된 경기예요.'};if(s.players.length>=SLOTS)return{status:409,error:'20명이 모두 찼어요.'};this.touch(p,now);s.players.push(p);
+   if(s.players.length>=SLOTS)return{status:409,error:'25명이 모두 찼어요.'};
+   newToken=randomToken();p=player(randomToken(8),(typeof body.nick==='string'?body.nick.trim().slice(0,16):'')||'플레이어');p.tokenHash=await digest(newToken);if(this.s!==s||s.phase!=='lobby')return{status:409,error:'이미 시작된 경기예요.'};if(s.players.length>=SLOTS)return{status:409,error:'25명이 모두 찼어요.'};this.touch(p,now);s.players.push(p);
   }else{
    p=await this.authenticate(token);s=this.s;if(!p)return{status:401,error:'입장 정보를 확인하세요.'};this.update(now);this.touch(p,now);
    try{

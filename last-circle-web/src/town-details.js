@@ -1,4 +1,4 @@
-import{POIS,BUILDINGS,terrainHeight,roadAt,riverDistance}from'./map.js';
+import{POIS,BUILDINGS,ROADS,terrainHeight,roadAt,riverDistance}from'./map.js';
 import{localPoint}from'./building-utils.js';
 export function townDetails(){const out=[];
  const free=(x,z,r=1)=>riverDistance(x,z)>15&&!BUILDINGS.some(b=>x>b.bounds.minX-r&&x<b.bounds.maxX+r&&z>b.bounds.minZ-r&&z<b.bounds.maxZ+r);
@@ -12,7 +12,7 @@ export function townDetails(){const out=[];
  }
  for(const poi of POIS.filter(p=>p.kind==='village')){const vertical=['north','south'].includes(poi.id),p=(a,b)=>({x:poi.x+(vertical?b:a),z:poi.z+(vertical?a:b)});
   for(let a=-170;a<=170;a+=34)for(const side of[-1,1]){const q=p(a,side*7.2);if(free(q.x,q.z,.5)&&roadAt(q.x,q.z).distance>roadAt(q.x,q.z).width/2+1){add(q.x,q.z,.22,.22,6.2,'street-pole',0x6d6250,undefined,'cylinder');add(q.x,q.z,vertical?1.5:.25,vertical?.25:1.5,.18,'lamp-arm',0x6d6250,terrainHeight(q.x,q.z)+5.9);const lamp=p(a,side*6.7);add(lamp.x,lamp.z,.5,.5,.2,'street-lamp',0xc6be8e,terrainHeight(q.x,q.z)+5.72,'box',{solid:false});}}
-  for(let a=-176;a<176;a+=8)for(const side of[-1,1]){const q=p(a,side*5.05);if(!free(q.x,q.z,.8)||Math.abs(a)<5)continue;add(q.x,q.z,vertical?1.15:7.85,vertical?7.85:1.15,.1,'curb',0xa49b82,terrainHeight(q.x,q.z)+.025);}
+  const street=ROADS.find(r=>r.id===poi.id+'-high-street');for(let i=1;i<street.points.length;i++){const a=street.points[i-1],b=street.points[i],dx=b.x-a.x,dz=b.z-a.z,len=Math.hypot(dx,dz),parts=Math.ceil(len/.8);for(let j=0;j<parts;j++)for(const side of[-1,1]){const t=(j+.5)/parts,x=a.x+dx*t+dz/len*side*(street.width/2+.65),z=a.z+dz*t-dx/len*side*(street.width/2+.65);if(!free(x,z,.8)||Math.hypot(x-poi.x,z-poi.z)<7||roadAt(x,z).id!==street.id)continue;const h=terrainHeight(x,z),bottom=Math.min(h,...[-.5,.5].flatMap(s=>[-.5,.5].map(k=>terrainHeight(x+dx/len*s*len/parts+dz/len*k*.65,z+dz/len*s*len/parts-dx/len*k*.65))))-.15;add(x,z,.65,len/parts+.012,h+.09-bottom,'curb',0xa49b82,bottom,'obb',{yaw:Math.atan2(dx,dz),conform:true});}}
   for(let i=0;i<3;i++){const q=p(-32+i*30,80+(i%2)*8);if(!free(q.x,q.z,4)||roadAt(q.x,q.z).distance<7)continue;for(const s of[-1,1])add(q.x+s*1.7,q.z,.12,.12,2.65,'market-post',0x846a48);add(q.x,q.z,4.2,3.2,.16,'market-canopy',[0x8b7754,0x7b8e72,0xb49a6a][i],terrainHeight(q.x,q.z)+2.65);add(q.x,q.z,3.4,1.2,.82,'market-table',0x92734f);for(let k=0;k<3;k++)add(q.x-.9+k*.9,q.z, .65,.8,.22,'produce-crate',0x8b7650,terrainHeight(q.x,q.z)+.82);}
   const well=p(18,74);if(free(well.x,well.z,2))add(well.x,well.z,2.4,2.4,.95,'village-well',0x999880,undefined,'cylinder');
   for(let i=0;i<8;i++){const q=p(-145+i*41,(i%2?1:-1)*(77+i%3*6));if(!free(q.x,q.z,3)||roadAt(q.x,q.z).distance<8)continue;add(q.x,q.z,2.2,2.2,1.25,'hay-bale',0xaaa06a,undefined,'cylinder');if(i%2)for(let j=0;j<3;j++)add(q.x+j*.8,q.z+2.4, .65,.65,.9,'farm-crate',0x8c7958);}
