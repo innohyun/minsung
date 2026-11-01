@@ -1,5 +1,6 @@
 import{localPoint,buildingYaw}from'./building-utils.js';
 import{rng}from'./math.js';
+import{naturalHeight as groundHeight}from'./map.js';
 
 // All joins are adjacent solids. Slabs, foundations, porches and walls never share a visible face.
 const roofHeight=b=>b.h;
@@ -9,6 +10,7 @@ export function createArchitecture(buildings){
   const random=rng(b.variant+993),t=.32,external=b.externalStairs,strip=external?0:5.2,side=b.stairSide||1,orientation=b.stairStart||1,main=b.w-strip,center=-side*strip/2;
   b.routes=[];b.rooms=[];b.layoutId=[b.style,b.variant,side,orientation,b.w,b.d,b.roofType].join(':');
   const add=(x,z,w,d,h,y=0,kind='wall',color=b.color,extra={})=>{const p=localPoint(b,x,z,y),shaped=['gable','hiproof','obb'].includes(extra.shape);const q={...p,w:shaped?w:b.rot?d:w,d:shaped?d:b.rot?w:d,h,kind,color,shape:shaped?extra.shape:'box',building:b.index,texture:kind==='wall'||kind==='partition'?b.wallTexture:undefined,...extra};if(shaped)q.yaw=buildingYaw(b);boxes.push(q);return q;};
+  const groundedStep=(x,z,w,d,top)=>{const corners=[[-w/2,-d/2],[-w/2,d/2],[w/2,-d/2],[w/2,d/2]].map(([a,c])=>localPoint(b,x+a,z+c)),base=Math.min(-.43,...corners.map(q=>groundHeight(q.x,q.z)-b.y))-.025;return add(x,z,w,d,top-base,base,'step',0x8e8876);};
   const visual=(...args)=>{const q=add(...args);q.solid=false;return q;};
   const slab=(x,z,w,d,y,kind='floor',color=0x92734f)=>add(x,z,w,d,.20,y-.20,kind,color);
   const loot=(x,z,y,id,category='floor',floor=0)=>lootSpots.push({...localPoint(b,x,z,y),id:'b'+b.index+'-'+id,building:b.index,floor,zone:b.zone,outdoor:false,category});
@@ -40,7 +42,7 @@ export function createArchitecture(buildings){
   }
   const front=-b.d/2,porchWidth=b.style==='corner-shop'?b.w-1:b.style==='garage'?5.5:b.w*(.5+(b.variant%3)*.1),porchDepth=1.8+(b.variant%3)*.5;
   slab(doorX,front-porchDepth/2,porchWidth,porchDepth,-.035,'porch');
-  add(doorX,front-porchDepth-.4,doorWidth+.5,.8,.20,-.42,'step',0x8d8069);
+  groundedStep(doorX,front-porchDepth-.35,doorWidth+.5,.7,-.22);groundedStep(doorX,front-porchDepth-.95,doorWidth+.5,.5,-.36);
   if(b.variant%4!==2){slab(doorX,front-porchDepth/2,porchWidth+.15,porchDepth,2.72,b.floors===2?'balcony':'awning',b.roofColor);for(const s of[-1,1])add(doorX+s*(porchWidth/2-.15),front-porchDepth+.2,.16,.16,2.72,0,'post',0x827054);}
   // Alternating staircase lanes and mirrored entry directions create four circulation plans.
   for(let f=1;f<=b.floors;f++){
@@ -49,7 +51,7 @@ export function createArchitecture(buildings){
    if(!external)slab(side*(b.w/2-strip/2-t/2),end*(b.d/2-1-t/2),strip-t,2-t,y,kind);
   }
   const run=external?b.d-2:b.d-4,steps=Math.ceil(b.level/.18);
-  if(external){const lane=b.w/2+1.45;b.routes.push([localPoint(b,lane,-run/2,0),localPoint(b,lane,run/2,roofHeight(b)),localPoint(b,b.w/2-.65,b.d/2-1.25,roofHeight(b))]);for(let j=0;j<steps;j++){const z=-run/2+(j+.5)*run/steps,h=(j+1)*b.level/steps;add(lane,z,2.35,run/steps,h,0,'step',0x8e8876);}slab(b.w/2+1.15,b.d/2-1,2.94,1.65,b.h+.02,'roof-deck');for(const[h,z]of[[-.21,-run/2-.95],[0,-run/2-.5]])add(lane,z,2.7,.65,.2,h-.2,'step',0x8e8876);}
+  if(external){const lane=b.w/2+1.45;b.routes.push([localPoint(b,lane,-run/2,0),localPoint(b,lane,run/2,roofHeight(b)),localPoint(b,b.w/2-.65,b.d/2-1.25,roofHeight(b))]);for(let j=0;j<steps;j++){const z=-run/2+(j+.5)*run/steps,h=(j+1)*b.level/steps;groundedStep(lane,z,2.35,run/steps,h);}slab(b.w/2+1.15,b.d/2-1,2.94,1.65,b.h+.02,'roof-deck');groundedStep(lane,-run/2-.9,2.7,.9,-.20);groundedStep(lane,-run/2-.225,2.7,.45,0);}
 
   for(let f=0;!external&&f<b.floors;f++){
    const lane=side*(b.w/2-(f%2?3.9:1.3)),dir=orientation*(f%2?-1:1);
@@ -83,6 +85,7 @@ export function createArchitecture(buildings){
   if(b.style==='garage'||b.style==='workshop'){add(roomCenter,b.d*.05,1.8,1.1,.78,0,'workbench',0x826345);for(const s of[-1,1])visual(roomCenter+s*.6,b.d*.05,.18,.55,.08,.78,'tool',0x606d70);}
   if(b.style==='clinic'){for(const s of[-1,1])visual(doorX+s*.25,front-.21,.4,.05,.08,2.95,'sign',0xe0e2cf);visual(doorX,front-.22,.16,.05,.6,2.68,'sign',0xb65d51);}
   if(b.style==='corner-shop'){add(roomCenter,-b.d*.02,Math.min(4,main-2),.65,.95,0,'counter',0x826345);visual(doorX,front-.22,doorWidth+.8,.08,.48,2.76,'shop-sign',0x62796e);}
+  if(b.style==='summit-lodge'){visual(0,front-.24,4,.12,.55,2.8,'summit-sign',0xb9a56c);add(roomMin+1,b.d*.2,1.3,1.3,1.3,0,'stove',0x484b4c);for(const side of[-1,1])visual(side*(b.w/2-.7),front-.4,.28,.28,4.2,0,'summit-tower',0x82734e);}
   if(b.style==='hunter'||b.style==='lumberjack'){
    if(b.style==='hunter'){add(roomMin+.9,-b.d*.02,.9,.9,.9,0,'stove',0x454e48);add(roomMin+.9,-b.d*.02,.18,.18,1.8,.9,'chimney',0x62675a);visual(roomMin+.6,b.d*.25,.8,1.8,.18,.56,'bedroll',0x5e7153);}
    else{add(roomMin+.8,-b.d*.02,1.2,2,.8,0,'workbench',0x987142);for(let k=0;k<4;k++)add(roomMin+.7,b.d*.35-k*.5,.6,.4,.28,0,'split-wood',0x9b733f);visual(roomMin+.5,-.4,.07,.12,1.05,.5,'axe-handle',0x967547);visual(roomMin+.5,-.4,.18,.4,.22,1.4,'axe-head',0x65726c);}

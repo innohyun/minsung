@@ -1,6 +1,6 @@
 import test from'node:test';import assert from'node:assert/strict';
 import{makeRoom,player,step,fire,applyInput,damage,eliminate}from'../src/sim.js';import{configureDuel,prepareDuel,readyDuel,resolveDuel,forfeitDuel}from'../src/duel.js';import{ARENA,integrateMovement,localPoint,BUILDINGS,terrainHeight,blocked}from'../src/world.js';import{api}from'../src/server/api.js';import{database}from'../scripts/db-local.mjs';
-const req=(path,b={},token)=>new Request('http://test'+path,{method:'POST',headers:{'content-type':'application/json','x-game-rules':'11',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(b)});
+const req=(path,b={},token)=>new Request('http://test'+path,{method:'POST',headers:{'content-type':'application/json','x-game-rules':'12',...(token?{authorization:'Bearer '+token}:{})},body:JSON.stringify(b)});
 const call=async(env,path,b,token)=>{const r=await api(req(path,b,token),env),body=await r.json();assert.ok(r.ok,JSON.stringify(body));return body;};
 function duel(){const s=configureDuel(makeRoom('ABCDEF','duel',player('a','A')));s.players.push(player('b','B'));prepareDuel(s);return s;}
 function ready(s){for(const p of s.players)readyDuel(s,p,{primary:0,secondary:3,utility:'smoke'});for(let i=0;i<77;i++)step(s,.04);assert.equal(s.phase,'battle');}

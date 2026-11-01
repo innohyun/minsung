@@ -11,7 +11,8 @@ export const WEAPONS=[
  {id:'m249',name:'M249',caliber:'556',magazine:75,reload:5,interval:.075,damage:42,head:2.5,range:270,spread:.014,recoil:.038,sight:'iron',zoom:1.25,color:0x66745d,length:1.32,family:'lmg'},
  {id:'p10',name:'P10 권총',caliber:'9mm',magazine:10,reload:1.5,interval:.22,damage:24,head:2.3,range:90,spread:.015,recoil:.024,sight:'iron',zoom:1.2,color:0x4e5c60,length:.35,family:'pistol'},
  {id:'groza',name:'GROZA',exclusive:true,caliber:'762',magazine:30,reload:2.6,interval:.08,damage:49,head:2.4,range:250,spread:.008,recoil:.031,sight:'dot',zoom:1.6,color:0x4e6a58,length:.91,family:'bullpup'},
- {id:'mk14',name:'Mk14',exclusive:true,caliber:'762',magazine:20,reload:3.2,interval:.12,damage:61,head:2.5,range:400,spread:.002,recoil:.05,sight:'scope',zoom:4,color:0x6f7768,length:1.25,family:'dmr'}
+ {id:'mk14',name:'Mk14',exclusive:true,caliber:'762',magazine:20,reload:3.2,interval:.12,damage:61,head:2.5,range:400,spread:.002,recoil:.05,sight:'scope',zoom:4,color:0x6f7768,length:1.25,family:'dmr'},
+ {id:'summit-300',name:'침봉 .300',exclusive:true,summitOnly:true,caliber:'300',magazine:5,reload:4.2,interval:1.7,damage:125,head:2.6,range:550,spread:.0005,recoil:.09,sight:'scope',zoom:8,color:0x687981,length:1.5,family:'bolt'}
 ];
 export const PISTOL=10,PRIMARY_WEAPONS=WEAPONS.slice(0,10);
 export const STANCES={stand:{height:1.78,eye:1.53,speed:3.2,radius:.32,recoil:1},crouch:{height:1.22,eye:1.05,speed:1.8,radius:.34,recoil:.55},prone:{height:.55,eye:.36,speed:.8,radius:.29,recoil:.23}};

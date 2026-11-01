@@ -1,7 +1,10 @@
 import{localPoint,footprintParts}from'./building-utils.js';
 import {clamp,smooth,rng} from './math.js';
-export const HALF=750,MAP_SIZE=1500,MAP_ID='emerald-towns',FLIGHT_HEIGHT=300,FLIGHT_SECONDS=40,FLIGHT_START=-720,FLIGHT_SPAN=1440,WATER_Y=-1.1;
+export const HALF=750,MAP_SIZE=1500,MAP_ID='emerald-highlands',FLIGHT_HEIGHT=300,FLIGHT_SECONDS=40,FLIGHT_START=-720,FLIGHT_SPAN=1440,WATER_Y=-1.1;
 export const ARENA={x:940,z:940,w:74,d:66,y:8,bounds:{minX:905,maxX:975,minZ:909,maxZ:971}};
+export const MOUNTAINS=[{id:'seorak',name:'침봉 바위산',x:-365,z:-255,r:135,h:176},{id:'east-ridge',name:'푸른 등줄기',x:450,z:-190,r:155,h:48},{id:'south-ridge',name:'남쪽 병풍 능선',x:-345,z:330,r:150,h:38}];
+export const FORESTS=[{id:'redwood-west',x:-570,z:-280,r:92},{id:'redwood-east',x:405,z:245,r:100},{id:'redwood-south',x:-250,z:595,r:86}];
+export function mountainHeight(x,z){return MOUNTAINS.reduce((sum,m)=>{const dx=x-m.x,dz=z-m.z,d=(dx*dx+dz*dz)/(m.r*m.r),ridge=1+.06*Math.sin(dx*.065)*Math.sin(dz*.049)*Math.min(1,d*3);return sum+m.h*Math.exp(-d)*ridge;},0);}
 const rollingHills=Array.from({length:28},(_,i)=>{const r=rng(1853+i*311);return{x:(r()-.5)*1400,z:(r()-.5)*1400,r:35+r()*60,h:5+r()*16};});
 export const POIS=[
  {id:'training',name:'중앙 훈련장',x:-40,z:-20,kind:'training',buildings:12,guns:28,outdoor:10},
@@ -13,7 +16,7 @@ export const POIS=[
  {id:'south',name:'남쪽 논밭 마을',x:-20,z:480,kind:'village',buildings:20,guns:28,outdoor:4},
  {id:'ruins',name:'이끼 유적',x:-500,z:10,kind:'ruins',buildings:5,guns:10,outdoor:3},
  {id:'quarry',name:'붉은 채석장',x:520,z:80,kind:'quarry',buildings:5,guns:10,outdoor:3},
- ...[[-660,-110],[-310,-670],[270,-650],[680,270],[-660,640],[260,650]].map(([x,z],i)=>({id:'homestead-'+i,name:i%2?'사냥꾼의 오두막':'나무꾼의 집',x,z,kind:'homestead',style:i%2?'hunter':'lumberjack',buildings:1,guns:1,outdoor:0})),
+ ...[[-660,-110],[-365,-255],[270,-650],[680,270],[-660,640],[260,650]].map(([x,z],i)=>({id:'homestead-'+i,name:i===1?'침봉 정상 산장':i%2?'사냥꾼의 오두막':'나무꾼의 집',x,z,kind:'homestead',style:i===1?'summit-lodge':i%2?'hunter':'lumberjack',buildings:1,guns:1,outdoor:0})),
  ...[[-280,-500],[185,-490],[-270,-5],[240,50],[-250,470],[225,490]].map(([x,z],i)=>({id:'camp-'+i,name:`숲 보급 야영지 ${i+1}`,x,z,kind:'camp',buildings:0,guns:3,outdoor:3}))
 ];
 export const riverX=z=>112+37*Math.sin(z*.0055)+14*Math.sin(z*.014);
@@ -23,7 +26,7 @@ export const BRIDGES=[[-340,'main'],[40,'main'],[430,'main'],[-450,'branch'],[-1
 export const FORDS=[{x:-625,z:branchZ(-625),kind:'branch'},{x:riverX(640),z:640,kind:'main'}];
 export function inFord(x,z){return FORDS.some(f=>Math.hypot(x-f.x,z-f.z)<19);}
 const hill=(x,z,cx,cz,s,h)=>h*Math.exp(-((x-cx)**2+(z-cz)**2)/(s*s));
-export function landscapeHeight(x,z){return hill(x,z,-365,-255,135,74)+hill(x,z,345,-100,125,82)+hill(x,z,-410,300,110,58)+hill(x,z,310,350,145,43)+hill(x,z,-90,230,110,28)+hill(x,z,15,-655,95,39)+hill(x,z,620,-580,90,53)+rollingHills.reduce((n,q)=>n+hill(x,z,q.x,q.z,q.r,q.h),0)+Math.sin(x*.012)*Math.cos(z*.016)*4.5+Math.sin(x*.044+z*.019)*.65;}
+export function landscapeHeight(x,z){return mountainHeight(x,z)+hill(x,z,-365,-255,135,74)+hill(x,z,345,-100,125,82)+hill(x,z,-410,300,110,58)+hill(x,z,310,350,145,43)+hill(x,z,-90,230,110,28)+hill(x,z,15,-655,95,39)+hill(x,z,620,-580,90,53)+rollingHills.reduce((n,q)=>n+hill(x,z,q.x,q.z,q.r,q.h),0)+Math.sin(x*.012)*Math.cos(z*.016)*4.5+Math.sin(x*.044+z*.019)*.65;}
 export function naturalHeight(x,z){const dist=riverDistance(x,z),h=landscapeHeight(x,z),depth=inFord(x,z)?1.55:3.6;return h*smooth(9,43,dist)-depth*(1-smooth(5,17,dist));}
 function spline(points){const out=[];for(let j=0;j<points.length-1;j++)for(let k=0;k<28;k++){const t=k/28,a=points[Math.max(0,j-1)],b=points[j],c=points[j+1],d=points[Math.min(points.length-1,j+2)],v=i=>.5*(2*b[i]+(-a[i]+c[i])*t+(2*a[i]-5*b[i]+4*c[i]-d[i])*t*t+(-a[i]+3*b[i]-3*c[i]+d[i])*t*t*t);out.push({x:v(0),z:v(1)});}out.push({x:points.at(-1)[0],z:points.at(-1)[1]});return out;}
 const n=BRIDGES[0],m=BRIDGES[1],s=BRIDGES[2],bw=BRIDGES[3],bc=BRIDGES[4];
@@ -34,18 +37,20 @@ export const ROADS=[
  {id:'west-jungle',width:5.6,points:[[-525,-550],[-630,-355],[-610,-90],[-520,80],[bw.x,bw.z-48],[bw.x,bw.z+48],[-570,310],[-480,530]]},
  {id:'inner-forest',width:5.5,points:[[-65,-590],[-155,-370],[-175,-185],[-40,65],[bc.x,bc.z-48],[bc.x,bc.z+48],[-100,340],[-20,550]]},
  {id:'east-coast',width:6.4,points:[[430,-390],[580,-280],[650,-100],[590,80],[650,270],[550,400],[470,570]]},
- {id:'camp-west',width:3.4,points:[[-520,80],[-455,-60],[-315,-200],[-300,-560]]},
+ {id:'camp-west',width:3.4,points:[[-520,80],[-455,-60],[-225,-185],[-210,-390],[-300,-560]]},
+ {id:'summit-switchbacks',width:2.7,points:[[-560,-115],[-535,-280],[-460,-360],[-295,-355],[-265,-255],[-310,-230],[-365,-280]]},
  {id:'ridge-trail',width:3,points:[[-630,-355],[-520,-265],[-370,-180],[-260,-100],[-40,65]]},
  ...POIS.filter(p=>p.kind==='village').flatMap(p=>{const vertical=['north','south'].includes(p.id),point=(a,b)=>vertical?[p.x+b,p.z+a]:[p.x+a,p.z+b];return[{id:p.id+'-high-street',kind:'street',width:7.2,points:[point(-188,0),point(-95,-2),point(0,1),point(95,0),point(188,3)]},{id:p.id+'-cross-street',kind:'street',width:5.2,points:[point(0,-88),point(0,1),point(0,88)]},...[-1,1].map(side=>({id:p.id+'-back-lane-'+side,kind:'lane',width:3.4,points:[point(-182,side*57),point(-85,side*54),point(85,side*56),point(182,side*59)]}))];})
 ].map(r=>({...r,points:spline(r.points)}));
 for(const r of ROADS)for(const p of r.points){p.y=naturalHeight(p.x,p.z);for(const b of BRIDGES){const q=Math.max(Math.abs(p.x-b.x)/(b.rot?17:52),Math.abs(p.z-b.z)/(b.rot?52:17));p.y+=(b.y-p.y)*(1-smooth(.58,1,q));}}
+const summitTrail=ROADS.find(r=>r.id==='summit-switchbacks');for(let pass=0;pass<4;pass++){for(let i=summitTrail.points.length-2;i>=0;i--){const a=summitTrail.points[i],b=summitTrail.points[i+1],limit=Math.hypot(a.x-b.x,a.z-b.z)*.72;a.y=Math.max(a.y,b.y-limit);}for(let i=1;i<summitTrail.points.length;i++){const a=summitTrail.points[i-1],b=summitTrail.points[i],limit=Math.hypot(a.x-b.x,a.z-b.z)*.72;b.y=Math.max(b.y,a.y-limit);}}
 const roadGrid=new Map();for(const r of ROADS)for(let i=1;i<r.points.length;i++){const a=r.points[i-1],b=r.points[i],seg={a,b,width:r.width};for(let x=Math.floor((Math.min(a.x,b.x)-16)/32);x<=Math.floor((Math.max(a.x,b.x)+16)/32);x++)for(let z=Math.floor((Math.min(a.z,b.z)-16)/32);z<=Math.floor((Math.max(a.z,b.z)+16)/32);z++){const key=x+','+z;if(!roadGrid.has(key))roadGrid.set(key,[]);roadGrid.get(key).push(seg);}}
 export function roadAt(x,z){let best={distance:Infinity,y:0,width:0};for(const s of roadGrid.get(Math.floor(x/32)+','+Math.floor(z/32))||[]){const dx=s.b.x-s.a.x,dz=s.b.z-s.a.z,t=clamp(((x-s.a.x)*dx+(z-s.a.z)*dz)/(dx*dx+dz*dz),0,1),d=Math.hypot(x-s.a.x-dx*t,z-s.a.z-dz*t);if(d<best.distance)best={distance:d,y:s.a.y+(s.b.y-s.a.y)*t,width:s.width};}return best;}
 export const BUILDINGS=[];
 const styles=['brick-home','plaster-villa','timber-cottage','corner-shop','garage','farmhouse','workshop','clinic','lodge','courtyard','row-house','storehouse'];
 const wallColors=[0xc5b995,0xa88660,0x9c6650,0xc7c4ad,0x8e704e,0xa9afa1,0xb9a57f,0x77634c],roofColors=[0x864c36,0x635c4e,0x69726a,0x8a7250,0x5f6561,0x8b634b];
 for(const poi of POIS)for(let i=0;i<poi.buildings;i++){
- const random=rng(11471+BUILDINGS.length*941),village=poi.kind==='village',vertical=['north','south'].includes(poi.id),side=i%2?1:-1,style=poi.kind==='homestead'?poi.style:poi.kind==='port'?(i%3?'storehouse':'corner-shop'):poi.kind==='quarry'?(i%2?'garage':'workshop'):styles[(i+POIS.indexOf(poi)*3)%styles.length],w=poi.kind==='homestead'?14:village?14+Math.floor(random()*5)*1.2:poi.kind==='port'?22+Math.floor(random()*3)*2:16+Math.floor(random()*4)*1.6,d=poi.kind==='homestead'?13:13+Math.floor(random()*5)*1.1,rot=village?+vertical:i%2,flip=village?side<0:!!(i%3===1),floors=['garage','storehouse','workshop','hunter','lumberjack'].includes(style)?1:(i%4===0?1:2),annex=i%4===1&&i%3!==0&&w<20?{x:-w/2-2.8,z:d*.16,w:5.6,d:6.5+random()*1.5}:null;
+ const random=rng(11471+BUILDINGS.length*941),village=poi.kind==='village',vertical=['north','south'].includes(poi.id),side=i%2?1:-1,style=poi.kind==='homestead'?poi.style:poi.kind==='port'?(i%3?'storehouse':'corner-shop'):poi.kind==='quarry'?(i%2?'garage':'workshop'):styles[(i+POIS.indexOf(poi)*3)%styles.length],w=poi.style==='summit-lodge'?19:poi.kind==='homestead'?14:village?14+Math.floor(random()*5)*1.2:poi.kind==='port'?22+Math.floor(random()*3)*2:16+Math.floor(random()*4)*1.6,d=poi.style==='summit-lodge'?16:poi.kind==='homestead'?13:13+Math.floor(random()*5)*1.1,rot=village?+vertical:i%2,flip=village?side<0:!!(i%3===1),floors=poi.style==='summit-lodge'?2:['garage','storehouse','workshop','hunter','lumberjack'].includes(style)?1:(i%4===0?1:2),annex=i%4===1&&i%3!==0&&w<20?{x:-w/2-2.8,z:d*.16,w:5.6,d:6.5+random()*1.5}:null;
  let offset=poi.kind==='homestead'?[0,0]:village?[(((i>>1)%5)-2)*36,side*(25+Math.floor(i/10)*62+random()*4)]:poi.kind==='resort'?[(i%4-1.5)*39,(Math.floor(i/4)-1)*38]:poi.kind==='port'?[(i%5-2)*42,(Math.floor(i/5)-.5)*49]:poi.kind==='training'?[(i%4-1.5)*37,(Math.floor(i/4)-1)*38]:[(i%3-1)*34,(Math.floor(i/3)-.5)*36];
  let chosen=null;
  for(let attempt=0;attempt<120&&!chosen;attempt++){
@@ -65,3 +70,6 @@ function heightSample(ix,iz){const cx=Math.floor(ix/32),cz=Math.floor(iz/32),key
 export function terrainHeight(x,z){const gx=x/2,gz=z/2,ix=Math.floor(gx),iz=Math.floor(gz),a=gx-ix,b=gz-iz;return(heightSample(ix,iz)*(1-a)+heightSample(ix+1,iz)*a)*(1-b)+(heightSample(ix,iz+1)*(1-a)+heightSample(ix+1,iz+1)*a)*b;}
 export function flightPosition(time,route=0){const q=FLIGHT_START+clamp(time/FLIGHT_SECONDS,0,1)*FLIGHT_SPAN;return route%2?{x:0,z:route>1?-q:q,y:FLIGHT_HEIGHT,yaw:route>1?Math.PI:0}:{x:route>1?-q:q,z:0,y:FLIGHT_HEIGHT,yaw:route>1?-Math.PI/2:Math.PI/2};}
 export const LANDING_POINTS=POIS.map(p=>({zone:p.id,x:p.x,z:p.z+(p.kind==='camp'?8:75)}));
+
+export function riverFlow(x,z){const main=Math.abs(x-riverX(z)),branch=x<riverX(z)?Math.abs(z-branchZ(x)):Infinity;if(Math.min(main,branch)>10)return{x:0,z:0};if(branch<main){const dz=.16*Math.cos(x*.008),n=Math.hypot(1,dz);return{x:.62/n,z:dz*.62/n};}const dx=.2035*Math.cos(z*.0055)+.196*Math.cos(z*.014),n=Math.hypot(dx,1);return{x:dx*.68/n,z:.68/n};}
+export function terrainBiome(x,z,h=terrainHeight(x,z)){const slope=Math.hypot(terrainHeight(x+2,z)-terrainHeight(x-2,z),terrainHeight(x,z+2)-terrainHeight(x,z-2))/4,road=roadAt(x,z);if(road.distance<road.width/2)return road.width>6?'road':'trail';if(riverDistance(x,z)<19)return'sand';if(h>155||slope>.65)return'rock';if(FORESTS.some(f=>Math.hypot(x-f.x,z-f.z)<f.r+15))return'forest';const moisture=Math.sin(x*.008+z*.004)+Math.cos(z*.009-x*.003);return moisture>.8?'meadow':moisture<-.7?'dry':'earth';}

@@ -1,0 +1,1 @@
+export class FlightClock{constructor(){this.key='';this.time=0;}step(authority,dt,key){if(key!==this.key||Math.abs(authority-this.time)>4){this.key=key;this.time=Math.max(0,authority);return this.time;}const previous=this.time;this.time+=Math.min(.1,dt);this.time+=(authority-this.time)*(1-Math.exp(-dt*2.2));this.time=Math.max(previous,this.time);return this.time;}}

@@ -1,0 +1,1 @@
+export function rewardDamage(s,attacker,victim,amount){if(!attacker||attacker===victim||!Number.isFinite(amount)||amount<=0)return 0;const coins=Math.max(1,Math.round(amount*.2));attacker.coins=(attacker.coins||0)+coins;attacker.coinRewardSeq=(attacker.coinRewardSeq||0)+1;attacker.coinReward={amount:coins,at:s.time};return coins;}

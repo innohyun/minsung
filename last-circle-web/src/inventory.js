@@ -38,7 +38,7 @@ export function dropEquipment(s,p){
  if(p.dropped)return;p.dropped=true;const items=[];
  for(const gun of p.loadout||[])if(gun)items.push({id:gun.uid,kind:'weapon',weapon:gun.weapon,magAmmo:gun.ammo,gunUID:gun.uid});
  for(const[caliber,amount]of Object.entries(p.bag))if(amount>0)items.push({id:'ammo-'+caliber,kind:'ammo',caliber,amount});
- for(const[field,kind]of[['meds','med'],['painkillers','pain'],['grenades','grenade'],['smokes','smoke'],['flashes','flash'],['molotovs','molotov'],['fuelCans','fuel']])if(p[field]>0)items.push({id:kind,kind,amount:p[field]});
+ for(const[field,kind]of[['meds','med'],['painkillers','pain'],['grenades','grenade'],['smokes','smoke'],['flashes','flash'],['molotovs','molotov'],['fuelCans','fuel'],['traps','trap']])if(p[field]>0)items.push({id:kind,kind,amount:p[field]});
  if(p.coins>0)items.push({id:'coins',kind:'coin',amount:p.coins});if(p.universalAmmo>0)items.push({id:'universal-ammo',kind:'universal',amount:p.universalAmmo});p.coins=p.universalAmmo=0;
  if(p.armor>0)items.push({id:'vest',kind:'armor',armor:'vest',amount:p.armor});if(p.helmet>0)items.push({id:'helmet',kind:'armor',armor:'helmet',amount:p.helmet});
  if(items.length)s.containers.push({id:'fallen-'+s.round+'-'+p.id,name:p.name,...dropPosition(p,s),items});
