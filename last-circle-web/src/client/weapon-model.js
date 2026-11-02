@@ -16,7 +16,7 @@ const PROFILES={
  mk14:{width:.15,height:.17,body:.58,stock:'precision',rail:8,bipod:true,handguard:.15},
  'summit-300':{width:.145,height:.15,body:.64,stock:'precision',rail:12,brake:true,handguard:.10,bipod:true}
 };
-export function createWeaponModel(parent,index,{geo,mat,box,M}){const w=WEAPONS[index],group=new T.Group();parent.add(group);group.name='weapon-'+w.id;const pistol=w.family==='pistol',bull=w.family==='bullpup',bolt=w.family==='bolt',lmg=w.family==='lmg',compact=w.family==='smg',metal=mat(w.color,{metalness:.5,roughness:.43}),black=M.dark,wood=mat(index===1||index===3?'#a87a4b':'#526762');
+export function createWeaponModel(parent,index,{geo,mat,box,M,art}){const w=WEAPONS[index],group=new T.Group();parent.add(group);group.name='weapon-'+w.id;const pistol=w.family==='pistol',bull=w.family==='bullpup',bolt=w.family==='bolt',lmg=w.family==='lmg',compact=w.family==='smg',metal=mat(w.color,{metalness:.5,roughness:.43}),black=M.dark,wood=mat(index===1||index===3?'#a87a4b':'#526762');
   const profile=PROFILES[w.id],body=box(group,0,0,bull?-.08:0,profile.width,profile.height,profile.body,metal,true);group.userData.silhouette=w.id;
   const barrel=new T.Mesh(geo.cylinder,black);barrel.position.set(0,.03,w.length*.34);barrel.rotation.x=Math.PI/2;barrel.scale.set(pistol?.035:.055,w.length*.54,pistol?.035:.055);group.add(barrel);
   box(group,0,pistol?-.10:-.13,pistol?-.045:-.08,pistol?.075:.085,pistol?.18:.23,pistol?.10:.12,black,true);
@@ -51,5 +51,5 @@ export function createWeaponModel(parent,index,{geo,mat,box,M}){const w=WEAPONS[
   if(w.id==='p10'){add(0,.015,.055,.103,.075,.25,metal);for(const side of[-1,1])for(let i=0;i<5;i++)add(side*.052,.025,-.07+i*.013,.005,.055,.006,black);}
   if(profile.bipod){for(const side of[-1,1]){const leg=add(side*.09,-.14,.43,.025,.35,.025,black);leg.rotation.z=side*.45;}}
   if(profile.brake)add(0,.03,w.length*.59,.09,.07,.12,black);
-  const flash=new T.Mesh(new T.ConeGeometry(pistol?.07:.13,pistol?.19:.36,5),new T.MeshBasicMaterial({color:'#ffe495'}));flash.rotation.x=Math.PI/2;flash.position.set(0,.03,w.length*.66);flash.visible=false;group.add(flash);return{group,magazine,flash,opticalHeight};
+  const flash=new T.Mesh(new T.ConeGeometry(pistol?.07:.13,pistol?.19:.36,5),new T.MeshBasicMaterial({color:'#ffe495'}));flash.rotation.x=Math.PI/2;flash.position.set(0,.03,w.length*.66);flash.visible=false;group.add(flash);const result={group,magazine,flash,opticalHeight,modern:false};art?.onReady(()=>{const model=art.clone('weapon_'+w.id);if(!model)return;group.clear();group.add(model,flash);result.magazine=model.getObjectByName('mag_'+w.id)||new T.Object3D();result.magazineRest=result.magazine.position.clone();result.modern=true;const muzzle=model.getObjectByName('muzzle_'+w.id);if(muzzle){model.updateWorldMatrix(true,true);flash.position.copy(model.worldToLocal(muzzle.getWorldPosition(new T.Vector3())));}if(w.sight==='dot'||w.sight==='holo'){const dot=new T.Mesh(new T.SphereGeometry(.0038,8,6),new T.MeshBasicMaterial({color:'#ff5144',toneMapped:false}));dot.position.set(0,opticalHeight,.022);group.add(dot);}});return result;
  }

@@ -1,0 +1,42 @@
+{
+  "tree_broadleaf": {
+    "planeWidth": 12.8263,
+    "planeHeight": 13.3478,
+    "center": [
+      0.3657,
+      6.1216,
+      0
+    ],
+    "anchor": [
+      0.5,
+      0.041379
+    ],
+    "alphaCutoff": 0.4,
+    "doubleSided": true,
+    "depthWrite": true,
+    "resolution": [
+      256,
+      512
+    ]
+  },
+  "tree_metasequoia": {
+    "planeWidth": 15.1344,
+    "planeHeight": 41.2317,
+    "center": [
+      0.115,
+      18.9114,
+      0
+    ],
+    "anchor": [
+      0.5,
+      0.041337
+    ],
+    "alphaCutoff": 0.4,
+    "doubleSided": true,
+    "depthWrite": true,
+    "resolution": [
+      256,
+      512
+    ]
+  }
+}

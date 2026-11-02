@@ -1,0 +1,14 @@
+import * as T from 'three';import{WEAPONS}from'../weapons.js';
+// Animation clocks use the replicated gait/throw/reload state on every viewer.
+export function attachAvatar(c,art){if(c.avatar)return;const model=art.character();if(!model)return;const mixer=new T.AnimationMixer(model.root),actions=new Map(model.clips.map(clip=>[clip.name,mixer.clipAction(clip)]));model.root.name='survivor-render';c.root.add(model.root);c.avatar={...model,mixer,actions,socket:model.root.getObjectByName('weapon_socket'),active:null};}
+export function animateAvatar(c,p,target,dt,time){const a=c.avatar;if(!a)return;const speed=Math.hypot(target.vx||0,target.vz||0),throwAge=time-(p.throwAt??-10),stance=target.stance||p.stance;
+ let clip=throwAge>=0&&throwAge<.6?'throw':p.reload>0?'reload':p.falling||p.gliding||p.jumpTime>0?'jump':stance==='prone'?(speed>.15?'prone_crawl':'prone_idle'):stance==='crouch'||p.downed?(speed>.15?'crouch_walk':'crouch_idle'):speed>4.5?'run':speed>.15?'walk':p.aim?'aim':'idle';
+ const action=a.actions.get(clip);if(action&&a.active!==clip){const previous=a.actions.get(a.active);action.reset().play();if(previous)action.crossFadeFrom(previous,.12,false);a.active=clip;}
+ a.mixer.update(dt);if(action){const duration=action.getClip().duration;if(clip==='throw')action.time=throwAge/.6*duration;else if(clip==='reload')action.time=(1-p.reload/WEAPONS[p.weapon].reload)*duration;else if(['walk','run','crouch_walk','prone_crawl'].includes(clip))action.time=((target.gaitPhase??p.gaitPhase??0)/(Math.PI*2)%1+1)%1*duration;a.mixer.update(0);}
+ a.root.rotation.set(p.falling?1.0:0,0,c.death*1.48);a.root.position.y=p.vehicleId?-.45:0;
+ for(const obj of[c.chest,c.vest,c.hips,c.pack,c.head,...c.legs.flatMap(l=>[l.upper,l.lower,l.shoe]),...c.arms.flatMap(l=>[l.upper,l.lower,l.hand])])obj.visible=false;
+ for(const g of c.guns){if(!g)continue;const held=g===c.guns[p.weapon]&&p.held!=='throwable'&&!p.switchLeft&&!p.falling&&!p.gliding;if(held&&a.socket){a.socket.add(g.group);g.group.position.set(0,0,-c.kick);g.group.rotation.set(0,0,0);}else if(g.group.parent!==c.body)c.body.add(g.group);}
+ if(a.socket&&c.heldGrenade.visible){c.root.updateMatrixWorld(true);const point=new T.Vector3();a.socket.getWorldPosition(point);c.heldGrenade.position.copy(c.body.worldToLocal(point));}
+}
+export function attachFirstPersonHands(parent,art){return['right','left'].map(side=>{const hand=art.clone('hand_'+side),sleeve=art.clone('forearm_'+side);if(!hand||!sleeve)return null;parent.add(hand,sleeve);return{hand,sleeve};});}
+export function poseFirstPersonHand(model,wrist,elbow,visible){if(!model)return;model.hand.visible=model.sleeve.visible=visible;model.hand.position.copy(wrist);model.hand.rotation.set(-.05,Math.PI,0);model.sleeve.position.copy(wrist);const direction=wrist.clone().sub(new T.Vector3(...elbow));model.sleeve.quaternion.setFromUnitVectors(new T.Vector3(0,0,1),direction.clone().normalize());model.sleeve.scale.z=direction.length()/.32;}

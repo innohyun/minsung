@@ -1,0 +1,15 @@
+import{localPoint}from'./building-utils.js';import{naturalHeight}from'./map.js';
+export function createFarmBarn(b){const boxes=[],lootSpots=[],add=(x,z,w,d,h,y,kind='barn-wall',color=b.color,extra={})=>{const p=localPoint(b,x,z,y),q={...p,w:b.rot?d:w,d:b.rot?w:d,h,shape:'box',kind,color,building:b.index,...extra};boxes.push(q);return q;},spot=(x,z,y,id,category='floor')=>lootSpots.push({...localPoint(b,x,z,y),id:'barn-'+id,building:b.index,floor:0,zone:b.zone,outdoor:false,category});
+ b.routes=[];b.rooms=[{floor:0,plan:'agricultural-hall',center:0,splitZ:0,doorAt:0}];b.layoutId='farm-barn-80x42-open-truss';b.doorX=0;
+ add(0,0,b.w-.4,b.d-.4,.25,-.25,'barn-floor',0x9c9989,{driveSurface:true});const ground=Math.min(...[-b.w/2,b.w/2].flatMap(x=>[-b.d/2,b.d/2].map(z=>{const p=localPoint(b,x,z);return naturalHeight(p.x,p.z)-b.y;})))-.05;add(0,0,b.w,b.d,-.25-ground,ground,'barn-foundation',0x8b897c);
+ // Both broad ends have a 12m open entrance; this hall never borrows house partitions or furniture.
+ for(const sign of[-1,1]){for(const side of[-1,1])add(side*(b.w/4+3),sign*(b.d/2-.14),b.w/2-6,.28,b.h,0);add(0,sign*(b.d/2-.14),12,.28,b.h-5,5);const front=sign*(b.d/2+1.5),top=-.02,base=Math.min(-.35,...[-6,6].map(x=>{const p=localPoint(b,x,front);return naturalHeight(p.x,p.z)-b.y;}))-.04;add(0,front,12,3,top-base,base,'barn-ramp',0x9b9887,{driveSurface:true});}
+ for(const side of[-1,1]){const x=side*(b.w/2-.14);for(const[lo,hi]of[[-21,-14],[-8,-3],[3,8],[14,21]])add(x,(lo+hi)/2,.28,hi-lo,b.h,0);for(const z of[-11,0,11]){add(x,z,.28,6,2,0);add(x,z,.28,6,b.h-5,5);}}
+ for(const z of[-18,-9,0,9,18]){for(const x of[-20,20])add(x,z,.24,.24,b.h,0,'barn-frame',0x58615e);add(0,z,b.w-.6,.18,.24,b.h-.35,'barn-frame',0x58615e);}
+ add(0,0,b.w-.08,b.d-.05,3,b.h+.02,'barn-roof',b.roofColor,{shape:'gable',texture:'metal'});
+ // Agricultural machinery has visible-model descriptors plus smaller solid parts.
+ function equipment(id,x,z,w,d,h){const p=localPoint(b,x,z),model={...p,w,d,h,y:b.y,shape:'box',kind:'farm-equipment',color:0x78845b,model:id,solid:false,building:b.index};boxes.push(model);if(id==='tractor'){add(x,z+.25,1.8,2.5,.95,.65,'tractor-body',0x62734c,{hidden:true});add(x,z-.75,1.45,1.5,1.15,1.5,'tractor-cab',0x62734c,{hidden:true});for(const side of[-1,1])for(const end of[-1,1])add(x+side*.92,z+end*1.15,.4,.8,.95,0,'tractor-wheel',0x303830,{hidden:true});}else add(x,z,w*.8,d*.8,Math.max(.45,h*.65),0,'farm-tool-solid',0x85795c,{hidden:true});}
+ equipment('tractor',-25,-8,2.4,4.1,2.8);equipment('plow',-25,-2,2.5,3.4,1.2);equipment('wheelbarrow',25,-8,1,1.8,.95);equipment('grain_pallet',25,6,2.4,1.8,1.45);
+ for(const side of[-1,1])for(let i=0;i<4;i++){const x=side*(24+i%2*7),z=9+Math.floor(i/2)*4;add(x,z,2.8,2.2,1.3,0,'barn-sacks',0xa99a6d);spot(x,z,1.4,'sacks-'+side+'-'+i,'table');}
+ for(const side of[-1,1]){spot(side*10,8,.1,'weapon-'+side,'barn-rare');spot(side*10+.8,8,.1,'ammo-'+side,'barn-rare');spot(side*12,-10,.1,'utility-'+side);}
+ return{boxes,lootSpots};}

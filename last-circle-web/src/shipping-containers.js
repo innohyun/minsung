@@ -1,0 +1,11 @@
+import{POIS,ARENA,terrainHeight}from'./map.js';
+export const SHIPPING_CONTAINERS=[];
+for(const poi of POIS.filter(p=>p.id==='freight-yard'||p.kind==='port'))for(let row=0;row<2;row++)for(let col=0;col<6;col++){const length=(col+row)%3===0?6.058:12.192,x=poi.x-45+col*18,z=poi.z+(poi.kind==='port'?-74:32)+row*10,base={id:poi.id+'-container-'+row+'-'+col,x,z,y:terrainHeight(x,z),length,width:2.438,height:2.591,yaw:Math.PI/2,open:(col+row)%3===1,zone:poi.id,color:[0x516b73,0x806c4e,0x667755,0x7e4c42][col%4]};SHIPPING_CONTAINERS.push(base);if((col+row)%4===0)SHIPPING_CONTAINERS.push({...base,id:base.id+'-upper',y:base.y+base.height,open:false});}
+for(const side of[-1,1])SHIPPING_CONTAINERS.push({id:'arena-container-'+side,x:ARENA.x+side*12,z:ARENA.z+side*5,y:ARENA.y,length:12.192,width:2.438,height:2.591,yaw:side*Math.PI/2,open:true,zone:'arena',color:side>0?0x526d6b:0x80704c});
+export function containerGeometry(){const boxes=[],lootSpots=[];for(const c of SHIPPING_CONTAINERS){const cs=Math.cos(c.yaw),sn=Math.sin(c.yaw),local=(x,z)=>({x:c.x+x*cs+z*sn,z:c.z-x*sn+z*cs}),add=(x,z,w,d,h,y,kind,extra={})=>{const p=local(x,z);boxes.push({...p,y:c.y+y,w,d,h,shape:'obb',yaw:c.yaw,color:c.color,kind,texture:'metal',containerId:c.id,...extra});};const prefix=c.zone==='arena'?'arena-container':'shipping-container',W=c.width,L=c.length,H=c.height;
+ add(0,0,W,L,H,0,prefix,{solid:false,hidden:true});add(0,0,W,L,.12,0,prefix+'-floor',{driveSurface:true});add(0,0,W,L,.08,H-.08,prefix+'-roof');for(const side of[-1,1])add(side*(W/2-.035),0,.07,L-.12,H-.20,.12,prefix+'-wall');add(0,-L/2+.035,W-.14,.07,H-.20,.12,prefix+'-wall');
+ for(const side of[-1,1]){if(!c.open)add(side*W/4,L/2-.035,W/2-.02,.07,H-.20,.12,prefix+'-door');else{const angle=-side*-110*Math.PI/180,hinge=side*W/2,offset=-side*(W/4-.01),x=hinge+offset*Math.cos(angle),z=L/2-offset*Math.sin(angle);add(x,z,W/2-.02,.07,H-.20,.12,prefix+'-door',{yaw:c.yaw+angle});}}
+ // Corner castings and locking rods are light visual details, never invisible walls.
+ for(const x of[-W/2+.06,W/2-.06])for(const z of[-L/2+.06,L/2-.06])add(x,z,.12,.12,H,.0,prefix+'-corner');
+ if(c.open&&c.zone!=='arena')for(let i=0;i<4;i++){const p=local((i%2?1:-1)*.45,(Math.floor(i/2)-.5)*1.2);lootSpots.push({...p,y:c.y+.22,id:c.id+'-loot-'+i,zone:c.zone,outdoor:true,category:'container'});}
+ }return{boxes,lootSpots};}

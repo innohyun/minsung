@@ -1,3 +1,4 @@
+import{createFarmBarn}from'./farm-architecture.js';
 import{localPoint,buildingYaw}from'./building-utils.js';
 import{rng}from'./math.js';
 import{naturalHeight as groundHeight}from'./map.js';
@@ -6,7 +7,7 @@ import{naturalHeight as groundHeight}from'./map.js';
 const roofHeight=b=>b.h;
 export function createArchitecture(buildings){
  const boxes=[],doors=[],windows=[],lootSpots=[];
- for(const b of buildings){
+ for(const b of buildings){if(b.style==='farm-barn'){const barn=createFarmBarn(b);boxes.push(...barn.boxes);lootSpots.push(...barn.lootSpots);continue;}
   const random=rng(b.variant+993),t=.32,external=b.externalStairs,strip=external?0:5.2,side=b.stairSide||1,orientation=b.stairStart||1,main=b.w-strip,center=-side*strip/2;
   b.routes=[];b.rooms=[];b.layoutId=[b.style,b.variant,side,orientation,b.w,b.d,b.roofType].join(':');
   const add=(x,z,w,d,h,y=0,kind='wall',color=b.color,extra={})=>{const p=localPoint(b,x,z,y),shaped=['gable','hiproof','obb'].includes(extra.shape);const q={...p,w:shaped?w:b.rot?d:w,d:shaped?d:b.rot?w:d,h,kind,color,shape:shaped?extra.shape:'box',building:b.index,texture:kind==='wall'||kind==='partition'?b.wallTexture:undefined,...extra};if(shaped)q.yaw=buildingYaw(b);boxes.push(q);return q;};

@@ -1,14 +1,14 @@
-export function decorateTerrain(material,roadMask=null){material.onBeforeCompile=shader=>{if(roadMask)shader.uniforms.roadMask={value:roadMask};shader.vertexShader='attribute float biome;varying vec3 groundP;varying float groundType;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ngroundP=position;groundType=biome;');shader.fragmentShader='uniform sampler2D roadMask;varying vec3 groundP;varying float groundType;float soilNoise(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}float softSoil(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(soilNoise(i),soilNoise(i+vec2(1.,0.)),f.x),mix(soilNoise(i+vec2(0.,1.)),soilNoise(i+vec2(1.,1.)),f.x),f.y);}\n'+shader.fragmentShader;shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`vec2 soil=groundP.xz;
-float grain=soilNoise(floor(soil*22.0));float pebble=softSoil(soil*2.7);float patches=sin(soil.x*.29+sin(soil.y*.17)*2.0)*sin(soil.y*.23);
-float pattern=.92+grain*.12+patches*.045;
-if(groundType>3.5&&groundType<4.5)pattern=.96+.055*sin(soil.y*7.0+sin(soil.x*.8)*2.0)+grain*.04;
-else if(groundType>4.5&&groundType<5.5){float seam=abs(sin(soil.x*1.3+soil.y*.75+sin(soil.y*.49)));pattern=.79+pebble*.24+grain*.06;if(seam<.055)pattern*=.73;}
-else if(groundType>2.5&&groundType<3.5)pattern=.76+pebble*.33+grain*.08+patches*.08;
-else if(groundType>5.5)pattern=.89+grain*.15+pebble*.04;
-else if(groundType<1.5)pattern=.87+pebble*.15+patches*.12+grain*.06;
-diffuseColor.rgb*=pattern;
-vec2 roadUv=vec2((groundP.x+1024.0)/2048.0,(groundP.z+1024.0)/2048.0);
-vec3 road=texture2D(roadMask,roadUv).rgb;float paved=road.r,trail=road.g;
-vec3 asphalt=vec3(.145,.169,.166)*(.91+grain*.12);
-vec3 dirtTrack=vec3(.335,.249,.151)*(.9+pebble*.16);
-diffuseColor.rgb=mix(diffuseColor.rgb,dirtTrack,trail*.90);diffuseColor.rgb=mix(diffuseColor.rgb,asphalt,paved);`);};return material;}
+export function decorateTerrain(material,roadMask=null){material.customProgramCacheKey=()=>material.userData.art?.loaded?'pbr-terrain-v14':'terrain-v14';material.onBeforeCompile=shader=>{if(roadMask)shader.uniforms.roadMask={value:roadMask};const art=material.userData.art?.loaded?material.userData.art:null;const atlas=art?.manifest.materials.surfaceAtlas;if(art){shader.uniforms.soilAlbedo={value:art.texture(atlas.baseColor)};shader.uniforms.soilNormal={value:art.texture(atlas.normal)};shader.uniforms.soilRoughness={value:art.texture(atlas.roughness)};}
+ shader.vertexShader='attribute float biome;varying vec3 groundP;varying float groundType;\n'+shader.vertexShader;shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\ngroundP=position;groundType=biome;');shader.fragmentShader=`uniform sampler2D roadMask;varying vec3 groundP;varying float groundType;
+float soilNoise(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float softSoil(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(soilNoise(i),soilNoise(i+vec2(1.,0.)),f.x),mix(soilNoise(i+vec2(0.,1.)),soilNoise(i+vec2(1.,1.)),f.x),f.y);}
+${art?`uniform sampler2D soilAlbedo;uniform sampler2D soilNormal;uniform sampler2D soilRoughness;
+vec2 tileUv(float tile,vec2 p){return (vec2(mod(tile,4.),floor(tile/4.))+vec2(.01)+fract(p)*.98)/4.;}
+vec2 soilUv(){vec2 p=groundP.xz;vec3 road=texture2D(roadMask,(p+1024.)/2048.).rgb;float tile=groundType>4.5&&groundType<5.5?1.:groundType>7.5?12.:groundType<2.5?13.:12.;tile=road.r>.35?14.:road.g>.35?12.:tile;return tileUv(tile,p/3.);}`:''}\n`+shader.fragmentShader;
+ shader.fragmentShader=shader.fragmentShader.replace('#include <map_fragment>',`vec2 soil=groundP.xz;float grain=soilNoise(floor(soil*22.0));float pebble=softSoil(soil*2.7);float patches=sin(soil.x*.29+sin(soil.y*.17)*2.0)*sin(soil.y*.23);diffuseColor.rgb*=.9+grain*.1+patches*.045;
+vec3 road=texture2D(roadMask,(soil+1024.)/2048.).rgb;float paved=road.r,trail=road.g;
+${art?`vec3 detail=pow(texture2D(soilAlbedo,soilUv()).rgb,vec3(2.2));diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*.5+detail*.65,.82);`:''}
+vec3 asphalt=vec3(.095,.115,.113)*(.91+grain*.12);vec3 dirtTrack=vec3(.30,.21,.12)*(.9+pebble*.16);diffuseColor.rgb=mix(diffuseColor.rgb,dirtTrack,trail*.9);diffuseColor.rgb=mix(diffuseColor.rgb,asphalt,paved);`);
+ if(art){shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>','#include <roughnessmap_fragment>\nroughnessFactor=clamp(texture2D(soilRoughness,soilUv()).g,.65,1.);');shader.fragmentShader=shader.fragmentShader.replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>
+vec3 soilN=texture2D(soilNormal,soilUv()).xyz*2.-1.;vec3 soilQ1=dFdx(-vViewPosition),soilQ2=dFdy(-vViewPosition);vec2 soilS1=dFdx(groundP.xz/3.),soilS2=dFdy(groundP.xz/3.);vec3 soilT=normalize(soilQ1*soilS2.y-soilQ2*soilS1.y),soilB=normalize(-soilQ1*soilS2.x+soilQ2*soilS1.x);normal=normalize(normal+soilT*soilN.x*.32+soilB*soilN.y*.32);`);}
+ };return material;}

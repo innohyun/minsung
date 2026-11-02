@@ -1,0 +1,7 @@
+{
+  "creator": "Original LAST CIRCLE procedural art",
+  "seed": 73129,
+  "externalSources": [],
+  "pipeline": "Pillow/numpy texture synthesis and custom Blender meshes",
+  "license": "Original project assets; no third party dependencies or source media"
+}

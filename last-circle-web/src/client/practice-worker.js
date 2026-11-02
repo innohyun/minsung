@@ -1,0 +1,5 @@
+import{makeRoom,player,start,snapshot}from'../sim.js';import{GameRoom}from'../realtime/engine.js';
+let room=null,timer=null,lastInput=0,lastSent=0;
+function publish(){if(room){postMessage({type:'state',state:snapshot(room.s,'you')});lastSent=performance.now();}}
+function tick(){if(!room)return;try{const now=Date.now(),p=room.s.players[0];room.touch(p,now);if(now-lastInput>350)Object.assign(p.input,{mx:0,mz:0,fire:false,sprint:false,carThrottle:0,carBrake:0,carSteer:0});room.update(now);if(performance.now()-lastSent>=30)publish();}catch(e){postMessage({type:'error',message:e.message});}timer=setTimeout(tick,16);}
+self.onmessage=event=>{const m=event.data;if(m.type==='init'){clearTimeout(timer);const s=makeRoom('LOCAL','혼자 연습하기',player('you',m.name));s.players[0].lastSeen=Date.now();s.lastWall=Date.now();start(s,'you');room=new GameRoom(s,()=>{});lastInput=Date.now();publish();tick();}else if(m.type==='input'&&room){const now=Date.now(),p=room.s.players[0];lastInput=now;room.touch(p,now);room.input(p,m.packet,now);publish();}else if(m.type==='stop'){clearTimeout(timer);room=null;close();}};

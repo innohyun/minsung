@@ -1,0 +1,1164 @@
+{
+  "impostors": {
+    "tree_broadleaf": {
+      "assetId": "tree_broadleaf-impostor",
+      "planeWidth": 12.8263,
+      "planeHeight": 13.3478,
+      "center": [
+        0.3657,
+        6.1216,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.041379
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_metasequoia": {
+      "assetId": "tree_metasequoia-impostor",
+      "planeWidth": 15.1344,
+      "planeHeight": 41.2317,
+      "center": [
+        0.115,
+        18.9114,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.041337
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    }
+  },
+  "revision": "0.13.0",
+  "coordinateSystem": {
+    "units": "meters",
+    "up": "+Y",
+    "forward": "+Z",
+    "origin": "ground for world props; feet for survivor; receiver for firearms"
+  },
+  "assets": [
+    {
+      "id": "world-kit",
+      "path": "assets/art/563d0f112f033590848a1c7c306e34e56f0a4d7c2e73e74b669188a937b9d03f.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "563d0f112f033590848a1c7c306e34e56f0a4d7c2e73e74b669188a937b9d03f",
+      "size": 3240480,
+      "kind": "model"
+    },
+    {
+      "id": "character",
+      "path": "assets/art/e82113db77098c6f33c5f25acf52c616d473616bf29c72f6001dc8032a32efc7.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "e82113db77098c6f33c5f25acf52c616d473616bf29c72f6001dc8032a32efc7",
+      "size": 2056012,
+      "kind": "model"
+    },
+    {
+      "id": "weapons",
+      "path": "assets/art/7122c3d4ce0cccedfa8d16c39932b054f8e6f6229a8969eda67fd7b68fe9ad72.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "7122c3d4ce0cccedfa8d16c39932b054f8e6f6229a8969eda67fd7b68fe9ad72",
+      "size": 3737768,
+      "kind": "model"
+    },
+    {
+      "id": "hands",
+      "path": "assets/art/45fe82d68cce351c1381324aead1c90925485a9e0481f5775c587c8ad5eb9800.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "45fe82d68cce351c1381324aead1c90925485a9e0481f5775c587c8ad5eb9800",
+      "size": 1493988,
+      "kind": "model"
+    },
+    {
+      "id": "surface-atlas-basecolor",
+      "path": "assets/art/38fde33bbcd22fea0154a34ac9df0fd719e7d571bb6d8b62a44924a04c3070ef.webp",
+      "mime": "image/webp",
+      "sha256": "38fde33bbcd22fea0154a34ac9df0fd719e7d571bb6d8b62a44924a04c3070ef",
+      "size": 278588,
+      "kind": "texture"
+    },
+    {
+      "id": "surface-atlas-normal",
+      "path": "assets/art/2104733bb19f96c4e0148e42c1304a70d56e7244ac85d5ed3c9062701add329d.webp",
+      "mime": "image/webp",
+      "sha256": "2104733bb19f96c4e0148e42c1304a70d56e7244ac85d5ed3c9062701add329d",
+      "size": 877926,
+      "kind": "texture"
+    },
+    {
+      "id": "surface-atlas-orm",
+      "path": "assets/art/f29cc0576c4b9eab712a103277565e8e53823ad3394993bd6624dba8e954f521.webp",
+      "mime": "image/webp",
+      "sha256": "f29cc0576c4b9eab712a103277565e8e53823ad3394993bd6624dba8e954f521",
+      "size": 119744,
+      "kind": "texture"
+    },
+    {
+      "id": "surface-atlas-roughness",
+      "path": "assets/art/8df85151c4d690f5cd7b60ec97db07c53567a3ead267aad24b1f64a9b30db63a.webp",
+      "mime": "image/webp",
+      "sha256": "8df85151c4d690f5cd7b60ec97db07c53567a3ead267aad24b1f64a9b30db63a",
+      "size": 100748,
+      "kind": "texture"
+    },
+    {
+      "id": "foliage-basecolor",
+      "path": "assets/art/2c7932aa879fd9cbf356a0bf304ecd4c59e68002d2530986141a8c26a6d33a90.webp",
+      "mime": "image/webp",
+      "sha256": "2c7932aa879fd9cbf356a0bf304ecd4c59e68002d2530986141a8c26a6d33a90",
+      "size": 118848,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-grass-basecolor",
+      "path": "assets/art/21434d80b372658371d5dedc77003464092f5158de0dec4263bc0045d00f1e25.webp",
+      "mime": "image/webp",
+      "sha256": "21434d80b372658371d5dedc77003464092f5158de0dec4263bc0045d00f1e25",
+      "size": 30130,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-grass-normal",
+      "path": "assets/art/9abe971037992fb7dee3c395d245a08dcdd5f428cb693dcdec5437af7f2e1ca6.webp",
+      "mime": "image/webp",
+      "sha256": "9abe971037992fb7dee3c395d245a08dcdd5f428cb693dcdec5437af7f2e1ca6",
+      "size": 96262,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-grass-roughness",
+      "path": "assets/art/d774e8f7805104c1d192d70cd8565f593dcda3c136c2dc2cffba6f1d08169988.webp",
+      "mime": "image/webp",
+      "sha256": "d774e8f7805104c1d192d70cd8565f593dcda3c136c2dc2cffba6f1d08169988",
+      "size": 6874,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-soil-basecolor",
+      "path": "assets/art/7c38535bda32e1963f1d6ea5935162a72537e2c38765ef0f2f1e2580a167b096.webp",
+      "mime": "image/webp",
+      "sha256": "7c38535bda32e1963f1d6ea5935162a72537e2c38765ef0f2f1e2580a167b096",
+      "size": 15074,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-soil-normal",
+      "path": "assets/art/a45fe8de49cfd1521eed2cf08ad25b9f8fd99aac175fb00fb51465d23e936bdf.webp",
+      "mime": "image/webp",
+      "sha256": "a45fe8de49cfd1521eed2cf08ad25b9f8fd99aac175fb00fb51465d23e936bdf",
+      "size": 156246,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-soil-roughness",
+      "path": "assets/art/d774e8f7805104c1d192d70cd8565f593dcda3c136c2dc2cffba6f1d08169988.webp",
+      "mime": "image/webp",
+      "sha256": "d774e8f7805104c1d192d70cd8565f593dcda3c136c2dc2cffba6f1d08169988",
+      "size": 6874,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-gravel-basecolor",
+      "path": "assets/art/cd6d27f5dbb8e8acb717a6831a0a4b75a3a518847f5cc87c952ad13d3786a418.webp",
+      "mime": "image/webp",
+      "sha256": "cd6d27f5dbb8e8acb717a6831a0a4b75a3a518847f5cc87c952ad13d3786a418",
+      "size": 58308,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-gravel-normal",
+      "path": "assets/art/2ffe39d0a27128b98245dc7606ddfb11f94fa745c2d4248435fa4aff4268f6bb.webp",
+      "mime": "image/webp",
+      "sha256": "2ffe39d0a27128b98245dc7606ddfb11f94fa745c2d4248435fa4aff4268f6bb",
+      "size": 175904,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-gravel-roughness",
+      "path": "assets/art/d774e8f7805104c1d192d70cd8565f593dcda3c136c2dc2cffba6f1d08169988.webp",
+      "mime": "image/webp",
+      "sha256": "d774e8f7805104c1d192d70cd8565f593dcda3c136c2dc2cffba6f1d08169988",
+      "size": 6874,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-stone-basecolor",
+      "path": "assets/art/5b913f55e97952c71a342e56a734d168976424ad96bc82686e3692fad886e47e.webp",
+      "mime": "image/webp",
+      "sha256": "5b913f55e97952c71a342e56a734d168976424ad96bc82686e3692fad886e47e",
+      "size": 22618,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-stone-normal",
+      "path": "assets/art/3ac0086c4a3b1ddb325b5713fafcce4b5201cbf468beb6dfb88e77790b3070d5.webp",
+      "mime": "image/webp",
+      "sha256": "3ac0086c4a3b1ddb325b5713fafcce4b5201cbf468beb6dfb88e77790b3070d5",
+      "size": 72686,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-stone-roughness",
+      "path": "assets/art/7820ed0a18ecc5e368cf630eee56d3f5260dedf0f1670b0a977e449cafa588e9.webp",
+      "mime": "image/webp",
+      "sha256": "7820ed0a18ecc5e368cf630eee56d3f5260dedf0f1670b0a977e449cafa588e9",
+      "size": 6794,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-wood-basecolor",
+      "path": "assets/art/0561bd072e83942febf6cf6afb7b8be7c42aa8d1660dbece16d4f1344fa655f9.webp",
+      "mime": "image/webp",
+      "sha256": "0561bd072e83942febf6cf6afb7b8be7c42aa8d1660dbece16d4f1344fa655f9",
+      "size": 11774,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-wood-normal",
+      "path": "assets/art/c102f41d70eca2f9f0a34f7d0a954039178cf8ca740b3a43f2f1068dc1295311.webp",
+      "mime": "image/webp",
+      "sha256": "c102f41d70eca2f9f0a34f7d0a954039178cf8ca740b3a43f2f1068dc1295311",
+      "size": 22660,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-wood-roughness",
+      "path": "assets/art/7820ed0a18ecc5e368cf630eee56d3f5260dedf0f1670b0a977e449cafa588e9.webp",
+      "mime": "image/webp",
+      "sha256": "7820ed0a18ecc5e368cf630eee56d3f5260dedf0f1670b0a977e449cafa588e9",
+      "size": 6794,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-metal-basecolor",
+      "path": "assets/art/f41f07157a7a6ab99b9c03e65a1ca57c81779dcf91291272870c961e81019cc6.webp",
+      "mime": "image/webp",
+      "sha256": "f41f07157a7a6ab99b9c03e65a1ca57c81779dcf91291272870c961e81019cc6",
+      "size": 27460,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-metal-normal",
+      "path": "assets/art/33a8a73edf1e39e95125917f8b24a51484d805172ce661834b6eb8be733282d7.webp",
+      "mime": "image/webp",
+      "sha256": "33a8a73edf1e39e95125917f8b24a51484d805172ce661834b6eb8be733282d7",
+      "size": 30186,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-metal-roughness",
+      "path": "assets/art/199d072209bf5df6ae09fa3193ddcf763e186075831cfc8d2927013c0e506250.webp",
+      "mime": "image/webp",
+      "sha256": "199d072209bf5df6ae09fa3193ddcf763e186075831cfc8d2927013c0e506250",
+      "size": 6800,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-asphalt-basecolor",
+      "path": "assets/art/6c94d5bffdbd2a5285e50c795a378b822b142e2da3b07b377201dcd8357a929a.webp",
+      "mime": "image/webp",
+      "sha256": "6c94d5bffdbd2a5285e50c795a378b822b142e2da3b07b377201dcd8357a929a",
+      "size": 18936,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-asphalt-normal",
+      "path": "assets/art/2ffe39d0a27128b98245dc7606ddfb11f94fa745c2d4248435fa4aff4268f6bb.webp",
+      "mime": "image/webp",
+      "sha256": "2ffe39d0a27128b98245dc7606ddfb11f94fa745c2d4248435fa4aff4268f6bb",
+      "size": 175904,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-asphalt-roughness",
+      "path": "assets/art/edf470d977d52b4c4a98dab46758e65d032f06a76ea5de7731f05f70f1631c25.webp",
+      "mime": "image/webp",
+      "sha256": "edf470d977d52b4c4a98dab46758e65d032f06a76ea5de7731f05f70f1631c25",
+      "size": 6072,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-brick-basecolor",
+      "path": "assets/art/846067e92e50ccf5e011c03f75a80dd6e291cd28191c10f58317abdab392465c.webp",
+      "mime": "image/webp",
+      "sha256": "846067e92e50ccf5e011c03f75a80dd6e291cd28191c10f58317abdab392465c",
+      "size": 12690,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-brick-normal",
+      "path": "assets/art/d59fc583420a723cc5b32255a0afff4c7f279d86d0648467edc7729fce745874.webp",
+      "mime": "image/webp",
+      "sha256": "d59fc583420a723cc5b32255a0afff4c7f279d86d0648467edc7729fce745874",
+      "size": 39778,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-brick-roughness",
+      "path": "assets/art/8602ae72c8a08e3ee95daf1c1b0c1929b844246df98dee6834efa800b8c91668.webp",
+      "mime": "image/webp",
+      "sha256": "8602ae72c8a08e3ee95daf1c1b0c1929b844246df98dee6834efa800b8c91668",
+      "size": 5084,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-plaster-basecolor",
+      "path": "assets/art/ba77f3ea7fdde30e1124f26a2f0505cf8e1068b9ff9b52b6f4b1a1c24e396347.webp",
+      "mime": "image/webp",
+      "sha256": "ba77f3ea7fdde30e1124f26a2f0505cf8e1068b9ff9b52b6f4b1a1c24e396347",
+      "size": 16358,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-plaster-normal",
+      "path": "assets/art/85663e2441c20b13331bc9a86fa2a59b8dc56fe52ac22bc9fbfff4a3e970d9a7.webp",
+      "mime": "image/webp",
+      "sha256": "85663e2441c20b13331bc9a86fa2a59b8dc56fe52ac22bc9fbfff4a3e970d9a7",
+      "size": 30354,
+      "kind": "texture"
+    },
+    {
+      "id": "terrain-plaster-roughness",
+      "path": "assets/art/8602ae72c8a08e3ee95daf1c1b0c1929b844246df98dee6834efa800b8c91668.webp",
+      "mime": "image/webp",
+      "sha256": "8602ae72c8a08e3ee95daf1c1b0c1929b844246df98dee6834efa800b8c91668",
+      "size": 5084,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_broadleaf-impostor",
+      "path": "assets/art/065d4a83655c9804768b31b76ab23314e7a960e0ab6d9a2244a491bb79427433.webp",
+      "mime": "image/webp",
+      "sha256": "065d4a83655c9804768b31b76ab23314e7a960e0ab6d9a2244a491bb79427433",
+      "size": 40416,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_metasequoia-impostor",
+      "path": "assets/art/0da9a78549ec05e60b6e138ecaaf506b09aef4d3f552ab7ea0beed2384b4a906.webp",
+      "mime": "image/webp",
+      "sha256": "0da9a78549ec05e60b6e138ecaaf506b09aef4d3f552ab7ea0beed2384b4a906",
+      "size": 49880,
+      "kind": "texture"
+    }
+  ],
+  "models": {
+    "tree_broadleaf": {
+      "assetId": "world-kit",
+      "node": "tree_broadleaf",
+      "bounds": {
+        "min": [
+          -5.5724,
+          -0.058,
+          -6.4734
+        ],
+        "max": [
+          6.3038,
+          12.3012,
+          6.8988
+        ],
+        "width": 11.8762,
+        "height": 12.3591,
+        "length": 13.3722
+      }
+    },
+    "tree_metasequoia": {
+      "assetId": "world-kit",
+      "node": "tree_metasequoia",
+      "bounds": {
+        "min": [
+          -6.8916,
+          -0.1773,
+          -7.1868
+        ],
+        "max": [
+          7.1216,
+          38.0002,
+          7.1868
+        ],
+        "width": 14.0133,
+        "height": 38.1775,
+        "length": 14.3737
+      }
+    },
+    "boulder": {
+      "assetId": "world-kit",
+      "node": "boulder",
+      "bounds": {
+        "min": [
+          -2.2817,
+          0.02,
+          -2.0077
+        ],
+        "max": [
+          2.3204,
+          3.0284,
+          1.9088
+        ],
+        "width": 4.6021,
+        "height": 3.0084,
+        "length": 3.9165
+      }
+    },
+    "hay_stack": {
+      "assetId": "world-kit",
+      "node": "hay_stack",
+      "bounds": {
+        "min": [
+          -1.18,
+          -0.0135,
+          -0.8833
+        ],
+        "max": [
+          1.1896,
+          1.9385,
+          0.8839
+        ],
+        "width": 2.3696,
+        "height": 1.952,
+        "length": 1.7672
+      }
+    },
+    "tractor": {
+      "assetId": "world-kit",
+      "node": "tractor",
+      "bounds": {
+        "min": [
+          -1.135,
+          0.0025,
+          -2.0375
+        ],
+        "max": [
+          1.135,
+          2.855,
+          1.845
+        ],
+        "width": 2.27,
+        "height": 2.8525,
+        "length": 3.8825
+      }
+    },
+    "plow": {
+      "assetId": "world-kit",
+      "node": "plow",
+      "bounds": {
+        "min": [
+          -1.105,
+          0.06,
+          -1.04
+        ],
+        "max": [
+          1.105,
+          0.67,
+          1.2283
+        ],
+        "width": 2.21,
+        "height": 0.61,
+        "length": 2.2683
+      }
+    },
+    "wheelbarrow": {
+      "assetId": "world-kit",
+      "node": "wheelbarrow",
+      "bounds": {
+        "min": [
+          -0.525,
+          0.005,
+          -1.524
+        ],
+        "max": [
+          0.525,
+          1.045,
+          1.065
+        ],
+        "width": 1.05,
+        "height": 1.04,
+        "length": 2.589
+      }
+    },
+    "grain_pallet": {
+      "assetId": "world-kit",
+      "node": "grain_pallet",
+      "bounds": {
+        "min": [
+          -0.655,
+          0.005,
+          -0.565
+        ],
+        "max": [
+          0.655,
+          1.08,
+          0.565
+        ],
+        "width": 1.31,
+        "height": 1.075,
+        "length": 1.13
+      }
+    },
+    "weapon_m416": {
+      "assetId": "weapons",
+      "node": "weapon_m416",
+      "magazineNode": "mag_m416",
+      "muzzleNode": "muzzle_m416",
+      "opticNode": "optic_m416",
+      "opticalHeight": 0.245,
+      "bounds": {
+        "min": [
+          -0.0803,
+          -0.3351,
+          -0.5806
+        ],
+        "max": [
+          0.077,
+          0.32,
+          0.628
+        ],
+        "width": 0.1573,
+        "height": 0.6551,
+        "length": 1.2086
+      }
+    },
+    "weapon_akm": {
+      "assetId": "weapons",
+      "node": "weapon_akm",
+      "magazineNode": "mag_akm",
+      "muzzleNode": "muzzle_akm",
+      "opticNode": "optic_akm",
+      "opticalHeight": 0.13,
+      "bounds": {
+        "min": [
+          -0.0751,
+          -0.3785,
+          -0.6285
+        ],
+        "max": [
+          0.0711,
+          0.136,
+          0.688
+        ],
+        "width": 0.1462,
+        "height": 0.5145,
+        "length": 1.3165
+      }
+    },
+    "weapon_ump45": {
+      "assetId": "weapons",
+      "node": "weapon_ump45",
+      "magazineNode": "mag_ump45",
+      "muzzleNode": "muzzle_ump45",
+      "opticNode": "optic_ump45",
+      "opticalHeight": 0.245,
+      "bounds": {
+        "min": [
+          -0.092,
+          -0.3351,
+          -0.4358
+        ],
+        "max": [
+          0.092,
+          0.3295,
+          0.472
+        ],
+        "width": 0.184,
+        "height": 0.6646,
+        "length": 0.9078
+      }
+    },
+    "weapon_kar98k": {
+      "assetId": "weapons",
+      "node": "weapon_kar98k",
+      "magazineNode": "mag_kar98k",
+      "muzzleNode": "muzzle_kar98k",
+      "opticNode": "optic_kar98k",
+      "opticalHeight": 0.18,
+      "bounds": {
+        "min": [
+          -0.0725,
+          -0.2887,
+          -0.7715
+        ],
+        "max": [
+          0.164,
+          0.27,
+          0.844
+        ],
+        "width": 0.2365,
+        "height": 0.5587,
+        "length": 1.6155
+      }
+    },
+    "weapon_s12k": {
+      "assetId": "weapons",
+      "node": "weapon_s12k",
+      "magazineNode": "mag_s12k",
+      "muzzleNode": "muzzle_s12k",
+      "opticNode": "optic_s12k",
+      "opticalHeight": 0.13,
+      "bounds": {
+        "min": [
+          -0.0907,
+          -0.3147,
+          -0.5862
+        ],
+        "max": [
+          0.09,
+          0.136,
+          0.634
+        ],
+        "width": 0.1807,
+        "height": 0.4507,
+        "length": 1.2202
+      }
+    },
+    "weapon_aug": {
+      "assetId": "weapons",
+      "node": "weapon_aug",
+      "magazineNode": "mag_aug",
+      "muzzleNode": "muzzle_aug",
+      "opticNode": "optic_aug",
+      "opticalHeight": 0.245,
+      "bounds": {
+        "min": [
+          -0.1063,
+          -0.3351,
+          -0.4984
+        ],
+        "max": [
+          0.1025,
+          0.32,
+          0.568
+        ],
+        "width": 0.2088,
+        "height": 0.6551,
+        "length": 1.0664
+      }
+    },
+    "weapon_vector": {
+      "assetId": "weapons",
+      "node": "weapon_vector",
+      "magazineNode": "mag_vector",
+      "muzzleNode": "muzzle_vector",
+      "opticNode": "optic_vector",
+      "opticalHeight": 0.245,
+      "bounds": {
+        "min": [
+          -0.092,
+          -0.3351,
+          -0.3913
+        ],
+        "max": [
+          0.092,
+          0.3295,
+          0.424
+        ],
+        "width": 0.184,
+        "height": 0.6646,
+        "length": 0.8153
+      }
+    },
+    "weapon_awm": {
+      "assetId": "weapons",
+      "node": "weapon_awm",
+      "magazineNode": "mag_awm",
+      "muzzleNode": "muzzle_awm",
+      "opticNode": "optic_awm",
+      "opticalHeight": 0.18,
+      "bounds": {
+        "min": [
+          -0.1132,
+          -0.2887,
+          -0.8119
+        ],
+        "max": [
+          0.164,
+          0.27,
+          0.904
+        ],
+        "width": 0.2772,
+        "height": 0.5587,
+        "length": 1.7159
+      }
+    },
+    "weapon_mini14": {
+      "assetId": "weapons",
+      "node": "weapon_mini14",
+      "magazineNode": "mag_mini14",
+      "muzzleNode": "muzzle_mini14",
+      "opticNode": "optic_mini14",
+      "opticalHeight": 0.18,
+      "bounds": {
+        "min": [
+          -0.07,
+          -0.3351,
+          -0.6835
+        ],
+        "max": [
+          0.073,
+          0.27,
+          0.748
+        ],
+        "width": 0.143,
+        "height": 0.6051,
+        "length": 1.4315
+      }
+    },
+    "weapon_m249": {
+      "assetId": "weapons",
+      "node": "weapon_m249",
+      "magazineNode": "mag_m249",
+      "muzzleNode": "muzzle_m249",
+      "opticNode": "optic_m249",
+      "opticalHeight": 0.13,
+      "bounds": {
+        "min": [
+          -0.28,
+          -0.33,
+          -0.7477
+        ],
+        "max": [
+          0.131,
+          0.294,
+          0.808
+        ],
+        "width": 0.411,
+        "height": 0.624,
+        "length": 1.5557
+      }
+    },
+    "weapon_p10": {
+      "assetId": "weapons",
+      "node": "weapon_p10",
+      "magazineNode": "mag_p10",
+      "muzzleNode": "muzzle_p10",
+      "opticNode": "optic_p10",
+      "opticalHeight": 0.088,
+      "bounds": {
+        "min": [
+          -0.0595,
+          -0.3086,
+          -0.1286
+        ],
+        "max": [
+          0.0557,
+          0.094,
+          0.226
+        ],
+        "width": 0.1152,
+        "height": 0.4026,
+        "length": 0.3546
+      }
+    },
+    "weapon_groza": {
+      "assetId": "weapons",
+      "node": "weapon_groza",
+      "magazineNode": "mag_groza",
+      "muzzleNode": "muzzle_groza",
+      "opticNode": "optic_groza",
+      "opticalHeight": 0.245,
+      "bounds": {
+        "min": [
+          -0.0959,
+          -0.3785,
+          -0.4932
+        ],
+        "max": [
+          0.0925,
+          0.32,
+          0.562
+        ],
+        "width": 0.1884,
+        "height": 0.6985,
+        "length": 1.0552
+      }
+    },
+    "weapon_mk14": {
+      "assetId": "weapons",
+      "node": "weapon_mk14",
+      "magazineNode": "mag_mk14",
+      "muzzleNode": "muzzle_mk14",
+      "opticNode": "optic_mk14",
+      "opticalHeight": 0.18,
+      "bounds": {
+        "min": [
+          -0.1132,
+          -0.3351,
+          -0.69
+        ],
+        "max": [
+          0.1132,
+          0.27,
+          0.766
+        ],
+        "width": 0.2264,
+        "height": 0.6051,
+        "length": 1.456
+      }
+    },
+    "weapon_summit-300": {
+      "assetId": "weapons",
+      "node": "weapon_summit-300",
+      "magazineNode": "mag_summit-300",
+      "muzzleNode": "muzzle_summit-300",
+      "opticNode": "optic_summit-300",
+      "opticalHeight": 0.18,
+      "bounds": {
+        "min": [
+          -0.1132,
+          -0.2887,
+          -0.8225
+        ],
+        "max": [
+          0.164,
+          0.27,
+          0.916
+        ],
+        "width": 0.2772,
+        "height": 0.5587,
+        "length": 1.7385
+      }
+    },
+    "survivor": {
+      "assetId": "character",
+      "node": "survivor",
+      "rigNode": "SurvivorRig",
+      "weaponSocket": "weapon_socket",
+      "rightHandBone": "hand_r",
+      "bounds": {
+        "min": [
+          -0.43,
+          0.0045,
+          -0.173
+        ],
+        "max": [
+          0.43,
+          1.7845,
+          0.6158
+        ],
+        "width": 0.86,
+        "height": 1.78,
+        "length": 0.7888
+      },
+      "animations": [
+        "idle",
+        "walk",
+        "run",
+        "crouch_idle",
+        "crouch_walk",
+        "prone_idle",
+        "prone_crawl",
+        "jump",
+        "throw",
+        "aim",
+        "reload"
+      ]
+    },
+    "first_person_arms": {
+      "assetId": "weapons",
+      "node": "first_person_arms",
+      "bounds": {
+        "min": [
+          -0.3609,
+          -0.4119,
+          -0.3712
+        ],
+        "max": [
+          0.3383,
+          -0.0627,
+          0.3258
+        ],
+        "width": 0.6992,
+        "height": 0.3493,
+        "length": 0.6969
+      },
+      "animation": "static receiver-space arms; inherit weapon sway/recoil, rotate whole node for reload"
+    },
+    "hand_right": {
+      "assetId": "hands",
+      "node": "hand_right",
+      "origin": "wrist",
+      "forward": "+Z palm / -Z sleeve",
+      "up": "+Y knuckles",
+      "bounds": {
+        "min": [
+          -0.0719,
+          -0.0515,
+          -0.015
+        ],
+        "max": [
+          0.047,
+          0.0415,
+          0.1625
+        ],
+        "width": 0.1189,
+        "height": 0.093,
+        "length": 0.1775
+      }
+    },
+    "hand_left": {
+      "assetId": "hands",
+      "node": "hand_left",
+      "origin": "wrist",
+      "forward": "+Z palm / -Z sleeve",
+      "up": "+Y knuckles",
+      "bounds": {
+        "min": [
+          -0.047,
+          -0.0515,
+          -0.015
+        ],
+        "max": [
+          0.0719,
+          0.0415,
+          0.1625
+        ],
+        "width": 0.1189,
+        "height": 0.093,
+        "length": 0.1775
+      }
+    },
+    "forearm_right": {
+      "assetId": "hands",
+      "node": "forearm_right",
+      "origin": "wrist",
+      "forward": "+Z palm / -Z sleeve",
+      "up": "+Y knuckles",
+      "bounds": {
+        "min": [
+          -0.066,
+          -0.066,
+          -0.32
+        ],
+        "max": [
+          0.066,
+          0.066,
+          -0.0
+        ],
+        "width": 0.132,
+        "height": 0.132,
+        "length": 0.32
+      }
+    },
+    "forearm_left": {
+      "assetId": "hands",
+      "node": "forearm_left",
+      "origin": "wrist",
+      "forward": "+Z palm / -Z sleeve",
+      "up": "+Y knuckles",
+      "bounds": {
+        "min": [
+          -0.066,
+          -0.066,
+          -0.32
+        ],
+        "max": [
+          0.066,
+          0.066,
+          -0.0
+        ],
+        "width": 0.132,
+        "height": 0.132,
+        "length": 0.32
+      }
+    }
+  },
+  "materials": {
+    "surfaceAtlas": {
+      "baseColor": "surface-atlas-basecolor",
+      "normal": "surface-atlas-normal",
+      "roughness": "surface-atlas-roughness",
+      "orm": "surface-atlas-orm",
+      "tiles": {
+        "bark": 0,
+        "stone": 1,
+        "hay": 2,
+        "rubber": 3,
+        "wood": 4,
+        "olive": 5,
+        "red": 6,
+        "metal": 7,
+        "cloth": 8,
+        "vest": 9,
+        "skin": 10,
+        "glass": 11,
+        "soil": 12,
+        "grass": 13,
+        "gravel": 14,
+        "dark": 15
+      },
+      "grid": [
+        4,
+        4
+      ]
+    },
+    "foliage": {
+      "baseColor": "foliage-basecolor",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.47,
+      "doubleSided": true,
+      "depthWrite": true,
+      "roughness": 0.86
+    },
+    "meadow": {
+      "baseColor": "terrain-grass-basecolor",
+      "normal": "terrain-grass-normal",
+      "roughness": "terrain-grass-roughness",
+      "tileMeters": 3,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0
+    },
+    "dirt": {
+      "baseColor": "terrain-soil-basecolor",
+      "normal": "terrain-soil-normal",
+      "roughness": "terrain-soil-roughness",
+      "tileMeters": 3,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0
+    },
+    "gravel": {
+      "baseColor": "terrain-gravel-basecolor",
+      "normal": "terrain-gravel-normal",
+      "roughness": "terrain-gravel-roughness",
+      "tileMeters": 3,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0
+    },
+    "rock": {
+      "baseColor": "terrain-stone-basecolor",
+      "normal": "terrain-stone-normal",
+      "roughness": "terrain-stone-roughness",
+      "tileMeters": 3,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0
+    },
+    "wood": {
+      "baseColor": "terrain-wood-basecolor",
+      "normal": "terrain-wood-normal",
+      "roughness": "terrain-wood-roughness",
+      "tileMeters": 1,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0
+    },
+    "weatheredMetal": {
+      "baseColor": "terrain-metal-basecolor",
+      "normal": "terrain-metal-normal",
+      "roughness": "terrain-metal-roughness",
+      "tileMeters": 1,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0.8
+    },
+    "asphalt": {
+      "baseColor": "terrain-asphalt-basecolor",
+      "normal": "terrain-asphalt-normal",
+      "roughness": "terrain-asphalt-roughness",
+      "tileMeters": 3,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0
+    },
+    "brick": {
+      "baseColor": "terrain-brick-basecolor",
+      "normal": "terrain-brick-normal",
+      "roughness": "terrain-brick-roughness",
+      "tileMeters": 1,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0
+    },
+    "plaster": {
+      "baseColor": "terrain-plaster-basecolor",
+      "normal": "terrain-plaster-normal",
+      "roughness": "terrain-plaster-roughness",
+      "tileMeters": 1,
+      "resolution": [
+        512,
+        512
+      ],
+      "metalness": 0
+    },
+    "tree_broadleaf": {
+      "baseColor": "tree_broadleaf-impostor",
+      "alphaMode": "MASK",
+      "planeWidth": 12.8263,
+      "planeHeight": 13.3478,
+      "center": [
+        0.3657,
+        6.1216,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.041379
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_metasequoia": {
+      "baseColor": "tree_metasequoia-impostor",
+      "alphaMode": "MASK",
+      "planeWidth": 15.1344,
+      "planeHeight": 41.2317,
+      "center": [
+        0.115,
+        18.9114,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.041337
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    }
+  },
+  "provenance": {
+    "externalSources": [],
+    "originalSource": "assets/source/last-circle-original-art.blend",
+    "generator": "scripts/create-art-assets.py"
+  }
+}
