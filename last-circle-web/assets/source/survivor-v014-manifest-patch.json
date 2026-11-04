@@ -1,0 +1,151 @@
+{
+  "revision": "0.14.0",
+  "assets": [
+    {
+      "id": "character-v014",
+      "path": "assets/art/3e9628fbb2fc7c0f881ae9785d229723057baac170f319829d23fabeeb848b1f.glb",
+      "sourcePath": "assets/source/survivor-v014.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "3e9628fbb2fc7c0f881ae9785d229723057baac170f319829d23fabeeb848b1f",
+      "size": 4582220,
+      "kind": "model"
+    }
+  ],
+  "models": {
+    "survivor": {
+      "assetId": "character-v014",
+      "node": "survivor",
+      "rigNode": "SurvivorRig",
+      "weaponSocket": "weapon_socket",
+      "rightHandBone": "hand_r",
+      "bounds": {
+        "min": [
+          -0.28099,
+          -0.0,
+          -0.15649
+        ],
+        "max": [
+          0.40076,
+          1.7824,
+          0.76333
+        ],
+        "width": 0.68175,
+        "height": 1.7824,
+        "length": 0.91983
+      },
+      "animations": [
+        "idle",
+        "aim",
+        "walk",
+        "run",
+        "crouch_idle",
+        "crouch_walk",
+        "prone_idle",
+        "prone_crawl",
+        "jump",
+        "throw",
+        "reload",
+        "walk_left",
+        "walk_right",
+        "walk_backward",
+        "run_left",
+        "run_right",
+        "run_backward",
+        "crouch_walk_left",
+        "crouch_walk_right",
+        "crouch_walk_backward"
+      ]
+    }
+  },
+  "coordinateSystem": {
+    "units": "meters",
+    "up": "+Y",
+    "forward": "+Z",
+    "origin": "feet on ground; no forward root motion"
+  },
+  "anatomy": {
+    "heightMeters": 1.8,
+    "headChinY": 1.535,
+    "headTopY": 1.8,
+    "headHeightMeters": 0.265,
+    "headToBodyRatio": 6.792,
+    "headWidthMeters": 0.226,
+    "shoulderWidthMeters": 0.611,
+    "biacromialBoneWidthMeters": 0.436,
+    "garmentConnectedComponents": 1,
+    "garmentComponentVertices": [
+      20306
+    ],
+    "garmentTriangles": 40608,
+    "totalSkinnedTriangles": 74066,
+    "jointWeights": {
+      "knee_l": {
+        "mixedVertices": 874,
+        "parentWeightRange": [
+          0.0201,
+          0.97876
+        ],
+        "childWeightRange": [
+          0.02124,
+          0.9799
+        ]
+      },
+      "elbow_l": {
+        "mixedVertices": 755,
+        "parentWeightRange": [
+          0.02082,
+          0.97939
+        ],
+        "childWeightRange": [
+          0.02061,
+          0.97918
+        ]
+      },
+      "knee_r": {
+        "mixedVertices": 888,
+        "parentWeightRange": [
+          0.0203,
+          0.97999
+        ],
+        "childWeightRange": [
+          0.02001,
+          0.9797
+        ]
+      },
+      "elbow_r": {
+        "mixedVertices": 765,
+        "parentWeightRange": [
+          0.02032,
+          0.98
+        ],
+        "childWeightRange": [
+          0.02,
+          0.97968
+        ]
+      }
+    },
+    "rootMotion": "none; jump uses no extra world/root lift",
+    "boneNames": [
+      "root",
+      "hips",
+      "spine",
+      "chest",
+      "neck",
+      "head",
+      "thigh_l",
+      "shin_l",
+      "foot_l",
+      "shoulder_l",
+      "upperarm_l",
+      "forearm_l",
+      "hand_l",
+      "thigh_r",
+      "shin_r",
+      "foot_r",
+      "shoulder_r",
+      "upperarm_r",
+      "forearm_r",
+      "hand_r"
+    ]
+  }
+}

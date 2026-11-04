@@ -1,4 +1,23 @@
-# LAST CIRCLE original art — revision 0.13.0
+# LAST CIRCLE original art — revision 0.14.0
+
+All assets are original project-authored meshes, textures and animations. No downloaded game models or photographs are used. The runtime mapping is `art-manifest.json`; files in `art/` are content addressed. Retained 0.13 weapons, hands, surface textures and farming props are documented below.
+
+## 0.14 source and rebuild
+
+- `python scripts/create-survivor-v014.py` builds `source/survivor-v014.blend`, the high-detail GLB, pose previews, topology/weight/pose validation and its manifest patch. Blender 4.3+, Pillow and numpy are required.
+- `python scripts/create-survivor-lod.py` opens that approved blend and exports the separately decimated skinned model for mobile/AI. High: 74,066 triangles; low: 26,663 triangles. Both retain all 20 clips and the same bone/socket contract.
+- `python scripts/create-trees-v014.py` builds five species with three independently seeded branch/crown variants each, shared leaf atlas, birch bark maps, editable blend, separate species GLBs, transparent far images and bounds/manifest metadata. No exposed root meshes are generated; trunk bases extend 0.1 m below the origin.
+- `python scripts/package-design-assets.py assets/source/survivor-v014-manifest-patch.json assets/source/survivor-v014-lod-manifest-patch.json assets/source/trees-v014-manifest-patch.json` merges the patches. It externalizes matching shared textures and repacks geometry buffers before hashing the runtime GLBs. Source GLBs remain self-contained and editable.
+
+The outer garment has one connected manifold component, smooth weights across elbows/knees, 20 bones and a 0.265 m head (~6.8 heads at 1.8 m design height). Relaxed idle height is 1.7824 m. Forward/backward/left/right clips exist for walk, run and crouch walk; idle, aim, prone idle/crawl, jump, throw and reload complete the 20 clips. A directional blend selects the feet from replicated velocity. Runtime two-bone leg IK adjusts planted feet to support heights; arm IK lowers the ready pose while retaining hand orientation. Jump clips bend/compress the body without adding a second world/root ascent. Translate the player from simulation state.
+
+`survivor` and `survivor_lod` use `SurvivorRig`, stable bone names listed below and `weapon_socket` under `hand_r`, Y up / +Z forward. Use each bank's own animation clips and SkeletonUtils.clone. Material primitives are clothing, hair and small face details, not detached capsule body segments.
+
+Tree roots are `tree_<oak|birch|pine|maple|metasequoia>_<0|1|2>`. Each manifest entry supplies physical `trunkDiameter`, measured bounds and its impostor. Scale height and trunk width separately. Bark and alpha-tested leaf primitives remain separate. Preserve vertex colors and the leaf-specific alpha atlas; do not replace every 2048px texture with the opaque surface atlas. The shader used for leaf wind is also applied to the alpha-tested shadow depth pass.
+
+Tree placement is authored by `src/tree-layout.js`. `scripts/bake-tree-layout.mjs` runs before bundling, stores exact Float64 coordinates in `src/generated/tree-layout.js`, and records source hashes. Runtime decodes those coordinates instead of rescanning the entire map at startup. The regression test compares every field against the generator.
+
+## Retained 0.13 assets and contracts
 
 All meshes, textures and animations are original deterministic project assets. There are no downloaded models, stock photographs, account requirements or runtime asset services. Rebuild with `python scripts/create-art-assets.py` (Blender 4.3+, Python Pillow/numpy). The editable source is `source/last-circle-original-art.blend`; texture sources and provenance are alongside it. Runtime files live in `art/`, named by SHA-256. `art-manifest.json` is the authoritative mapping; every listed size and SHA matches the file bytes.
 

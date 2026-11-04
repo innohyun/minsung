@@ -1,0 +1,791 @@
+{
+  "revision": "0.14.0",
+  "models": {
+    "tree_oak_0": {
+      "species": "oak",
+      "variant": 0,
+      "trunkDiameter": 0.7,
+      "bounds": {
+        "min": [
+          -6.4498,
+          -0.1,
+          -5.1635
+        ],
+        "max": [
+          7.6495,
+          12.8899,
+          8.2988
+        ],
+        "width": 14.0993,
+        "height": 12.9899,
+        "length": 13.4623
+      },
+      "triangles": 14500,
+      "barkTriangles": 3362,
+      "foliageTriangles": 11138,
+      "primaryBranches": 4,
+      "totalBranches": 79,
+      "leafClusters": 55,
+      "lean": [
+        0.6,
+        0.2
+      ],
+      "gapAzimuth": 4.6665,
+      "impostor": {
+        "planeWidth": 15.1567,
+        "planeHeight": 13.9641,
+        "center": [
+          0.5999,
+          6.3949,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.042046
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_oak_1": {
+      "species": "oak",
+      "variant": 1,
+      "trunkDiameter": 0.77,
+      "bounds": {
+        "min": [
+          -7.923,
+          -0.1,
+          -8.2649
+        ],
+        "max": [
+          7.6097,
+          11.7868,
+          8.0337
+        ],
+        "width": 15.5326,
+        "height": 11.8868,
+        "length": 16.2986
+      },
+      "triangles": 14500,
+      "barkTriangles": 3960,
+      "foliageTriangles": 10540,
+      "primaryBranches": 5,
+      "totalBranches": 96,
+      "leafClusters": 66,
+      "lean": [
+        -1.25,
+        0.7
+      ],
+      "gapAzimuth": 0.1357,
+      "impostor": {
+        "planeWidth": 16.6975,
+        "planeHeight": 12.7783,
+        "center": [
+          -0.1566,
+          5.8434,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.042711
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_oak_2": {
+      "species": "oak",
+      "variant": 2,
+      "trunkDiameter": 0.64,
+      "bounds": {
+        "min": [
+          -4.4711,
+          -0.1,
+          -7.5653
+        ],
+        "max": [
+          6.0103,
+          15.5775,
+          5.2159
+        ],
+        "width": 10.4814,
+        "height": 15.6775,
+        "length": 12.7812
+      },
+      "triangles": 14498,
+      "barkTriangles": 2546,
+      "foliageTriangles": 11952,
+      "primaryBranches": 3,
+      "totalBranches": 55,
+      "leafClusters": 39,
+      "lean": [
+        1.5,
+        -0.5
+      ],
+      "gapAzimuth": 0.7243,
+      "impostor": {
+        "planeWidth": 11.2675,
+        "planeHeight": 16.8533,
+        "center": [
+          0.7696,
+          7.7387,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.040819
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_birch_0": {
+      "species": "birch",
+      "variant": 0,
+      "trunkDiameter": 0.38,
+      "bounds": {
+        "min": [
+          -5.0634,
+          -0.1,
+          -3.4173
+        ],
+        "max": [
+          5.0914,
+          19.0007,
+          4.0201
+        ],
+        "width": 10.1549,
+        "height": 19.1007,
+        "length": 7.4373
+      },
+      "triangles": 11998,
+      "barkTriangles": 5172,
+      "foliageTriangles": 6826,
+      "primaryBranches": 12,
+      "totalBranches": 120,
+      "leafClusters": 73,
+      "lean": [
+        0.65,
+        0.3
+      ],
+      "gapAzimuth": 1.7581,
+      "impostor": {
+        "planeWidth": 10.9165,
+        "planeHeight": 20.5333,
+        "center": [
+          0.014,
+          9.4503,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.039754
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_birch_1": {
+      "species": "birch",
+      "variant": 1,
+      "trunkDiameter": 0.42,
+      "bounds": {
+        "min": [
+          -5.4391,
+          -0.1,
+          -4.1087
+        ],
+        "max": [
+          3.6782,
+          16.5505,
+          4.383
+        ],
+        "width": 9.1174,
+        "height": 16.6505,
+        "length": 8.4917
+      },
+      "triangles": 12000,
+      "barkTriangles": 4412,
+      "foliageTriangles": 7588,
+      "primaryBranches": 10,
+      "totalBranches": 100,
+      "leafClusters": 61,
+      "lean": [
+        -1.3,
+        0.75
+      ],
+      "gapAzimuth": 2.8779,
+      "impostor": {
+        "planeWidth": 9.8012,
+        "planeHeight": 17.8993,
+        "center": [
+          -0.8804,
+          8.2252,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.040472
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_birch_2": {
+      "species": "birch",
+      "variant": 2,
+      "trunkDiameter": 0.35,
+      "bounds": {
+        "min": [
+          -3.6953,
+          -0.1,
+          -4.5112
+        ],
+        "max": [
+          4.8509,
+          21.3282,
+          3.5155
+        ],
+        "width": 8.5461,
+        "height": 21.4282,
+        "length": 8.0267
+      },
+      "triangles": 11998,
+      "barkTriangles": 5552,
+      "foliageTriangles": 6446,
+      "primaryBranches": 13,
+      "totalBranches": 130,
+      "leafClusters": 79,
+      "lean": [
+        1.6,
+        -0.6
+      ],
+      "gapAzimuth": 3.2987,
+      "impostor": {
+        "planeWidth": 9.1871,
+        "planeHeight": 23.0353,
+        "center": [
+          0.5778,
+          10.6141,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.039226
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_pine_0": {
+      "species": "pine",
+      "variant": 0,
+      "trunkDiameter": 0.52,
+      "bounds": {
+        "min": [
+          -5.3692,
+          -0.1,
+          -5.5034
+        ],
+        "max": [
+          6.0094,
+          23.8915,
+          5.7401
+        ],
+        "width": 11.3786,
+        "height": 23.9915,
+        "length": 11.2435
+      },
+      "triangles": 14498,
+      "barkTriangles": 5922,
+      "foliageTriangles": 8576,
+      "primaryBranches": 12,
+      "totalBranches": 144,
+      "leafClusters": 87,
+      "lean": [
+        0.65,
+        0.3
+      ],
+      "gapAzimuth": 1.4612,
+      "impostor": {
+        "planeWidth": 12.232,
+        "planeHeight": 25.7909,
+        "center": [
+          0.3201,
+          11.8958,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.03876
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_pine_1": {
+      "species": "pine",
+      "variant": 1,
+      "trunkDiameter": 0.59,
+      "bounds": {
+        "min": [
+          -7.6492,
+          -0.1,
+          -6.2032
+        ],
+        "max": [
+          5.1087,
+          19.6883,
+          6.869
+        ],
+        "width": 12.7579,
+        "height": 19.7883,
+        "length": 13.0722
+      },
+      "triangles": 14498,
+      "barkTriangles": 5350,
+      "foliageTriangles": 9148,
+      "primaryBranches": 11,
+      "totalBranches": 128,
+      "leafClusters": 77,
+      "lean": [
+        -1.7,
+        0.8
+      ],
+      "gapAzimuth": 1.2596,
+      "impostor": {
+        "planeWidth": 13.7147,
+        "planeHeight": 21.2724,
+        "center": [
+          -1.2703,
+          9.7941,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.039585
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_pine_2": {
+      "species": "pine",
+      "variant": 2,
+      "trunkDiameter": 0.48,
+      "bounds": {
+        "min": [
+          -6.2793,
+          -0.1,
+          -5.3957
+        ],
+        "max": [
+          5.7096,
+          25.9781,
+          4.3791
+        ],
+        "width": 11.989,
+        "height": 26.0781,
+        "length": 9.7747
+      },
+      "triangles": 14498,
+      "barkTriangles": 6206,
+      "foliageTriangles": 8292,
+      "primaryBranches": 13,
+      "totalBranches": 151,
+      "leafClusters": 91,
+      "lean": [
+        1.1,
+        -0.6
+      ],
+      "gapAzimuth": 3.6659,
+      "impostor": {
+        "planeWidth": 12.8882,
+        "planeHeight": 28.034,
+        "center": [
+          -0.2849,
+          12.9391,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.03845
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_maple_0": {
+      "species": "maple",
+      "variant": 0,
+      "trunkDiameter": 0.6,
+      "bounds": {
+        "min": [
+          -5.2992,
+          -0.1,
+          -6.6971
+        ],
+        "max": [
+          6.0876,
+          13.9338,
+          6.4229
+        ],
+        "width": 11.3868,
+        "height": 14.0338,
+        "length": 13.1199
+      },
+      "triangles": 14500,
+      "barkTriangles": 3562,
+      "foliageTriangles": 10938,
+      "primaryBranches": 4,
+      "totalBranches": 86,
+      "leafClusters": 61,
+      "lean": [
+        0.45,
+        0.3
+      ],
+      "gapAzimuth": 1.6932,
+      "impostor": {
+        "planeWidth": 12.2408,
+        "planeHeight": 15.0863,
+        "center": [
+          0.3942,
+          6.9169,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.041511
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_maple_1": {
+      "species": "maple",
+      "variant": 1,
+      "trunkDiameter": 0.68,
+      "bounds": {
+        "min": [
+          -6.2685,
+          -0.1,
+          -5.9326
+        ],
+        "max": [
+          4.7473,
+          12.2608,
+          7.8917
+        ],
+        "width": 11.0158,
+        "height": 12.3608,
+        "length": 13.8243
+      },
+      "triangles": 14498,
+      "barkTriangles": 4204,
+      "foliageTriangles": 10294,
+      "primaryBranches": 5,
+      "totalBranches": 104,
+      "leafClusters": 72,
+      "lean": [
+        -1.0,
+        0.7
+      ],
+      "gapAzimuth": 4.1943,
+      "impostor": {
+        "planeWidth": 11.842,
+        "planeHeight": 13.2879,
+        "center": [
+          -0.7606,
+          6.0804,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.042409
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_maple_2": {
+      "species": "maple",
+      "variant": 2,
+      "trunkDiameter": 0.55,
+      "bounds": {
+        "min": [
+          -3.8564,
+          -0.1,
+          -6.5674
+        ],
+        "max": [
+          6.3344,
+          15.012,
+          4.5327
+        ],
+        "width": 10.1908,
+        "height": 15.112,
+        "length": 11.1001
+      },
+      "triangles": 14500,
+      "barkTriangles": 2494,
+      "foliageTriangles": 12006,
+      "primaryBranches": 3,
+      "totalBranches": 53,
+      "leafClusters": 37,
+      "lean": [
+        1.35,
+        -0.45
+      ],
+      "gapAzimuth": 0.6921,
+      "impostor": {
+        "planeWidth": 10.9551,
+        "planeHeight": 16.2454,
+        "center": [
+          1.239,
+          7.456,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.041039
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_metasequoia_0": {
+      "species": "metasequoia",
+      "variant": 0,
+      "trunkDiameter": 1.65,
+      "bounds": {
+        "min": [
+          -8.3956,
+          -0.1,
+          -6.5286
+        ],
+        "max": [
+          7.0904,
+          38.3983,
+          8.473
+        ],
+        "width": 15.486,
+        "height": 38.4983,
+        "length": 15.0016
+      },
+      "triangles": 17500,
+      "barkTriangles": 6884,
+      "foliageTriangles": 10616,
+      "primaryBranches": 31,
+      "totalBranches": 274,
+      "leafClusters": 163,
+      "lean": [
+        0.65,
+        0.35
+      ],
+      "gapAzimuth": 0.466,
+      "impostor": {
+        "planeWidth": 16.6474,
+        "planeHeight": 41.3857,
+        "center": [
+          -0.6526,
+          19.1492,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.0373
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_metasequoia_1": {
+      "species": "metasequoia",
+      "variant": 1,
+      "trunkDiameter": 1.8,
+      "bounds": {
+        "min": [
+          -10.0977,
+          -0.1,
+          -8.792
+        ],
+        "max": [
+          8.5695,
+          35.0773,
+          7.6176
+        ],
+        "width": 18.6672,
+        "height": 35.1773,
+        "length": 16.4096
+      },
+      "triangles": 17498,
+      "barkTriangles": 7382,
+      "foliageTriangles": 10116,
+      "primaryBranches": 34,
+      "totalBranches": 295,
+      "leafClusters": 175,
+      "lean": [
+        -0.8,
+        0.6
+      ],
+      "gapAzimuth": 3.1841,
+      "impostor": {
+        "planeWidth": 20.0672,
+        "planeHeight": 37.8156,
+        "center": [
+          -0.7641,
+          17.4887,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.037528
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    },
+    "tree_metasequoia_2": {
+      "species": "metasequoia",
+      "variant": 2,
+      "trunkDiameter": 1.5,
+      "bounds": {
+        "min": [
+          -7.0631,
+          -0.1,
+          -7.9346
+        ],
+        "max": [
+          6.5581,
+          40.1713,
+          6.2722
+        ],
+        "width": 13.6213,
+        "height": 40.2713,
+        "length": 14.2067
+      },
+      "triangles": 17500,
+      "barkTriangles": 6252,
+      "foliageTriangles": 11248,
+      "primaryBranches": 29,
+      "totalBranches": 242,
+      "leafClusters": 143,
+      "lean": [
+        1.0,
+        -0.45
+      ],
+      "gapAzimuth": 0.4392,
+      "impostor": {
+        "planeWidth": 14.6429,
+        "planeHeight": 43.2916,
+        "center": [
+          -0.2525,
+          20.0357,
+          0
+        ],
+        "anchor": [
+          0.5,
+          0.037193
+        ],
+        "alphaCutoff": 0.4,
+        "doubleSided": true,
+        "depthWrite": true,
+        "resolution": [
+          256,
+          512
+        ]
+      },
+      "notes": "Mature distributed crown volumes plus terminal ramification; no roots/buttresses/repeated tiers. Botanical cards <=.7m."
+    }
+  },
+  "rootGeometry": "none; trunk bottom-.1m",
+  "sharedImages": [
+    "surface-atlas-basecolor",
+    "surface-atlas-normal",
+    "surface-atlas-orm"
+  ]
+}

@@ -1,0 +1,2 @@
+import{TREE_LAYOUT_DATA,TREE_LAYOUT_COUNT}from'./generated/tree-layout.js';import{treeDesign}from'./tree-species.js';
+export function decodeTreeLayout(){const raw=atob(TREE_LAYOUT_DATA),bytes=Uint8Array.from(raw,c=>c.charCodeAt(0)),view=new DataView(bytes.buffer);return Array.from({length:TREE_LAYOUT_COUNT},(_,i)=>{const at=i*35,seed=view.getUint16(at+32,true),type=view.getUint8(at+34);return{x:view.getFloat64(at,true),z:view.getFloat64(at+8,true),y:view.getFloat64(at+16,true),h:view.getFloat64(at+24,true),type,seed,...treeDesign(seed,type===5)};});}

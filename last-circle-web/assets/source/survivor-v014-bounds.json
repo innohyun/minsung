@@ -1,0 +1,267 @@
+{
+  "footContact": {
+    "walk": {
+      "maxStanceIkErrorMeters": 0.0050432,
+      "samples": 76
+    },
+    "run": {
+      "maxStanceIkErrorMeters": 0.0059656,
+      "samples": 49
+    },
+    "walk_left": {
+      "maxStanceIkErrorMeters": 1e-07,
+      "samples": 76
+    },
+    "run_backward": {
+      "maxStanceIkErrorMeters": 1e-07,
+      "samples": 49
+    },
+    "crouch_walk": {
+      "maxStanceIkErrorMeters": 1e-07,
+      "samples": 76
+    }
+  },
+  "revision": "0.14.0",
+  "standingBounds": {
+    "min": [
+      -0.28099,
+      -0.0,
+      -0.15649
+    ],
+    "max": [
+      0.40076,
+      1.7824,
+      0.76333
+    ],
+    "width": 0.68175,
+    "height": 1.7824,
+    "length": 0.91983
+  },
+  "anatomy": {
+    "heightMeters": 1.8,
+    "headChinY": 1.535,
+    "headTopY": 1.8,
+    "headHeightMeters": 0.265,
+    "headToBodyRatio": 6.792,
+    "headWidthMeters": 0.226,
+    "shoulderWidthMeters": 0.611,
+    "biacromialBoneWidthMeters": 0.436,
+    "garmentConnectedComponents": 1,
+    "garmentComponentVertices": [
+      20306
+    ],
+    "garmentTriangles": 40608,
+    "totalSkinnedTriangles": 74066,
+    "jointWeights": {
+      "knee_l": {
+        "mixedVertices": 874,
+        "parentWeightRange": [
+          0.0201,
+          0.97876
+        ],
+        "childWeightRange": [
+          0.02124,
+          0.9799
+        ]
+      },
+      "elbow_l": {
+        "mixedVertices": 755,
+        "parentWeightRange": [
+          0.02082,
+          0.97939
+        ],
+        "childWeightRange": [
+          0.02061,
+          0.97918
+        ]
+      },
+      "knee_r": {
+        "mixedVertices": 888,
+        "parentWeightRange": [
+          0.0203,
+          0.97999
+        ],
+        "childWeightRange": [
+          0.02001,
+          0.9797
+        ]
+      },
+      "elbow_r": {
+        "mixedVertices": 765,
+        "parentWeightRange": [
+          0.02032,
+          0.98
+        ],
+        "childWeightRange": [
+          0.02,
+          0.97968
+        ]
+      }
+    },
+    "rootMotion": "none; jump uses no extra world/root lift",
+    "boneNames": [
+      "root",
+      "hips",
+      "spine",
+      "chest",
+      "neck",
+      "head",
+      "thigh_l",
+      "shin_l",
+      "foot_l",
+      "shoulder_l",
+      "upperarm_l",
+      "forearm_l",
+      "hand_l",
+      "thigh_r",
+      "shin_r",
+      "foot_r",
+      "shoulder_r",
+      "upperarm_r",
+      "forearm_r",
+      "hand_r"
+    ]
+  },
+  "clips": [
+    "idle",
+    "aim",
+    "walk",
+    "run",
+    "crouch_idle",
+    "crouch_walk",
+    "prone_idle",
+    "prone_crawl",
+    "jump",
+    "throw",
+    "reload",
+    "walk_left",
+    "walk_right",
+    "walk_backward",
+    "run_left",
+    "run_right",
+    "run_backward",
+    "crouch_walk_left",
+    "crouch_walk_right",
+    "crouch_walk_backward"
+  ],
+  "durations": {
+    "idle": 2,
+    "aim": 2,
+    "walk": 0.9,
+    "run": 0.7,
+    "crouch_idle": 2,
+    "crouch_walk": 1.2,
+    "prone_idle": 2,
+    "prone_crawl": 1.6,
+    "jump": 1.0,
+    "throw": 0.85,
+    "reload": 2.0,
+    "walk_left": 0.9,
+    "walk_right": 0.9,
+    "walk_backward": 0.9,
+    "run_left": 0.7,
+    "run_right": 0.7,
+    "run_backward": 0.7,
+    "crouch_walk_left": 1.2,
+    "crouch_walk_right": 1.2,
+    "crouch_walk_backward": 1.2
+  },
+  "poseBounds": {
+    "idle": {
+      "min": [
+        -0.28107,
+        -0.0,
+        -0.15555
+      ],
+      "max": [
+        0.40068,
+        1.7774,
+        0.76333
+      ],
+      "width": 0.68175,
+      "height": 1.7774,
+      "length": 0.91888
+    },
+    "walk": {
+      "min": [
+        -0.28244,
+        0.0,
+        -0.22477
+      ],
+      "max": [
+        0.40184,
+        1.77159,
+        0.76333
+      ],
+      "width": 0.68428,
+      "height": 1.77159,
+      "length": 0.9881
+    },
+    "run": {
+      "min": [
+        -0.29459,
+        0.00518,
+        -0.4235
+      ],
+      "max": [
+        0.39774,
+        1.70445,
+        0.76333
+      ],
+      "width": 0.69232,
+      "height": 1.69927,
+      "length": 1.18683
+    },
+    "crouch_idle": {
+      "min": [
+        -0.34319,
+        -0.0,
+        -0.10922
+      ],
+      "max": [
+        0.39238,
+        1.25328,
+        0.76333
+      ],
+      "width": 0.73557,
+      "height": 1.25329,
+      "length": 0.87255
+    },
+    "prone_idle": {
+      "min": [
+        -0.33827,
+        -0.011,
+        -0.99917
+      ],
+      "max": [
+        0.38153,
+        0.56524,
+        1.10333
+      ],
+      "width": 0.71979,
+      "height": 0.57624,
+      "length": 2.1025
+    },
+    "jump": {
+      "min": [
+        -0.32443,
+        0.28589,
+        -0.2235
+      ],
+      "max": [
+        0.41057,
+        1.74899,
+        0.73333
+      ],
+      "width": 0.735,
+      "height": 1.4631,
+      "length": 0.95684
+    }
+  },
+  "boneContract": "same existing deform bone names, weapon_socket child of right (+X) hand_r",
+  "textureImages": [
+    "surface-atlas-basecolor",
+    "surface-atlas-normal",
+    "surface-atlas-orm"
+  ]
+}

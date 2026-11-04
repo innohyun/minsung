@@ -1,3 +1,5 @@
+import{bakeTreeLayout}from'./bake-tree-layout.mjs';
+await bakeTreeLayout();
 import {build} from 'esbuild';
 import {readFile,mkdir,writeFile,copyFile,cp} from 'node:fs/promises';
 await mkdir('worker',{recursive:true});await mkdir('dist/server',{recursive:true});await mkdir('dist/.openai',{recursive:true});await mkdir('.local',{recursive:true});

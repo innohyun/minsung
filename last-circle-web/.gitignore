@@ -8,3 +8,5 @@ dist/
 worker/index.js
 
 __pycache__/
+
+*.blend1

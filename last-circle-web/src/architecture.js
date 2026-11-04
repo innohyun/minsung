@@ -1,7 +1,8 @@
+import{furnishHouse,facadeDetails}from'./house-details.js';
 import{createFarmBarn}from'./farm-architecture.js';
 import{localPoint,buildingYaw}from'./building-utils.js';
 import{rng}from'./math.js';
-import{naturalHeight as groundHeight}from'./map.js';
+import{terrainHeight as groundHeight}from'./map.js';
 
 // All joins are adjacent solids. Slabs, foundations, porches and walls never share a visible face.
 const roofHeight=b=>b.h;
@@ -10,7 +11,7 @@ export function createArchitecture(buildings){
  for(const b of buildings){if(b.style==='farm-barn'){const barn=createFarmBarn(b);boxes.push(...barn.boxes);lootSpots.push(...barn.lootSpots);continue;}
   const random=rng(b.variant+993),t=.32,external=b.externalStairs,strip=external?0:5.2,side=b.stairSide||1,orientation=b.stairStart||1,main=b.w-strip,center=-side*strip/2;
   b.routes=[];b.rooms=[];b.layoutId=[b.style,b.variant,side,orientation,b.w,b.d,b.roofType].join(':');
-  const add=(x,z,w,d,h,y=0,kind='wall',color=b.color,extra={})=>{const p=localPoint(b,x,z,y),shaped=['gable','hiproof','obb'].includes(extra.shape);const q={...p,w:shaped?w:b.rot?d:w,d:shaped?d:b.rot?w:d,h,kind,color,shape:shaped?extra.shape:'box',building:b.index,texture:kind==='wall'||kind==='partition'?b.wallTexture:undefined,...extra};if(shaped)q.yaw=buildingYaw(b);boxes.push(q);return q;};
+  const add=(x,z,w,d,h,y=0,kind='wall',color=b.color,extra={})=>{const p=localPoint(b,x,z,y),shaped=['gable','hiproof','obb'].includes(extra.shape);const q={...p,w:shaped?w:b.rot?d:w,d:shaped?d:b.rot?w:d,h,kind,color,shape:shaped?extra.shape:'box',building:b.index,texture:kind==='wall'?b.wallTexture:kind==='partition'?'plaster':undefined,...extra};if(shaped)q.yaw=buildingYaw(b);boxes.push(q);return q;};
   const groundedStep=(x,z,w,d,top)=>{const corners=[[-w/2,-d/2],[-w/2,d/2],[w/2,-d/2],[w/2,d/2]].map(([a,c])=>localPoint(b,x+a,z+c)),base=Math.min(-.43,...corners.map(q=>groundHeight(q.x,q.z)-b.y))-.025;return add(x,z,w,d,top-base,base,'step',0x8e8876);};
   const visual=(...args)=>{const q=add(...args);q.solid=false;return q;};
   const slab=(x,z,w,d,y,kind='floor',color=0x92734f)=>add(x,z,w,d,.20,y-.20,kind,color);
@@ -21,6 +22,7 @@ export function createArchitecture(buildings){
    if(exterior)for(const o of which.filter(o=>o.type==='window')){
     const sx=axis==='z'?Math.sign(fixed):0,sz=axis==='x'?Math.sign(fixed):0,p=localPoint(b,axis==='z'?fixed+sx*t/2:o.at,axis==='x'?fixed+sz*t/2:o.at,y),f=b.flip?-1:1,nx=(b.rot?-sz:sx)*f,nz=(b.rot?sx:sz)*f;
     windows.push({...p,nx,nz,width:o.w,building:b.index,floor:Math.round(y/b.level),bottom:o.bottom,top:o.top});
+    visual(axis==='x'?o.at:fixed+sx*.26,axis==='z'?o.at:fixed+sz*.26,axis==='x'?o.w+.25:.32,axis==='z'?o.w+.25:.32,.09,y+o.bottom-.12,'window-sill',0xa9a28e);visual(axis==='x'?o.at:fixed,axis==='z'?o.at:fixed,axis==='x'?o.w-.10:.025,axis==='z'?o.w-.10:.025,.18,y+o.top-.20,'window-glass',0x9cafab);
     const trim=b.variant%3===0?0x657267:0xcac1a7;
     for(const sign of[-1,1])visual(axis==='x'?o.at+sign*(o.w/2+.06):fixed+sx*.205,axis==='z'?o.at+sign*(o.w/2+.06):fixed+sz*.205,axis==='x'?.12:.1,axis==='z'?.12:.1,o.top-o.bottom+.22,y+o.bottom-.11,'window-trim',trim);
     for(const yy of[o.bottom-.10,o.top+.04])visual(axis==='x'?o.at:fixed+sx*.21,axis==='z'?o.at:fixed+sz*.21,axis==='x'?o.w+.22:.12,axis==='z'?o.w+.22:.12,.08,y+yy,'window-trim',trim);
@@ -29,17 +31,18 @@ export function createArchitecture(buildings){
   };
   // Outer bounds contain the wall thickness; side walls stop at the inner front/back planes.
   slab(0,0,b.w-2*t,b.d-2*t,0);add(0,0,b.w,b.d,.40,-.60,'foundation',0x726d5a);
-  const doorX=((b.variant%5)-2)*.25,doorWidth=b.style==='warehouse'?5.8:b.style==='garage'?3.6:3.2;
+  const doorX=((b.variant%5)-2)*.25,doorWidth=b.style==='warehouse'?5.8:b.style==='garage'?3.6:1.35;
   b.doorX=doorX;
-  doors.push({...localPoint(b,doorX,-b.d/2+t/2),id:'door-'+b.index,building:b.index,rot:b.rot,flip:b.flip,w:doorWidth-.06,h:2.68,yaw:buildingYaw(b)});
+  doors.push({...localPoint(b,doorX,-b.d/2+t/2),id:'door-'+b.index,building:b.index,rot:b.rot,flip:b.flip,w:doorWidth-.06,h:b.style==='warehouse'||b.style==='garage'?2.68:2.18,yaw:buildingYaw(b)});
+  for(const sign of[-1,1])visual(doorX+sign*(doorWidth/2+.07),-b.d/2-.07,.12,.18,b.style==='warehouse'||b.style==='garage'?2.7:2.23,0,'door-frame',b.variant%2?0xa59b83:0x777b6b);
   for(let floor=0;floor<b.floors;floor++){
    const y=floor*b.level,ww=2.15+(b.variant%4)*.15;
    for(const s of[-1,1]){
-    const holes=[-1,1].map(k=>({type:'window',at:k*b.d*.24,w:2.1+(b.variant%3)*.2,bottom:1,top:2.25}));
+    const holes=[-1,1].map(k=>({type:'window',at:k*b.d*.24+(((b.variant+floor*7+s*3+k+19)%7)-3)*.12,w:1.55+((b.variant+floor+k+13)%4)*.27,bottom:.92+((b.variant+floor)%3)*.04,top:2.22+((b.variant+floor)%2)*.04}));
     if(b.annex&&s===-1&&floor===0){const a=b.annex;for(let j=holes.length-1;j>=0;j--)if(Math.abs(holes[j].at-a.z)<a.d/2)holes.splice(j,1);holes.push({type:'door',at:a.z,w:2.7,bottom:0,top:2.7});slab(-b.w/2+t/2,a.z,t,2.7,0);}
     opening('z',s*(b.w/2-t/2),-b.d/2+t,b.d/2-t,y,holes);
    }
-   for(const s of[-1,1]){const holes=[-1,1].map(k=>({type:'window',at:k*b.w*.30,w:ww,bottom:1,top:2.25}));if(floor===0&&s<0)holes.push({type:'door',at:doorX,w:doorWidth,bottom:0,top:2.7});opening('x',s*(b.d/2-t/2),-b.w/2,b.w/2,y,holes);}
+   for(const s of[-1,1]){const holes=[-1,1].map(k=>({type:'window',at:k*b.w*(.27+((b.variant+floor+k+17)%3)*.015)+(((b.variant+floor*13+k+19)%5)-2)*.13,w:ww-(floor?((b.variant+k+9)%2)*.35:0),bottom:.94+(b.variant%2)*.05,top:2.24}));if(floor>0&&s<0&&b.variant%3===1)holes.push({type:'window',at:doorX+.14,w:1.1,bottom:1.02,top:2.24});if(floor===0&&s<0)holes.push({type:'door',at:doorX,w:doorWidth,bottom:0,top:b.style==='warehouse'||b.style==='garage'?2.7:2.22});opening('x',s*(b.d/2-t/2),-b.w/2,b.w/2,y,holes);}
   }
   const front=-b.d/2,porchWidth=b.style==='corner-shop'?b.w-1:b.style==='garage'?5.5:b.w*(.5+(b.variant%3)*.1),porchDepth=1.8+(b.variant%3)*.5;
   slab(doorX,front-porchDepth/2,porchWidth,porchDepth,-.035,'porch');
@@ -60,12 +63,14 @@ export function createArchitecture(buildings){
    for(let j=0;j<steps;j++){const z=-dir*run/2+dir*(j+.5)*run/steps,h=(j+1)*b.level/steps;add(lane,z,2.35,run/steps,h,f*b.level,'step',0x8e8876);}
   }
   const roof=b.h,towerX=side*(b.w/2-strip/2),exit=orientation*(b.floors%2?1:-1),passZ=exit*(b.d/2-1.75),inner=side*(b.w/2-strip);
-  if(!external){slab(towerX,0,strip-.03,b.d-.03,roof+2.55,'stair-roof',b.roofColor);
-  add(side*(b.w/2-t/2),0,t,b.d,2.55,roof,'stairwall',b.color);
-  for(const s of[-1,1])add(towerX,s*(b.d/2-t/2),strip-t,t,2.55,roof,'stairwall',b.color);
-  // Doorway from the stair head onto the roof.
-  for(const[lo,hi]of[[-b.d/2,passZ-1.3],[passZ+1.3,b.d/2]])if(hi-lo>.01)add(inner,(hi+lo)/2,t,hi-lo,2.55,roof,'stairwall',b.color);
-  add(inner,passZ,t,2.6,.38,roof+2.17,'stairwall',b.color);}
+  if(!external){const last=b.floors-1,dir=orientation*(last%2?-1:1),lane=side*(b.w/2-(last%2?3.9:1.3)),headZ=dir*(b.d/2-2.38),depth=4.42,outerX=lane+side*1.42,innerX=lane-side*1.42,lo=headZ-depth/2,hi=headZ+depth/2,opening=[dir*(b.d/2-2.70),dir*(b.d/2-.55)].sort((a,c)=>a-c);
+   slab(lane,headZ,3.08,depth+.10,roof+2.35,'stair-roof',0x85897d);
+   add(outerX,headZ,.24,depth,2.35,roof,'stairwall',b.color,{texture:b.wallTexture});
+   add(lane,dir*(b.d/2-.17),2.62,.24,2.35,roof,'stairwall',b.color,{texture:b.wallTexture});
+   add(lane,dir*(b.d/2-4.59),2.62,.20,.50,roof+1.85,'stairwall',b.color,{texture:b.wallTexture});
+   for(const[a,c]of[[lo,opening[0]],[opening[1],hi]])if(c-a>.02)add(innerX,(a+c)/2,.24,c-a,2.35,roof,'stairwall',b.color,{texture:b.wallTexture});
+   add(innerX,(opening[0]+opening[1])/2,.24,opening[1]-opening[0],.20,roof+2.15,'stairwall',b.color,{texture:b.wallTexture});
+  }
   if(b.roofType!=='terrace')add(center,0,main-.08,b.d-.05,1.4+(b.variant%5)*.16,roof+.015,'pitched-roof',b.roofColor,{shape:b.roofType,texture:'tile'});
   else{for(const s of[-1,1])add(center,s*(b.d/2-.12),main-.05,.24,.64,roof+.015,'parapet',b.color);add(-(external?1:side)*(b.w/2-.12),0,.24,b.d-.48,.64,roof+.015,'parapet',b.color);}
   // Rooms and furnishings stay on the wide side, with a 1.4m hall beside the stairs.
@@ -78,12 +83,10 @@ export function createArchitecture(buildings){
    b.rooms.push({floor:f,plan,splitZ,center:roomCenter,doorAt:roomCenter+(plan%2?.65:-.4)});
    const tableX=roomCenter+(plan%2?.24:-.2),tableZ=-b.d*.30;add(tableX,tableZ,2.6,1.05,.80,y,'table',0x92734f);
    for(let k=0;k<3;k++)loot(tableX+(k-1)*.72,tableZ,y+.91,'f'+f+'-table'+k,'table',f);
-   const bedZ=b.d*.31,bedX=roomCenter+(plan%2?.4:-.3);add(bedX,bedZ,2.8,1.4,.40,y,'bed',0x766044);add(bedX,bedZ,2.65,1.26,.16,y+.4,'mattress',[0x76816a,0x8b7f64,0x687e7e][b.variant%3]);
-   add(side>0?roomMin+.45:roomMax-.45,b.d*.39,.65,.9,1.55,y,'cabinet',0x826345);
-   const shelfZ=b.d/2-.56;add(roomCenter,shelfZ,2.5,.48,1.15,y,'shelf',0x826345);
-   for(let k=0;k<3;k++)loot(roomCenter+(k-1)*.7,shelfZ,y+1.26,'f'+f+'-shelf'+k,'shelf',f);
+   furnishHouse(b,{add,visual,loot,roomMin,roomMax,roomCenter,plan,floor:f,y});
    for(const[k,z]of[-.12,.17].entries())for(const[j,x]of[roomCenter-.8,roomCenter+.85].entries())loot(x,z*b.d,y+.09,'f'+f+'-floor'+k+'-'+j,'floor',f);
   }
+  facadeDetails(b,{visual,center,main});
   if(b.style==='garage'||b.style==='workshop'){add(roomCenter,b.d*.05,1.8,1.1,.78,0,'workbench',0x826345);for(const s of[-1,1])visual(roomCenter+s*.6,b.d*.05,.18,.55,.08,.78,'tool',0x606d70);}
   if(b.style==='clinic'){for(const s of[-1,1])visual(doorX+s*.25,front-.21,.4,.05,.08,2.95,'sign',0xe0e2cf);visual(doorX,front-.22,.16,.05,.6,2.68,'sign',0xb65d51);}
   if(b.style==='corner-shop'){add(roomCenter,-b.d*.02,Math.min(4,main-2),.65,.95,0,'counter',0x826345);visual(doorX,front-.22,doorWidth+.8,.08,.48,2.76,'shop-sign',0x62796e);}

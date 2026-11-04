@@ -1,0 +1,60 @@
+{
+  "revision": "0.14.0",
+  "assets": [
+    {
+      "id": "character-lod-v014",
+      "sourcePath": "assets/source/survivor-v014-lod.glb",
+      "path": "assets/art/3ec8afc30a059032527dcaeb1c763fa250b9c3d4e23c46e55d97c792364c48ff.glb",
+      "mime": "model/gltf-binary",
+      "kind": "model",
+      "sha256": "3ec8afc30a059032527dcaeb1c763fa250b9c3d4e23c46e55d97c792364c48ff",
+      "size": 2907516
+    }
+  ],
+  "models": {
+    "survivor_lod": {
+      "assetId": "character-lod-v014",
+      "node": "survivor",
+      "rigNode": "SurvivorRig",
+      "weaponSocket": "weapon_socket",
+      "rightHandBone": "hand_r",
+      "bounds": {
+        "min": [
+          -0.28099,
+          -0.0,
+          -0.15649
+        ],
+        "max": [
+          0.40076,
+          1.7824,
+          0.76333
+        ],
+        "width": 0.68175,
+        "height": 1.7824,
+        "length": 0.91983
+      },
+      "animations": [
+        "idle",
+        "aim",
+        "walk",
+        "run",
+        "crouch_idle",
+        "crouch_walk",
+        "prone_idle",
+        "prone_crawl",
+        "jump",
+        "throw",
+        "reload",
+        "walk_left",
+        "walk_right",
+        "walk_backward",
+        "run_left",
+        "run_right",
+        "run_backward",
+        "crouch_walk_left",
+        "crouch_walk_right",
+        "crouch_walk_backward"
+      ]
+    }
+  }
+}

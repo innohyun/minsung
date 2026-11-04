@@ -1,0 +1,1043 @@
+{
+  "revision": "0.14.0",
+  "assets": [
+    {
+      "id": "trees-v014-oak",
+      "path": "assets/art/717861fdc997044672910d5632e49a73047e4c5e6299f737f2bebccc72a7247c.glb",
+      "sourcePath": "assets/source/trees-v014-oak.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "717861fdc997044672910d5632e49a73047e4c5e6299f737f2bebccc72a7247c",
+      "size": 5338064,
+      "kind": "model"
+    },
+    {
+      "id": "trees-v014-birch",
+      "path": "assets/art/3e6e7fbd6ebe357ec6622200bfcc373f47dd3e47a165e700a8b601fab23c8a5d.glb",
+      "sourcePath": "assets/source/trees-v014-birch.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "3e6e7fbd6ebe357ec6622200bfcc373f47dd3e47a165e700a8b601fab23c8a5d",
+      "size": 3181132,
+      "kind": "model"
+    },
+    {
+      "id": "trees-v014-pine",
+      "path": "assets/art/4cdfb7e2548890b3cdce7e9cb801d8303373d46e8c73f843986beffbff185a32.glb",
+      "sourcePath": "assets/source/trees-v014-pine.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "4cdfb7e2548890b3cdce7e9cb801d8303373d46e8c73f843986beffbff185a32",
+      "size": 4883544,
+      "kind": "model"
+    },
+    {
+      "id": "trees-v014-maple",
+      "path": "assets/art/fa20c35b04106673f70fcc3c77921cb84d14ed7fcefa161f640fd2bc051b53b8.glb",
+      "sourcePath": "assets/source/trees-v014-maple.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "fa20c35b04106673f70fcc3c77921cb84d14ed7fcefa161f640fd2bc051b53b8",
+      "size": 5315216,
+      "kind": "model"
+    },
+    {
+      "id": "trees-v014-metasequoia",
+      "path": "assets/art/4673675c1cf3138d3ed0e94f308b5a07b9c3f4d191885b23cec69e6a411deb7d.glb",
+      "sourcePath": "assets/source/trees-v014-metasequoia.glb",
+      "mime": "model/gltf-binary",
+      "sha256": "4673675c1cf3138d3ed0e94f308b5a07b9c3f4d191885b23cec69e6a411deb7d",
+      "size": 5591704,
+      "kind": "model"
+    },
+    {
+      "id": "trees-v014-leaf-atlas-basecolor",
+      "path": "assets/art/49ec48fd3ea4943952114ed089d1bae25ddeb06edc84ea4df95a1e03d6d8bb27.webp",
+      "sourcePath": "assets/source/trees-v014-leaf-atlas-basecolor.webp",
+      "mime": "image/webp",
+      "sha256": "49ec48fd3ea4943952114ed089d1bae25ddeb06edc84ea4df95a1e03d6d8bb27",
+      "size": 556816,
+      "kind": "texture"
+    },
+    {
+      "id": "trees-v014-birch-basecolor",
+      "path": "assets/art/bdf5bbff0ad42b700185902b4a89512126d78367d3d09cf0efeac46ad131ec98.webp",
+      "sourcePath": "assets/source/trees-v014-birch-basecolor.webp",
+      "mime": "image/webp",
+      "sha256": "bdf5bbff0ad42b700185902b4a89512126d78367d3d09cf0efeac46ad131ec98",
+      "size": 64278,
+      "kind": "texture"
+    },
+    {
+      "id": "trees-v014-birch-normal",
+      "path": "assets/art/09697fb9197d3002331eb9704ee4c3d5030709516bc6a5ab478613dd4773a44a.webp",
+      "sourcePath": "assets/source/trees-v014-birch-normal.webp",
+      "mime": "image/webp",
+      "sha256": "09697fb9197d3002331eb9704ee4c3d5030709516bc6a5ab478613dd4773a44a",
+      "size": 26926,
+      "kind": "texture"
+    },
+    {
+      "id": "trees-v014-birch-orm",
+      "path": "assets/art/14ba67aad56449eb12c7b678be57537ce3fbd476bec402f7ba7220c75a065ab1.webp",
+      "sourcePath": "assets/source/trees-v014-birch-orm.webp",
+      "mime": "image/webp",
+      "sha256": "14ba67aad56449eb12c7b678be57537ce3fbd476bec402f7ba7220c75a065ab1",
+      "size": 49986,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_oak_0-impostor-v014",
+      "path": "assets/art/e14ffda5347ce5732282ba83f7b7061554f1cf382099d62e09cb6492696ae9b8.webp",
+      "sourcePath": "assets/source/trees-v014-tree_oak_0-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "e14ffda5347ce5732282ba83f7b7061554f1cf382099d62e09cb6492696ae9b8",
+      "size": 52496,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_oak_1-impostor-v014",
+      "path": "assets/art/40e63a9fa4d683f55c84a696acf6494115cac85df75adcc52c7df2d9bef68930.webp",
+      "sourcePath": "assets/source/trees-v014-tree_oak_1-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "40e63a9fa4d683f55c84a696acf6494115cac85df75adcc52c7df2d9bef68930",
+      "size": 52470,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_oak_2-impostor-v014",
+      "path": "assets/art/2ea9c3b521d0859acd8d17d0e7a32da3b5acd85adf2c66894283a8dcdd346202.webp",
+      "sourcePath": "assets/source/trees-v014-tree_oak_2-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "2ea9c3b521d0859acd8d17d0e7a32da3b5acd85adf2c66894283a8dcdd346202",
+      "size": 47122,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_birch_0-impostor-v014",
+      "path": "assets/art/979b04384c6c530d631bae5b818ab1b0a862477870bb2de92b7541e4e9df8159.webp",
+      "sourcePath": "assets/source/trees-v014-tree_birch_0-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "979b04384c6c530d631bae5b818ab1b0a862477870bb2de92b7541e4e9df8159",
+      "size": 70710,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_birch_1-impostor-v014",
+      "path": "assets/art/d78cdd3f10293645dfa92bfebb9ee4fa82a92e8a69dc62d5b26a6c0a19b30ab7.webp",
+      "sourcePath": "assets/source/trees-v014-tree_birch_1-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "d78cdd3f10293645dfa92bfebb9ee4fa82a92e8a69dc62d5b26a6c0a19b30ab7",
+      "size": 83774,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_birch_2-impostor-v014",
+      "path": "assets/art/66219374e586fd6c59fbf866bed0f0f1990392a152b4c22c54dc702b9c4d8f61.webp",
+      "sourcePath": "assets/source/trees-v014-tree_birch_2-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "66219374e586fd6c59fbf866bed0f0f1990392a152b4c22c54dc702b9c4d8f61",
+      "size": 76048,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_pine_0-impostor-v014",
+      "path": "assets/art/76a5facc41c3be0cdd32f2a4b8c662925d18f4d55c0675057be078f123f9f488.webp",
+      "sourcePath": "assets/source/trees-v014-tree_pine_0-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "76a5facc41c3be0cdd32f2a4b8c662925d18f4d55c0675057be078f123f9f488",
+      "size": 47484,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_pine_1-impostor-v014",
+      "path": "assets/art/9e683c64297d2953841360daa207b5a3f2fd6ee44849e6f628e8e8a56eb18e6f.webp",
+      "sourcePath": "assets/source/trees-v014-tree_pine_1-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "9e683c64297d2953841360daa207b5a3f2fd6ee44849e6f628e8e8a56eb18e6f",
+      "size": 48500,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_pine_2-impostor-v014",
+      "path": "assets/art/4122d22611473261ab67e3a9c045de24022d5c6513d8e66bb3b5b05251af69ac.webp",
+      "sourcePath": "assets/source/trees-v014-tree_pine_2-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "4122d22611473261ab67e3a9c045de24022d5c6513d8e66bb3b5b05251af69ac",
+      "size": 45458,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_maple_0-impostor-v014",
+      "path": "assets/art/323a16556f99267ecb7d74d0e7d6434df494e35701a091a896fffe52b957f67f.webp",
+      "sourcePath": "assets/source/trees-v014-tree_maple_0-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "323a16556f99267ecb7d74d0e7d6434df494e35701a091a896fffe52b957f67f",
+      "size": 47768,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_maple_1-impostor-v014",
+      "path": "assets/art/ad1b5c24041b34653ae06c89d3f9f4b48d7ef3d187e0d8387ff78a7e6e834110.webp",
+      "sourcePath": "assets/source/trees-v014-tree_maple_1-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "ad1b5c24041b34653ae06c89d3f9f4b48d7ef3d187e0d8387ff78a7e6e834110",
+      "size": 46744,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_maple_2-impostor-v014",
+      "path": "assets/art/de7a47ccee99ab45e5d28c06847647acce82aa1af78f67e14ee2f21735952ce1.webp",
+      "sourcePath": "assets/source/trees-v014-tree_maple_2-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "de7a47ccee99ab45e5d28c06847647acce82aa1af78f67e14ee2f21735952ce1",
+      "size": 47836,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_metasequoia_0-impostor-v014",
+      "path": "assets/art/dfbfaf74d49ceb065f94fd4646ce7d6aab8fa6f27d9a6df170d964e2151d041b.webp",
+      "sourcePath": "assets/source/trees-v014-tree_metasequoia_0-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "dfbfaf74d49ceb065f94fd4646ce7d6aab8fa6f27d9a6df170d964e2151d041b",
+      "size": 73250,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_metasequoia_1-impostor-v014",
+      "path": "assets/art/3dd349a0a5819e9254c9636a3a557b0a3e0cce5dfe9c56902d8978ea164d88f3.webp",
+      "sourcePath": "assets/source/trees-v014-tree_metasequoia_1-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "3dd349a0a5819e9254c9636a3a557b0a3e0cce5dfe9c56902d8978ea164d88f3",
+      "size": 69820,
+      "kind": "texture"
+    },
+    {
+      "id": "tree_metasequoia_2-impostor-v014",
+      "path": "assets/art/d450672833f36cb9332dc3d4daad22fcddf8bb1fedf23794746f1672d1bad0e3.webp",
+      "sourcePath": "assets/source/trees-v014-tree_metasequoia_2-impostor.webp",
+      "mime": "image/webp",
+      "sha256": "d450672833f36cb9332dc3d4daad22fcddf8bb1fedf23794746f1672d1bad0e3",
+      "size": 75274,
+      "kind": "texture"
+    }
+  ],
+  "models": {
+    "tree_oak_0": {
+      "assetId": "trees-v014-oak",
+      "node": "tree_oak_0",
+      "bounds": {
+        "min": [
+          -6.4498,
+          -0.1,
+          -5.1635
+        ],
+        "max": [
+          7.6495,
+          12.8899,
+          8.2988
+        ],
+        "width": 14.0993,
+        "height": 12.9899,
+        "length": 13.4623
+      },
+      "trunkDiameter": 0.7,
+      "species": "oak",
+      "variant": 0,
+      "triangles": 14500
+    },
+    "tree_oak_1": {
+      "assetId": "trees-v014-oak",
+      "node": "tree_oak_1",
+      "bounds": {
+        "min": [
+          -7.923,
+          -0.1,
+          -8.2649
+        ],
+        "max": [
+          7.6097,
+          11.7868,
+          8.0337
+        ],
+        "width": 15.5326,
+        "height": 11.8868,
+        "length": 16.2986
+      },
+      "trunkDiameter": 0.77,
+      "species": "oak",
+      "variant": 1,
+      "triangles": 14500
+    },
+    "tree_oak_2": {
+      "assetId": "trees-v014-oak",
+      "node": "tree_oak_2",
+      "bounds": {
+        "min": [
+          -4.4711,
+          -0.1,
+          -7.5653
+        ],
+        "max": [
+          6.0103,
+          15.5775,
+          5.2159
+        ],
+        "width": 10.4814,
+        "height": 15.6775,
+        "length": 12.7812
+      },
+      "trunkDiameter": 0.64,
+      "species": "oak",
+      "variant": 2,
+      "triangles": 14498
+    },
+    "tree_birch_0": {
+      "assetId": "trees-v014-birch",
+      "node": "tree_birch_0",
+      "bounds": {
+        "min": [
+          -5.0634,
+          -0.1,
+          -3.4173
+        ],
+        "max": [
+          5.0914,
+          19.0007,
+          4.0201
+        ],
+        "width": 10.1549,
+        "height": 19.1007,
+        "length": 7.4373
+      },
+      "trunkDiameter": 0.38,
+      "species": "birch",
+      "variant": 0,
+      "triangles": 11998
+    },
+    "tree_birch_1": {
+      "assetId": "trees-v014-birch",
+      "node": "tree_birch_1",
+      "bounds": {
+        "min": [
+          -5.4391,
+          -0.1,
+          -4.1087
+        ],
+        "max": [
+          3.6782,
+          16.5505,
+          4.383
+        ],
+        "width": 9.1174,
+        "height": 16.6505,
+        "length": 8.4917
+      },
+      "trunkDiameter": 0.42,
+      "species": "birch",
+      "variant": 1,
+      "triangles": 12000
+    },
+    "tree_birch_2": {
+      "assetId": "trees-v014-birch",
+      "node": "tree_birch_2",
+      "bounds": {
+        "min": [
+          -3.6953,
+          -0.1,
+          -4.5112
+        ],
+        "max": [
+          4.8509,
+          21.3282,
+          3.5155
+        ],
+        "width": 8.5461,
+        "height": 21.4282,
+        "length": 8.0267
+      },
+      "trunkDiameter": 0.35,
+      "species": "birch",
+      "variant": 2,
+      "triangles": 11998
+    },
+    "tree_pine_0": {
+      "assetId": "trees-v014-pine",
+      "node": "tree_pine_0",
+      "bounds": {
+        "min": [
+          -5.3692,
+          -0.1,
+          -5.5034
+        ],
+        "max": [
+          6.0094,
+          23.8915,
+          5.7401
+        ],
+        "width": 11.3786,
+        "height": 23.9915,
+        "length": 11.2435
+      },
+      "trunkDiameter": 0.52,
+      "species": "pine",
+      "variant": 0,
+      "triangles": 14498
+    },
+    "tree_pine_1": {
+      "assetId": "trees-v014-pine",
+      "node": "tree_pine_1",
+      "bounds": {
+        "min": [
+          -7.6492,
+          -0.1,
+          -6.2032
+        ],
+        "max": [
+          5.1087,
+          19.6883,
+          6.869
+        ],
+        "width": 12.7579,
+        "height": 19.7883,
+        "length": 13.0722
+      },
+      "trunkDiameter": 0.59,
+      "species": "pine",
+      "variant": 1,
+      "triangles": 14498
+    },
+    "tree_pine_2": {
+      "assetId": "trees-v014-pine",
+      "node": "tree_pine_2",
+      "bounds": {
+        "min": [
+          -6.2793,
+          -0.1,
+          -5.3957
+        ],
+        "max": [
+          5.7096,
+          25.9781,
+          4.3791
+        ],
+        "width": 11.989,
+        "height": 26.0781,
+        "length": 9.7747
+      },
+      "trunkDiameter": 0.48,
+      "species": "pine",
+      "variant": 2,
+      "triangles": 14498
+    },
+    "tree_maple_0": {
+      "assetId": "trees-v014-maple",
+      "node": "tree_maple_0",
+      "bounds": {
+        "min": [
+          -5.2992,
+          -0.1,
+          -6.6971
+        ],
+        "max": [
+          6.0876,
+          13.9338,
+          6.4229
+        ],
+        "width": 11.3868,
+        "height": 14.0338,
+        "length": 13.1199
+      },
+      "trunkDiameter": 0.6,
+      "species": "maple",
+      "variant": 0,
+      "triangles": 14500
+    },
+    "tree_maple_1": {
+      "assetId": "trees-v014-maple",
+      "node": "tree_maple_1",
+      "bounds": {
+        "min": [
+          -6.2685,
+          -0.1,
+          -5.9326
+        ],
+        "max": [
+          4.7473,
+          12.2608,
+          7.8917
+        ],
+        "width": 11.0158,
+        "height": 12.3608,
+        "length": 13.8243
+      },
+      "trunkDiameter": 0.68,
+      "species": "maple",
+      "variant": 1,
+      "triangles": 14498
+    },
+    "tree_maple_2": {
+      "assetId": "trees-v014-maple",
+      "node": "tree_maple_2",
+      "bounds": {
+        "min": [
+          -3.8564,
+          -0.1,
+          -6.5674
+        ],
+        "max": [
+          6.3344,
+          15.012,
+          4.5327
+        ],
+        "width": 10.1908,
+        "height": 15.112,
+        "length": 11.1001
+      },
+      "trunkDiameter": 0.55,
+      "species": "maple",
+      "variant": 2,
+      "triangles": 14500
+    },
+    "tree_metasequoia_0": {
+      "assetId": "trees-v014-metasequoia",
+      "node": "tree_metasequoia_0",
+      "bounds": {
+        "min": [
+          -8.3956,
+          -0.1,
+          -6.5286
+        ],
+        "max": [
+          7.0904,
+          38.3983,
+          8.473
+        ],
+        "width": 15.486,
+        "height": 38.4983,
+        "length": 15.0016
+      },
+      "trunkDiameter": 1.65,
+      "species": "metasequoia",
+      "variant": 0,
+      "triangles": 17500
+    },
+    "tree_metasequoia_1": {
+      "assetId": "trees-v014-metasequoia",
+      "node": "tree_metasequoia_1",
+      "bounds": {
+        "min": [
+          -10.0977,
+          -0.1,
+          -8.792
+        ],
+        "max": [
+          8.5695,
+          35.0773,
+          7.6176
+        ],
+        "width": 18.6672,
+        "height": 35.1773,
+        "length": 16.4096
+      },
+      "trunkDiameter": 1.8,
+      "species": "metasequoia",
+      "variant": 1,
+      "triangles": 17498
+    },
+    "tree_metasequoia_2": {
+      "assetId": "trees-v014-metasequoia",
+      "node": "tree_metasequoia_2",
+      "bounds": {
+        "min": [
+          -7.0631,
+          -0.1,
+          -7.9346
+        ],
+        "max": [
+          6.5581,
+          40.1713,
+          6.2722
+        ],
+        "width": 13.6213,
+        "height": 40.2713,
+        "length": 14.2067
+      },
+      "trunkDiameter": 1.5,
+      "species": "metasequoia",
+      "variant": 2,
+      "triangles": 17500
+    }
+  },
+  "impostors": {
+    "tree_oak_0": {
+      "assetId": "tree_oak_0-impostor-v014",
+      "planeWidth": 15.1567,
+      "planeHeight": 13.9641,
+      "center": [
+        0.5999,
+        6.3949,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.042046
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_oak_1": {
+      "assetId": "tree_oak_1-impostor-v014",
+      "planeWidth": 16.6975,
+      "planeHeight": 12.7783,
+      "center": [
+        -0.1566,
+        5.8434,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.042711
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_oak_2": {
+      "assetId": "tree_oak_2-impostor-v014",
+      "planeWidth": 11.2675,
+      "planeHeight": 16.8533,
+      "center": [
+        0.7696,
+        7.7387,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.040819
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_birch_0": {
+      "assetId": "tree_birch_0-impostor-v014",
+      "planeWidth": 10.9165,
+      "planeHeight": 20.5333,
+      "center": [
+        0.014,
+        9.4503,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.039754
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_birch_1": {
+      "assetId": "tree_birch_1-impostor-v014",
+      "planeWidth": 9.8012,
+      "planeHeight": 17.8993,
+      "center": [
+        -0.8804,
+        8.2252,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.040472
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_birch_2": {
+      "assetId": "tree_birch_2-impostor-v014",
+      "planeWidth": 9.1871,
+      "planeHeight": 23.0353,
+      "center": [
+        0.5778,
+        10.6141,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.039226
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_pine_0": {
+      "assetId": "tree_pine_0-impostor-v014",
+      "planeWidth": 12.232,
+      "planeHeight": 25.7909,
+      "center": [
+        0.3201,
+        11.8958,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.03876
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_pine_1": {
+      "assetId": "tree_pine_1-impostor-v014",
+      "planeWidth": 13.7147,
+      "planeHeight": 21.2724,
+      "center": [
+        -1.2703,
+        9.7941,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.039585
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_pine_2": {
+      "assetId": "tree_pine_2-impostor-v014",
+      "planeWidth": 12.8882,
+      "planeHeight": 28.034,
+      "center": [
+        -0.2849,
+        12.9391,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.03845
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_maple_0": {
+      "assetId": "tree_maple_0-impostor-v014",
+      "planeWidth": 12.2408,
+      "planeHeight": 15.0863,
+      "center": [
+        0.3942,
+        6.9169,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.041511
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_maple_1": {
+      "assetId": "tree_maple_1-impostor-v014",
+      "planeWidth": 11.842,
+      "planeHeight": 13.2879,
+      "center": [
+        -0.7606,
+        6.0804,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.042409
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_maple_2": {
+      "assetId": "tree_maple_2-impostor-v014",
+      "planeWidth": 10.9551,
+      "planeHeight": 16.2454,
+      "center": [
+        1.239,
+        7.456,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.041039
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_metasequoia_0": {
+      "assetId": "tree_metasequoia_0-impostor-v014",
+      "planeWidth": 16.6474,
+      "planeHeight": 41.3857,
+      "center": [
+        -0.6526,
+        19.1492,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.0373
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_metasequoia_1": {
+      "assetId": "tree_metasequoia_1-impostor-v014",
+      "planeWidth": 20.0672,
+      "planeHeight": 37.8156,
+      "center": [
+        -0.7641,
+        17.4887,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.037528
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    },
+    "tree_metasequoia_2": {
+      "assetId": "tree_metasequoia_2-impostor-v014",
+      "planeWidth": 14.6429,
+      "planeHeight": 43.2916,
+      "center": [
+        -0.2525,
+        20.0357,
+        0
+      ],
+      "anchor": [
+        0.5,
+        0.037193
+      ],
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true,
+      "resolution": [
+        256,
+        512
+      ]
+    }
+  },
+  "materials": {
+    "tree_oak_0": {
+      "baseColor": "tree_oak_0-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_oak_1": {
+      "baseColor": "tree_oak_1-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_oak_2": {
+      "baseColor": "tree_oak_2-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_birch_0": {
+      "baseColor": "tree_birch_0-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_birch_1": {
+      "baseColor": "tree_birch_1-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_birch_2": {
+      "baseColor": "tree_birch_2-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_pine_0": {
+      "baseColor": "tree_pine_0-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_pine_1": {
+      "baseColor": "tree_pine_1-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_pine_2": {
+      "baseColor": "tree_pine_2-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_maple_0": {
+      "baseColor": "tree_maple_0-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_maple_1": {
+      "baseColor": "tree_maple_1-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_maple_2": {
+      "baseColor": "tree_maple_2-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_metasequoia_0": {
+      "baseColor": "tree_metasequoia_0-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_metasequoia_1": {
+      "baseColor": "tree_metasequoia_1-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "tree_metasequoia_2": {
+      "baseColor": "tree_metasequoia_2-impostor-v014",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.4,
+      "doubleSided": true,
+      "depthWrite": true
+    },
+    "treesV014Foliage": {
+      "baseColor": "trees-v014-leaf-atlas-basecolor",
+      "alphaMode": "MASK",
+      "alphaCutoff": 0.45,
+      "doubleSided": true,
+      "depthWrite": true,
+      "roughness": 0.88
+    },
+    "treesV014BirchBark": {
+      "baseColor": "trees-v014-birch-basecolor",
+      "normal": "trees-v014-birch-normal",
+      "orm": "trees-v014-birch-orm"
+    }
+  },
+  "species": {
+    "oak": [
+      "tree_oak_0",
+      "tree_oak_1",
+      "tree_oak_2"
+    ],
+    "birch": [
+      "tree_birch_0",
+      "tree_birch_1",
+      "tree_birch_2"
+    ],
+    "pine": [
+      "tree_pine_0",
+      "tree_pine_1",
+      "tree_pine_2"
+    ],
+    "maple": [
+      "tree_maple_0",
+      "tree_maple_1",
+      "tree_maple_2"
+    ],
+    "metasequoia": [
+      "tree_metasequoia_0",
+      "tree_metasequoia_1",
+      "tree_metasequoia_2"
+    ]
+  },
+  "sharedImages": [
+    "surface-atlas-basecolor",
+    "surface-atlas-normal",
+    "surface-atlas-orm"
+  ],
+  "coordinateSystem": {
+    "units": "meters",
+    "up": "+Y",
+    "forward": "+Z",
+    "origin": "trunk at ground, bottom exactly-.1m; NO roots or buttresses"
+  }
+}

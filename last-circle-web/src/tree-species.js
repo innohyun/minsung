@@ -1,0 +1,2 @@
+export const TREE_SPECIES={oak:{name:'참나무',trunk:.70},birch:{name:'자작나무',trunk:.38},pine:{name:'소나무',trunk:.52},maple:{name:'단풍나무',trunk:.60},metasequoia:{name:'메타세쿼이아',trunk:1.65}};
+export function treeDesign(seed,giant=false){const species=giant?'metasequoia':['oak','birch','pine','maple'][(Math.imul(seed+17,7321)>>>0)%4],variant=(Math.imul(seed+73,1597)>>>0)%3,thickness=giant?1:.85+((Math.imul(seed,571)>>>0)%101)/100*.3;return{species,variant,trunkWidth:TREE_SPECIES[species].trunk*thickness,modelId:'tree_'+species+'_'+variant};}

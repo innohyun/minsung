@@ -1,0 +1,648 @@
+{
+  "revision": "0.14.0",
+  "checks": {
+    "actualGLTFLoader": true,
+    "allAssetHashes": true,
+    "rootIdentity": true,
+    "noExposedRoots": true,
+    "groundTrunkDiameter": true,
+    "leafAlphaMask": true,
+    "finiteGeometry": true,
+    "boundsMatch": true,
+    "all15Distinct": true
+  },
+  "banks": {
+    "oak": {
+      "size": 5338064,
+      "sha256": "717861fdc997044672910d5632e49a73047e4c5e6299f737f2bebccc72a7247c",
+      "roots": [
+        "tree_oak_0",
+        "tree_oak_1",
+        "tree_oak_2"
+      ],
+      "triangles": 43498,
+      "materials": [
+        {
+          "name": "LC • weathered surface atlas",
+          "alphaMode": "OPAQUE"
+        },
+        {
+          "name": "Trees014 • foliage leaf cards",
+          "alphaMode": "MASK",
+          "alphaCutoff": 0.45
+        }
+      ],
+      "embeddedImages": [
+        "surface-atlas-normal",
+        "surface-atlas-basecolor",
+        "surface-atlas-orm",
+        "trees-v014-leaf-atlas-basecolor"
+      ]
+    },
+    "birch": {
+      "size": 3181132,
+      "sha256": "3e6e7fbd6ebe357ec6622200bfcc373f47dd3e47a165e700a8b601fab23c8a5d",
+      "roots": [
+        "tree_birch_0",
+        "tree_birch_1",
+        "tree_birch_2"
+      ],
+      "triangles": 35996,
+      "materials": [
+        {
+          "name": "Trees014 • birch papery bark",
+          "alphaMode": "OPAQUE"
+        },
+        {
+          "name": "Trees014 • foliage leaf cards",
+          "alphaMode": "MASK",
+          "alphaCutoff": 0.45
+        }
+      ],
+      "embeddedImages": [
+        "trees-v014-birch-normal",
+        "trees-v014-birch-basecolor",
+        "trees-v014-birch-orm",
+        "trees-v014-leaf-atlas-basecolor"
+      ]
+    },
+    "pine": {
+      "size": 4883544,
+      "sha256": "4cdfb7e2548890b3cdce7e9cb801d8303373d46e8c73f843986beffbff185a32",
+      "roots": [
+        "tree_pine_0",
+        "tree_pine_1",
+        "tree_pine_2"
+      ],
+      "triangles": 43494,
+      "materials": [
+        {
+          "name": "LC • weathered surface atlas",
+          "alphaMode": "OPAQUE"
+        },
+        {
+          "name": "Trees014 • foliage leaf cards",
+          "alphaMode": "MASK",
+          "alphaCutoff": 0.45
+        }
+      ],
+      "embeddedImages": [
+        "surface-atlas-normal",
+        "surface-atlas-basecolor",
+        "surface-atlas-orm",
+        "trees-v014-leaf-atlas-basecolor"
+      ]
+    },
+    "maple": {
+      "size": 5315216,
+      "sha256": "fa20c35b04106673f70fcc3c77921cb84d14ed7fcefa161f640fd2bc051b53b8",
+      "roots": [
+        "tree_maple_0",
+        "tree_maple_1",
+        "tree_maple_2"
+      ],
+      "triangles": 43498,
+      "materials": [
+        {
+          "name": "LC • weathered surface atlas",
+          "alphaMode": "OPAQUE"
+        },
+        {
+          "name": "Trees014 • foliage leaf cards",
+          "alphaMode": "MASK",
+          "alphaCutoff": 0.45
+        }
+      ],
+      "embeddedImages": [
+        "surface-atlas-normal",
+        "surface-atlas-basecolor",
+        "surface-atlas-orm",
+        "trees-v014-leaf-atlas-basecolor"
+      ]
+    },
+    "metasequoia": {
+      "size": 5591704,
+      "sha256": "4673675c1cf3138d3ed0e94f308b5a07b9c3f4d191885b23cec69e6a411deb7d",
+      "roots": [
+        "tree_metasequoia_0",
+        "tree_metasequoia_1",
+        "tree_metasequoia_2"
+      ],
+      "triangles": 52498,
+      "materials": [
+        {
+          "name": "LC • weathered surface atlas",
+          "alphaMode": "OPAQUE"
+        },
+        {
+          "name": "Trees014 • foliage leaf cards",
+          "alphaMode": "MASK",
+          "alphaCutoff": 0.45
+        }
+      ],
+      "embeddedImages": [
+        "surface-atlas-normal",
+        "surface-atlas-basecolor",
+        "surface-atlas-orm",
+        "trees-v014-leaf-atlas-basecolor"
+      ]
+    }
+  },
+  "models": {
+    "tree_oak_0": {
+      "triangles": 14500,
+      "barkTriangles": 3362,
+      "leafTriangles": 11138,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -6.449797630310059,
+          -0.10000000149011612,
+          -5.163454532623291
+        ],
+        "max": [
+          7.649499893188477,
+          12.889881134033203,
+          8.298842430114746
+        ],
+        "size": [
+          14.099297523498535,
+          12.98988113552332,
+          13.462296962738037
+        ]
+      },
+      "trunkDiameter": 0.6999999960832742,
+      "groundBarkDiameter": 0.7026733706678364,
+      "declaredTrunkDiameter": 0.7,
+      "groundVertexCount": 30,
+      "geometryHash": "337eb4acf3ab1a69edbcdaaa05744fe8f5a1b8225137222a3f56efdff594d2af",
+      "primaryBranches": 4,
+      "lean": [
+        0.6,
+        0.2
+      ]
+    },
+    "tree_oak_1": {
+      "triangles": 14500,
+      "barkTriangles": 3960,
+      "leafTriangles": 10540,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -7.922954082489014,
+          -0.10000000149011612,
+          -8.264938354492188
+        ],
+        "max": [
+          7.609663486480713,
+          11.78676700592041,
+          8.033710479736328
+        ],
+        "size": [
+          15.532617568969727,
+          11.886767007410526,
+          16.298648834228516
+        ]
+      },
+      "trunkDiameter": 0.7699999966353916,
+      "groundBarkDiameter": 0.7729272700545978,
+      "declaredTrunkDiameter": 0.77,
+      "groundVertexCount": 30,
+      "geometryHash": "028122a950300eb5e3416e1f14c49b6508398e46139442c83e7ce7ae07162ef1",
+      "primaryBranches": 5,
+      "lean": [
+        -1.25,
+        0.7
+      ]
+    },
+    "tree_oak_2": {
+      "triangles": 14498,
+      "barkTriangles": 2546,
+      "leafTriangles": 11952,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -4.47105598449707,
+          -0.10000000149011612,
+          -7.5652995109558105
+        ],
+        "max": [
+          6.01032018661499,
+          15.577455520629883,
+          5.215858459472656
+        ],
+        "size": [
+          10.48137617111206,
+          15.677455522119999,
+          12.781157970428467
+        ]
+      },
+      "trunkDiameter": 0.6400000076183213,
+      "groundBarkDiameter": 0.6424156821285151,
+      "declaredTrunkDiameter": 0.64,
+      "groundVertexCount": 30,
+      "geometryHash": "0205ac65ac13876ed9144d503e31beeffb0eeeb0a7f5ccbbe56155e5d64fccd4",
+      "primaryBranches": 3,
+      "lean": [
+        1.5,
+        -0.5
+      ]
+    },
+    "tree_birch_0": {
+      "triangles": 11998,
+      "barkTriangles": 5172,
+      "leafTriangles": 6826,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -5.063432693481445,
+          -0.10000000149011612,
+          -3.4172523021698
+        ],
+        "max": [
+          5.091423988342285,
+          19.00068473815918,
+          4.020076751708984
+        ],
+        "size": [
+          10.15485668182373,
+          19.100684739649296,
+          7.437329053878784
+        ]
+      },
+      "trunkDiameter": 0.3800000023026786,
+      "groundBarkDiameter": 0.3814723193678675,
+      "declaredTrunkDiameter": 0.38,
+      "groundVertexCount": 30,
+      "geometryHash": "2e8facd2223354283e0c188a9fd62c9d8b2de899c7820ba001e6230fef983dd8",
+      "primaryBranches": 12,
+      "lean": [
+        0.65,
+        0.3
+      ]
+    },
+    "tree_birch_1": {
+      "triangles": 12000,
+      "barkTriangles": 4412,
+      "leafTriangles": 7588,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -5.439121723175049,
+          -0.10000000149011612,
+          -4.108693599700928
+        ],
+        "max": [
+          3.6782386302948,
+          16.550453186035156,
+          4.383035182952881
+        ],
+        "size": [
+          9.117360353469849,
+          16.650453187525272,
+          8.491728782653809
+        ]
+      },
+      "trunkDiameter": 0.41999999859375464,
+      "groundBarkDiameter": 0.4216098385859427,
+      "declaredTrunkDiameter": 0.42,
+      "groundVertexCount": 30,
+      "geometryHash": "3fa69a283e3857712d7f5ea49771d1e6335754d79105e8131178a9af9cc7480c",
+      "primaryBranches": 10,
+      "lean": [
+        -1.3,
+        0.75
+      ]
+    },
+    "tree_birch_2": {
+      "triangles": 11998,
+      "barkTriangles": 5552,
+      "leafTriangles": 6446,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -3.695260763168335,
+          -0.10000000149011612,
+          -4.511203765869141
+        ],
+        "max": [
+          4.85087251663208,
+          21.328166961669922,
+          3.5154685974121094
+        ],
+        "size": [
+          8.546133279800415,
+          21.428166963160038,
+          8.02667236328125
+        ]
+      },
+      "trunkDiameter": 0.3499999980416371,
+      "groundBarkDiameter": 0.3513281252829877,
+      "declaredTrunkDiameter": 0.35,
+      "groundVertexCount": 30,
+      "geometryHash": "170e81488cf1ad894737a678a513b6a4ea295825f033e4b922f9d2ffb5a2cf9e",
+      "primaryBranches": 13,
+      "lean": [
+        1.6,
+        -0.6
+      ]
+    },
+    "tree_pine_0": {
+      "triangles": 14498,
+      "barkTriangles": 5922,
+      "leafTriangles": 8576,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -5.369203567504883,
+          -0.10000000149011612,
+          -5.503419876098633
+        ],
+        "max": [
+          6.009376525878906,
+          23.89153480529785,
+          5.740126132965088
+        ],
+        "size": [
+          11.378580093383789,
+          23.991534806787968,
+          11.24354600906372
+        ]
+      },
+      "trunkDiameter": 0.5200000026690704,
+      "groundBarkDiameter": 0.5220134280405908,
+      "declaredTrunkDiameter": 0.52,
+      "groundVertexCount": 30,
+      "geometryHash": "8fc712d9f9b92c7adeac866ad1a2b4ce518a4846c311d8d12e700537388c0d45",
+      "primaryBranches": 12,
+      "lean": [
+        0.65,
+        0.3
+      ]
+    },
+    "tree_pine_1": {
+      "triangles": 14498,
+      "barkTriangles": 5350,
+      "leafTriangles": 9148,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -7.649246692657471,
+          -0.10000000149011612,
+          -6.203202247619629
+        ],
+        "max": [
+          5.108694553375244,
+          19.688268661499023,
+          6.869023323059082
+        ],
+        "size": [
+          12.757941246032715,
+          19.78826866298914,
+          13.072225570678711
+        ]
+      },
+      "trunkDiameter": 0.5899999921888882,
+      "groundBarkDiameter": 0.5922515140141416,
+      "declaredTrunkDiameter": 0.59,
+      "groundVertexCount": 30,
+      "geometryHash": "cd3c4a14f896b44769a70834f408b6f8fdb403ca2d6f4cb2ef6512e414f4b501",
+      "primaryBranches": 11,
+      "lean": [
+        -1.7,
+        0.8
+      ]
+    },
+    "tree_pine_2": {
+      "triangles": 14498,
+      "barkTriangles": 6206,
+      "leafTriangles": 8292,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -6.279346942901611,
+          -0.10000000149011612,
+          -5.395654201507568
+        ],
+        "max": [
+          5.7096052169799805,
+          25.978120803833008,
+          4.379073143005371
+        ],
+        "size": [
+          11.988952159881592,
+          26.078120805323124,
+          9.77472734451294
+        ]
+      },
+      "trunkDiameter": 0.47999999648418146,
+      "groundBarkDiameter": 0.48183860965360475,
+      "declaredTrunkDiameter": 0.48,
+      "groundVertexCount": 30,
+      "geometryHash": "566eddc697e93ba045780f1e90c220e2d048d14ed6d7b4494e701c30ccc1660d",
+      "primaryBranches": 13,
+      "lean": [
+        1.1,
+        -0.6
+      ]
+    },
+    "tree_maple_0": {
+      "triangles": 14500,
+      "barkTriangles": 3562,
+      "leafTriangles": 10938,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -5.29921817779541,
+          -0.10000000149011612,
+          -6.697062015533447
+        ],
+        "max": [
+          6.087601661682129,
+          13.933841705322266,
+          6.422879695892334
+        ],
+        "size": [
+          11.386819839477539,
+          14.033841706812382,
+          13.119941711425781
+        ]
+      },
+      "trunkDiameter": 0.6000000338897962,
+      "groundBarkDiameter": 0.6023189684947732,
+      "declaredTrunkDiameter": 0.6,
+      "groundVertexCount": 30,
+      "geometryHash": "7e7816824b977a0fc2544d6b03b84548600961d5233cedec0f07add581fed61b",
+      "primaryBranches": 4,
+      "lean": [
+        0.45,
+        0.3
+      ]
+    },
+    "tree_maple_1": {
+      "triangles": 14498,
+      "barkTriangles": 4204,
+      "leafTriangles": 10294,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -6.268495559692383,
+          -0.10000000149011612,
+          -5.932602405548096
+        ],
+        "max": [
+          4.747300148010254,
+          12.260808944702148,
+          7.8916916847229
+        ],
+        "size": [
+          11.015795707702637,
+          12.360808946192265,
+          13.824294090270996
+        ]
+      },
+      "trunkDiameter": 0.6800000105864831,
+      "groundBarkDiameter": 0.6826193904713163,
+      "declaredTrunkDiameter": 0.68,
+      "groundVertexCount": 30,
+      "geometryHash": "203187c59a2b408ecc9dab100be6433c2523f299433ea6e63d51c339c2b4ba48",
+      "primaryBranches": 5,
+      "lean": [
+        -1,
+        0.7
+      ]
+    },
+    "tree_maple_2": {
+      "triangles": 14500,
+      "barkTriangles": 2494,
+      "leafTriangles": 12006,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -3.856381893157959,
+          -0.10000000149011612,
+          -6.567351818084717
+        ],
+        "max": [
+          6.334392547607422,
+          15.012022972106934,
+          4.532727241516113
+        ],
+        "size": [
+          10.19077444076538,
+          15.11202297359705,
+          11.10007905960083
+        ]
+      },
+      "trunkDiameter": 0.5500000294926631,
+      "groundBarkDiameter": 0.5521192550667962,
+      "declaredTrunkDiameter": 0.55,
+      "groundVertexCount": 30,
+      "geometryHash": "943ef968d23af06ca6f5342f505491a26a5db723429be59243d87565f760ae4e",
+      "primaryBranches": 3,
+      "lean": [
+        1.35,
+        -0.45
+      ]
+    },
+    "tree_metasequoia_0": {
+      "triangles": 17500,
+      "barkTriangles": 6884,
+      "leafTriangles": 10616,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -8.395597457885742,
+          -0.10000000149011612,
+          -6.528584003448486
+        ],
+        "max": [
+          7.090447902679443,
+          38.39833068847656,
+          8.472996711730957
+        ],
+        "size": [
+          15.486045360565186,
+          38.49833068996668,
+          15.001580715179443
+        ]
+      },
+      "trunkDiameter": 1.6500000246190343,
+      "groundBarkDiameter": 1.6563753811555648,
+      "declaredTrunkDiameter": 1.65,
+      "groundVertexCount": 38,
+      "geometryHash": "ab5175d47af287be865b6adbe874fae5e2da3c7f3543e31798d5f8632fa2f13f",
+      "primaryBranches": 31,
+      "lean": [
+        0.65,
+        0.35
+      ]
+    },
+    "tree_metasequoia_1": {
+      "triangles": 17498,
+      "barkTriangles": 7382,
+      "leafTriangles": 10116,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -10.097687721252441,
+          -0.10000000149011612,
+          -8.792012214660645
+        ],
+        "max": [
+          8.569470405578613,
+          35.07732391357422,
+          7.617635250091553
+        ],
+        "size": [
+          18.667158126831055,
+          35.177323915064335,
+          16.409647464752197
+        ]
+      },
+      "trunkDiameter": 1.7999999585277906,
+      "groundBarkDiameter": 1.8068811644698397,
+      "declaredTrunkDiameter": 1.8,
+      "groundVertexCount": 38,
+      "geometryHash": "fde0241da9a02a29d64642c499b9d76a2f9c61053a5ea15f6049b76e06a4223c",
+      "primaryBranches": 34,
+      "lean": [
+        -0.8,
+        0.6
+      ]
+    },
+    "tree_metasequoia_2": {
+      "triangles": 17500,
+      "barkTriangles": 6252,
+      "leafTriangles": 11248,
+      "meshes": 2,
+      "bounds": {
+        "min": [
+          -7.063149452209473,
+          -0.10000000149011612,
+          -7.9345831871032715
+        ],
+        "max": [
+          6.5581488609313965,
+          40.17134475708008,
+          6.272151947021484
+        ],
+        "size": [
+          13.62129831314087,
+          40.271344758570194,
+          14.206735134124756
+        ]
+      },
+      "trunkDiameter": 1.500000055392235,
+      "groundBarkDiameter": 1.5057810954792221,
+      "declaredTrunkDiameter": 1.5,
+      "groundVertexCount": 38,
+      "geometryHash": "fdc9f8f354314e7e71e73bdbc262d90066f66f4c88122c5693246a43e541a76d",
+      "primaryBranches": 29,
+      "lean": [
+        1,
+        -0.45
+      ]
+    }
+  }
+}
